@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "../i18n";
 
 export interface NameRequest {
   title: string;
@@ -56,7 +57,7 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
         )}
         <div className="dialog-actions">
           <button type="button" onClick={onCancel}>
-            취소
+            {t("common.cancel")}
           </button>
           <button className="primary" type="submit" disabled={!ok}>
             {confirmLabel}

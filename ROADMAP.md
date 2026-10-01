@@ -71,6 +71,9 @@
 - [ ] i18n (영어), 접근성 (키보드로 노드 이동, 스크린리더 라벨)
   - [x] 접근성: ←→ 부모/자식, ↑↓ 옆 레인, Enter 메뉴, 선택한 커밋을 aria-live로 읽어 줌, 캔버스 포커스 가능
   - [ ] i18n (영어)
+    - [x] 기반: `src/i18n`(사전, `t()`, `<Rich>`), 언어 설정(시스템/한국어/English), 탑바·사이드바·검색·다이얼로그·설정·그래프 위 글자
+    - [ ] App 알림·Inspector·Composer·StashPanel
+    - [ ] 시트(Backport, Conflict, Diff, Rebase), Auth·Sync 다이얼로그, `rebasePlan`
 - [x] ESLint, Playwright e2e를 CI에 추가
   - [x] Playwright e2e: 데모 모드 대상 5개 흐름(커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기), CI `E2E` 잡
   - [x] ESLint: typescript-eslint 권장 + react-hooks(`rules-of-hooks`, `exhaustive-deps`) + effect 식 본문 금지. CI Web 잡에서 실행
@@ -109,5 +112,6 @@
 | 2026-10-01 | PR #20 squash merge(`1d0ac4e`). M5: 설정 화면(`settings.ts` 파싱 + vitest 3, `SettingsDialog`, `git::set_program` 전역 git 경로를 검증 후 적용, 예전 `otgit.animate` 키 이어받음)(테스트 57, e2e 11)                                                                    |
 | 2026-10-01 | PR #21 squash merge(`62759c0`). M5: 키보드로 커밋 이동(`graph/navigate.ts` `stepFrom` + vitest 2, 화면 밖이면 배율 유지하며 따라감, 입력·목록에 포커스가 있을 땐 화살표를 가로채지 않음), 스크린리더 안내(e2e 12)                                                       |
 | 2026-10-01 | PR #22 squash merge(`2aa0abf`). M4: Shift+끌기로 커밋 순서 옮기기(`planMove` + vitest 3, 드래그 모드 `move`, 확인은 기존 RebaseSheet에서)(e2e 13)                                                                                                                       |
-| 2026-10-01 | PR #23 squash merge(`0755c5e`). 사용자 결정: 밝은 테마 없음, 은하계 스타일, 영어 번역 필요, 서명·자동 업데이트는 나중에, 배포는 dmg/exe. 은하계 스타일(`graph/space.ts`, UI 토큰 `--glass*`/`--ui*`, 조작 요소의 네온·발광 제거, CONVENTIONS에 규칙)                    |
-| 2026-10-01 | PR #24 squash merge(`d284a40`). 배포: `bundle.targets = [dmg, nsis]`(macOS 11+, universal / Windows 사용자 설치, 한·영 설치 화면), `release.yml`(태그 → 초안 Release, 수동 실행 → artifact), 옷깃 아이콘(은하계 + 네온 브랜치 그래프, `tauri icon`으로 전 크기 생성)    |
+| 2026-10-01 | PR #24 squash merge(`d284a40`). 사용자 결정: 밝은 테마 없음, 은하계 스타일, 영어 번역 필요, 서명·자동 업데이트는 나중에, 배포는 dmg/exe. 은하계 스타일(`graph/space.ts`, UI 토큰 `--glass*`/`--ui*`, 조작 요소의 네온·발광 제거, CONVENTIONS에 규칙)                    |
+| 2026-10-01 | PR #25 squash merge(`d2a5ccf`). 배포: `bundle.targets = [dmg, nsis]`(macOS 11+, universal / Windows 사용자 설치, 한·영 설치 화면), `release.yml`(태그 → 초안 Release, 수동 실행 → artifact), 옷깃 아이콘(은하계 + 네온 브랜치 그래프, `tauri icon`으로 전 크기 생성)    |
+| 2026-10-01 | i18n 기반: `src/i18n`(`ko.ts` 원본, `en.ts`, `t()`, `<Rich>`), 설정에 언어(시스템/한국어/English, `<html lang>`), 탑바·사이드바·검색·다이얼로그·설정·단축키 표·그래프 글자 번역, Playwright는 `ko-KR` 고정 + 영어 전환 e2e(vitest 42, e2e 14)                           |

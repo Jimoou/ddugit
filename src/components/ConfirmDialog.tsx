@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { t } from "../i18n";
 
 export interface Confirm {
   title: string;
@@ -16,7 +17,7 @@ export function ConfirmDialog({ confirm, busy, onCancel }: { confirm: Confirm; b
         <div className={`eyebrow ${confirm.danger ? "danger" : ""}`}>{confirm.title}</div>
         <div className="confirm-body">{confirm.body}</div>
         <div className="dialog-actions">
-          <button onClick={onCancel}>취소</button>
+          <button onClick={onCancel}>{t("common.cancel")}</button>
           <button
             className={confirm.danger ? "danger" : "primary"}
             autoFocus

@@ -1,6 +1,8 @@
 // User settings kept in localStorage. Parsing is pure (and tested) so a
 // corrupt or older stored value falls back to defaults instead of breaking.
 
+import type { Key, LanguagePref } from "./i18n";
+
 export interface Settings {
   /** Sparkles flowing along edges and node birth bursts. */
   animate: boolean;
@@ -8,12 +10,15 @@ export interface Settings {
   historyPage: number;
   /** git executable; empty means `git` on PATH. */
   gitPath: string;
+  /** UI language; "system" follows the OS (Korean if it is Korean, else English). */
+  language: LanguagePref;
 }
 
 export const HISTORY_PAGES = [1000, 3000, 10000] as const;
+export const LANGUAGES: readonly LanguagePref[] = ["system", "ko", "en"];
 
 export function defaults(reducedMotion = false): Settings {
-  return { animate: !reducedMotion, historyPage: 3000, gitPath: "" };
+  return { animate: !reducedMotion, historyPage: 3000, gitPath: "", language: "system" };
 }
 
 /** Stored JSON → settings, keeping only well-formed fields. */
@@ -33,49 +38,51 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
         ? o.historyPage
         : base.historyPage,
     gitPath: typeof o.gitPath === "string" ? o.gitPath : base.gitPath,
+    language: LANGUAGES.find((l) => l === o.language) ?? base.language,
   };
 }
 
+/** `keys` and `what` are dictionary keys, or literal text (key names like "Enter"). */
 export interface Shortcut {
-  keys: string;
-  what: string;
+  keys: Key | string;
+  what: Key | string;
 }
 
 /** Shown in the settings screen; keep in sync with the handlers. */
-export const SHORTCUTS: { group: string; items: Shortcut[] }[] = [
+export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
   {
-    group: "그래프",
+    group: "keys.graph",
     items: [
-      { keys: "휠", what: "시간축을 따라 이동" },
-      { keys: "⌘/Ctrl + 휠, 핀치", what: "커서 기준 확대·축소" },
-      { keys: "Shift + 휠", what: "위아래로 이동" },
-      { keys: "+ / -", what: "확대 / 축소" },
-      { keys: "0", what: "전체 보기" },
-      { keys: "H", what: "HEAD로" },
-      { keys: "점 끌어 브랜치 끝에 놓기", what: "병합" },
-      { keys: "⌥/Alt + 끌기", what: "cherry-pick" },
-      { keys: "Shift + 끌기", what: "현재 브랜치 커밋 순서 옮기기 (rebase)" },
-      { keys: "우클릭", what: "커밋·브랜치 메뉴" },
-      { keys: "← / →", what: "이전(부모) / 다음(자식) 커밋 선택" },
-      { keys: "↑ / ↓", what: "위 / 아래 레인의 가까운 커밋" },
-      { keys: "Enter", what: "선택한 커밋의 메뉴" },
-      { keys: "Esc", what: "선택 해제" },
+      { keys: "keys.wheel", what: "keys.wheel.what" },
+      { keys: "keys.zoom", what: "keys.zoom.what" },
+      { keys: "keys.shiftWheel", what: "keys.shiftWheel.what" },
+      { keys: "+ / -", what: "keys.plusMinus.what" },
+      { keys: "0", what: "keys.fit.what" },
+      { keys: "H", what: "keys.head.what" },
+      { keys: "keys.dragMerge", what: "keys.dragMerge.what" },
+      { keys: "keys.altDrag", what: "cherry-pick" },
+      { keys: "keys.shiftDrag", what: "keys.shiftDrag.what" },
+      { keys: "keys.rightClick", what: "keys.rightClick.what" },
+      { keys: "← / →", what: "keys.leftRight.what" },
+      { keys: "↑ / ↓", what: "keys.upDown.what" },
+      { keys: "Enter", what: "keys.enter.what" },
+      { keys: "Esc", what: "keys.esc.what" },
     ],
   },
   {
-    group: "검색",
+    group: "keys.search",
     items: [
-      { keys: "⌘/Ctrl + F", what: "커밋 검색" },
-      { keys: "Enter / Shift + Enter", what: "다음 / 이전 결과" },
+      { keys: "⌘/Ctrl + F", what: "keys.find.what" },
+      { keys: "Enter / Shift + Enter", what: "keys.findStep.what" },
     ],
   },
   {
-    group: "커밋과 변경",
+    group: "keys.commit",
     items: [
-      { keys: "⌘/Ctrl + Enter", what: "커밋 (작성 중일 때)" },
-      { keys: "[ / ]", what: "diff에서 이전 / 다음 파일" },
-      { keys: "줄 번호 클릭, Shift + 클릭", what: "줄 단위로 고르기 (스테이징)" },
+      { keys: "⌘/Ctrl + Enter", what: "keys.commitKey.what" },
+      { keys: "[ / ]", what: "keys.files.what" },
+      { keys: "keys.lines", what: "keys.lines.what" },
     ],
   },
-  { group: "앱", items: [{ keys: "?", what: "설정과 단축키" }] },
+  { group: "keys.app", items: [{ keys: "?", what: "keys.help.what" }] },
 ];

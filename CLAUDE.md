@@ -73,7 +73,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 ## 주의
 
-- UI 문자열은 한국어, 코드·주석·커밋은 영어.
+- UI 문자열은 `src/i18n`의 사전(`ko.ts` 원본 + `en.ts`)에 두고 `t("key")`로 읽는다. 코드·주석·커밋은 영어.
 - 렌더 루프(rAF) 안에서 매 프레임 `setState`를 부르지 않는다. 프레임 상태는 ref에 둔다.
 - git CLI는 `GIT_TERMINAL_PROMPT=0`, stdin을 닫은 상태로 실행한다. 프롬프트에서 멈추면 GUI가 굳는다.
 - 새 git 쓰기 작업에는 반드시 임시 저장소 테스트(각 `git/*.rs` 하단, `testutil` 사용)를 붙인다. 원격 작업은 로컬 bare 저장소로 테스트한다.

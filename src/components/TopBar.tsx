@@ -1,4 +1,5 @@
 import { isTauri } from "../api";
+import { isKey, type Key, t } from "../i18n";
 import type { HeadInfo, Progress, RemoteOp } from "../types";
 
 interface Props {
@@ -20,21 +21,16 @@ interface Props {
   onSettings(): void;
 }
 
-/** git's progress phases in Korean; unknown phases are shown as-is. */
-const PHASE: Record<string, string> = {
-  "Enumerating objects": "목록 작성",
-  "Counting objects": "개수 세는 중",
-  "Compressing objects": "압축 중",
-  "Writing objects": "올리는 중",
-  "Receiving objects": "받는 중",
-  "Resolving deltas": "정리 중",
-  "Updating files": "파일 갱신",
+/** git's progress phase, translated when known. */
+const phase = (name: string) => {
+  const key = `progress.${name}`;
+  return isKey(key) ? t(key) : name;
 };
 
-const REMOTE: { op: RemoteOp; icon: string; label: string; title: string }[] = [
-  { op: "fetch", icon: "⟳", label: "Fetch", title: "원격의 새 커밋을 가져오기만 합니다 (작업 트리는 그대로)" },
-  { op: "pull", icon: "↓", label: "Pull", title: "원격 커밋을 받아 현재 브랜치에 반영합니다" },
-  { op: "push", icon: "↑", label: "Push", title: "내 커밋을 원격에 올립니다" },
+const REMOTE: { op: RemoteOp; icon: string; label: string; title: Key }[] = [
+  { op: "fetch", icon: "⟳", label: "Fetch", title: "top.fetch.title" },
+  { op: "pull", icon: "↓", label: "Pull", title: "top.pull.title" },
+  { op: "push", icon: "↑", label: "Push", title: "top.push.title" },
 ];
 
 export function TopBar(p: Props) {
@@ -50,10 +46,10 @@ export function TopBar(p: Props) {
         {p.repoName} <span className="muted">▾</span>
       </button>
       <span className="branch-now" style={{ ["--c" as string]: p.headColor }}>
-        ◉ {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : "빈 저장소")}
+        ◉ {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
       </span>
       {head.upstream && <span className="upstream muted">⇄ {head.upstream}</span>}
-      {!isTauri && <span className="demo-pill">데모 모드</span>}
+      {!isTauri && <span className="demo-pill">{t("top.demo")}</span>}
       <div className="spacer" />
 
       <div className="remote-group">
@@ -65,11 +61,11 @@ export function TopBar(p: Props) {
               key={op}
               className={`ghost remote ${running ? "running" : ""}`}
               disabled={p.busy}
-              title={op === "push" && !head.upstream ? "처음 push: 원격에 브랜치를 만들고 연결합니다" : title}
+              title={op === "push" && !head.upstream ? t("top.push.first") : t(title)}
               onClick={() => p.onRemote(op)}
             >
               <span className="ico">{icon}</span>{" "}
-              {running && p.progress ? `${PHASE[p.progress.phase] ?? p.progress.phase} ${p.progress.percent}%` : label}
+              {running && p.progress ? `${phase(p.progress.phase)} ${p.progress.percent}%` : label}
               {n > 0 && !running && <span className={`count ${op}`}>{n}</span>}
               {running && p.progress && (
                 <span className="progress" title={p.progress.phase}>
@@ -82,15 +78,15 @@ export function TopBar(p: Props) {
       </div>
 
       <button className="ghost" onClick={p.onCompose} disabled={p.busy}>
-        ＋ 커밋 {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
+        {t("top.commit")} {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
       </button>
-      <button className="ghost" onClick={p.onRefresh} title="새로고침">
+      <button className="ghost" onClick={p.onRefresh} title={t("top.refresh")}>
         ⟲
       </button>
-      <button className={`ghost ${p.animate ? "on" : ""}`} title="반짝임 효과" onClick={p.onToggleAnimate}>
+      <button className={`ghost ${p.animate ? "on" : ""}`} title={t("top.sparkle")} onClick={p.onToggleAnimate}>
         ✦
       </button>
-      <button className="ghost" title="설정과 단축키 (?)" aria-label="설정" onClick={p.onSettings}>
+      <button className="ghost" title={t("top.settings")} aria-label={t("top.settings.label")} onClick={p.onSettings}>
         ⚙
       </button>
     </header>

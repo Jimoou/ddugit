@@ -275,3 +275,18 @@ test("shift-dragging a commit onto another opens the rebase plan with it moved",
   const now = new Map(snap.commits.map((c) => [c.id, c]));
   expect(now.get(snap.head.target!)!.summary).toBe("Step 2 of 3");
 });
+
+test("settings: switching to English relabels the app and is remembered", async ({ demo }) => {
+  const { page } = demo;
+  await page.keyboard.press("?");
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  await dialog.getByLabel("언어").selectOption("en");
+  await expect(page.getByRole("dialog", { name: "Settings" })).toContainText("Shortcuts");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".topbar")).toContainText("Commit");
+  await expect(page.locator(".hint")).toContainText("Drag to pan");
+
+  await page.reload();
+  await expect(page.locator(".topbar")).toContainText("Demo mode");
+  expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+});
