@@ -4,7 +4,7 @@ import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
-import { type Effect, FxLayer, useFx } from "./components/Fx";
+import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -1182,6 +1182,7 @@ export function RepoView({
               />
             )}
             <FxLayer playing={fx} />
+            <Nebula on={conflicts > 0} still={!animate} />
             <GraphCanvas
               ref={graph}
               layout={layout}

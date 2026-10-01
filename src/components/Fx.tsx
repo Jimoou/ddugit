@@ -137,3 +137,16 @@ function One({ e }: { e: Effect }) {
       );
   }
 }
+
+/**
+ * While files are in conflict a red nebula hangs over the graph; once the last
+ * one is resolved it thins out and drifts apart. Always mounted so the clearing
+ * can play; `still` (sparkles off) keeps the tint but drops the motion.
+ */
+export function Nebula({ on, still }: { on: boolean; still: boolean }) {
+  return (
+    <div className="fx-clip" aria-hidden>
+      <div className={`nebula ${on ? "on" : ""} ${still ? "still" : ""}`} />
+    </div>
+  );
+}
