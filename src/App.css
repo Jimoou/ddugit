@@ -220,6 +220,31 @@ textarea:focus {
     text-shadow: 0 0 10px var(--cyan);
   }
 }
+.remote {
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+.remote.running:disabled {
+  opacity: 1;
+  color: var(--cyan);
+}
+.remote .progress {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+.remote .progress i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  transition: width 0.15s;
+}
 .topbar .count.pull {
   background: var(--cyan);
 }
@@ -975,4 +1000,51 @@ table.diff tr.rem .sign {
 }
 .choices .muted {
   font-size: 12px;
+}
+
+/* ------------------------------------------------------------- auth dialog */
+.dialog.auth {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+.url {
+  font: 12px var(--mono);
+  color: var(--cyan);
+  word-break: break-all;
+}
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.steps li::marker {
+  color: var(--cyan);
+  font-weight: 700;
+}
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.cmd code {
+  flex: 1;
+  font: 12px var(--mono);
+  overflow-x: auto;
+  white-space: nowrap;
+  user-select: text;
+}
+.raw {
+  margin: 6px 0 0;
+  font: 11px/1.5 var(--mono);
+  white-space: pre-wrap;
+  color: var(--muted);
+  user-select: text;
 }

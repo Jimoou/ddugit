@@ -1,11 +1,16 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
-import type { FileDiff, OpResult, RemoteOp, RepoSnapshot } from "./types";
+import type { FileDiff, OpResult, Progress, RemoteOp, RepoSnapshot } from "./types";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 export const DEMO_PATH = "demo";
+
+/** Receives streamed updates; a Tauri `Channel` in the app, a plain object in demo mode. */
+export interface Sink<T> {
+  onmessage: (msg: T) => void;
+}
 
 /** Tauri command name → argument object. The demo backend implements the same table. */
 export interface Commands {
@@ -17,7 +22,7 @@ export interface Commands {
   git_continue_rebase: [{ path: string }, OpResult];
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
-  git_remote: [{ path: string; op: RemoteOp }, OpResult];
+  git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null }, FileDiff[]];
 }
@@ -44,7 +49,15 @@ export const api = {
   checkout: (path: string, target: string) => call("git_checkout", { path, target }),
   createBranch: (path: string, name: string, at: string | null, switchTo: boolean) =>
     call("git_create_branch", { path, name, at, switch: switchTo }),
-  remote: (path: string, op: RemoteOp) => call("git_remote", { path, op }),
+  remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
+    let sink: Sink<Progress> = { onmessage: onProgress };
+    if (isTauri && path !== DEMO_PATH) {
+      const ch = new Channel<Progress>();
+      ch.onmessage = onProgress;
+      sink = ch;
+    }
+    return call("git_remote", { path, op, onProgress: sink });
+  },
   worktreeDiff: (path: string, file: string | null = null) => call("worktree_diff", { path, file }),
   commitDiff(path: string, id: string): Promise<FileDiff[]> {
     const key = `${path}\n${id}`;

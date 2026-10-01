@@ -3,7 +3,7 @@
 // Rust backend so the whole UX can be exercised without a repo on disk.
 
 import type { Args, Command, Ret } from "./api";
-import type { CommitInfo, FileChange, FileDiff, OpResult, OpStatus, RefInfo, RepoSnapshot } from "./types";
+import type { CommitInfo, FileChange, FileDiff, OpResult, OpStatus, RefInfo, RemoteOp, RepoSnapshot } from "./types";
 
 let seq = 0;
 const fakeId = () => {
@@ -112,6 +112,7 @@ class MockRepo {
       },
       commits: this.order.filter((id) => reachable.has(id)).map((id) => this.commits.get(id)!),
       refs,
+      remotes: [{ name: "origin", url: "https://github.com/otgit/otgit-demo.git" }],
       changes: this.changes.map((c) => ({ ...c })),
       state: this.state,
       truncated: false,
@@ -243,6 +244,44 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
   return res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`);
 }
 
+/** Dev/e2e switch: make the next remote call fail authentication. */
+export const demoControls = { failNextRemote: null as null | "https" | "ssh" };
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).__otgitDemo = demoControls;
+}
+
+const AUTH_OUTPUT = {
+  https: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+  ssh: "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.",
+};
+
+const PHASES = {
+  fetch: ["Receiving objects", "Resolving deltas"],
+  push: ["Compressing objects", "Writing objects"],
+};
+
+function remoteOp(op: RemoteOp): OpResult | string {
+  if (op === "fetch") {
+    // First fetch: a teammate pushed to origin/main and to our branch.
+    if (!repo.fetched) {
+      repo.fetched = true;
+      const main = repo.remotes.get("origin/main")!;
+      repo.remotes.set("origin/main", repo.commit([main], "Teammate: tighten lane spacing", "Minji"));
+      const up = repo.upstream();
+      if (up) repo.remotes.set(up, repo.commit([repo.remotes.get(up)!], "Teammate: fix minimap drag", "Hyunwoo"));
+    }
+    return res("ok", "Fetching origin");
+  }
+  if (op === "push") {
+    const local = repo.branches.get(repo.head)!;
+    const up = repo.upstream();
+    if (up && !repo.ancestors(local).has(repo.remotes.get(up)!)) return res("rejected", " ! [rejected]  (fetch first)");
+    repo.remotes.set(up ?? `origin/${repo.head}`, local);
+    return res("ok", up ? "" : `branch '${repo.head}' set up to track 'origin/${repo.head}'.`);
+  }
+  return pull(op === "pull" ? "ff" : op === "pullMerge" ? "merge" : "rebase");
+}
+
 type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
 
 export const mock: Table = {
@@ -290,28 +329,21 @@ export const mock: Table = {
     return delay(res("ok"));
   },
 
-  git_remote({ op }) {
-    if (op === "fetch") {
-      // First fetch: a teammate pushed to origin/main and to our branch.
-      if (!repo.fetched) {
-        repo.fetched = true;
-        const main = repo.remotes.get("origin/main")!;
-        repo.remotes.set("origin/main", repo.commit([main], "Teammate: tighten lane spacing", "Minji"));
-        const up = repo.upstream();
-        if (up) repo.remotes.set(up, repo.commit([repo.remotes.get(up)!], "Teammate: fix minimap drag", "Hyunwoo"));
+  async git_remote({ op, onProgress }) {
+    const fake = demoControls.failNextRemote;
+    if (fake) {
+      demoControls.failNextRemote = null;
+      await delay(null, 300);
+      return res("auth", AUTH_OUTPUT[fake]);
+    }
+    for (const phase of PHASES[op === "push" ? "push" : "fetch"]) {
+      for (let pct = 0; pct <= 100; pct += 20) {
+        onProgress.onmessage({ phase, percent: pct });
+        await delay(null, 60);
       }
-      return delay(res("ok", "Fetching origin"), 500);
     }
-    if (op === "push") {
-      const local = repo.branches.get(repo.head)!;
-      const up = repo.upstream();
-      if (up && !repo.ancestors(local).has(repo.remotes.get(up)!))
-        return delay(res("rejected", " ! [rejected]        (fetch first)"), 400);
-      repo.remotes.set(up ?? `origin/${repo.head}`, local);
-      return delay(res("ok", up ? "" : `branch '${repo.head}' set up to track 'origin/${repo.head}'.`), 400);
-    }
-    const r = pull(op === "pull" ? "ff" : op === "pullMerge" ? "merge" : "rebase");
-    return typeof r === "string" ? fail(r) : delay(r, 400);
+    const r = remoteOp(op);
+    return typeof r === "string" ? fail(r) : r;
   },
 
   commit_diff({ id }) {

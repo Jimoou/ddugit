@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri } from "./api";
 import { Composer } from "./components/Composer";
+import { AuthDialog } from "./components/AuthDialog";
 import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
@@ -10,7 +11,7 @@ import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, computeLayout } from "./graph/layout";
 import { NEON } from "./graph/scene";
-import type { FileDiff, OpResult, OpStatus, RefInfo, RemoteOp, RepoSnapshot } from "./types";
+import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RemoteOp, RepoSnapshot } from "./types";
 import "./App.css";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
@@ -34,6 +35,14 @@ const CONFLICT_HINT: Record<string, string> = {
   rebase: "파일을 고친 뒤 '계속'을 누르면 리베이스를 이어갑니다.",
 };
 
+/** URL of the remote behind HEAD's upstream (else `origin`, else the first remote). */
+function upstreamUrl(snap: RepoSnapshot): string | null {
+  const name = snap.head.upstream?.split("/")[0];
+  const r =
+    snap.remotes.find((x) => x.name === name) ?? snap.remotes.find((x) => x.name === "origin") ?? snap.remotes[0];
+  return r?.url ?? null;
+}
+
 function store(key: string, value?: string): string | null {
   try {
     if (value === undefined) return localStorage.getItem(key);
@@ -56,6 +65,8 @@ export default function App() {
   const [composer, setComposer] = useState(false);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
   const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
+  const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [diff, setDiff] = useState<DiffState | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
@@ -174,38 +185,42 @@ export default function App() {
     return (refs.find((r) => r.kind === "local") ?? refs[0])?.name ?? id;
   };
 
-  /** Every git write goes through here: busy state, toasts, follow-up dialogs, refresh. */
-  async function run(label: string, op: () => Promise<OpResult>, after?: () => void): Promise<OpStatus> {
-    if (!path) return "failed";
+  /**
+   * Every git write goes through here: busy state, toasts, refresh.
+   * Statuses that need a follow-up dialog (diverged / rejected / auth) are left to the caller.
+   */
+  async function run(label: string, op: () => Promise<OpResult>, after?: () => void): Promise<OpResult> {
+    let r: OpResult = { status: "failed", output: "" };
     setBusy(true);
-    let status: OpStatus = "failed";
     try {
-      const r = await op();
-      status = r.status;
-      if (status === "ok") {
+      r = await op();
+      if (r.status === "ok") {
         toast("ok", label);
         after?.();
-      } else if (status === "conflict") toast("err", "충돌이 났어요. 상단 안내에 따라 해결하거나 취소하세요.");
-      else if (status === "diverged" || status === "rejected") setSync(status);
-      else toast("err", r.output || `${label} 실패`);
+      } else if (r.status === "conflict") toast("err", "충돌이 났어요. 상단 안내에 따라 해결하거나 취소하세요.");
+      else if (r.status === "failed") toast("err", r.output || `${label} 실패`);
     } catch (e) {
       toast("err", String(e));
     } finally {
       setBusy(false);
       await refresh();
     }
-    return status;
+    return r;
   }
 
   const remote = async (op: RemoteOp): Promise<OpStatus> => {
     setRemoteBusy(op);
+    setProgress(null);
     try {
-      const status = await run(REMOTE_DONE[op], () => api.remote(path!, op));
+      const r = await run(REMOTE_DONE[op], () => api.remote(path!, op, setProgress));
+      if (r.status === "auth") setAuth({ op, output: r.output });
+      if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
       // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
-      if (status === "rejected") await api.remote(path!, "fetch").then(refresh, () => {});
-      return status;
+      if (r.status === "rejected") await api.remote(path!, "fetch").then(refresh, () => {});
+      return r.status;
     } finally {
       setRemoteBusy(null);
+      setProgress(null);
     }
   };
 
@@ -257,6 +272,7 @@ export default function App() {
         changeCount={snap.changes.length}
         busy={busy}
         remoteBusy={remoteBusy}
+        progress={progress}
         animate={animate}
         onOpenRepo={openRepo}
         onCompose={() => setComposer(true)}
@@ -452,6 +468,21 @@ export default function App() {
           onMerge={() => void resolveSync("pullMerge")}
           onRebase={() => void resolveSync("pullRebase")}
           onCancel={() => setSync(null)}
+        />
+      )}
+
+      {auth && (
+        <AuthDialog
+          url={upstreamUrl(snap)}
+          output={auth.output}
+          repoPath={snap.path}
+          busy={busy}
+          onClose={() => setAuth(null)}
+          onRetry={() => {
+            const op = auth.op;
+            setAuth(null);
+            void remote(op);
+          }}
         />
       )}
 

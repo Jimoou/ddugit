@@ -28,6 +28,8 @@ pub enum OpStatus {
     Diverged,
     /// Push refused because the remote has commits we don't.
     Rejected,
+    /// Credentials or SSH host trust missing; the UI explains how to set them up.
+    Auth,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -96,7 +98,7 @@ struct Output {
     text: String,
 }
 
-fn git(dir: &Path, args: &[&str]) -> Result<Output> {
+fn command(dir: &Path, args: &[&str]) -> Command {
     let mut cmd = Command::new("git");
     cmd.args(args)
         .current_dir(dir)
@@ -112,21 +114,86 @@ fn git(dir: &Path, args: &[&str]) -> Result<Output> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    let out = cmd
-        .output()
-        .map_err(|e| format!("Failed to run git (is it installed and on PATH?): {e}"))?;
-    let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    cmd
+}
+
+const SPAWN_ERR: &str = "Failed to run git (is it installed and on PATH?)";
+
+fn join_output(ok: bool, stdout: &str, stderr: &str) -> Output {
+    let mut text = stdout.trim_end().to_string();
     if !stderr.trim().is_empty() {
         if !text.is_empty() {
             text.push('\n');
         }
         text.push_str(stderr.trim_end());
     }
-    Ok(Output {
-        ok: out.status.success(),
+    Output {
+        ok,
         text: text.trim().to_string(),
-    })
+    }
+}
+
+fn git(dir: &Path, args: &[&str]) -> Result<Output> {
+    let out = command(dir, args)
+        .output()
+        .map_err(|e| format!("{SPAWN_ERR}: {e}"))?;
+    Ok(join_output(
+        out.status.success(),
+        &String::from_utf8_lossy(&out.stdout),
+        &String::from_utf8_lossy(&out.stderr),
+    ))
+}
+
+/// Like `git`, but streams stderr: every `\r`/`\n`-separated segment goes to
+/// `on_segment`, which returns `true` to swallow it (progress lines) instead of
+/// keeping it in the output text.
+fn git_streaming(dir: &Path, args: &[&str], mut on_segment: impl FnMut(&str) -> bool) -> Result<Output> {
+    use std::io::Read;
+    let mut child = command(dir, args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("{SPAWN_ERR}: {e}"))?;
+    let mut stdout = child.stdout.take().expect("piped stdout");
+    // Drain stdout on its own thread so a full pipe can never deadlock git.
+    let out_thread = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        buf
+    });
+
+    let mut stderr = child.stderr.take().expect("piped stderr");
+    let (mut kept, mut seg, mut chunk) = (String::new(), Vec::new(), [0u8; 4096]);
+    let mut flush = |seg: &mut Vec<u8>, kept: &mut String| {
+        let line = String::from_utf8_lossy(seg).into_owned();
+        seg.clear();
+        if !line.trim().is_empty() && !on_segment(&line) {
+            kept.push_str(&line);
+            kept.push('\n');
+        }
+    };
+    loop {
+        let n = stderr.read(&mut chunk).map_err(err)?;
+        if n == 0 {
+            break;
+        }
+        for &b in &chunk[..n] {
+            if b == b'\r' || b == b'\n' {
+                flush(&mut seg, &mut kept);
+            } else {
+                seg.push(b);
+            }
+        }
+    }
+    flush(&mut seg, &mut kept);
+
+    let status = child.wait().map_err(err)?;
+    let stdout = out_thread.join().unwrap_or_default();
+    Ok(join_output(
+        status.success(),
+        &String::from_utf8_lossy(&stdout),
+        &kept,
+    ))
 }
 
 fn git_ok(dir: &Path, args: &[&str]) -> Result<String> {

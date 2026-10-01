@@ -63,12 +63,20 @@ pub struct FileChange {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct RemoteInfo {
+    pub name: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct RepoSnapshot {
     pub path: String,
     pub name: String,
     pub head: HeadInfo,
     pub commits: Vec<CommitInfo>,
     pub refs: Vec<RefInfo>,
+    pub remotes: Vec<RemoteInfo>,
     pub changes: Vec<FileChange>,
     /// `clean`, `merge`, `rebase`, `cherry-pick`, `revert`, ...
     pub state: String,
@@ -94,6 +102,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
         head,
         commits,
         refs,
+        remotes: read_remotes(&repo),
         changes,
         state: state_name(repo.state()).to_string(),
         truncated,
@@ -179,6 +188,23 @@ fn read_refs(repo: &Repository) -> Result<Vec<RefInfo>> {
         });
     }
     Ok(out)
+}
+
+fn read_remotes(repo: &Repository) -> Vec<RemoteInfo> {
+    let Ok(names) = repo.remotes() else {
+        return Vec::new();
+    };
+    names
+        .iter()
+        .flatten()
+        .filter_map(|n| {
+            let r = repo.find_remote(n).ok()?;
+            Some(RemoteInfo {
+                name: n.to_string(),
+                url: r.url()?.to_string(),
+            })
+        })
+        .collect()
 }
 
 fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, bool)> {

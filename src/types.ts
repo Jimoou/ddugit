@@ -41,12 +41,13 @@ export interface RepoSnapshot {
   head: HeadInfo;
   commits: CommitInfo[];
   refs: RefInfo[];
+  remotes: RemoteInfo[];
   changes: FileChange[];
   state: string;
   truncated: boolean;
 }
 
-export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected";
+export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected" | "auth";
 
 export interface OpResult {
   status: OpStatus;
@@ -54,6 +55,17 @@ export interface OpResult {
 }
 
 export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push";
+
+/** Parsed from git's `--progress` output. */
+export interface Progress {
+  phase: string;
+  percent: number;
+}
+
+export interface RemoteInfo {
+  name: string;
+  url: string;
+}
 
 export interface DiffLine {
   kind: "+" | "-" | " ";

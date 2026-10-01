@@ -2,8 +2,9 @@ mod git;
 
 use git::diff::FileDiff;
 use git::read::RepoSnapshot;
-use git::remote::RemoteOp;
+use git::remote::{Progress, RemoteOp};
 use git::OpResult;
+use tauri::ipc::Channel;
 
 /// Run blocking git work off the main thread so the window never stalls.
 async fn blocking<T, F>(f: F) -> Result<T, String>
@@ -38,7 +39,8 @@ command!(git_continue_rebase(path: String) -> OpResult => git::write::continue_r
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
-command!(git_remote(path: String, op: RemoteOp) -> OpResult => git::remote::remote(&path, op));
+command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
 command!(worktree_diff(path: String, file: Option<String>) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref()));
