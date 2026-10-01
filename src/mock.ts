@@ -599,6 +599,24 @@ export const mock: Table = {
     return delay(res("ok"));
   },
 
+  git_rebase({ base, steps }) {
+    if (repo.state !== "clean") return fail("Repository is in the middle of an operation");
+    // Rebuild the branch on `base`: squash / fixup fold into the previous commit.
+    let tip = base;
+    for (const s of steps) {
+      const c = repo.commits.get(s.id);
+      if (!c) return fail(`Unknown commit ${s.id}`);
+      if (s.action === "drop") continue;
+      if (s.action === "pick") tip = repo.commit([tip], c.summary, c.author);
+      else {
+        const prev = repo.commits.get(tip)!;
+        if (s.action === "squash") prev.message += `\n${c.message}`;
+      }
+    }
+    repo.branches.set(repo.head, tip);
+    return delay(res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`));
+  },
+
   // Patch equivalence is approximated by equal summaries.
   backport_compare({ source, target }) {
     const [src, tgt] = [repo.resolve(source), repo.resolve(target)];

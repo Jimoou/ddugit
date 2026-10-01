@@ -119,3 +119,35 @@ test("adds the original project as a remote and lists its fixes to backport", as
   await expect(sheet.locator("tbody")).toContainText("Fix crash on empty repository");
   await expect(sheet.locator(".bp-hint")).toHaveCount(0);
 });
+
+test("reorders and folds commits with the interactive rebase sheet", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => d.grow(3));
+  const before = await demo.snapshot();
+  const byId = new Map(before.commits.map((c) => [c.id, c]));
+  const parent = (id: string) => byId.get(id)!.parents[0];
+  const base = parent(parent(parent(before.head.target!)));
+  // Wait for the grown commits to be on the canvas, then open the node menu on the base.
+  await expect.poll(async () => (await demo.screenOf(before.head.target!)) !== null).toBe(true);
+  const at = (await demo.screenOf(base))!;
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await page.click(".context-menu >> text=이 다음 커밋들 정리");
+
+  const rows = page.locator(".rb-list li");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("Step 1 of 3");
+  await rows.nth(2).dragTo(rows.nth(0));
+  await expect(rows.nth(0)).toContainText("Step 3 of 3");
+  await rows.nth(2).locator("select").selectOption("fixup");
+  await expect(page.locator(".rebase-sheet header")).toContainText("3개 → 2개");
+  await page.click(".rebase-sheet button.primary");
+  await demo.toast("커밋을 정리했어요");
+
+  const snap = await demo.snapshot();
+  const now = new Map(snap.commits.map((c) => [c.id, c]));
+  const head = now.get(snap.head.target!)!;
+  const prev = now.get(head.parents[0])!;
+  expect([prev.summary, head.summary]).toEqual(["Step 3 of 3", "Step 1 of 3"]);
+  expect(prev.parents[0]).toBe(base);
+  await expect(page.locator(".rebase-sheet")).toHaveCount(0);
+});

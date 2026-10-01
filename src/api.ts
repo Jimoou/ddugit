@@ -7,6 +7,7 @@ import type {
   FileDiff,
   OpResult,
   PickOp,
+  RebaseStep,
   Progress,
   RefOp,
   RemoteOp,
@@ -49,6 +50,7 @@ export interface Commands {
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
+  git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
   backport_ignore: [{ path: string; id: string; ignore: boolean }, null];
   backport_apply: [{ path: string; ids: string[]; target: string }, OpResult];
@@ -108,6 +110,8 @@ export const api = {
     }
     return hit;
   },
+  /** Rewrite the commits after `base` as `steps` (oldest first) say. */
+  rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
   backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),
   backportIgnore: (path: string, id: string, ignore: boolean) => call("backport_ignore", { path, id, ignore }),
   /** `ids` oldest first. */

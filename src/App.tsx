@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
+import { RebaseSheet } from "./components/RebaseSheet";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { ConflictSheet } from "./components/ConflictSheet";
@@ -20,6 +21,7 @@ import { ancestors, computeLayout } from "./graph/layout";
 import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
+import { rebaseRange } from "./rebasePlan";
 import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RefOp, RemoteOp, RepoSnapshot } from "./types";
 import "./App.css";
 
@@ -89,6 +91,8 @@ export default function App() {
   const [diff, setDiff] = useState<DiffState | null>(null);
   const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
   const [backport, setBackport] = useState<{ source: string; target: string } | null>(null);
+  /** Base commit of an interactive rebase being planned. */
+  const [rebaseFrom, setRebaseFrom] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
   const [limit, setLimit] = useState(HISTORY_PAGE);
@@ -131,6 +135,7 @@ export default function App() {
     setFocusRef(null);
     setDiff(null);
     setBackport(null);
+    setRebaseFrom(null);
     setLimit(HISTORY_PAGE);
   }, [path]);
 
@@ -190,6 +195,7 @@ export default function App() {
       if (!path) return;
       const req = ++diffReq.current;
       setBackport(null);
+      setRebaseFrom(null);
       setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
       const load =
         source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
@@ -210,6 +216,12 @@ export default function App() {
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
+  // Commits the planned rebase rewrites; null when there is nothing valid to plan.
+  const rebase = useMemo(() => {
+    if (!rebaseFrom || !snap?.head.target) return null;
+    const r = rebaseRange(commitById, snap.head.target, rebaseFrom);
+    return typeof r === "string" || r.length === 0 ? null : r;
+  }, [rebaseFrom, snap, commitById]);
   const matches = useMemo(
     () => (snap && search ? searchCommits(snap.commits, snap.refs, search.query) : []),
     [snap, search?.query], // eslint-disable-line react-hooks/exhaustive-deps
@@ -446,6 +458,7 @@ export default function App() {
       disabled: !snap.head.branch || isHead,
       onSelect: () => {
         setDiff(null);
+        setRebaseFrom(null);
         setBackport({ source: r.name, target: snap.head.branch! });
       },
     };
@@ -538,6 +551,7 @@ export default function App() {
     const clean = snap.state === "clean";
     const locals = snap.refs.filter((r) => r.kind === "local" && r.target === id && r.name !== snap.head.branch);
     const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
+    const range = onHead && !isHead && head ? rebaseRange(commitById, head, id) : null;
     return [
       { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(id) },
       { label: "여기에 태그…", onSelect: () => askTagAt(id) },
@@ -575,6 +589,16 @@ export default function App() {
         label: "마지막 커밋 수정 (amend)",
         disabled: !isHead || !clean,
         onSelect: () => show({ composer: true, amend: true }),
+      },
+      {
+        label: "이 다음 커밋들 정리… (rebase -i)",
+        hint: typeof range === "string" ? "병합 있음" : undefined,
+        disabled: !clean || !snap.head.branch || !onHead || isHead || typeof range === "string",
+        onSelect: () => {
+          setDiff(null);
+          setBackport(null);
+          setRebaseFrom(id);
+        },
       },
       "separator" as const,
       { label: "SHA 복사", hint: id.slice(0, 7), onSelect: () => void navigator.clipboard?.writeText(id) },
@@ -769,6 +793,26 @@ export default function App() {
             />
           )}
 
+          {rebase && !conflictSheet && (
+            <RebaseSheet
+              // Fresh plan whenever the history under it changes.
+              key={`${rebaseFrom}:${snap.head.target}`}
+              branch={snap.head.branch ?? "HEAD"}
+              base={commitById.get(rebaseFrom!)!}
+              commits={rebase}
+              unpushed={snap.head.upstream ? snap.head.ahead : null}
+              busy={busy}
+              onApply={(steps) =>
+                void run(
+                  "커밋을 정리했어요",
+                  () => api.rebase(path, rebaseFrom!, steps),
+                  () => setRebaseFrom(null),
+                )
+              }
+              onClose={() => setRebaseFrom(null)}
+            />
+          )}
+
           {backport && !conflictSheet && (
             <BackportSheet
               path={path}
@@ -812,7 +856,7 @@ export default function App() {
             />
           )}
 
-          {diff && !conflictSheet && !backport && (
+          {diff && !conflictSheet && !backport && !rebase && (
             <DiffSheet
               title={diff.title}
               files={diff.files}

@@ -7,25 +7,30 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #15(백포트 트래커)를 squash merge했다(`91920f1`).
+- PR #16(앱 안에서 원격 추가·삭제)을 squash merge했다(`fac2a73`).
 
 ## 지금 하는 일
 
-앱 안에서 원격 추가·삭제 → PR #16에서 CI 대기 (10분 뒤 확인 예약)
+M4 · interactive rebase → PR #17에서 CI 대기 (10분 뒤 확인 예약)
 
-- `RefOp::AddRemote { name, url }`, `RemoveRemote { name }` (`git remote add/remove`). 테스트는 로컬 저장소를 원격으로 추가하고 fetch한 뒤 삭제까지 확인한다
-- 사이드바 "원격" 제목 옆에 ＋를 붙였다. 원격 브랜치가 하나도 없어도 그룹이 보인다
-  - 이름과 URL을 받아 추가하고 바로 Fetch(`--all`)한다. 인증 실패는 기존 인증 안내 흐름을 탄다
-- 원격 브랜치 우클릭 → "원격 X 삭제…" (확인을 거친다)
-- `NameDialog`: `messagePlaceholder`를 `extra { placeholder, multiline, required }`로 일반화했다(태그 설명, 원격 URL)
-- 백포트 시트의 터미널 안내를 "원격 추가…" 버튼으로 바꿨다
-- 데모: 원격을 추가하면 `<name>/main`에 원본 쪽 수정 커밋 2개가 생긴다. e2e 7번째 테스트(원격 추가 → 백포트 목록)가 확인한다
+- `git/rebase.rs` `rebase(path, base, steps)`
+  - todo 파일(`.git/otgit-rebase-todo`)을 직접 쓰고 `git -c "sequence.editor=cp '<file>'" rebase -i <base>`로 넣는다. 메시지 편집기는 기존의 `GIT_EDITOR=true`가 처리한다
+  - 거부하는 경우: `base..HEAD`에 병합 커밋이 있을 때, 계획이 그 범위의 커밋을 정확히 한 번씩 담지 않았을 때(빠뜨리면 조용히 사라지므로), 처음 남는 커밋이 squash/fixup일 때
+  - 충돌은 `conflict_aware`로 기존 충돌 해결 흐름(계속/취소)을 탄다
+- `src/rebasePlan.ts`
+  - `rebaseRange`: 첫 부모를 따라가며 목록을 만들고, 병합 커밋이 있거나 base가 조상이 아니면 이유를 돌려준다
+  - `planProblem`, `resultCount`, `move`
+- `RebaseSheet`
+  - 행을 끌거나 ↑↓로 순서를 바꾸고, 커밋마다 유지 / 합치기(메시지 합침·버림) / 버리기를 고른다
+  - 합칠 커밋은 들여 쓰고, 버릴 커밋은 취소선으로 보여 준다
+  - 이미 push한 커밋까지 바뀌면 강제 push가 필요하다고 경고한다(`ahead`로 판단)
+- 여는 곳: 현재 브랜치 이력의 커밋 우클릭 → "이 다음 커밋들 정리… (rebase -i)" (병합이 섞여 있으면 비활성)
 
 ## 다음 단계
 
-1. M4 · 드래그로 interactive rebase (순서 바꾸기, squash)
+1. 강제 push 지원 (`--force-with-lease`). rebase 뒤 push가 거절되면 SyncDialog에서 고를 수 있게 한다
 2. M5 · React Compiler 규칙 켜기 (setState-in-effect 8곳 정리)
-3. 백포트: 여러 대상 한눈에 보기 (고객사별 미반영 개수 표)
+3. 백포트: 여러 대상 한눈에 보기
 
 ## 막힌 것 / 결정 필요
 

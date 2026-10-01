@@ -9,6 +9,7 @@ pub mod conflict;
 pub mod diff;
 pub mod pick;
 pub mod read;
+pub mod rebase;
 pub mod refs;
 pub mod remote;
 pub mod stage;
