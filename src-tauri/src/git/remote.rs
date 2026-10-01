@@ -64,6 +64,10 @@ pub enum RemoteOp {
     PullMerge,
     PullRebase,
     Push,
+    /// Replace the upstream branch with ours (after a rebase or amend), but
+    /// only if it still is what we last fetched: `--force-with-lease` refuses
+    /// when someone pushed in the meantime instead of throwing their work away.
+    ForcePush,
 }
 
 impl RemoteOp {
@@ -76,6 +80,7 @@ impl RemoteOp {
             RemoteOp::PullMerge => &["pull", "--no-rebase", "--no-edit", "--progress"],
             RemoteOp::PullRebase => &["pull", "--rebase", "--progress"],
             RemoteOp::Push => &["push", "--progress"],
+            RemoteOp::ForcePush => &["push", "--force-with-lease", "--progress"],
         }
     }
 
@@ -128,7 +133,7 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
 
     let status = match op {
         _ if is_auth_failure(&o.text) => OpStatus::Auth,
-        RemoteOp::Push if o.text.contains("[rejected]") => OpStatus::Rejected,
+        RemoteOp::Push | RemoteOp::ForcePush if o.text.contains("[rejected]") => OpStatus::Rejected,
         RemoteOp::Pull => {
             // ff-only failed: diverged if both sides have new commits after the pull's fetch.
             let h = read_head(&open(path)?);
@@ -225,6 +230,33 @@ mod tests {
         assert_eq!(
             remote(s(a.path()), RemoteOp::Push, |_| {}).unwrap().status,
             OpStatus::Ok
+        );
+    }
+
+    #[test]
+    fn force_push_replaces_rewritten_history_but_not_unseen_work() {
+        let (_origin, a, b) = setup();
+        let pa = s(a.path());
+        // A rewrites its pushed commit: a plain push is rejected, a forced one lands.
+        git_ok(a.path(), &["commit", "--amend", "-q", "-m", "base (reworded)"]).unwrap();
+        assert_eq!(
+            remote(pa, RemoteOp::Push, |_| {}).unwrap().status,
+            OpStatus::Rejected
+        );
+        let r = remote(pa, RemoteOp::ForcePush, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+
+        // B pushes on top of the new history; A, without fetching, rewrites again.
+        git_ok(b.path(), &["pull", "-q", "--rebase"]).unwrap();
+        commit_file(b.path(), "b.txt", "b", "from B");
+        git_ok(b.path(), &["push", "-q"]).unwrap();
+        git_ok(a.path(), &["commit", "--amend", "-q", "-m", "base (again)"]).unwrap();
+        let r = remote(pa, RemoteOp::ForcePush, |_| {}).unwrap();
+        assert_eq!(
+            r.status,
+            OpStatus::Rejected,
+            "lease protects B's commit: {}",
+            r.output
         );
     }
 

@@ -103,7 +103,7 @@ export interface OpResult {
   output: string;
 }
 
-export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push";
+export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push" | "forcePush";
 
 /** Parsed from git's `--progress` output. */
 export interface Progress {

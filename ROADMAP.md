@@ -57,6 +57,7 @@
 - [x] 드래그로 interactive rebase (순서 바꾸기, squash) — 커밋 우클릭 → "이 다음 커밋들 정리", 목록 끌어서 순서 · 유지/합치기/버리기
   - [ ] 그래프 위에서 노드를 끌어 바로 순서 바꾸기 (지금은 시트의 목록에서)
   - [ ] 병합이 섞인 구간(`--rebase-merges`)
+  - [x] 정리한 뒤 강제 push: Push 거부 화면에 "덮어쓰기"(`--force-with-lease`)
 - [ ] GitHub / GitLab PR 연동 (그래프에 PR 상태 표시)
 
 ## M5 · 배포 품질
@@ -97,3 +98,4 @@
 | 2026-10-01 | PR #14 squash merge(`4b08f67`). M4: 백포트 트래커(`git/backport.rs`: `--cherry-mark`로 같은 패치, `-x` 트레일러로 고쳐서 옮긴 것까지 인식, 제외는 `otgit.backportIgnored` 로컬 config, 일괄 cherry-pick -x, `format-patch` 내보내기, `BackportSheet`)(테스트 50, e2e 6) |
 | 2026-10-01 | PR #15 squash merge(`91920f1`). 원격 추가·삭제(`RefOp::AddRemote/RemoveRemote`, 사이드바 ＋, `NameDialog` 두 번째 칸 일반화, 백포트 시트 안내를 버튼으로)(테스트 51, e2e 7)                                                                                             |
 | 2026-10-01 | PR #16 squash merge(`fac2a73`). M4: interactive rebase(`git/rebase.rs`: 미리 쓴 todo를 `sequence.editor=cp`로 넣음, 빠진 커밋·맨 앞 squash 거부, 충돌은 기존 흐름; `rebasePlan.ts` + vitest 4; `RebaseSheet`)(테스트 54, e2e 8)                                         |
+| 2026-10-01 | PR #17 squash merge(`5a95888`). 강제 push(`RemoteOp::ForcePush` = `push --force-with-lease`, 거부 화면 세 번째 선택, 그사이 남이 올린 커밋은 lease가 막는 것을 bare 저장소로 테스트)(테스트 55, e2e 9)                                                                  |
