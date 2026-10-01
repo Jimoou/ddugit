@@ -2140,3 +2140,26 @@ kbd {
     transform: scale(2.2);
   }
 }
+
+/* ----------------------------------------------------------------- bisect */
+.bisect-banner {
+  background: linear-gradient(90deg, rgba(109, 90, 230, 0.22), rgba(20, 18, 46, 0.9));
+}
+.bisect-banner .ok {
+  color: var(--ok);
+}
+.bisect-banner button.good {
+  border-color: rgba(79, 209, 165, 0.6);
+  color: #b9f5df;
+}
+.bisect-banner button.bad {
+  border-color: rgba(255, 77, 109, 0.6);
+  color: #ffc2cc;
+}
+.nova.red::before,
+.nova.red::after {
+  border-color: rgba(255, 120, 140, 0.95);
+  box-shadow:
+    0 0 22px rgba(255, 77, 109, 0.85),
+    inset 0 0 14px rgba(255, 77, 109, 0.5);
+}

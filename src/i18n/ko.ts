@@ -548,6 +548,27 @@ export const ko = {
 
   // edit: pushed
   "edit.pushed": "이미 push한 커밋을 다시 써요. 다시 올리려면 강제 push가 필요해요.",
+
+  // bisect
+  "bisect.markBad": "버그가 있는 커밋으로 표시",
+  "bisect.markGood": "버그가 없는 커밋으로 표시",
+  "bisect.order": "버그가 없는 커밋은 버그가 있는 커밋보다 앞(조상)이어야 해요",
+  "bisect.draft": "버그를 찾을 범위를 골라 주세요(커밋 우클릭):",
+  "bisect.draft.bad": "버그 있음",
+  "bisect.draft.good": "버그 없음",
+  "bisect.started": "버그 찾기를 시작했어요",
+  "bisect.left": "후보 {n}개 · 약 {steps}단계 남음.",
+  "bisect.test": "지금 <b>{sha}</b> {summary} 에서 확인해 보세요.",
+  "bisect.good": "버그 없음",
+  "bisect.bad": "버그 있음",
+  "bisect.skip": "건너뛰기",
+  "bisect.judged.good": "버그 없음으로 표시했어요",
+  "bisect.judged.bad": "버그 있음으로 표시했어요",
+  "bisect.judged.skip": "건너뛰었어요",
+  "bisect.found": "범인을 찾았어요: <b>{sha}</b> {summary}",
+  "bisect.show": "보기",
+  "bisect.finish": "끝내기",
+  "bisect.done": "버그 찾기를 끝내고 원래 브랜치로 돌아왔어요",
 } as const;
 
 export type Key = keyof typeof ko;

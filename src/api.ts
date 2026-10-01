@@ -3,6 +3,8 @@ import { demoControls, mock } from "./mock";
 import type {
   BackportItem,
   BackportTally,
+  BisectOp,
+  BisectState,
   BranchReport,
   CommitEdit,
   ConflictFile,
@@ -58,6 +60,8 @@ export interface Commands {
   git_delete_branches: [{ path: string; names: string[]; force: boolean }, OpResult];
   git_edit_commit: [{ path: string; id: string; edit: CommitEdit }, OpResult];
   git_restore_file: [{ path: string; source: string; file: string }, OpResult];
+  git_bisect: [{ path: string; op: BisectOp }, OpResult];
+  bisect_state: [{ path: string }, BisectState | null];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
   git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
@@ -133,6 +137,9 @@ export const api = {
   editCommit: (path: string, id: string, edit: CommitEdit) => call("git_edit_commit", { path, id, edit }),
   /** Put `file` back as commit `source` had it (staged, not committed). */
   restoreFile: (path: string, source: string, file: string) => call("git_restore_file", { path, source, file }),
+  /** Start a bisect between a bad and a good commit, or judge the commit checked out now. Finish with `abort`. */
+  bisect: (path: string, op: BisectOp) => call("git_bisect", { path, op }),
+  bisectState: (path: string) => call("bisect_state", { path }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
   stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),

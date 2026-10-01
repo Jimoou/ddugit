@@ -47,6 +47,8 @@ class MockRepo {
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();
   remoteUrls = new Map([["origin", "https://github.com/otgit/otgit-demo.git"]]);
+  /** Demo bisect (HEAD isn't moved; the probe is reported in the state instead). */
+  bisect: { bad: string; good: string[]; skipped: string[] } | null = null;
   /** Where HEAD has been, newest first (like `git reflog`); `lost` is computed on read. */
   reflog: Omit<ReflogEntry, "lost">[] = [];
 
@@ -390,6 +392,19 @@ function remoteOp(op: RemoteOp): OpResult | string {
   return pull(op === "pull" ? "ff" : op === "pullMerge" ? "merge" : "rebase");
 }
 
+/** Candidates, the commit to test next (the middle one) and the culprit, like git computes them. */
+function mockBisect() {
+  const b = repo.bisect!;
+  const good = new Set(b.good.flatMap((g) => [...repo.ancestors(g)]));
+  const candidates = repo.order.filter(
+    (id) => repo.ancestors(b.bad).has(id) && !good.has(id) && !b.skipped.includes(id),
+  );
+  const culprit = candidates.length === 1 ? candidates[0] : null;
+  const rest = candidates.filter((id) => id !== b.bad);
+  const current = culprit ? null : (rest[Math.floor(rest.length / 2)] ?? null);
+  return { bad: b.bad, good: b.good, skipped: b.skipped, current, culprit, candidates };
+}
+
 type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
 
 const mockTable: Table = {
@@ -466,6 +481,10 @@ const mockTable: Table = {
   },
 
   git_abort() {
+    if (repo.bisect) {
+      repo.bisect = null;
+      return delay(res("ok", "Bisect reset"));
+    }
     if (repo.pending) repo.changes = repo.changes.filter((c) => !repo.pending!.files.has(c.path));
     repo.pending = null;
     repo.state = "clean";
@@ -788,6 +807,23 @@ const mockTable: Table = {
     repo.changes.push({ path: file, staged: "modified", unstaged: null, conflicted: false });
     return delay(res("ok"));
   },
+
+  git_bisect({ op }) {
+    if (op.kind === "start") {
+      if (!repo.ancestors(op.bad).has(op.good)) return fail("The good commit must be an ancestor of the bad one");
+      repo.bisect = { bad: op.bad, good: [op.good], skipped: [] };
+      return delay(res("ok", "Bisecting"));
+    }
+    const b = repo.bisect;
+    const probe = b && mockBisect().current;
+    if (!b || !probe) return fail("Not bisecting");
+    if (op.kind === "good") b.good.push(probe);
+    else if (op.kind === "bad") b.bad = probe;
+    else b.skipped.push(probe);
+    return delay(res("ok"));
+  },
+
+  bisect_state: () => delay(repo.bisect ? mockBisect() : null),
 
   git_reset({ target, mode }) {
     if (repo.state !== "clean") return fail("Finish or cancel the operation in progress first");

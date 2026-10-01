@@ -550,4 +550,25 @@ export const en: Record<Key, string> = {
 
   // edit: pushed
   "edit.pushed": "Pushed commits get rewritten. Pushing again will need a force push.",
+
+  // bisect
+  "bisect.markBad": "Mark as bad (has the bug)",
+  "bisect.markGood": "Mark as good (no bug)",
+  "bisect.order": "The good commit must come before (be an ancestor of) the bad one",
+  "bisect.draft": "Pick the range to search (right-click commits):",
+  "bisect.draft.bad": "bad",
+  "bisect.draft.good": "good",
+  "bisect.started": "Started hunting the bug",
+  "bisect.left": "{n} candidates · about {steps} steps left.",
+  "bisect.test": "Test at <b>{sha}</b> {summary} now.",
+  "bisect.good": "Good",
+  "bisect.bad": "Bad",
+  "bisect.skip": "Skip",
+  "bisect.judged.good": "Marked good",
+  "bisect.judged.bad": "Marked bad",
+  "bisect.judged.skip": "Skipped",
+  "bisect.found": "Found it: <b>{sha}</b> {summary}",
+  "bisect.show": "Show",
+  "bisect.finish": "Finish",
+  "bisect.done": "Finished; back on your branch",
 };

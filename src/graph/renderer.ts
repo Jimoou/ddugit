@@ -22,6 +22,9 @@ export interface Drag {
   mode: "merge" | "pick" | "move";
 }
 
+/** A mark on a commit: bisect ends, the commit under test, the culprit. */
+export type NodeBadge = "good" | "bad" | "probe" | "culprit";
+
 export interface DrawState {
   scene: Scene;
   view: View;
@@ -47,6 +50,7 @@ export interface DrawState {
   stashSelected: number | null;
   /** Commit being merged / picked in while the operation waits on conflicts. */
   incoming: string | null;
+  badges: Map<string, NodeBadge>;
   /** History was cut: draw a "load more" tail before the oldest commit. */
   truncated: boolean;
   /** Output: screen rect of that tail's button (null when not drawn). */
@@ -369,6 +373,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.arc(p.x, p.y, rr + (node.id === s.drag?.target ? 9 : 7), 0, Math.PI * 2);
       ctx.stroke();
     }
+    const badge = s.badges.get(node.id);
+    if (badge) drawBadge(ctx, badge, p, rr, s.animate ? time : 0);
     labelQueue.push({ x: p.x, y: p.y, id: node.id, color: c, d });
   }
 
@@ -626,4 +632,46 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.fillText(label, bx + bw / 2, by + 8);
     }
   }
+}
+
+const BADGE_COLOR = { good: "#4fd1a5", bad: "#ff4d6d", probe: "#cfc6ff", culprit: "#ff4d6d" } as const;
+
+/** Bisect marks: a ring for good / bad, a turning scanner on the commit under test, a pulsing culprit. */
+function drawBadge(ctx: CanvasRenderingContext2D, badge: NodeBadge, p: Pt, r: number, time: number) {
+  const c = BADGE_COLOR[badge];
+  ctx.save();
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 2;
+  if (badge === "probe") {
+    // A telescope reticle turning slowly around the commit.
+    ctx.setLineDash([5, 5]);
+    ctx.lineDashOffset = -time * 24;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r + 11, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1.2;
+    for (const a of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+      const dx = Math.cos(a + time * 0.6),
+        dy = Math.sin(a + time * 0.6);
+      ctx.beginPath();
+      ctx.moveTo(p.x + dx * (r + 15), p.y + dy * (r + 15));
+      ctx.lineTo(p.x + dx * (r + 22), p.y + dy * (r + 22));
+      ctx.stroke();
+    }
+  } else if (badge === "culprit") {
+    const pulse = (Math.sin(time * 4) + 1) / 2;
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 14 + pulse * 10;
+    for (const extra of [8, 14 + pulse * 4]) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + extra, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
