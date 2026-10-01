@@ -16,6 +16,7 @@ import type {
   Resolution,
   StashOp,
 } from "./types";
+import { t } from "./i18n";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -133,7 +134,7 @@ export const api = {
     await invoke("watch_repo", { path });
     return unlisten;
   },
-  async pickFolder(title = "Git 저장소 열기"): Promise<string | null> {
+  async pickFolder(title = t("app.open")): Promise<string | null> {
     if (!isTauri) return DEMO_PATH;
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ directory: true, multiple: false, title });

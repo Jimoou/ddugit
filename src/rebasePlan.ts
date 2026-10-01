@@ -1,6 +1,7 @@
 // Interactive rebase planning: which commits a rebase from `base` rewrites,
 // and whether a plan is one git will accept. Pure, so it is unit-tested.
 
+import { type Key, t } from "./i18n";
 import type { CommitInfo, RebaseAction, RebaseStep } from "./types";
 
 /**
@@ -12,8 +13,8 @@ export function rebaseRange(byId: Map<string, CommitInfo>, head: string, base: s
   const out: CommitInfo[] = [];
   for (let id: string | undefined = head; id !== base;) {
     const c: CommitInfo | undefined = id ? byId.get(id) : undefined;
-    if (!c) return "기준 커밋이 현재 브랜치의 이력에 없어요";
-    if (c.parents.length > 1) return "사이에 병합 커밋이 있어서 여기서는 정리할 수 없어요";
+    if (!c) return t("plan.notOnBranch");
+    if (c.parents.length > 1) return t("plan.hasMerge");
     out.push(c);
     id = c.parents[0];
   }
@@ -23,8 +24,8 @@ export function rebaseRange(byId: Map<string, CommitInfo>, head: string, base: s
 /** Why git would reject `steps`, or null when it is fine. */
 export function planProblem(steps: RebaseStep[]): string | null {
   const first = steps.find((s) => s.action !== "drop");
-  if (!first) return "모든 커밋을 버리게 돼요. 하나는 남겨 주세요";
-  if (first.action === "squash" || first.action === "fixup") return "맨 위(가장 오래된) 커밋은 합칠 대상이 없어요";
+  if (!first) return t("plan.dropAll");
+  if (first.action === "squash" || first.action === "fixup") return t("plan.firstSquash");
   return null;
 }
 
@@ -39,11 +40,11 @@ export function move<T>(list: T[], from: number, to: number): T[] {
   return next;
 }
 
-export const ACTIONS: { value: RebaseAction; label: string }[] = [
-  { value: "pick", label: "유지" },
-  { value: "squash", label: "위와 합치기 (메시지 합침)" },
-  { value: "fixup", label: "위와 합치기 (메시지 버림)" },
-  { value: "drop", label: "버리기" },
+export const ACTIONS: { value: RebaseAction; label: Key }[] = [
+  { value: "pick", label: "plan.action.pick" },
+  { value: "squash", label: "plan.action.squash" },
+  { value: "fixup", label: "plan.action.fixup" },
+  { value: "drop", label: "plan.action.drop" },
 ];
 
 /**

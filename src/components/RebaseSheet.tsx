@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fmtTime } from "../format";
 import { ACTIONS, move, planProblem, resultCount } from "../rebasePlan";
 import type { CommitInfo, RebaseAction, RebaseStep } from "../types";
+import { t } from "../i18n";
 
 interface Props {
   branch: string;
@@ -41,14 +42,15 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
     <section className="diff-sheet rebase-sheet" style={{ height: "50vh" }}>
       <header>
         <div className="title">
-          <span className="eyebrow">커밋 정리</span>
+          <span className="eyebrow">{t("rb.title")}</span>
           <b>{branch}</b>
           <span className="muted">
-            {base.summary} <code>{base.id.slice(0, 7)}</code> 다음 커밋 {commits.length}개 → {resultCount(steps)}개
+            {base.summary} <code>{base.id.slice(0, 7)}</code>{" "}
+            {t("rb.summary", { n: commits.length, m: resultCount(steps) })}
           </span>
         </div>
-        <span className="muted keys">끌어서 순서 바꾸기 · 위가 먼저(오래된 것)</span>
-        <button className="icon" onClick={onClose} title="닫기">
+        <span className="muted keys">{t("rb.keys")}</span>
+        <button className="icon" onClick={onClose} title={t("common.close")}>
           ✕
         </button>
       </header>
@@ -78,12 +80,17 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
                 ⋮⋮
               </span>
               <span className="rb-move">
-                <button title="위로" aria-label={`${c.summary} 위로`} disabled={i === 0} onClick={() => shift(i, -1)}>
+                <button
+                  title={t("rb.up")}
+                  aria-label={t("rb.upOf", { summary: c.summary })}
+                  disabled={i === 0}
+                  onClick={() => shift(i, -1)}
+                >
                   ↑
                 </button>
                 <button
-                  title="아래로"
-                  aria-label={`${c.summary} 아래로`}
+                  title={t("rb.down")}
+                  aria-label={t("rb.downOf", { summary: c.summary })}
                   disabled={i === steps.length - 1}
                   onClick={() => shift(i, 1)}
                 >
@@ -91,13 +98,13 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
                 </button>
               </span>
               <select
-                aria-label={`${c.summary} 처리`}
+                aria-label={t("rb.actionOf", { summary: c.summary })}
                 value={s.action}
                 onChange={(e) => setAction(i, e.target.value as RebaseAction)}
               >
                 {ACTIONS.map((a) => (
                   <option key={a.value} value={a.value}>
-                    {a.label}
+                    {t(a.label)}
                   </option>
                 ))}
               </select>
@@ -115,12 +122,12 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
         {problem ? (
           <span className="danger-text">{problem}</span>
         ) : rewritesPushed ? (
-          <span className="warn-text">이미 push한 커밋도 바뀌어요. 적용한 뒤에는 강제 push가 필요해요.</span>
+          <span className="warn-text">{t("rb.pushed")}</span>
         ) : (
-          <span className="muted">충돌이 나면 충돌 해결 화면으로 이어지고, 언제든 취소할 수 있어요.</span>
+          <span className="muted">{t("rb.safe")}</span>
         )}
         <button className="primary" disabled={busy || !changed || problem !== null} onClick={() => onApply(steps)}>
-          적용 (rebase)
+          {t("rb.apply")}
         </button>
       </footer>
     </section>
