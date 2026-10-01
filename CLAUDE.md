@@ -39,6 +39,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `stash.rs`: discard, stash
   - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블)
   - `diff.rs`: 커밋 diff, 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
+  - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
   - `stage.rs`: hunk 스테이지·내리기 (패치에서 hunk만 골라 `git apply --cached`)
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.

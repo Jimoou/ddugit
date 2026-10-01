@@ -7,23 +7,22 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #4(커밋 검색)를 squash merge했다(`021d5c5`).
+- PR #5(hunk 스테이징)를 squash merge했다(`3c20d93`).
 
 ## 지금 하는 일
 
-M2 · hunk 스테이징 완료 → PR #5에서 CI 대기 (10분 뒤 확인 예약)
+M2 · 충돌 해결 화면 완료 → PR #6에서 CI 대기 (10분 뒤 확인 예약)
 
-- 백엔드
-  - `git/stage.rs`: 단일 파일 패치에서 `@@` hunk만 골라 `git apply --cached [--reverse]` (stdin은 `git_input`)
-  - `diff.rs`: `DiffScope`, `local_diff`(표시와 스테이징이 같은 diff 옵션을 써서 hunk 번호가 일치)
-  - `write.rs`: `commit_index`
-  - 테스트 37
-- UI: `DiffSheet`의 `stage` prop(범위 탭, hunk 버튼), 커밋 작성기의 "스테이지된 변경만 커밋"(일부만 스테이지된 파일이 생기면 자동으로 켜짐, ½ 배지)
+- 백엔드 `git/conflict.rs`, 테스트 40
+- `src/conflict.ts`: 마커 파서와 `resolveText`, vitest 6 (diff3, CRLF, 끝나지 않은 블록 포함)
+- `ConflictSheet`: 블록 선택, 파일 전체 선택, 바이너리 처리. `run()`이 conflict 상태를 받으면 자동으로 열리고, 배너의 "충돌 해결" 버튼과 커밋 작성기의 충돌 파일 클릭으로도 열림
+- 데모: `window.__otgitDemo.conflictNext = true` 후 병합하면 충돌 파일 2개가 생김
 
 ## 다음 단계
 
-1. 충돌 해결 화면 (ours / theirs / 수동, 충돌 파일 목록 → 해결 표시)
-2. 줄 단위 스테이징 (hunk 안에서 줄 선택 → 패치 재작성)
+1. 그래프에 진행 중인 병합 표시 (HEAD 옆에 "병합 중" 점선 노드와 들어오는 쪽 연결선)
+2. 충돌 블록 직접 편집
+3. M3 시작: 이전 이력 더 불러오기, 파일 감시로 자동 새로고침
 
 ## 막힌 것 / 결정 필요
 

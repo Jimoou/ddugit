@@ -1,6 +1,18 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
-import type { DiffScope, FileDiff, OpResult, PickOp, Progress, RefOp, RemoteOp, RepoSnapshot, StashOp } from "./types";
+import type {
+  ConflictFile,
+  DiffScope,
+  FileDiff,
+  OpResult,
+  PickOp,
+  Progress,
+  RefOp,
+  RemoteOp,
+  RepoSnapshot,
+  Resolution,
+  StashOp,
+} from "./types";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -29,6 +41,8 @@ export interface Commands {
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
   git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
+  conflict_file: [{ path: string; file: string }, ConflictFile];
+  git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
 }
@@ -72,6 +86,8 @@ export const api = {
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
   stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),
+  conflictFile: (path: string, file: string) => call("conflict_file", { path, file }),
+  resolve: (path: string, file: string, how: Resolution) => call("git_resolve", { path, file, how }),
   worktreeDiff: (path: string, file: string | null = null, scope: DiffScope = "all") =>
     call("worktree_diff", { path, file, scope }),
   commitDiff(path: string, id: string): Promise<FileDiff[]> {

@@ -1,5 +1,6 @@
 mod git;
 
+use git::conflict::{ConflictFile, Resolution};
 use git::diff::{DiffScope, FileDiff};
 use git::pick::PickOp;
 use git::read::RepoSnapshot;
@@ -57,6 +58,9 @@ command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash
 command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
     => git::stash::stash_push(&path, &message, &paths));
 command!(git_stash(path: String, op: StashOp, index: usize) -> OpResult => git::stash::stash(&path, op, index));
+command!(conflict_file(path: String, file: String) -> ConflictFile => git::conflict::conflict_file(&path, &file));
+command!(git_resolve(path: String, file: String, how: Resolution) -> OpResult
+    => git::conflict::resolve(&path, &file, &how));
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref(), scope));
@@ -91,6 +95,8 @@ pub fn run() {
             git_discard,
             git_stash_push,
             git_stash,
+            conflict_file,
+            git_resolve,
             commit_diff,
             worktree_diff,
         ])

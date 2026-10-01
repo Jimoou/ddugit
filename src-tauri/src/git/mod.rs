@@ -4,6 +4,7 @@
 //! merge, checkout, branch, fetch/pull/push) shell out to the user's `git` so
 //! hooks, credentials, signing and LFS behave exactly as on the command line.
 
+pub mod conflict;
 pub mod diff;
 pub mod pick;
 pub mod read;
@@ -256,6 +257,8 @@ mod testutil {
         git_ok(p, &["config", "user.name", "Test"]).unwrap();
         git_ok(p, &["config", "user.email", "t@example.com"]).unwrap();
         git_ok(p, &["config", "commit.gpgsign", "false"]).unwrap();
+        // Runners (e.g. Windows) may set core.autocrlf globally; tests compare exact bytes.
+        git_ok(p, &["config", "core.autocrlf", "false"]).unwrap();
     }
 
     pub fn s(p: &Path) -> &str {

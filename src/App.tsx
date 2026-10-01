@@ -3,6 +3,7 @@ import { api, DEMO_PATH, isTauri } from "./api";
 import { Composer } from "./components/Composer";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
+import { ConflictSheet } from "./components/ConflictSheet";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { DiffSheet } from "./components/DiffSheet";
@@ -82,6 +83,7 @@ export default function App() {
   const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [diff, setDiff] = useState<DiffState | null>(null);
+  const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
@@ -256,8 +258,10 @@ export default function App() {
       if (r.status === "ok") {
         toast("ok", label);
         after?.();
-      } else if (r.status === "conflict") toast("err", "충돌이 났어요. 상단 안내에 따라 해결하거나 취소하세요.");
-      else if (r.status === "failed") toast("err", r.output || `${label} 실패`);
+      } else if (r.status === "conflict") {
+        toast("err", "충돌이 났어요. 아래 충돌 해결 화면에서 고르거나 취소하세요.");
+        setConflictSheet({});
+      } else if (r.status === "failed") toast("err", r.output || `${label} 실패`);
     } catch (e) {
       toast("err", String(e));
     } finally {
@@ -557,6 +561,7 @@ export default function App() {
             {IN_PROGRESS[snap.state]?.hint ?? ""}
           </span>
           <span className="row">
+            {conflicts > 0 && <button onClick={() => setConflictSheet({})}>충돌 해결</button>}
             {IN_PROGRESS[snap.state]?.canContinue && (
               <button disabled={busy} onClick={() => run("이어서 마쳤어요", () => api.continueOp(path))}>
                 계속
@@ -660,7 +665,19 @@ export default function App() {
             </div>
           </div>
 
-          {diff && (
+          {conflictSheet && (
+            <ConflictSheet
+              path={path}
+              files={snap.changes.filter((c) => c.conflicted).map((c) => c.path)}
+              state={snap.state}
+              initialFile={conflictSheet.file}
+              busy={busy}
+              onResolve={(file, how) => void run(`${file} 해결했어요`, () => api.resolve(path, file, how))}
+              onClose={() => setConflictSheet(null)}
+            />
+          )}
+
+          {diff && !conflictSheet && (
             <DiffSheet
               title={diff.title}
               files={diff.files}
@@ -704,8 +721,9 @@ export default function App() {
             headPushed={!!snap.head.upstream && snap.head.ahead === 0}
             onClose={() => setComposer(false)}
             onOpenFile={(file) => {
-              // Fully staged files have nothing in the "unstaged" view.
               const c = snap.changes.find((x) => x.path === file);
+              if (c?.conflicted) return setConflictSheet({ file });
+              // Fully staged files have nothing in the "unstaged" view.
               loadDiff({ kind: "worktree", scope: c?.unstaged ? "unstaged" : "staged" }, "작업 중인 변경", file);
             }}
             onStash={(message, paths) =>
