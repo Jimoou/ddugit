@@ -493,10 +493,7 @@ test("hunts down the commit that broke something with bisect", async ({ demo }) 
     [bad, "버그가 있는 커밋으로 표시"],
     [good, "버그가 없는 커밋으로 표시"],
   ] as const) {
-    await expect.poll(async () => (await demo.screenOf(id)) !== null).toBe(true);
-    const at = (await demo.screenOf(id))!;
-    await page.mouse.click(at.x, at.y, { button: "right" });
-    await page.click(`.context-menu >> text=${label}`);
+    await (await demo.commitMenu(id)).getByText(label).click();
   }
   await demo.toast("버그 찾기를 시작했어요");
 
@@ -511,5 +508,38 @@ test("hunts down the commit that broke something with bisect", async ({ demo }) 
   }
   await expect(banner).toContainText(`범인을 찾았어요: ${culprit.slice(0, 7)}`);
   await banner.getByRole("button", { name: "끝내기" }).click();
+  await expect(banner).toHaveCount(0);
+});
+
+test("traces a file through history and shows who changed each line", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const tip = (await demo.screenOf(snap.head.target!))!;
+  await page.mouse.click(tip.x, tip.y);
+  const file = page.locator(".inspector .changed li").first();
+  await file.click({ button: "right" });
+  await page.click(".context-menu >> text=이 파일이 지나온 커밋 보기");
+
+  const banner = page.locator(".trail-banner");
+  await expect(banner).toContainText("별자리로 이었어요");
+  const n = Number(/커밋 (\d+)개/.exec((await banner.textContent()) ?? "")![1]);
+  expect(n).toBeGreaterThan(0);
+
+  // Stepping older moves the selection along the trail.
+  const before = await page.locator(".inspector").textContent();
+  await banner.getByRole("button", { name: /더 예전/ }).click();
+  if (n > 1) await expect(page.locator(".inspector")).not.toHaveText(before ?? "");
+
+  // Blame for the selected commit: one hunk per commit in the demo, each jumping to its commit.
+  await banner.getByRole("button", { name: "줄마다 보기" }).click();
+  const sheet = page.locator(".blame-sheet");
+  await expect(sheet).toContainText("줄마다 누가 고쳤나");
+  await expect(sheet.locator(".blame-hunk").first()).toBeVisible();
+  await sheet.locator(".blame-gutter").first().click();
+  await expect(sheet.locator(".blame-hunk.on")).toHaveCount(1);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await banner.getByRole("button", { name: "닫기" }).click();
   await expect(banner).toHaveCount(0);
 });

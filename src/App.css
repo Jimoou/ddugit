@@ -2163,3 +2163,85 @@ kbd {
     0 0 22px rgba(255, 77, 109, 0.85),
     inset 0 0 14px rgba(255, 77, 109, 0.5);
 }
+
+/* --- file history: a constellation through the file's commits, blame by star temperature --- */
+.trail-banner {
+  background: linear-gradient(90deg, rgba(255, 212, 121, 0.16), rgba(20, 18, 46, 0.9));
+  border-bottom-color: rgba(255, 212, 121, 0.4);
+  color: #fff1d0;
+}
+.trail-eye {
+  color: #ffd479;
+  text-shadow: 0 0 8px rgba(255, 212, 121, 0.7);
+}
+.blame-body {
+  flex: 1;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.blame-hunk {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  border-left: 2px solid var(--star);
+  border-bottom: 1px solid var(--line);
+}
+.blame-hunk.on {
+  background: rgba(255, 212, 121, 0.08);
+}
+.blame-gutter {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.blame-gutter:hover {
+  background: var(--ui-soft);
+}
+.blame-gutter .star {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--star);
+  box-shadow: 0 0 8px var(--star);
+}
+.blame-gutter code {
+  color: var(--star);
+}
+.blame-gutter .who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.blame-gutter .muted {
+  flex: none;
+  white-space: nowrap;
+}
+.blame-lines {
+  margin: 0;
+  padding: 3px 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+  color: var(--text);
+}
+.blame-lines .ln {
+  display: inline-block;
+  width: 3.5em;
+  margin-right: 1em;
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+}

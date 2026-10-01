@@ -569,6 +569,16 @@ export const ko = {
   "bisect.show": "보기",
   "bisect.finish": "끝내기",
   "bisect.done": "버그 찾기를 끝내고 원래 브랜치로 돌아왔어요",
+  "history.trail": "이 파일이 지나온 커밋 보기",
+  "history.trail.eyebrow": "파일 이력",
+  "history.trail.count": "<code>{file}</code> 을(를) 바꾼 커밋 {n}개를 별자리로 이었어요.",
+  "history.trail.newer": "더 최근",
+  "history.trail.older": "더 예전",
+  "history.blame": "줄마다 마지막으로 고친 커밋 보기 (blame)",
+  "history.blame.short": "줄마다 보기",
+  "history.blame.title": "줄마다 누가 고쳤나",
+  "history.blame.at": "{sha} 기준",
+  "history.blame.hint": "푸를수록 최근, 붉을수록 오래된 줄이에요. 왼쪽을 누르면 그 커밋으로 가요",
 } as const;
 
 export type Key = keyof typeof ko;

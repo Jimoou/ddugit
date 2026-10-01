@@ -46,6 +46,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`)
   - `bisect.rs`: `git bisect` 시작·좋음·나쁨·건너뛰기와 상태 읽기(refs/bisect/*에서 후보·지금 확인할 커밋·범인). 끝내기는 `write::abort`(bisect reset)
   - `edit.rs`: 지난 커밋 손보기(메시지·작성자·파일별로 둘로 나누기). 부모부터 rebase -i --autostash로 다시 쌓고 대상 바로 뒤에 `exec`을 끼운다. 파일 하나를 어떤 커밋 상태로 되돌리기(`restore_file`)
+  - `history.rs`: 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
   - `cleanup.rs`: 브랜치 정리 보고(기준 브랜치에 병합됨 / 원격에서 사라짐(gone) / 마지막 커밋 시각)와 여러 브랜치 한 번에 삭제
   - `undo.rs`: reset(soft/mixed/hard, 진행 중이면 거부), reflog(HEAD가 지나온 자리 + 어느 참조에서도 닿지 않는 `lost` 표시)
   - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)

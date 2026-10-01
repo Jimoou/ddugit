@@ -7,30 +7,28 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #35(과거 커밋 손보기, 노바 연출)를 squash merge했다(`59571df`).
+- PR #36(bisect)을 squash merge했다(`d995819`). CI가 `playwright install --with-deps`(apt)에서 30분 넘게 멈춰 있어서 취소하고 다시 돌렸다. 그래서 e2e 단계에 `timeout-minutes`(설치 8분, 테스트 15분)를 붙였다.
 
 ## 지금 하는 일
 
-M6 고급 git 4단계-1 "bisect" → PR CI 대기
+M6 고급 git 마지막 "파일 이력·blame" → PR CI 대기
 
-- Rust `git/bisect.rs`
-  - `BisectOp`: start{bad,good} / good / bad / skip
-  - `state()`: `.git/BISECT_START`가 있으면 refs/bisect/* 로 bad·good·skip을 읽는다. 후보는 `rev-list bad --not goods`에서 skip을 뺀 것이고, 하나 남으면 그게 범인이다
-  - 끝내기는 기존 `abort`(bisect reset)
-- 그래프: `NodeBadge`(renderer `drawBadge`). 배지가 있는 커밋은 접히지 않는다
-- RepoView
-  - 스냅샷마다 `bisectState`를 읽는다. 새로 확인할 커밋이 나오면 카메라를 옮기고, 범인이 나오면 붉은 노바를 띄운다
-  - 시작 전 고른 범위는 `bisectDraft`에 둔다(우클릭 두 번)
-  - 진행 중에는 일반 배너 대신 bisect 배너를 띄운다
-- 데모: HEAD를 옮기지 않고, 상태의 `current`(후보 가운데)로만 알려 준다
-- e2e는 "0"(전체 보기) 대신 "h"로 HEAD를 맞춘다. 전체 보기 배율에서는 일직선 구간이 막대로 접혀서 커밋을 우클릭할 수 없다
+- Rust `git/history.rs`
+  - `file_log(rev, file)`: `git log --follow --name-only`로 커밋마다 그때의 경로를 얻는다. libgit2에는 follow가 없어서 CLI로 읽는다
+  - `blame(rev, file)`: libgit2 `blame_file(newest_commit)`로 hunk마다 커밋·작성자·시각·요약을 낸다. 내용은 그 커밋의 blob에서 읽는다
+- 화면
+  - Inspector의 변경 파일을 우클릭하면 "이 파일이 지나온 커밋 보기"와 "blame"이 나온다. 이력은 그 커밋이 HEAD에 닿으면 HEAD부터 읽는다
+  - 그래프 `trail`(renderer `drawTrail`): 금빛 점선 별자리, 각 커밋에 반짝이는 십자, 옛것→최근으로 흐르는 혜성. 다른 커밋은 focus로 흐리게 한다
+  - 배너: 더 최근 / 더 예전 / 줄마다 보기 / 닫기
+  - `components/History.tsx`의 `BlameSheet`: 줄 묶음마다 별 색(`ageColor`: 붉을수록 오래됨, 푸를수록 최근). 왼쪽을 누르면 그 커밋으로 간다. Esc로 닫는다
+- 데모: `filesOf(id)`(commit_diff와 공유)로 파일을 바꾼 커밋을 고르고, blame은 커밋마다 줄 묶음 하나씩 만든다
 
-## 다음 단계 (M6 순서, ROADMAP 참고)
+## 다음 단계
 
-1. 고급 git 작업 마지막: 파일 이력(그래프에서 그 파일을 바꾼 커밋만 밝게)·blame(줄마다 마지막으로 바꾼 커밋)
-2. 기존 기능의 게임 같은 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌
-3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
-4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다
+1. 기존 기능의 게임 같은 연출: 원격(push 궤적, pull·fetch 유성) → 그래프 작업(merge 중력장·섬광, cherry-pick 혜성, rebase 별자리) → 충돌(붉은 성운)
+2. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
+3. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다
+4. 사용자가 v0.1.0 초안 Release를 Publish해야 태그가 생긴다
 
 ## 막힌 것 / 결정 필요
 

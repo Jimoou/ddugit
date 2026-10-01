@@ -36,8 +36,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # A stalled apt mirror can hang this for hours; fail fast and re-run instead.
       - run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
       - run: npm run e2e
+        timeout-minutes: 15
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

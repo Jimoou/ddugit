@@ -51,6 +51,8 @@ export interface DrawState {
   /** Commit being merged / picked in while the operation waits on conflicts. */
   incoming: string | null;
   badges: Map<string, NodeBadge>;
+  /** Commits that touched one file, newest first: drawn as a constellation. */
+  trail: string[];
   /** History was cut: draw a "load more" tail before the oldest commit. */
   truncated: boolean;
   /** Output: screen rect of that tail's button (null when not drawn). */
@@ -283,6 +285,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.fillText(label, b.x, b.y + 0.5);
     s.moreHit.rect = rect;
   }
+
+  if (s.trail.length) drawTrail(ctx, s);
 
   // --- link HEAD → [+] --------------------------------------------------------
   const plusS = toScreen(view, s.plus);
@@ -632,6 +636,75 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.fillText(label, bx + bw / 2, by + 8);
     }
   }
+}
+
+const TRAIL = "#ffd479";
+
+/**
+ * A star chart through the commits that touched a file, oldest to newest,
+ * with a glint on each and a comet tracing the file's path through time.
+ */
+function drawTrail(ctx: CanvasRenderingContext2D, s: DrawState) {
+  const { scene, view, time } = s;
+  const n = scene.layout.rowCount;
+  const pts = s.trail
+    .flatMap((id) => {
+      const node = scene.layout.byId.get(id);
+      return node ? [toScreen(view, { x: xOf(node.row, n), y: yOf(node.lane) })] : [];
+    })
+    .reverse();
+  if (!pts.length) return;
+  const r = nodeRadius(view.k);
+  ctx.save();
+  ctx.strokeStyle = alpha(TRAIL, 0.55);
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([2, 6]);
+  ctx.beginPath();
+  pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = alpha(TRAIL, 0.85);
+  for (const [i, p] of pts.entries()) {
+    const twinkle = s.animate ? 0.75 + 0.25 * Math.sin(time * 2 + i * 1.7) : 1;
+    const arm = (r + 12) * twinkle;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x - arm, p.y);
+    ctx.lineTo(p.x + arm, p.y);
+    ctx.moveTo(p.x, p.y - arm);
+    ctx.lineTo(p.x, p.y + arm);
+    ctx.stroke();
+  }
+  if (s.animate && pts.length > 1) {
+    const lens = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i].x, p.y - pts[i].y));
+    const total = lens.reduce((a, b) => a + b, 0);
+    const period = Math.max(3, total / 220);
+    const at = (d: number) => {
+      for (const [i, len] of lens.entries()) {
+        if (d <= len) {
+          const f = len ? d / len : 0;
+          return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * f, y: pts[i].y + (pts[i + 1].y - pts[i].y) * f };
+        }
+        d -= len;
+      }
+      return pts[pts.length - 1];
+    };
+    const head = ((time / period) % 1) * total;
+    for (let j = 0; j < 8; j++) {
+      const p = at(Math.max(0, head - j * 7));
+      const rad = 5 - j * 0.5;
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad * 2.5);
+      g.addColorStop(0, alpha("#ffffff", 0.9 * (1 - j / 8)));
+      g.addColorStop(0.4, alpha(TRAIL, 0.6 * (1 - j / 8)));
+      g.addColorStop(1, alpha(TRAIL, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rad * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 const BADGE_COLOR = { good: "#4fd1a5", bad: "#ff4d6d", probe: "#cfc6ff", culprit: "#ff4d6d" } as const;

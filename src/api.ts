@@ -5,11 +5,13 @@ import type {
   BackportTally,
   BisectOp,
   BisectState,
+  Blame,
   BranchReport,
   CommitEdit,
   ConflictFile,
   DiffScope,
   FileDiff,
+  FileTouch,
   OpResult,
   PickOp,
   RebaseStep,
@@ -62,6 +64,8 @@ export interface Commands {
   git_restore_file: [{ path: string; source: string; file: string }, OpResult];
   git_bisect: [{ path: string; op: BisectOp }, OpResult];
   bisect_state: [{ path: string }, BisectState | null];
+  file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
+  git_blame: [{ path: string; rev: string; file: string }, Blame];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
   git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
@@ -140,6 +144,10 @@ export const api = {
   /** Start a bisect between a bad and a good commit, or judge the commit checked out now. Finish with `abort`. */
   bisect: (path: string, op: BisectOp) => call("git_bisect", { path, op }),
   bisectState: (path: string) => call("bisect_state", { path }),
+  /** Commits reachable from `rev` that changed `file` (following renames), newest first. */
+  fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
+  /** Who last changed each line of `file` as of `rev`. */
+  blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
   stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),

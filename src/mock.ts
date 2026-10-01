@@ -5,6 +5,7 @@
 import type { Args, Command, Ret } from "./api";
 import type {
   BackportItem,
+  Blame,
   CommitInfo,
   FileChange,
   FileDiff,
@@ -258,6 +259,12 @@ function fakeFile(path: string, seed: number, summary: string, status = "modifie
     truncated: false,
     hunks: [{ header, lines }],
   };
+}
+
+/** The demo files a commit "changed" (stable per commit id). */
+function filesOf(id: string) {
+  const h = hash(id);
+  return [...new Set(Array.from({ length: 1 + (h % 3) }, (_, i) => FILES[(h + i * 2) % FILES.length]))];
 }
 
 function hash(s: string) {
@@ -640,10 +647,10 @@ const mockTable: Table = {
     const c = repo.commits.get(id);
     if (!c) return fail(`Unknown commit ${id}`);
     const h = hash(id);
-    const n = 1 + (h % 3);
-    const files = Array.from({ length: n }, (_, i) => FILES[(h + i * 2) % FILES.length]);
-    const status = (i: number) => (c.parents.length === 0 || (i === n - 1 && h % 4 === 0) ? "added" : "modified");
-    return delay([...new Set(files)].map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
+    const files = filesOf(id);
+    const status = (i: number) =>
+      c.parents.length === 0 || (i === files.length - 1 && h % 4 === 0) ? "added" : "modified";
+    return delay(files.map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
   },
 
   git_stage_hunks({ file, unstage }) {
@@ -824,6 +831,28 @@ const mockTable: Table = {
   },
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
+  file_log({ rev, file }) {
+    const tip = (rev === "HEAD" ? repo.branches.get(repo.head) : repo.branches.get(rev)) ?? rev;
+    if (!repo.commits.has(tip)) return fail(`Unknown revision ${rev}`);
+    const seen = repo.ancestors(tip);
+    return delay(
+      repo.order.filter((id) => seen.has(id) && filesOf(id).includes(file)).map((id) => ({ id, path: file })),
+    );
+  },
+  async git_blame({ path, rev, file }) {
+    const touches = await mockTable.file_log({ path, rev, file });
+    if (!touches.length) return fail(`'${file}' is not in ${rev.slice(0, 7)}`);
+    // A few hunks per commit that touched it, oldest at the top like a file that grew downward.
+    const lines: string[] = [];
+    const hunks: Blame["hunks"] = [];
+    for (const [i, t] of [...touches].reverse().entries()) {
+      const c = repo.commits.get(t.id)!;
+      const len = 2 + (hash(t.id) % 5);
+      hunks.push({ commit: c.id, start: lines.length, len, author: c.author, time: c.time, summary: c.summary });
+      lines.push(`// ${c.summary}`, ...Array.from({ length: len - 1 }, (_, k) => `const v${i}_${k} = ${k * i};`));
+    }
+    return delay({ lines, hunks });
+  },
 
   git_reset({ target, mode }) {
     if (repo.state !== "clean") return fail("Finish or cancel the operation in progress first");

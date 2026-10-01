@@ -3,6 +3,7 @@ import { api } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
+import { BlameSheet } from "./components/History";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -34,6 +35,7 @@ import type {
   CommitEdit,
   CommitInfo,
   FileDiff,
+  FileTouch,
   OpResult,
   OpStatus,
   Progress,
@@ -144,6 +146,10 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  /** File history: the commits that touched one file, drawn as a constellation. */
+  const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
+  const [blameReq, setBlameReq] = useState<{ rev: string; file: string } | null>(null);
+  const closeBlame = useCallback(() => setBlameReq(null), []);
   const [cleanupOpen, setCleanupOpen] = useState(false);
   /** Touching up a past commit: which edit, and its files (loaded for splitting). */
   const [editReq, setEditReq] = useState<{
@@ -352,6 +358,8 @@ export function RepoView({
     [bisect],
   );
 
+  const trailIds = useMemo(() => trail?.touches.map((x) => x.id), [trail]);
+  const trailFocus = useMemo(() => (trailIds ? new Set(trailIds) : null), [trailIds]);
   const focus = useMemo(() => {
     if (search?.query.trim()) return new Set(matches);
     return snap && focusRef ? ancestors(snap.commits, focusRef.target) : null;
@@ -623,8 +631,33 @@ export function RepoView({
           disabled: !commit.parents.length,
           onSelect: () => void run(t("file.restored", { file }), () => api.restoreFile(path, commit.parents[0], file)),
         },
+        { label: t("history.trail"), hint: "log", onSelect: () => void openTrail(commit, file) },
+        { label: t("history.blame"), hint: "blame", onSelect: () => setBlameReq({ rev: commit.id, file }) },
       ],
     });
+
+  /** Draw the file's path through history; from HEAD when it reaches this commit, so newer changes show too. */
+  const openTrail = async (commit: CommitInfo, file: string) => {
+    const rev = isAncestor(commit.id, snap?.head.target ?? null) ? "HEAD" : commit.id;
+    try {
+      const touches = await api.fileLog(path, rev, file);
+      setTrail({ file, touches });
+      setBisectDraft(null);
+    } catch (e) {
+      toast("err", String(e));
+    }
+  };
+
+  /** Step to the next older (+1) or newer (-1) commit on the file's trail. */
+  const stepTrail = (dir: 1 | -1) => {
+    if (!trail) return;
+    const ids = trail.touches.map((x) => x.id).filter((id) => commitById.has(id));
+    if (!ids.length) return;
+    const i = selected ? ids.indexOf(selected) : -1;
+    const id = i < 0 ? ids[0] : ids[Math.min(ids.length - 1, Math.max(0, i + dir))];
+    show({ commit: id });
+    graph.current?.centerOn(id);
+  };
 
   /** Delete branches together; their tips scatter as stardust where they were drawn. */
   const deleteBranches = (names: string[], tips: string[], force: boolean) => {
@@ -997,6 +1030,34 @@ export function RepoView({
         </div>
       )}
 
+      {trail && (
+        <div className="banner trail-banner">
+          <span>
+            <b className="trail-eye">✦ {t("history.trail.eyebrow")}</b>{" "}
+            <Rich k="history.trail.count" vars={{ file: trail.file, n: trail.touches.length }} />
+          </span>
+          <span className="row">
+            <button onClick={() => stepTrail(-1)} title={t("history.trail.newer")}>
+              ◀ {t("history.trail.newer")}
+            </button>
+            <button onClick={() => stepTrail(1)} title={t("history.trail.older")}>
+              {t("history.trail.older")} ▶
+            </button>
+            <button
+              onClick={() =>
+                setBlameReq({
+                  rev: selected && trailFocus?.has(selected) ? selected : (trail.touches[0]?.id ?? "HEAD"),
+                  file: trail.touches.find((x) => x.id === selected)?.path ?? trail.touches[0]?.path ?? trail.file,
+                })
+              }
+            >
+              {t("history.blame.short")}
+            </button>
+            <button onClick={() => setTrail(null)}>{t("common.close")}</button>
+          </span>
+        </div>
+      )}
+
       {snap.state !== "clean" && snap.state !== "bisect" && (
         <div className="banner">
           <span>
@@ -1097,8 +1158,9 @@ export function RepoView({
               headBranch={snap.head.branch}
               changeCount={snap.changes.length}
               selected={selected}
-              focus={bisectFocus ?? focus}
+              focus={trailFocus ?? bisectFocus ?? focus}
               badges={badges}
+              trail={trailIds}
               animate={animate}
               onSelect={(id) => (id || !composer ? show({ commit: id }) : undefined)}
               onPlus={() => show({ composer: true })}
@@ -1235,7 +1297,7 @@ export function RepoView({
             />
           )}
 
-          {cleanupOpen && !conflictSheet && !backport && !rebase && !reflogOpen && (
+          {cleanupOpen && !conflictSheet && !backport && !rebase && !reflogOpen && !blameReq && (
             <CleanupSheet
               path={path}
               version={snap}
@@ -1281,7 +1343,7 @@ export function RepoView({
             />
           )}
 
-          {reflogOpen && !conflictSheet && !backport && !rebase && (
+          {reflogOpen && !conflictSheet && !backport && !rebase && !blameReq && (
             <ReflogSheet
               path={path}
               version={snap}
@@ -1313,7 +1375,22 @@ export function RepoView({
             />
           )}
 
-          {diff && !conflictSheet && !backport && !rebase && !reflogOpen && !cleanupOpen && (
+          {blameReq && !conflictSheet && !backport && !rebase && (
+            <BlameSheet
+              path={path}
+              rev={blameReq.rev}
+              file={blameReq.file}
+              selected={selected}
+              onSelect={(id) => {
+                if (!commitById.has(id)) return;
+                show({ commit: id });
+                graph.current?.centerOn(id);
+              }}
+              onClose={closeBlame}
+            />
+          )}
+
+          {diff && !conflictSheet && !backport && !rebase && !reflogOpen && !cleanupOpen && !blameReq && (
             <DiffSheet
               title={diff.title}
               files={diff.files}
