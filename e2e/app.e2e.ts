@@ -80,3 +80,25 @@ test("folds a straight run when zoomed out and unfolds it on click", async ({ de
   await page.mouse.click((newest.x + oldest.x) / 2, newest.y);
   await expect.poll(() => demo.zoom()).toBeGreaterThanOrEqual(65);
 });
+
+test("backports a missing commit and then counts it as applied", async ({ demo }) => {
+  const { page } = demo;
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  await expect(sheet.locator("tbody tr").first()).toBeVisible();
+  const missing = async () => Number(await sheet.locator("b.bp-missing").textContent());
+  const before = await missing();
+  expect(before).toBeGreaterThan(1);
+
+  await sheet.locator("tbody tr").first().locator("input[type=checkbox]").check();
+  await page.screenshot({ path: "test-results/backport.png" });
+  await sheet.getByRole("button", { name: /cherry-pick$/ }).click();
+  await page.click(".dialog button.primary");
+  await demo.toast(/개 커밋을 .*에 가져왔어요/);
+  await expect.poll(missing).toBe(before - 1);
+
+  // Ignoring hides nothing but moves the commit out of the missing count.
+  await sheet.getByRole("button", { name: "제외", exact: true }).first().click();
+  await expect.poll(missing).toBe(before - 2);
+});

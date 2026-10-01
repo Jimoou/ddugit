@@ -1,5 +1,6 @@
 mod git;
 
+use git::backport::BackportItem;
 use git::conflict::{ConflictFile, Resolution};
 use git::diff::{DiffScope, FileDiff};
 use git::pick::PickOp;
@@ -42,6 +43,14 @@ command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bo
 });
 command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, lines: Option<Vec<usize>>, unstage: bool) -> OpResult
     => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
+command!(backport_compare(path: String, source: String, target: String) -> Vec<BackportItem>
+    => git::backport::compare(&path, &source, &target));
+command!(backport_ignore(path: String, id: String, ignore: bool) -> ()
+    => git::backport::set_ignored(&path, &id, ignore));
+command!(backport_apply(path: String, ids: Vec<String>, target: String) -> OpResult
+    => git::backport::apply(&path, &ids, &target));
+command!(backport_export(path: String, ids: Vec<String>, out_dir: String) -> OpResult
+    => git::backport::export(&path, &ids, &out_dir));
 command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
     => git::write::merge(&path, &source, target.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
@@ -101,6 +110,10 @@ pub fn run() {
             repo_snapshot,
             git_commit,
             git_stage_hunks,
+            backport_compare,
+            backport_ignore,
+            backport_apply,
+            backport_export,
             git_merge,
             git_abort,
             git_continue,
