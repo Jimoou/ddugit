@@ -328,6 +328,16 @@ textarea:focus {
   color: var(--muted);
   margin: 14px 6px 6px;
 }
+.sidebar h3 .h3-add {
+  float: right;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sidebar h3 .h3-add:hover {
+  color: var(--cyan);
+}
 .sidebar ul {
   list-style: none;
   margin: 0;

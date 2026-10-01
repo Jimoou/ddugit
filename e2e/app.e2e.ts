@@ -102,3 +102,20 @@ test("backports a missing commit and then counts it as applied", async ({ demo }
   await sheet.getByRole("button", { name: "제외", exact: true }).first().click();
   await expect.poll(missing).toBe(before - 2);
 });
+
+test("adds the original project as a remote and lists its fixes to backport", async ({ demo }) => {
+  const { page } = demo;
+  await page.click(".sidebar .h3-add");
+  await page.fill(".dialog input >> nth=0", "upstream");
+  await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
+  await page.click(".dialog button.primary");
+  await demo.toast("원격 upstream을(를) 추가했어요");
+  await expect(page.locator(".sidebar li >> text=upstream/main")).toBeVisible();
+
+  await page.click(".sidebar li >> text=upstream/main", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  await expect(sheet.locator("tbody tr")).not.toHaveCount(0);
+  await expect(sheet.locator("tbody")).toContainText("Fix crash on empty repository");
+  await expect(sheet.locator(".bp-hint")).toHaveCount(0);
+});

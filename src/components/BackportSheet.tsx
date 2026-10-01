@@ -11,6 +11,7 @@ interface Props {
   target: string;
   /** With fewer than two remotes, explain how to add the other repository. */
   remoteCount: number;
+  onAddRemote(): void;
   /** Changes whenever the repository does, so the list reloads. */
   version: unknown;
   busy: boolean;
@@ -192,9 +193,9 @@ export function BackportSheet(p: Props) {
         )}
         {p.remoteCount < 2 && (
           <p className="note bp-hint">
-            다른 저장소(예: 원본 프로젝트 ↔ 고객사 저장소)와 비교하려면 한 번만 원격을 추가하세요:{" "}
-            <code>git remote add upstream &lt;URL&gt;</code> 후 Fetch. 그다음 가져올 쪽에서 <code>upstream/main</code>을
-            고르면 됩니다.
+            다른 저장소(예: 원본 프로젝트 ↔ 고객사 저장소)와 비교하려면 그 저장소를 원격으로 추가하세요. 가져온 뒤
+            가져올 쪽에서 <code>upstream/main</code> 같은 브랜치를 고르면 됩니다.{" "}
+            <button onClick={p.onAddRemote}>원격 추가…</button>
           </p>
         )}
       </div>

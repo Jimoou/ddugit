@@ -44,6 +44,7 @@ class MockRepo {
   pending: { source: string; label: string; files: Map<string, string> } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
   backportIgnored = new Set<string>();
+  remoteUrls = new Map([["origin", "https://github.com/otgit/otgit-demo.git"]]);
 
   commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
     const id = fakeId();
@@ -145,7 +146,7 @@ class MockRepo {
       },
       commits: all.slice(0, limit).map((id) => this.commits.get(id)!),
       refs,
-      remotes: [{ name: "origin", url: "https://github.com/otgit/otgit-demo.git" }],
+      remotes: [...this.remoteUrls].map(([name, url]) => ({ name, url })),
       changes: this.changes.map((c) => ({ ...c })),
       stashes: this.stashes.map(({ message, id, base, time }, index) => ({ index, message, id, base, time })),
       state: this.state,
@@ -457,6 +458,20 @@ export const mock: Table = {
         return delay(res("ok"));
       case "deleteTag":
         repo.tags.delete(op.name);
+        return delay(res("ok"));
+      case "addRemote": {
+        if (repo.remoteUrls.has(op.name)) return fail(`error: remote ${op.name} already exists.`);
+        repo.remoteUrls.set(op.name, op.url);
+        // Stand-in for what the first fetch brings: the other project's main with two fixes.
+        let tip = repo.remotes.get("origin/main")!;
+        for (const fix of ["Fix crash on empty repository", "Escape branch names in labels"])
+          tip = repo.commit([tip], fix);
+        repo.remotes.set(`${op.name}/main`, tip);
+        return delay(res("ok"));
+      }
+      case "removeRemote":
+        if (!repo.remoteUrls.delete(op.name)) return fail(`error: No such remote: '${op.name}'`);
+        for (const r of [...repo.remotes.keys()]) if (r.startsWith(`${op.name}/`)) repo.remotes.delete(r);
         return delay(res("ok"));
       case "checkoutRemote": {
         const local = op.remoteRef.replace(/^[^/]+\//, "");

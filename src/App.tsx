@@ -375,10 +375,24 @@ export default function App() {
       title: `${at.slice(0, 7)}에 태그`,
       placeholder: "v1.0.0",
       confirmLabel: "태그 만들기",
-      messagePlaceholder: "설명 (비워 두면 가벼운 태그, 쓰면 주석 태그)",
+      extra: { placeholder: "설명 (비워 두면 가벼운 태그, 쓰면 주석 태그)", multiline: true },
       onSubmit: (name, message) => {
         setNameReq(null);
         void refRun(`${name} 태그를 만들었어요`, { kind: "createTag", name, at, message });
+      },
+    });
+
+  /** Add another repository (e.g. the original project) as a remote and fetch it. */
+  const askRemote = () =>
+    setNameReq({
+      title: "원격 저장소 추가",
+      placeholder: snap?.remotes.some((r) => r.name === "upstream") ? "이름" : "이름 (예: upstream)",
+      extra: { placeholder: "URL (https://… 또는 git@…:…)", required: true },
+      confirmLabel: "추가하고 가져오기",
+      onSubmit: async (name, url) => {
+        setNameReq(null);
+        const r = await refRun(`원격 ${name}을(를) 추가했어요`, { kind: "addRemote", name, url });
+        if (r.status === "ok") await remote("fetch");
       },
     });
 
@@ -459,14 +473,37 @@ export default function App() {
             }),
         },
       ];
-    if (r.kind === "remote")
+    if (r.kind === "remote") {
+      const name = snap.remotes.map((x) => x.name).find((n) => r.name.startsWith(`${n}/`)) ?? r.name.split("/")[0];
       return [
         { label: "로컬 브랜치로 체크아웃", hint: "추적", onSelect: () => void checkoutRef(r) },
         merge,
         compare,
         "separator",
         { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(r.target) },
+        "separator",
+        {
+          label: `원격 ${name} 삭제…`,
+          danger: true,
+          onSelect: () =>
+            setConfirm({
+              title: "원격 삭제",
+              danger: true,
+              confirmLabel: "삭제",
+              body: (
+                <p>
+                  원격 <b>{name}</b>과(와) 그 원격 브랜치 목록을 이 저장소에서 지웁니다. 원격 저장소 자체와 로컬
+                  브랜치는 그대로예요.
+                </p>
+              ),
+              onConfirm: () => {
+                setConfirm(null);
+                void refRun(`원격 ${name}을(를) 지웠어요`, { kind: "removeRemote", name });
+              },
+            }),
+        },
       ];
+    }
     return [
       { label: "체크아웃", disabled: isHead, onSelect: () => void checkoutRef(r) },
       merge,
@@ -628,6 +665,7 @@ export default function App() {
             if (r) graph.current?.centerOn(r.target);
           }}
           onCheckout={checkoutRef}
+          onAddRemote={askRemote}
           onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
           stashes={snap.stashes}
           selectedStash={selectedStash}
@@ -736,6 +774,7 @@ export default function App() {
               path={path}
               branches={snap.refs.filter((r) => r.kind !== "tag").map((r) => r.name)}
               remoteCount={snap.remotes.length}
+              onAddRemote={askRemote}
               source={backport.source}
               target={backport.target}
               version={snap}
