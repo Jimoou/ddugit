@@ -37,8 +37,20 @@ export class Demo {
     await this.page.evaluate(() => window.dispatchEvent(new Event("focus")));
   }
 
-  screenOf(id: string) {
+  private rawScreenOf(id: string) {
     return this.page.evaluate((id) => (window as unknown as DemoWindow).__otgit.screenOf(id), id);
+  }
+
+  /** Screen position of a commit once the camera has stopped moving (it eases after loads). */
+  async screenOf(id: string) {
+    let last = await this.rawScreenOf(id);
+    for (let i = 0; i < 40; i++) {
+      await this.page.waitForTimeout(50);
+      const now = await this.rawScreenOf(id);
+      if (now && last && Math.abs(now.x - last.x) < 0.5 && Math.abs(now.y - last.y) < 0.5) return now;
+      last = now;
+    }
+    return last;
   }
 
   toast(text: string | RegExp) {
