@@ -293,3 +293,45 @@ test("settings: switching to English relabels the app and is remembered", async 
   await expect(page.locator(".topbar")).toContainText("Demo mode");
   expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
 });
+
+test("clones from a URL, remembers it in the repository menu and stars it", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(
+    () => ((window as unknown as { __otgitDemo: { nextFolder: string } }).__otgitDemo.nextFolder = "/work"),
+  );
+  await page.locator(".topbar .repo").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /URL로 가져오기/ })
+    .click();
+  const dialog = page.locator(".dialog.clone");
+  await dialog.getByPlaceholder("https://github.com/owner/repo.git").fill("https://github.com/acme/rocket.git");
+  await dialog.getByRole("button", { name: "고르기…" }).click();
+  await expect(dialog).toContainText("→ /work/rocket");
+  await dialog.getByRole("button", { name: "가져오기" }).click();
+  await demo.toast("rocket을(를) 가져왔어요");
+
+  await page.locator(".topbar .repo").click();
+  const row = page.locator(".repo-menu .recent-list li").filter({ hasText: "/work/rocket" });
+  await expect(row).toHaveClass(/on/);
+  await row.getByRole("button", { name: "즐겨찾기", exact: true }).click();
+  await expect(row.locator(".star")).toHaveText("★");
+  await expect(row.locator(".star")).toHaveAttribute("aria-pressed", "true");
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("otgit.recent")!));
+  expect(stored[0]).toMatchObject({ path: "/work/rocket", starred: true });
+});
+
+test("creates a new repository in a plain folder", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(
+    () => ((window as unknown as { __otgitDemo: { nextFolder: string } }).__otgitDemo.nextFolder = "/tmp/not-a-repo"),
+  );
+  await page.locator(".topbar .repo").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /새 저장소 만들기/ })
+    .click();
+  await demo.toast("새 저장소를 만들었어요");
+  await page.locator(".topbar .repo").click();
+  await expect(page.locator(".repo-menu .recent-list li.on")).toContainText("/tmp/not-a-repo");
+});

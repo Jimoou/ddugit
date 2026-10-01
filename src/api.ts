@@ -1,5 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { mock } from "./mock";
+import { demoControls, mock } from "./mock";
 import type {
   BackportItem,
   BackportTally,
@@ -31,6 +31,9 @@ export interface Sink<T> {
 /** Tauri command name → argument object. The demo backend implements the same table. */
 export interface Commands {
   initial_repo: [Record<string, never>, string | null];
+  repo_root: [{ dir: string }, string | null];
+  git_clone: [{ url: string; dest: string; onProgress: Sink<Progress> }, OpResult];
+  git_init: [{ dir: string }, OpResult];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
   git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
   git_stage_hunks: [
@@ -70,11 +73,27 @@ function call<C extends Command>(cmd: C, args: Args<C>): Promise<Ret<C>> {
   return invoke(cmd, args);
 }
 
+/** A Tauri channel for real repositories, a plain callback object for the demo. */
+function progressSink(onProgress: (p: Progress) => void, path?: string): Sink<Progress> {
+  if (!isTauri || path === DEMO_PATH) return { onmessage: onProgress };
+  const ch = new Channel<Progress>();
+  ch.onmessage = onProgress;
+  return ch;
+}
+
 // Commits are immutable, so their diffs can be cached for the session.
 const diffCache = new Map<string, Promise<FileDiff[]>>();
 
 export const api = {
   initialRepo: () => (isTauri ? call("initial_repo", {}) : Promise.resolve(null)),
+  /** Root of the repository `dir` (a file or folder) belongs to, or null. */
+  repoRoot: (dir: string) => call("repo_root", { dir }),
+  /** Clone `url` into `dest` (a new or empty folder). */
+  clone(url: string, dest: string, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_clone", { url, dest, onProgress: progressSink(onProgress) });
+  },
+  /** `git init` (on `main`) in an existing folder. */
+  init: (dir: string) => call("git_init", { dir }),
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
   commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
     call("git_commit", { path, message, paths, amend, stagedOnly }),
@@ -89,13 +108,7 @@ export const api = {
     call("git_create_branch", { path, name, at, switch: switchTo }),
   ref: (path: string, op: RefOp) => call("git_ref", { path, op }),
   remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
-    let sink: Sink<Progress> = { onmessage: onProgress };
-    if (isTauri && path !== DEMO_PATH) {
-      const ch = new Channel<Progress>();
-      ch.onmessage = onProgress;
-      sink = ch;
-    }
-    return call("git_remote", { path, op, onProgress: sink });
+    return call("git_remote", { path, op, onProgress: progressSink(onProgress, path) });
   },
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
@@ -135,7 +148,11 @@ export const api = {
     return unlisten;
   },
   async pickFolder(title = t("app.open")): Promise<string | null> {
-    if (!isTauri) return DEMO_PATH;
+    if (!isTauri) {
+      const next = demoControls.nextFolder;
+      demoControls.nextFolder = null;
+      return next ?? DEMO_PATH;
+    }
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ directory: true, multiple: false, title });
     return typeof r === "string" ? r : null;

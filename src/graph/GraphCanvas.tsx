@@ -251,7 +251,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const el = wrapRef.current!;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      const c = canvasRef.current!;
+      const c = canvasRef.current;
+      if (!c) return; // unmounted (e.g. switching repositories)
       const dpr = window.devicePixelRatio || 1;
       c.width = Math.round(r.width * dpr);
       c.height = Math.round(r.height * dpr);

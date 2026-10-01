@@ -4,6 +4,7 @@ import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { RebaseSheet } from "./components/RebaseSheet";
 import { AuthDialog } from "./components/AuthDialog";
+import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { ConflictSheet } from "./components/ConflictSheet";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
@@ -26,6 +27,7 @@ import { planMove, rebaseRange } from "./rebasePlan";
 import { defaults, parseSettings, type Settings } from "./settings";
 import { isKey, type Key, resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
+import { repoName } from "./recent";
 import type { Drag } from "./graph/renderer";
 import type {
   FileDiff,
@@ -121,6 +123,13 @@ export default function App() {
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
   const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
   const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
+  const recent = useRecent();
+  const touchRecent = recent.touch;
+  const [repoMenu, setRepoMenu] = useState(false);
+  const [clone, setClone] = useState<CloneInit | null>(null);
+  const [cloneAuth, setCloneAuth] = useState<{ req: Required<CloneInit>; output: string } | null>(null);
+  /** A folder is being dragged over the window. */
+  const [dropping, setDropping] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [diff, setDiff] = useState<DiffState | null>(null);
   const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
@@ -196,13 +205,17 @@ export default function App() {
     if (!path) return;
     let live = true;
     api.snapshot(path, limit).then(
-      (s) => live && applySnapshot(s),
+      (s) => {
+        if (!live) return;
+        applySnapshot(s);
+        if (path !== DEMO_PATH) touchRecent(path);
+      },
       (e) => live && setLoadError(String(e)),
     );
     return () => {
       live = false;
     };
-  }, [path, limit, applySnapshot]);
+  }, [path, limit, applySnapshot, touchRecent]);
 
   // Files and refs changed on disk (editor, terminal git) → refresh.
   useEffect(() => {
@@ -684,12 +697,121 @@ export default function App() {
     ];
   };
 
-  const openRepo = async () => {
-    const p = await api.pickFolder();
-    if (!p) return;
+  const openPath = (p: string) => {
     if (p !== DEMO_PATH) store(LAST_REPO, p);
+    setLoadError(null);
     setPath(p);
   };
+
+  const openRepo = async () => {
+    const p = await api.pickFolder();
+    if (p) openPath(p);
+  };
+
+  /** Make `dir` a repository (if it isn't one already) and open it. */
+  const initAt = async (dir: string) => {
+    if (await api.repoRoot(dir)) {
+      toast("ok", t("connect.init.exists"));
+      return openPath(dir);
+    }
+    try {
+      const r = await api.init(dir);
+      if (r.status !== "ok") return toast("err", r.output);
+      toast("ok", t("connect.init.done"));
+      openPath(dir);
+    } catch (e) {
+      toast("err", String(e));
+    }
+  };
+  const newRepo = async () => {
+    const dir = await api.pickFolder(t("connect.init.folder"));
+    if (dir) await initAt(dir);
+  };
+
+  /** A folder (or file) dropped on the window: open its repository, or offer to create one. */
+  const openDropped = async (dropped: string) => {
+    const root = await api.repoRoot(dropped);
+    if (root) return openPath(root);
+    setConfirm({
+      title: t("connect.notRepo.title"),
+      confirmLabel: t("connect.notRepo.go"),
+      body: (
+        <p>
+          <Rich k="connect.notRepo.body" vars={{ path: dropped }} />
+        </p>
+      ),
+      onConfirm: () => {
+        setConfirm(null);
+        void initAt(dropped);
+      },
+    });
+  };
+  const dropRef = useRef(openDropped);
+  useEffect(() => {
+    dropRef.current = openDropped;
+  });
+
+  // Folders dragged onto the window (desktop app only).
+  useEffect(() => {
+    if (!isTauri) return;
+    let live = true;
+    let stop = () => {};
+    void import("@tauri-apps/api/webview")
+      .then(({ getCurrentWebview }) =>
+        getCurrentWebview().onDragDropEvent(({ payload }) => {
+          if (payload.type === "over" || payload.type === "enter") setDropping(true);
+          else if (payload.type === "leave") setDropping(false);
+          else {
+            setDropping(false);
+            if (payload.paths[0]) void dropRef.current(payload.paths[0]);
+          }
+        }),
+      )
+      .then((un) => (live ? (stop = un) : un()));
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
+
+  const connectOverlays = (
+    <>
+      {clone && (
+        <CloneDialog
+          init={clone}
+          onCancel={() => setClone(null)}
+          onCloned={(dest) => {
+            setClone(null);
+            toast("ok", t("connect.cloned", { name: repoName(dest) }));
+            openPath(dest);
+          }}
+          onAuth={(req, output) => {
+            setClone(null);
+            setCloneAuth({ req, output });
+          }}
+        />
+      )}
+      {cloneAuth && (
+        <AuthDialog
+          url={cloneAuth.req.url}
+          output={cloneAuth.output}
+          repoPath={cloneAuth.req.parent}
+          fetchCmd={`git clone ${cloneAuth.req.url}`}
+          busy={false}
+          onClose={() => setCloneAuth(null)}
+          onRetry={() => {
+            setClone(cloneAuth.req);
+            setCloneAuth(null);
+          }}
+        />
+      )}
+      {dropping && (
+        <div className="drop-zone">
+          <div>{t("connect.drop")}</div>
+        </div>
+      )}
+    </>
+  );
 
   // --- empty / error states ---------------------------------------------------
   if (!path || (!snap && loadError)) {
@@ -698,11 +820,26 @@ export default function App() {
         <h1 className="wordmark">otgit</h1>
         <p>{t("app.tagline")}</p>
         {loadError && <p className="note warn">{loadError}</p>}
-        <div className="row">
-          <button className="primary" onClick={openRepo}>
-            {t("app.open")}
-          </button>
-          <button onClick={() => setPath(DEMO_PATH)}>{t("app.demo")}</button>
+        <ConnectActions
+          primary
+          onOpen={() => void openRepo()}
+          onClone={() => setClone({})}
+          onInit={() => void newRepo()}
+        />
+        <section className="welcome-recent">
+          <div className="eyebrow">{t("connect.recent")}</div>
+          <RecentList recent={recent} onOpen={openPath} />
+        </section>
+        <button className="ghost" onClick={() => openPath(DEMO_PATH)}>
+          {t("app.demo")}
+        </button>
+        {connectOverlays}
+        <div className="toasts floating">
+          {toasts.map((item) => (
+            <div key={item.id} className={`toast ${item.kind}`}>
+              {item.text}
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -725,7 +862,20 @@ export default function App() {
         remoteBusy={remoteBusy}
         progress={progress}
         animate={animate}
-        onOpenRepo={openRepo}
+        onOpenRepo={() => setRepoMenu((o) => !o)}
+        repoMenu={
+          repoMenu && (
+            <RepoMenu
+              recent={recent}
+              current={path}
+              onOpenPath={openPath}
+              onOpen={() => void openRepo()}
+              onClone={() => setClone({})}
+              onInit={() => void newRepo()}
+              onClose={() => setRepoMenu(false)}
+            />
+          )
+        }
         onCompose={() => show({ composer: true })}
         onRefresh={() => void refresh()}
         onRemote={(op) => void remote(op)}
@@ -1113,6 +1263,8 @@ export default function App() {
       )}
 
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
+
+      {connectOverlays}
 
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { isTauri } from "../api";
 import { isKey, type Key, t } from "../i18n";
 import type { HeadInfo, Progress, RemoteOp } from "../types";
@@ -13,7 +14,10 @@ interface Props {
   remoteBusy: RemoteOp | null;
   progress: Progress | null;
   animate: boolean;
+  /** Toggle the repository menu (recent, open, clone, new). */
   onOpenRepo(): void;
+  /** The open repository menu, shown under the name. */
+  repoMenu?: ReactNode;
   onCompose(): void;
   onRefresh(): void;
   onRemote(op: RemoteOp): void;
@@ -40,9 +44,12 @@ export function TopBar(p: Props) {
   return (
     <header className="topbar">
       <h1 className="wordmark small">otgit</h1>
-      <button className="repo" onClick={p.onOpenRepo} title={p.repoPath}>
-        {p.repoName} <span className="muted">▾</span>
-      </button>
+      <span className="repo-anchor">
+        <button className="repo" onClick={p.onOpenRepo} title={p.repoPath} aria-expanded={!!p.repoMenu}>
+          {p.repoName} <span className="muted">▾</span>
+        </button>
+        {p.repoMenu}
+      </span>
       <span className="branch-now" style={{ ["--c" as string]: p.headColor }}>
         ◉ {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
       </span>

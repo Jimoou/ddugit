@@ -324,6 +324,8 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
 export const demoControls = {
   /** Make the next remote call fail authentication. */
   failNextRemote: null as null | "https" | "ssh",
+  /** Folder the next "choose folder" dialog returns (default: the demo repository). */
+  nextFolder: null as string | null,
   /** Make the next merge stop on a conflict in two files. */
   conflictNext: false,
   /** Current demo state, read synchronously (e2e assertions). */
@@ -378,6 +380,24 @@ type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
 
 export const mock: Table = {
   initial_repo: () => delay(null, 0),
+  // Any folder "is" the demo repository, except ones named like a plain folder.
+  repo_root: ({ dir }) => delay(/not-a-repo/.test(dir) ? null : dir, 0),
+  async git_clone({ url, onProgress }) {
+    const fake = demoControls.failNextRemote;
+    if (fake) {
+      demoControls.failNextRemote = null;
+      await delay(null, 200);
+      return res("auth", AUTH_OUTPUT[fake]);
+    }
+    if (!url.trim()) return fail("Enter a repository URL");
+    for (const phase of PHASES.fetch)
+      for (let pct = 0; pct <= 100; pct += 25) {
+        onProgress.onmessage({ phase, percent: pct });
+        await delay(null, 40);
+      }
+    return res("ok", `Cloning into '${url}'...`);
+  },
+  git_init: () => delay(res("ok", "Initialized empty Git repository")),
   repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
 
   git_commit({ message, paths, amend, stagedOnly }) {

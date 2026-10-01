@@ -44,10 +44,12 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `diff.rs`: 커밋 diff, 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
   - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
   - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`)
+  - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)
   - `backport.rs`: 두 브랜치(예: `upstream/main` ↔ 고객사 `main`) 사이 미반영 커밋 비교(`--cherry-mark` + `-x` 트레일러), 제외 표시(받는 쪽별 로컬 config), 대상별 요약, 일괄 cherry-pick, 패치 내보내기
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.
+- `src/recent.ts`: 최근 저장소·즐겨찾기 목록(순수 함수). `components/Connect.tsx`가 저장(`useRecent`)과 화면(저장소 메뉴, 첫 화면 목록, clone 창)을 맡는다
 - `src/settings.ts`: 사용자 설정(localStorage, 파싱은 순수 함수)과 단축키 표. 단축키를 바꾸면 `SHORTCUTS`도 고친다.
 - `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`
 - `src/components/`: 패널과 다이얼로그

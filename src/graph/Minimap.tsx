@@ -62,7 +62,8 @@ export function Minimap({ scene, getView, getSize, onJump }: Props) {
   useEffect(() => {
     renderCache();
     const ro = new ResizeObserver(() => {
-      const c = ref.current!;
+      const c = ref.current;
+      if (!c) return; // unmounted (e.g. switching repositories)
       const dpr = window.devicePixelRatio || 1;
       c.width = Math.round(c.clientWidth * dpr);
       c.height = Math.round(H * dpr);

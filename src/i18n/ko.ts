@@ -425,6 +425,34 @@ export const ko = {
   "sync.force": "덮어쓰기 (강제 push)",
   "sync.force.hint":
     "원격에만 있는 커밋 {n}개를 지우고 {upstream}을(를) 내 이력으로 바꿉니다. 커밋을 정리(rebase·amend)해서 생긴 이전 버전들이라면 이게 맞아요. 다른 사람의 커밋이 섞여 있으면 병합이나 리베이스를 고르세요. 이 창을 연 뒤에 누가 또 올리면 git이 거부합니다(--force-with-lease).",
+
+  // connect: recent, open, clone, new, drop
+  "connect.title": "저장소",
+  "connect.open": "폴더 열기…",
+  "connect.clone": "URL로 가져오기 (clone)",
+  "connect.init": "새 저장소 만들기",
+  "connect.recent": "최근 저장소",
+  "connect.noRecent": "아직 연 저장소가 없어요.",
+  "connect.star": "즐겨찾기",
+  "connect.unstar": "즐겨찾기 해제",
+  "connect.forget": "목록에서 지우기",
+  "connect.clone.url": "저장소 주소 (HTTPS 또는 SSH)",
+  "connect.clone.where": "저장할 폴더",
+  "connect.clone.noFolder": "폴더를 고르세요",
+  "connect.clone.choose": "고르기…",
+  "connect.clone.name": "폴더 이름",
+  "connect.clone.starting": "연결하는 중…",
+  "connect.clone.running": "가져오는 중…",
+  "connect.clone.go": "가져오기",
+  "connect.clone.failed": "가져오지 못했어요",
+  "connect.cloned": "{name}을(를) 가져왔어요",
+  "connect.init.folder": "새 저장소를 만들 폴더",
+  "connect.init.exists": "이미 git 저장소예요. 그대로 열어요.",
+  "connect.init.done": "새 저장소를 만들었어요",
+  "connect.drop": "놓으면 이 폴더를 열어요",
+  "connect.notRepo.title": "git 저장소가 아니에요",
+  "connect.notRepo.body": "<b>{path}</b>에 새 저장소를 만들까요?",
+  "connect.notRepo.go": "여기에 만들기",
 } as const;
 
 export type Key = keyof typeof ko;
