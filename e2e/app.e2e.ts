@@ -493,10 +493,7 @@ test("hunts down the commit that broke something with bisect", async ({ demo }) 
     [bad, "버그가 있는 커밋으로 표시"],
     [good, "버그가 없는 커밋으로 표시"],
   ] as const) {
-    await expect.poll(async () => (await demo.screenOf(id)) !== null).toBe(true);
-    const at = (await demo.screenOf(id))!;
-    await page.mouse.click(at.x, at.y, { button: "right" });
-    await page.click(`.context-menu >> text=${label}`);
+    await (await demo.commitMenu(id)).getByText(label).click();
   }
   await demo.toast("버그 찾기를 시작했어요");
 
