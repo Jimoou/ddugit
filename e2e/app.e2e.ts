@@ -474,6 +474,8 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
 });
 
 test("hunts down the commit that broke something with bisect", async ({ demo }) => {
+  // Many steps, each waiting on the graph: give a slow runner room.
+  test.slow();
   const { page } = demo;
   await demo.mutate((d) => d.grow(7));
   const snap = await demo.snapshot();
