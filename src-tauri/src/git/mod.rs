@@ -4,6 +4,7 @@
 //! merge, checkout, branch, fetch/pull/push) shell out to the user's `git` so
 //! hooks, credentials, signing and LFS behave exactly as on the command line.
 
+pub mod conflict;
 pub mod diff;
 pub mod pick;
 pub mod read;

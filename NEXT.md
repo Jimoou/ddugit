@@ -7,23 +7,22 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #4(커밋 검색)를 squash merge했다(`021d5c5`).
+- PR #5(hunk 스테이징)를 squash merge했다(`3c20d93`).
 
 ## 지금 하는 일
 
-M2 · hunk 스테이징 완료 → PR #5에서 CI 대기 (10분 뒤 확인 예약)
+M2 · 충돌 해결 화면 (PR #6 예정)
 
-- 백엔드
-  - `git/stage.rs`: 단일 파일 패치에서 `@@` hunk만 골라 `git apply --cached [--reverse]` (stdin은 `git_input`)
-  - `diff.rs`: `DiffScope`, `local_diff`(표시와 스테이징이 같은 diff 옵션을 써서 hunk 번호가 일치)
-  - `write.rs`: `commit_index`
-  - 테스트 37
-- UI: `DiffSheet`의 `stage` prop(범위 탭, hunk 버튼), 커밋 작성기의 "스테이지된 변경만 커밋"(일부만 스테이지된 파일이 생기면 자동으로 켜짐, ½ 배지)
-
-## 다음 단계
-
-1. 충돌 해결 화면 (ours / theirs / 수동, 충돌 파일 목록 → 해결 표시)
-2. 줄 단위 스테이징 (hunk 안에서 줄 선택 → 패치 재작성)
+- [x] 백엔드 `git/conflict.rs`
+  - `conflict_file`: 인덱스 충돌 항목에서 base / ours / theirs와 마커가 들어간 작업 파일을 읽음
+  - `resolve(Resolution)`: Ours / Theirs / Content. 한쪽이 삭제한 경우는 `git rm`
+  - 테스트 40
+- [ ] 프런트
+  - `src/conflict.ts`: 마커 파싱(`<<<<<<<`, diff3의 `|||||||`, `=======`, `>>>>>>>`) → 블록별 선택 → 결과 텍스트, vitest
+  - `ConflictSheet`: 충돌 파일 목록, 블록마다 ours/theirs 카드 + "이쪽 / 저쪽 / 둘 다", 파일 전체 ours/theirs, 결과 미리보기 → "해결 완료"
+  - 진입: 배너의 "충돌 해결" 버튼, 커밋 작성기에서 충돌 파일 클릭
+  - 데모: `__otgitDemo.conflictNext = true`이면 다음 병합에서 충돌이 남
+  - 리베이스 중에는 ours/theirs 의미가 반대라서 라벨을 상태에 맞춰 바꾼다
 
 ## 막힌 것 / 결정 필요
 
