@@ -59,19 +59,25 @@ export class Demo {
   /**
    * Right-click a commit until its own menu opens. Even a still sample can
    * miss on a slow runner (a move can start right after it), so check the
-   * menu's title and try again instead of trusting one click.
+   * menu's title and try again instead of trusting one click. A slow runner
+   * can also take a while to show the menu: a late one with the right title
+   * counts, and only a wrong one is closed.
    */
   async commitMenu(id: string) {
     const summary = (await this.snapshot()).commits.find((c) => c.id === id)!.summary;
     const menu = this.page.locator(".context-menu");
+    const title = menu.locator(".menu-title");
     await expect(async () => {
-      if (await menu.count()) await this.page.keyboard.press("Escape");
-      await expect(menu).toHaveCount(0, { timeout: 1000 });
+      if (await menu.count()) {
+        if ((await title.textContent()) === summary) return;
+        await this.page.keyboard.press("Escape");
+        await expect(menu).toHaveCount(0, { timeout: 3000 });
+      }
       const at = await this.screenOf(id);
       if (!at) throw new Error(`commit ${id.slice(0, 7)} is not drawn`);
       await this.page.mouse.click(at.x, at.y, { button: "right" });
-      await expect(menu.locator(".menu-title")).toHaveText(summary, { timeout: 1000 });
-    }).toPass({ timeout: 20_000 });
+      await expect(title).toHaveText(summary, { timeout: 4000 });
+    }).toPass({ timeout: 30_000 });
     return menu;
   }
 

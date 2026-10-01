@@ -2245,3 +2245,138 @@ kbd {
   color: var(--muted);
   user-select: none;
 }
+
+/* ------------------------------------------------------- remote: orbit & meteors */
+/* A push: the trajectory draws itself from HEAD and a comet rides it out of the sky. */
+.launch {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.launch::before {
+  content: "";
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  margin: -18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(34, 232, 255, 0.35) 45%, transparent 70%);
+  animation: ignite 0.6s ease-out forwards;
+}
+@keyframes ignite {
+  from {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+.launch .trajectory {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.launch .trajectory path {
+  fill: none;
+  stroke: rgba(34, 232, 255, 0.7);
+  stroke-width: 1.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 4px rgba(34, 232, 255, 0.9));
+  animation: trajectory 1.4s ease-in forwards;
+}
+@keyframes trajectory {
+  60% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+.launch .comet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 46px;
+  height: 4px;
+  margin: -2px 0 0 -42px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(34, 232, 255, 0.6) 60%, #fff);
+  filter: drop-shadow(0 0 6px rgba(34, 232, 255, 0.95));
+  offset-rotate: auto;
+  offset-anchor: 42px 2px;
+  animation: comet 0.9s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+}
+@keyframes comet {
+  from {
+    offset-distance: 0%;
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* A fetch / pull: a meteor streaks down onto each arriving commit and flashes on impact. */
+.meteor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.meteor::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 90px;
+  height: 3px;
+  margin: -1.5px 0 0 -2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #fff, rgba(166, 255, 77, 0.6) 35%, transparent);
+  filter: drop-shadow(0 0 5px rgba(166, 255, 77, 0.9));
+  transform-origin: 2px 1.5px;
+  opacity: 0;
+  animation: meteor 0.65s cubic-bezier(0.4, 0, 1, 1) var(--delay) forwards;
+}
+@keyframes meteor {
+  from {
+    opacity: 0;
+    transform: translate(260px, -310px) rotate(-50deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) rotate(-50deg) scaleX(0.3);
+  }
+}
+.meteor::after {
+  content: "";
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(166, 255, 77, 0.4) 40%, transparent 70%);
+  opacity: 0;
+  animation: impact 0.6s ease-out calc(var(--delay) + 0.6s) forwards;
+}
+@keyframes impact {
+  from {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
