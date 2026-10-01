@@ -43,7 +43,8 @@ class MockRepo {
   /** In-progress demo merge: source commit and the conflicted files' marked-up text. */
   pending: { source: string; label: string; files: Map<string, string> } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
-  backportIgnored = new Set<string>();
+  /** Target branch → commits ignored for it. */
+  backportIgnored = new Map<string, Set<string>>();
   remoteUrls = new Map([["origin", "https://github.com/otgit/otgit-demo.git"]]);
 
   commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
@@ -639,17 +640,29 @@ export const mock: Table = {
         time: c.time,
         state: ported.has(c.summary)
           ? { kind: "applied" }
-          : repo.backportIgnored.has(c.id)
+          : repo.backportIgnored.get(target)?.has(c.id)
             ? { kind: "ignored" }
             : { kind: "missing" },
       })),
     );
   },
 
-  backport_ignore({ id, ignore }) {
-    if (ignore) repo.backportIgnored.add(id);
-    else repo.backportIgnored.delete(id);
+  backport_ignore({ target, id, ignore }) {
+    const set = repo.backportIgnored.get(target) ?? new Set<string>();
+    if (ignore) set.add(id);
+    else set.delete(id);
+    repo.backportIgnored.set(target, set);
     return delay(null);
+  },
+
+  async backport_summary({ path, source, targets }) {
+    const out = [];
+    for (const target of targets.filter((t) => t !== source)) {
+      const items = await mock.backport_compare({ path, source, target });
+      const n = (k: string) => items.filter((i) => i.state.kind === k).length;
+      out.push({ target, missing: n("missing"), applied: n("applied") + n("picked"), ignored: n("ignored") });
+    }
+    return out;
   },
 
   backport_apply({ ids, target }) {

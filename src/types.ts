@@ -60,6 +60,13 @@ export interface RebaseStep {
 export type BackportState =
   { kind: "missing" } | { kind: "applied" } | { kind: "picked"; by: string } | { kind: "ignored" };
 
+export interface BackportTally {
+  target: string;
+  missing: number;
+  applied: number;
+  ignored: number;
+}
+
 export interface BackportItem {
   id: string;
   summary: string;

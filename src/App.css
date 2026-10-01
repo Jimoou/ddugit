@@ -1456,6 +1456,24 @@ table.diff tr.picked .no {
 .bp-hint code {
   color: var(--text);
 }
+.bp-overview tbody tr {
+  cursor: pointer;
+}
+.bp-overview tbody tr:hover,
+.bp-overview tbody tr.on {
+  background: rgba(34, 232, 255, 0.06);
+}
+.bp-overview td:first-child,
+.bp-overview th:first-child {
+  width: auto;
+}
+.bp-overview td:not(:first-child),
+.bp-overview th:not(:first-child) {
+  width: 1%;
+  padding-left: 28px;
+  text-align: right;
+  white-space: nowrap;
+}
 b.bp-missing {
   color: var(--amber);
 }

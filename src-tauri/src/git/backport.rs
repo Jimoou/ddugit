@@ -3,8 +3,9 @@
 //! remote). Lists the commits of `source` the `target` does not have yet,
 //! recognising earlier ports by patch id (`--cherry-mark`) and by the
 //! `(cherry picked from commit …)` trailer `-x` leaves, so a port that needed
-//! conflict fixes still counts. Commits that do not apply to the fork can be
-//! ignored; the choice lives in the repository's local config.
+//! conflict fixes still counts. Commits that do not apply to a fork can be
+//! ignored per target branch (one repository may carry several customers'
+//! branches); the choice lives in the repository's local config.
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -16,7 +17,13 @@ use super::{git, git_ok, repo_dir, OpResult, Result};
 
 /// Commits listed at most; older ones need a narrower `source`.
 const MAX_ITEMS: usize = 1000;
-const IGNORE_KEY: &str = "otgit.backportIgnored";
+/// Before ignores were per target they had one repository-wide key; it still applies everywhere.
+const LEGACY_IGNORE_KEY: &str = "otgit.backportIgnored";
+/// `otgit.<target>.backportIgnored`: git splits keys at the first and last dot,
+/// so a branch name with `/` or `.` is a valid subsection.
+fn ignore_key(target: &str) -> String {
+    format!("otgit.{target}.backportIgnored")
+}
 const TRAILER: &str = "(cherry picked from commit ";
 
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -69,7 +76,7 @@ pub fn compare(path: &str, source: &str, target: &str) -> Result<Vec<BackportIte
         ],
     )?;
     let picked = picked_in(&dir, &format!("{source}..{target}"))?;
-    let ignored = ignored(&dir)?;
+    let ignored = ignored(&dir, target)?;
 
     Ok(log
         .lines()
@@ -116,29 +123,60 @@ fn picked_in(dir: &Path, range: &str) -> Result<HashMap<String, String>> {
     Ok(out)
 }
 
-fn ignored(dir: &Path) -> Result<HashSet<String>> {
-    // Exit code 1 just means the key is not set.
-    let o = git(dir, &["config", "--local", "--get-all", IGNORE_KEY])?;
-    Ok(if o.ok {
-        o.text.lines().map(|l| l.trim().to_string()).collect()
-    } else {
-        HashSet::new()
-    })
+fn ignored(dir: &Path, target: &str) -> Result<HashSet<String>> {
+    let mut out = HashSet::new();
+    for key in [ignore_key(target), LEGACY_IGNORE_KEY.to_string()] {
+        // Exit code 1 just means the key is not set.
+        let o = git(dir, &["config", "--local", "--get-all", &key])?;
+        if o.ok {
+            out.extend(o.text.lines().map(|l| l.trim().to_string()));
+        }
+    }
+    Ok(out)
 }
 
-/// Mark (or unmark) `id` as not needed in the target.
-pub fn set_ignored(path: &str, id: &str, ignore: bool) -> Result<()> {
+/// Mark (or unmark) `id` as not needed in `target`.
+pub fn set_ignored(path: &str, target: &str, id: &str, ignore: bool) -> Result<()> {
     let dir = repo_dir(path)?;
-    let has = ignored(&dir)?.contains(id);
-    if ignore && !has {
-        git_ok(&dir, &["config", "--local", "--add", IGNORE_KEY, id])?;
-    } else if !ignore && has {
-        git_ok(
-            &dir,
-            &["config", "--local", "--unset", IGNORE_KEY, &format!("^{id}$")],
-        )?;
+    let key = ignore_key(target);
+    if ignore && !ignored(&dir, target)?.contains(id) {
+        git_ok(&dir, &["config", "--local", "--add", &key, id])?;
+    } else if !ignore {
+        let pattern = format!("^{id}$");
+        // Unset from both keys; a missing value is not an error here.
+        for k in [key.as_str(), LEGACY_IGNORE_KEY] {
+            let _ = git(&dir, &["config", "--local", "--unset-all", k, &pattern])?;
+        }
     }
     Ok(())
+}
+
+/// Per-target counts for one source, for an overview of several forks.
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BackportTally {
+    pub target: String,
+    pub missing: usize,
+    pub applied: usize,
+    pub ignored: usize,
+}
+
+/// `compare` for each of `targets` (the source itself is skipped).
+pub fn summary(path: &str, source: &str, targets: &[String]) -> Result<Vec<BackportTally>> {
+    targets
+        .iter()
+        .filter(|t| t.as_str() != source)
+        .map(|t| {
+            let items = compare(path, source, t)?;
+            let count = |f: fn(&BackportState) -> bool| items.iter().filter(|i| f(&i.state)).count();
+            Ok(BackportTally {
+                target: t.clone(),
+                missing: count(|s| *s == BackportState::Missing),
+                applied: count(|s| matches!(s, BackportState::Applied | BackportState::Picked { .. })),
+                ignored: count(|s| *s == BackportState::Ignored),
+            })
+        })
+        .collect()
 }
 
 /// Cherry-pick `ids` (oldest first) onto `target` with `-x`, so later
@@ -238,10 +276,10 @@ mod tests {
     fn ignore_then_apply_the_rest() {
         let (d, [_, _, fix3]) = forked();
         let p = s(d.path());
-        set_ignored(p, &fix3, true).unwrap();
-        set_ignored(p, &fix3, true).unwrap(); // idempotent
+        set_ignored(p, "fork", &fix3, true).unwrap();
+        set_ignored(p, "fork", &fix3, true).unwrap(); // idempotent
         assert_eq!(states(p)[0].1, BackportState::Ignored);
-        set_ignored(p, &fix3, false).unwrap();
+        set_ignored(p, "fork", &fix3, false).unwrap();
         assert_eq!(states(p)[0].1, BackportState::Missing);
 
         checkout(p, "main").unwrap();
@@ -264,5 +302,38 @@ mod tests {
             .collect();
         names.sort();
         assert_eq!(names, ["0001-fix-1.patch", "0002-fix-3.patch"]);
+    }
+
+    #[test]
+    fn ignores_are_per_target_and_summary_counts_each() {
+        let (d, [_, _, fix3]) = forked();
+        let p = s(d.path());
+        // A second customer branch, also from base, with nothing ported yet.
+        git_ok(d.path(), &["branch", "acme/main", "fork~3"]).unwrap();
+        set_ignored(p, "fork", &fix3, true).unwrap();
+        let acme = compare(p, "main", "acme/main").unwrap();
+        assert!(acme.iter().all(|i| i.state == BackportState::Missing), "{acme:?}");
+
+        let targets = ["fork".to_string(), "acme/main".to_string(), "main".to_string()];
+        let t = summary(p, "main", &targets).unwrap();
+        assert_eq!(t.len(), 2, "the source itself is skipped");
+        assert_eq!((t[0].missing, t[0].applied, t[0].ignored), (0, 2, 1));
+        assert_eq!((t[1].target.as_str(), t[1].missing), ("acme/main", 3));
+
+        // The repository-wide key from before still counts for every target.
+        git_ok(
+            d.path(),
+            &["config", "--local", "--add", LEGACY_IGNORE_KEY, &fix3],
+        )
+        .unwrap();
+        assert_eq!(
+            compare(p, "main", "acme/main").unwrap()[0].state,
+            BackportState::Ignored
+        );
+        set_ignored(p, "acme/main", &fix3, false).unwrap();
+        assert_eq!(
+            compare(p, "main", "acme/main").unwrap()[0].state,
+            BackportState::Missing
+        );
     }
 }

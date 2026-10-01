@@ -238,6 +238,10 @@ export default function App() {
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
+  const backportTargets = useMemo(
+    () => (snap?.refs ?? []).filter((r) => r.kind === "local").map((r) => r.name),
+    [snap],
+  );
   // Commits the planned rebase rewrites; null when there is nothing valid to plan.
   const rebase = useMemo(() => {
     if (!rebaseFrom || !snap?.head.target) return null;
@@ -839,6 +843,7 @@ export default function App() {
             <BackportSheet
               path={path}
               branches={snap.refs.filter((r) => r.kind !== "tag").map((r) => r.name)}
+              targets={backportTargets}
               remoteCount={snap.remotes.length}
               onAddRemote={askRemote}
               source={backport.source}

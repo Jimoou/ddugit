@@ -2,6 +2,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
 import type {
   BackportItem,
+  BackportTally,
   ConflictFile,
   DiffScope,
   FileDiff,
@@ -52,7 +53,8 @@ export interface Commands {
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
-  backport_ignore: [{ path: string; id: string; ignore: boolean }, null];
+  backport_ignore: [{ path: string; target: string; id: string; ignore: boolean }, null];
+  backport_summary: [{ path: string; source: string; targets: string[] }, BackportTally[]];
   backport_apply: [{ path: string; ids: string[]; target: string }, OpResult];
   backport_export: [{ path: string; ids: string[]; outDir: string }, OpResult];
 }
@@ -113,7 +115,10 @@ export const api = {
   /** Rewrite the commits after `base` as `steps` (oldest first) say. */
   rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
   backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),
-  backportIgnore: (path: string, id: string, ignore: boolean) => call("backport_ignore", { path, id, ignore }),
+  backportIgnore: (path: string, target: string, id: string, ignore: boolean) =>
+    call("backport_ignore", { path, target, id, ignore }),
+  backportSummary: (path: string, source: string, targets: string[]) =>
+    call("backport_summary", { path, source, targets }),
   /** `ids` oldest first. */
   backportApply: (path: string, ids: string[], target: string) => call("backport_apply", { path, ids, target }),
   backportExport: (path: string, ids: string[], outDir: string) => call("backport_export", { path, ids, outDir }),
