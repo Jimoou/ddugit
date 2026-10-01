@@ -7,22 +7,29 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #2(cherry-pick / revert / amend + 노드 우클릭 메뉴)를 squash merge했다(`a0bff0b`).
-- 브랜치 관리 → PR #3
-  - 백엔드: `git/refs.rs`, `RefOp` 태그 enum으로 이름 변경·삭제(`Unmerged` 상태)·태그·원격 체크아웃 처리, 테스트 33
-  - UI: 그래프 배지 히트 테스트(`labelHits`, 렌더러가 매 프레임 채움), 배지와 사이드바 우클릭 `refMenu`, 병합 안 된 브랜치는 2단계 확인, `NameDialog`(초기값·메시지 필드)
+- PR #3(브랜치·태그 관리 + 배지/사이드바 우클릭 메뉴)을 squash merge했다(`0db48ef`).
 
-## 다음 단계 (추천 순서)
+## 지금 하는 일
 
-1. PR #3 CI 통과 → squash merge → `main`에서 다시 시작
-2. 커밋 검색(메시지·작성자·SHA)과 그래프 하이라이트, ⌘/Ctrl+F
-3. hunk 단위 스테이징 (diff 시트에서 hunk 선택 → 부분 커밋)
-4. 충돌 해결 화면
+M2 · 커밋 검색 완료 → PR #4에서 CI 대기 (10분 뒤 확인 예약)
+
+- ⌘/Ctrl+F로 그래프 위에 검색창을 띄운다. 메시지·작성자·SHA·브랜치 이름으로 찾는다.
+- 맞는 커밋만 밝게 표시하고 나머지는 흐리게 한다(기존 `focus` 집합 재사용). Enter / Shift+Enter로 다음·이전 결과로 카메라가 이동한다.
+- 순수 함수 `searchCommits`에 vitest를 붙인다.
+
+## 다음 단계
+
+1. hunk 단위 스테이징 (diff 시트에서 hunk 선택 → 부분 커밋)
+2. 충돌 해결 화면
 
 ## 막힌 것 / 결정 필요
 
 - 브랜치 보호 규칙(`main` 직접 push 금지, CI 필수)은 사용자가 GitHub 설정에서 켜야 한다.
-- Stop 훅이 push하지 않은 커밋을 막는다. 그래서 PR CI가 도는 중에 다음 작업을 commit하면, CI 취소를 피하려면 그 PR이 merge될 때까지 commit을 미루거나 merge 후 rebase해서 push한다.
+
+## PR 운영 규칙 (중요)
+
+- **GitGuardian 검사가 "진행 중"으로 멈춰 있으면 GitHub의 "검사 묶음 완료" 이벤트가 오지 않는다.** 그래서 PR을 올리면 `send_later`로 **10분 뒤** 확인을 예약하고, CI 4개(Web, Rust ×3)가 통과했으면 바로 squash merge한다. 사용자가 CI 상태를 알려줄 때까지 기다리지 않는다.
+- CI는 새 push가 오면 이전 실행을 취소한다. Stop 훅이 push하지 않은 커밋을 막으므로, PR CI가 도는 동안에는 commit하지 않거나 merge 후 rebase해서 push한다.
 
 ## 알아둘 것
 

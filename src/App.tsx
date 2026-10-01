@@ -8,12 +8,14 @@ import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
+import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
 import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, computeLayout } from "./graph/layout";
+import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RefOp, RemoteOp, RepoSnapshot } from "./types";
@@ -82,6 +84,7 @@ export default function App() {
   const [diff, setDiff] = useState<DiffState | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
+  const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const [animate, setAnimate] = useState(() => {
     const saved = store(ANIMATE);
     if (saved !== null) return saved === "1";
@@ -174,7 +177,35 @@ export default function App() {
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
-  const focus = useMemo(() => (snap && focusRef ? ancestors(snap.commits, focusRef.target) : null), [snap, focusRef]);
+  const matches = useMemo(
+    () => (snap && search ? searchCommits(snap.commits, snap.refs, search.query) : []),
+    [snap, search?.query], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  // Search highlights its matches; otherwise a focused branch highlights its ancestry.
+  const focus = useMemo(() => {
+    if (search?.query.trim()) return new Set(matches);
+    return snap && focusRef ? ancestors(snap.commits, focusRef.target) : null;
+  }, [snap, focusRef, search?.query, matches]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Select match `i` (wrapping) and fly the camera to it. */
+  const goToMatch = (i: number, list = matches) => {
+    if (!list.length) return;
+    const index = (i + list.length) % list.length;
+    setSearch((s) => s && { ...s, index });
+    show({ commit: list[index] });
+    graph.current?.centerOn(list[index]);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        setSearch((s) => s ?? { query: "", index: 0 });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const colorOf = useCallback((id: string) => NEON[layout?.byId.get(id)?.color ?? 0], [layout]);
 
   /** Local branch a merge can land on at commit `id`. */
@@ -560,6 +591,19 @@ export default function App() {
 
         <section className="stage">
           <div className="stage-graph">
+            {search && (
+              <SearchBar
+                query={search.query}
+                count={matches.length}
+                index={search.index}
+                onQuery={(query) => {
+                  setSearch({ query, index: 0 });
+                  if (snap) goToMatch(0, searchCommits(snap.commits, snap.refs, query));
+                }}
+                onStep={(d) => goToMatch(search.index + d)}
+                onClose={() => setSearch(null)}
+              />
+            )}
             <GraphCanvas
               ref={graph}
               layout={layout}
@@ -610,7 +654,7 @@ export default function App() {
               </button>
             </div>
             <div className="hint">
-              드래그 이동 · ⌘/Ctrl+휠 확대 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
+              드래그 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
               {snap.truncated && " · 최근 커밋만 표시 중"}
             </div>
           </div>
