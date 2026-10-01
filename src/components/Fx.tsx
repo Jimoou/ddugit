@@ -13,7 +13,13 @@ export type Effect =
   /** A push: a comet climbs from HEAD into orbit along a drawn trajectory. */
   | { kind: "launch"; from: Pt }
   /** A fetch / pull: meteors fall onto the commits that arrived. */
-  | { kind: "meteors"; to: Pt[] };
+  | { kind: "meteors"; to: Pt[] }
+  /** A merge: two stars fuse into the merge commit with a flash and a shockwave. */
+  | { kind: "fusion"; at: Pt }
+  /** A cherry-pick: a copy of the picked commit flies as a comet onto the new one. */
+  | { kind: "comet"; from: Pt; to: Pt }
+  /** A rebase: the replayed commits relink into a constellation, star by star (oldest first). */
+  | { kind: "constellation"; at: Pt[] };
 
 type Playing = Effect & { id: number };
 
@@ -84,6 +90,42 @@ function One({ e }: { e: Effect }) {
           </svg>
           <i className="comet" style={{ offsetPath: `path("${ORBIT}")` }} />
         </div>
+      );
+    case "fusion":
+      return (
+        <div className="fusion" style={{ left: e.at.x, top: e.at.y }}>
+          <i className="a" />
+          <i className="b" />
+        </div>
+      );
+    case "comet": {
+      const dx = e.to.x - e.from.x,
+        dy = e.to.y - e.from.y;
+      // Arc over the straight line, bowing away from the graph's lanes.
+      const path = `M0 0 Q ${dx / 2} ${dy / 2 - Math.max(60, Math.abs(dx) / 3)} ${dx} ${dy}`;
+      return (
+        <>
+          <div className="pick-comet" style={{ left: e.from.x, top: e.from.y }}>
+            <i className="comet" style={{ offsetPath: `path("${path}")` }} />
+          </div>
+          <div className="landing" style={{ left: e.to.x, top: e.to.y }} />
+        </>
+      );
+    }
+    case "constellation":
+      return (
+        <>
+          <svg className="relink" width="100%" height="100%">
+            <polyline points={e.at.map((p) => `${p.x},${p.y}`).join(" ")} pathLength={1} />
+          </svg>
+          {e.at.map((p, i) => (
+            <div
+              key={i}
+              className="twinkle"
+              style={{ left: p.x, top: p.y, ["--delay" as string]: `${(i * 600) / Math.max(1, e.at.length - 1)}ms` }}
+            />
+          ))}
+        </>
       );
     case "meteors":
       return (

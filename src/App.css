@@ -2380,3 +2380,172 @@ kbd {
     transform: scale(1.7);
   }
 }
+
+/* ------------------------------------------- graph work: fusion, comet, constellation */
+/* A merge: two stars rush together, then a flash and a shockwave ring. */
+.fusion {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.fusion i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 12px 3px rgba(255, 61, 242, 0.9);
+  animation: fuse-a 0.45s cubic-bezier(0.6, 0, 1, 0.6) forwards;
+}
+.fusion i.b {
+  box-shadow: 0 0 12px 3px rgba(34, 232, 255, 0.9);
+  animation-name: fuse-b;
+}
+@keyframes fuse-a {
+  from {
+    transform: translate(-70px, -50px);
+  }
+  to {
+    transform: translate(0, 0) scale(0.4);
+  }
+}
+@keyframes fuse-b {
+  from {
+    transform: translate(-70px, 50px);
+  }
+  to {
+    transform: translate(0, 0) scale(0.4);
+  }
+}
+.fusion::before,
+.fusion::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+}
+.fusion::before {
+  width: 70px;
+  height: 70px;
+  margin: -35px;
+  background: radial-gradient(
+    circle,
+    #fff,
+    rgba(255, 255, 255, 0.5) 30%,
+    rgba(207, 198, 255, 0.2) 55%,
+    transparent 70%
+  );
+  animation: fuse-flash 0.6s ease-out 0.42s forwards;
+}
+.fusion::after {
+  width: 60px;
+  height: 60px;
+  margin: -30px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 16px rgba(207, 198, 255, 0.9);
+  animation: shockwave 0.9s ease-out 0.45s forwards;
+}
+@keyframes fuse-flash {
+  from {
+    opacity: 1;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@keyframes shockwave {
+  from {
+    opacity: 1;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
+/* A cherry-pick: a copy of the commit arcs over as a comet and lands on the new one. */
+.pick-comet {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.pick-comet .comet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 4px;
+  margin: -2px 0 0 -36px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(166, 255, 77, 0.6) 60%, #fff);
+  filter: drop-shadow(0 0 6px rgba(166, 255, 77, 0.95));
+  offset-rotate: auto;
+  offset-anchor: 36px 2px;
+  animation: comet 0.7s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+.landing {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff, rgba(166, 255, 77, 0.45) 40%, transparent 70%);
+  opacity: 0;
+  animation: impact 0.6s ease-out 0.62s forwards;
+}
+
+/* A rebase: the replayed commits relink into a constellation, oldest to newest. */
+.relink {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.relink polyline {
+  fill: none;
+  stroke: rgba(184, 168, 255, 0.85);
+  stroke-width: 1.5;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 4px rgba(184, 168, 255, 0.9));
+  animation: relink 1.5s ease-out forwards;
+}
+@keyframes relink {
+  45% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+.twinkle {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px;
+  opacity: 0;
+  background:
+    linear-gradient(transparent 45%, #fff 45% 55%, transparent 55%),
+    linear-gradient(90deg, transparent 45%, #fff 45% 55%, transparent 55%);
+  filter: drop-shadow(0 0 5px rgba(184, 168, 255, 1));
+  animation: twinkle 0.7s ease-out var(--delay) forwards;
+}
+@keyframes twinkle {
+  from {
+    opacity: 1;
+    transform: scale(0.2) rotate(0deg);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1) rotate(45deg);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.6) rotate(90deg);
+  }
+}

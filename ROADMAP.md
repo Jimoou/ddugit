@@ -95,7 +95,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
     - [x] 파일 이력·blame: 변경 파일 우클릭 → 그 파일을 바꾼 커밋을 금빛 별자리로 잇고(이름 바뀜 추적, 혜성이 옛것→최근으로 흐름) 나머지는 흐리게, 배너에서 더 최근/더 예전으로 이동. blame 시트는 줄 묶음마다 별 색(붉을수록 오래됨, 푸를수록 최근), 누르면 그 커밋으로
 - [ ] 게임 같은 우주 연출 (기능마다, 반짝임 효과를 끄면 정적으로)
   - [x] 원격: push는 HEAD에서 쏘아 올리는 궤적과 혜성, pull·fetch는 새로 들어온 커밋마다 떨어지는 유성과 충돌 섬광 (진행률은 탑바 버튼에 그대로 둔다: 조작 요소는 차분하게). 연출은 `components/Fx.tsx`의 효과 큐 하나로 모았다
-  - [ ] 그래프 작업: 병합은 끌면 대상 끝에 중력장, 놓으면 두 별이 합쳐지는 섬광 · cherry-pick은 혜성이 복사돼 날아감 · 순서 정리는 별자리가 다시 배열
+  - [x] 그래프 작업: 끌어서 유효한 대상 위에 오면 중력장(돌며 빨려드는 점선 고리, 병합·cherry-pick·순서 옮기기 공통), 병합은 두 별이 합쳐지는 섬광과 충격파, cherry-pick은 원본에서 새 커밋으로 혜성, rebase는 다시 쌓인 커밋을 별자리로 잇고 하나씩 반짝임. 위치는 카메라가 멈춘 뒤(rAF 세 프레임 같을 때) 읽는다
   - [ ] 충돌은 붉은 성운 경고, 해결하면 걷힘 · 되돌리기(reset/reflog)는 시간을 감는 효과 · 탭 전환은 워프
   - 원칙: 조작 요소는 지금처럼 차분하게(가독성), 연출은 그래프 캔버스와 결과 순간에만. `prefers-reduced-motion`과 반짝임 설정을 따른다
 
@@ -147,3 +147,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-01 | PR #35 squash merge(`59571df`). M6 bisect: `git/bisect.rs`(+테스트 2: 9개 중 범인 찾기, 건너뛰기), 그래프 `NodeBadge`(good/bad 고리, probe 조준선, culprit 맥박), 전용 배너, 후보 밖 흐리게(focus), 데모 bisect(HEAD는 그대로, 상태로만)(e2e 21)                                                                                                       |
 | 2026-10-01 | PR #36 squash merge(`d995819`). M6 파일 이력·blame: `git/history.rs`(+테스트 2: 이름 바뀜 따라가기, 줄마다 커밋), 그래프 `trail`(금빛 별자리·혜성), 이력 배너, `BlameSheet`(별 온도 색), CI e2e 단계 timeout(e2e 22)                                                                                                                                   |
 | 2026-10-01 | PR #37 squash merge(`aff5c4d`). bisect e2e를 메뉴 제목 확인 후 재시도로 안정화(`commitMenu`). M6 원격 연출: `components/Fx.tsx`(`useFx` 효과 큐 + `FxLayer`, 노바·별가루·되감기도 옮김), push 궤적·혜성(`offset-path`), fetch·pull 유성(작업 전후 스냅샷 비교, `latest` ref)(e2e 23)                                                                   |
+| 2026-10-01 | PR #38 squash merge(`aedb7fc`). 연출 2단계 그래프 작업: renderer `drawGravityWell`, `Fx` fusion·comet·constellation, `playAfterDraw`(rAF로 카메라가 멈출 때까지 기다림, `run()`이 끝난 뒤 새 스냅샷 기준), CI Linux deps 단계 timeout(e2e 24)                                                                                                          |

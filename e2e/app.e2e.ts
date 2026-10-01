@@ -27,6 +27,8 @@ test("merges by dragging a branch tip onto HEAD", async ({ demo }) => {
   await expect.poll(async () => (await demo.snapshot()).head.target).not.toBe(before.head.target);
   const snap = await demo.snapshot();
   expect(snap.commits.find((c) => c.id === snap.head.target)!.parents).toEqual([before.head.target, tip]);
+  // The two stars fuse where the merge commit landed.
+  await expect(page.locator(".fx-clip .fusion")).toHaveCount(1);
 });
 
 test("resolves a conflict block by editing it by hand", async ({ demo }) => {
@@ -150,6 +152,8 @@ test("reorders and folds commits with the interactive rebase sheet", async ({ de
   expect([prev.summary, head.summary]).toEqual(["Step 3 of 3", "Step 1 of 3"]);
   expect(prev.parents[0]).toBe(base);
   await expect(page.locator(".rebase-sheet")).toHaveCount(0);
+  // The two replayed commits relink as a constellation, a star on each.
+  await expect(page.locator(".fx-clip .twinkle")).toHaveCount(2);
 });
 
 test("overwrites the upstream after rewriting a pushed commit", async ({ demo }) => {
@@ -571,4 +575,16 @@ test("a push rides a comet into orbit and fetched commits arrive as meteors, unl
   await page.getByRole("button", { name: /Push/ }).click();
   await page.waitForTimeout(300);
   await expect(launch).toHaveCount(0);
+});
+
+test("cherry-picks a commit from its menu and a comet carries the copy over", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const main = before.refs.find((r) => r.kind === "local" && r.name === "main")!.target;
+  await (await demo.commitMenu(main)).getByText(/에 cherry-pick$/).click();
+  await page.click(".dialog button.primary");
+  await demo.toast(/에 복사했어요/);
+  const snap = await demo.snapshot();
+  expect(snap.commits.find((c) => c.id === snap.head.target)!.parents).toEqual([before.head.target]);
+  await expect(page.locator(".fx-clip .pick-comet")).toHaveCount(1);
 });
