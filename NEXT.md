@@ -7,27 +7,29 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #33(실수 되돌리기: reset·reflog, 되감기 연출)을 squash merge했다(`96a6026`).
+- PR #34(브랜치 정리, 별가루 연출)를 squash merge했다(`a874e36`).
 
 ## 지금 하는 일
 
-M6 고급 git 2단계 "브랜치 정리" → PR CI 대기
+M6 고급 git 3단계 "과거 커밋 손보기" → PR CI 대기
 
-- Rust `git/cleanup.rs`
-  - `report`: 기준 = origin/HEAD → main/master → 현재 브랜치. 현재 브랜치와 기준은 목록에서 뺀다
-  - gone = `branch.<name>.merge` 설정은 있는데 upstream이 없을 때
-  - `delete_branches(names, force)`: force가 없으면 병합 안 된 브랜치를 `Unmerged`로 거부한다
-- `components/Cleanup.tsx`
-  - `groupOf`: 병합 완료 > 원격에서 사라짐 > 오래됨(90일)
-  - 병합 완료는 기본 선택이고, 병합 안 된 브랜치가 섞이면 확인 창을 띄운다
-- 사이드바 "브랜치" 옆 ✧로 연다. 되돌리기 기록과 시트 자리를 나눠 쓴다
-- 연출: 지우기 전에 `graph.screenOf(tip)`로 자리를 잡아 두고, 성공하면 `.stardust`(가운데 섬광 + 16개 입자, 앞 절반은 밝게 유지)
-- 데모: `__otgitDemo.goneBranches`로 원격에서 사라진 브랜치를 흉내 낸다
-- 기존 e2e의 `.sidebar .h3-add`가 정리 버튼까지 잡아서 title로 구분했다
+- Rust `git/edit.rs`
+  - `edit_commit(id, CommitEdit)`: 부모부터 `rebase -i --autostash`(뿌리 커밋이면 `--root`). todo는 전부 pick하고, 대상 뒤에 `exec` 한 줄을 넣는다
+    - reword: `commit --amend --only -F 파일`
+    - author: `--author='..'`
+    - split: `reset HEAD~1` → 고른 파일 add·commit → 나머지 add·commit
+  - 메시지는 `.git/otgit-edit/`의 파일로 넘기고, sh 인용은 `q()`로 한다
+  - `restore_file(source, file)`: 그 커밋에 파일이 있으면 checkout, 없으면 rm. 결과는 스테이지된 변경이다
+  - serde: `tag = "kind"`, `rename_all_fields = "camelCase"`
+- 화면
+  - 커밋 우클릭 "메시지 고치기…/작성자 바꾸기…/커밋 나누기…": 현재 브랜치 일직선 위이고 병합 커밋이 아닐 때만 켜진다
+  - `EditCommitDialog`: 다시 쓰는 커밋 수와 push 경고를 연 순간에 계산한다(`isAncestor`가 ref 캐시라서 렌더 중에 못 부른다)
+  - Inspector 변경 파일 우클릭: 이 커밋 상태로 / 이전 상태로
+- 연출: 손본 커밋 자리에 `.nova`(빛의 고리 두 겹, 1초)
 
 ## 다음 단계 (M6 순서, ROADMAP 참고)
 
-1. 고급 git 작업: 과거 커밋 손보기(reword, 작성자, 나누기, 파일 하나 되돌리기) → bisect·blame. 각 기능에 맞는 우주 연출을 함께 넣는다
+1. 고급 git 작업 마지막: bisect(그래프에서 좋음/나쁨 클릭)·파일 이력·blame. 각 기능에 맞는 우주 연출을 함께 넣는다
 2. 기존 기능의 게임 같은 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌
 3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
 4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다

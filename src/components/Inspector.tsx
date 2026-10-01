@@ -17,6 +17,8 @@ interface Props {
   onCreateBranch(name: string, at: string): void;
   onSelect(id: string): void;
   onOpenFile(path: string): void;
+  /** Right-click on a changed file. */
+  onFileMenu?(path: string, x: number, y: number): void;
 }
 
 export function Inspector(props: Props) {
@@ -79,7 +81,7 @@ export function Inspector(props: Props) {
         )}
       </dl>
 
-      <ChangedFiles files={files} onOpen={onOpenFile} />
+      <ChangedFiles files={files} onOpen={onOpenFile} onMenu={props.onFileMenu} />
 
       {locals.length > 0 && (
         <div className="actions">

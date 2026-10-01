@@ -50,6 +50,13 @@ export type StashOp = "apply" | "pop" | "drop";
 export type PickOp = "cherryPick" | "revert";
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
+/** A touch-up to one past commit on the current branch (see `git/edit.rs`). */
+export type CommitEdit =
+  | { kind: "reword"; message: string }
+  | { kind: "author"; name: string; email: string }
+  /** `first`: paths (old names of renames too) for a first commit; the rest stay in a second. */
+  | { kind: "split"; first: string[]; firstMessage: string; secondMessage: string };
+
 /** One local branch for housekeeping (see `git/cleanup.rs`). */
 export interface BranchHealth {
   name: string;

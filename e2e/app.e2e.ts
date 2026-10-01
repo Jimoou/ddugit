@@ -427,3 +427,48 @@ test("cleans up merged and gone branches from the sidebar", async ({ demo }) => 
   expect(names).not.toContain("feature/theme");
   expect(names).not.toContain("feature/login");
 });
+
+test("rewords and splits a past commit, and restores a file as of a commit", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => d.grow(3));
+  let snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  const target = byId.get(snap.head.target!)!.parents[0];
+  const later = byId.get(snap.head.target!)!.summary;
+
+  // Reword the commit before HEAD; HEAD's commit is replayed on top.
+  await expect.poll(async () => (await demo.screenOf(target)) !== null).toBe(true);
+  const at = (await demo.screenOf(target))!;
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await page.click(".context-menu >> text=메시지 고치기…");
+  const dialog = page.getByRole("dialog", { name: "메시지 고치기" });
+  await dialog.getByLabel("커밋 메시지").fill("Better words");
+  await dialog.getByRole("button", { name: "적용" }).click();
+  await demo.toast("메시지를 고쳤어요");
+  snap = await demo.snapshot();
+  const head = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect(head.summary).toBe(later);
+  expect(snap.commits.find((c) => c.id === head.parents[0])!.summary).toBe("Better words");
+
+  // Split the reworded commit by files (the demo shows a few files per commit).
+  const reworded = head.parents[0];
+  await expect.poll(async () => (await demo.screenOf(reworded)) !== null).toBe(true);
+  const at2 = (await demo.screenOf(reworded))!;
+  await page.mouse.click(at2.x, at2.y, { button: "right" });
+  await page.click(".context-menu >> text=커밋 나누기…");
+  const split = page.getByRole("dialog", { name: "커밋 나누기" });
+  await split.locator(".split-files input").first().check();
+  await split.getByRole("button", { name: "적용" }).click();
+  await demo.toast("커밋을 둘로 나눴어요");
+  expect((await demo.snapshot()).commits.length).toBe(snap.commits.length + 1);
+
+  // Restore one of HEAD's files as it was before HEAD.
+  const now = await demo.snapshot();
+  const tip = (await demo.screenOf(now.head.target!))!;
+  await page.mouse.click(tip.x, tip.y);
+  const file = page.locator(".inspector .changed li").first();
+  await file.click({ button: "right" });
+  await page.click(".context-menu >> text=이 커밋 이전 상태로");
+  await expect(page.locator(".toast").filter({ hasText: "되돌렸어요" })).toBeVisible();
+  expect((await demo.snapshot()).changes.some((c) => c.staged)).toBe(true);
+});
