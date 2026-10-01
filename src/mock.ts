@@ -750,6 +750,45 @@ const mockTable: Table = {
     return delay(res("ok", names.map((n) => `Deleted branch ${n}`).join("\n")));
   },
 
+  git_edit_commit({ id, edit }) {
+    if (repo.state !== "clean") return fail("Finish or cancel the operation in progress first");
+    // First-parent chain from HEAD down to `id`, then rebuilt upwards.
+    const chain: string[] = [];
+    for (let c: string | undefined = repo.branches.get(repo.head); c !== id; c = repo.commits.get(c!)?.parents[0]) {
+      if (!c) return fail("The commit isn't on the current branch");
+      chain.unshift(c);
+    }
+    const old = repo.commits.get(id)!;
+    const copy = (src: string, parent: string | undefined, over: Partial<CommitInfo> = {}) => {
+      const c = repo.commits.get(src)!;
+      const nid = repo.commit(
+        parent ? [parent, ...c.parents.slice(1)] : [],
+        over.summary ?? c.summary,
+        over.author ?? c.author,
+      );
+      repo.commits.set(nid, { ...repo.commits.get(nid)!, ...over, id: nid, time: c.time });
+      return nid;
+    };
+    let tip: string;
+    if (edit.kind === "reword") {
+      const summary = edit.message.split("\n")[0];
+      tip = copy(id, old.parents[0], { summary, message: edit.message });
+    } else if (edit.kind === "author") tip = copy(id, old.parents[0], { author: edit.name, email: edit.email });
+    else {
+      const first = copy(id, old.parents[0], { summary: edit.firstMessage.split("\n")[0], message: edit.firstMessage });
+      tip = copy(id, first, { summary: edit.secondMessage.split("\n")[0], message: edit.secondMessage });
+    }
+    for (const c of chain) tip = copy(c, tip);
+    repo.branches.set(repo.head, tip);
+    return delay(res("ok"));
+  },
+
+  git_restore_file({ file }) {
+    repo.changes = repo.changes.filter((c) => c.path !== file);
+    repo.changes.push({ path: file, staged: "modified", unstaged: null, conflicted: false });
+    return delay(res("ok"));
+  },
+
   git_reset({ target, mode }) {
     if (repo.state !== "clean") return fail("Finish or cancel the operation in progress first");
     const tip = repo.branches.get(repo.head)!;

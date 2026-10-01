@@ -522,6 +522,32 @@ export const ko = {
   "clean.force.body":
     "<b>{names}</b>에는 기준 브랜치에 없는 커밋이 있어요. 지우면 그 커밋들은 그래프에서 사라집니다(되돌리기 기록으로만 복구 가능).",
   "clean.force.go": "그래도 삭제",
+
+  // edit past commits
+  "edit.reword": "메시지 고치기",
+  "edit.author": "작성자 바꾸기",
+  "edit.split": "커밋 나누기",
+  "edit.reword.menu": "메시지 고치기…",
+  "edit.author.menu": "작성자 바꾸기…",
+  "edit.split.menu": "커밋 나누기…",
+  "edit.message": "커밋 메시지",
+  "edit.name": "이름",
+  "edit.email": "이메일",
+  "edit.split.pick": "첫 번째 커밋에 넣을 파일을 고르세요. 나머지는 두 번째 커밋이 돼요.",
+  "edit.split.one": "파일이 하나뿐이라 나눌 수 없어요.",
+  "edit.split.first": "첫 번째 커밋 메시지 (파일 {n}개)",
+  "edit.split.second": "두 번째 커밋 메시지 (파일 {n}개)",
+  "edit.rewrites": "이 커밋부터 커밋 {n}개를 다시 씁니다. 커밋하지 않은 변경은 잠시 보관했다가 되돌려 놓아요.",
+  "edit.go": "적용",
+  "edit.done.reword": "메시지를 고쳤어요",
+  "edit.done.author": "작성자를 바꿨어요",
+  "edit.done.split": "커밋을 둘로 나눴어요",
+  "file.restore.here": "이 파일을 이 커밋 상태로 되돌리기",
+  "file.restore.before": "이 파일을 이 커밋 이전 상태로 되돌리기",
+  "file.restored": "{file}을(를) 되돌렸어요. 스테이지에 올라가 있어요",
+
+  // edit: pushed
+  "edit.pushed": "이미 push한 커밋을 다시 써요. 다시 올리려면 강제 push가 필요해요.",
 } as const;
 
 export type Key = keyof typeof ko;

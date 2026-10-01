@@ -524,4 +524,30 @@ export const en: Record<Key, string> = {
   "clean.force.body":
     "<b>{names}</b> have commits the base branch lacks. Deleting them removes those commits from the graph (recoverable only from the undo history).",
   "clean.force.go": "Delete anyway",
+
+  // edit past commits
+  "edit.reword": "Edit message",
+  "edit.author": "Change author",
+  "edit.split": "Split commit",
+  "edit.reword.menu": "Edit message…",
+  "edit.author.menu": "Change author…",
+  "edit.split.menu": "Split commit…",
+  "edit.message": "Commit message",
+  "edit.name": "Name",
+  "edit.email": "Email",
+  "edit.split.pick": "Pick the files for the first commit. The rest become the second.",
+  "edit.split.one": "There is only one file, so it can't be split.",
+  "edit.split.first": "First commit message ({n} files)",
+  "edit.split.second": "Second commit message ({n} files)",
+  "edit.rewrites": "Rewrites {n} commits from this one on. Uncommitted changes are set aside and put back.",
+  "edit.go": "Apply",
+  "edit.done.reword": "Edited the message",
+  "edit.done.author": "Changed the author",
+  "edit.done.split": "Split the commit in two",
+  "file.restore.here": "Restore this file as of this commit",
+  "file.restore.before": "Restore this file as before this commit",
+  "file.restored": "Restored {file}; the change is staged",
+
+  // edit: pushed
+  "edit.pushed": "Pushed commits get rewritten. Pushing again will need a force push.",
 };

@@ -2076,3 +2076,67 @@ kbd {
     transform: rotate(var(--a)) translateX(var(--d)) scale(0.4);
   }
 }
+
+/* ------------------------------------------------------ edit past commits */
+.dialog.edit-commit {
+  width: min(520px, calc(100vw - 32px));
+}
+.split-files {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.split-files li {
+  padding: 3px 4px;
+  font-size: 12.5px;
+}
+.split-files .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.split-files .path {
+  font-family: var(--mono);
+}
+
+/* An edited commit flares like a nova: a ring of light that expands and fades. */
+.nova {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+.nova::before,
+.nova::after {
+  content: "";
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  margin: -30px;
+  border-radius: 50%;
+  border: 2px solid rgba(207, 198, 255, 0.95);
+  box-shadow:
+    0 0 18px rgba(179, 166, 255, 0.8),
+    inset 0 0 12px rgba(179, 166, 255, 0.5);
+  animation: nova 1s ease-out forwards;
+}
+.nova::after {
+  animation-delay: 0.18s;
+  opacity: 0;
+}
+@keyframes nova {
+  from {
+    opacity: 1;
+    transform: scale(0.15);
+  }
+  60% {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}

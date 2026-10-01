@@ -4,6 +4,7 @@ import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { CleanupSheet } from "./components/Cleanup";
+import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
@@ -29,6 +30,8 @@ import { isKey, type Key, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import type { Drag } from "./graph/renderer";
 import type {
+  CommitEdit,
+  CommitInfo,
   FileDiff,
   OpResult,
   OpStatus,
@@ -141,6 +144,16 @@ export function RepoView({
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
   const [cleanupOpen, setCleanupOpen] = useState(false);
+  /** Touching up a past commit: which edit, and its files (loaded for splitting). */
+  const [editReq, setEditReq] = useState<{
+    mode: EditMode;
+    id: string;
+    files: FileDiff[] | null;
+    rewrites: number;
+    pushed: boolean;
+  } | null>(null);
+  /** Where an edited commit was, for a brief nova (bumped id replays it). */
+  const [nova, setNova] = useState<{ n: number; at: { x: number; y: number } | null }>({ n: 0, at: null });
   /** Where deleted branch tips were, to scatter them as stardust (bumped id replays it). */
   const [dust, setDust] = useState<{ n: number; at: { x: number; y: number }[] }>({ n: 0, at: [] });
   /** Bumped after a reset to replay the rewind effect. */
@@ -501,6 +514,51 @@ export function RepoView({
       },
     });
 
+  /** Open the edit dialog for `id`; splitting needs its files. */
+  const openEdit = (mode: EditMode, id: string) => {
+    const parent = commitById.get(id)?.parents[0];
+    const rewrites = snap?.head.target
+      ? [...ancestors(snap.commits, snap.head.target)].filter((c) => !parent || !isAncestor(c, parent)).length
+      : 1;
+    setEditReq({ mode, id, files: null, rewrites, pushed: pushedCommit(id) });
+    if (mode === "split")
+      void api.commitDiff(path, id).then(
+        (files) => setEditReq((r) => (r && r.id === id ? { ...r, files } : r)),
+        () => setEditReq((r) => (r && r.id === id ? { ...r, files: [] } : r)),
+      );
+  };
+
+  const applyEdit = (id: string, edit: CommitEdit) => {
+    const at = graph.current?.screenOf(id) ?? null;
+    return run(
+      t(`edit.done.${edit.kind}`),
+      () => api.editCommit(path, id, edit),
+      () => {
+        setEditReq(null);
+        setNova((v) => ({ n: v.n + 1, at }));
+      },
+    );
+  };
+
+  /** Right-click on a commit's changed file: put it back as this commit (or its parent) had it. */
+  const fileMenu = (commit: CommitInfo, file: string, x: number, y: number) =>
+    setMenu({
+      x,
+      y,
+      title: file,
+      items: [
+        {
+          label: t("file.restore.here"),
+          onSelect: () => void run(t("file.restored", { file }), () => api.restoreFile(path, commit.id, file)),
+        },
+        {
+          label: t("file.restore.before"),
+          disabled: !commit.parents.length,
+          onSelect: () => void run(t("file.restored", { file }), () => api.restoreFile(path, commit.parents[0], file)),
+        },
+      ],
+    });
+
   /** Delete branches together; their tips scatter as stardust where they were drawn. */
   const deleteBranches = (names: string[], tips: string[], force: boolean) => {
     const at = tips.flatMap((id) => graph.current?.screenOf(id) ?? []);
@@ -522,6 +580,12 @@ export function RepoView({
         setTimeout(() => graph.current?.centerOnHead(), 60);
       },
     );
+
+  /** Is `id` already on the upstream branch (so rewriting it needs a force push)? */
+  const pushedCommit = (id: string) => {
+    const up = snap?.refs.find((r) => r.kind === "remote" && r.name === snap.head.upstream);
+    return !!up && isAncestor(id, up.target);
+  };
 
   /** Ask how to go back to `target` (a commit, maybe one only the reflog knows). */
   const askReset = (target: string, initial?: ResetMode, summary?: string) => {
@@ -651,6 +715,13 @@ export function RepoView({
     const locals = snap.refs.filter((r) => r.kind === "local" && r.target === id && r.name !== snap.head.branch);
     const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
     const range = onHead && !isHead && head ? rebaseRange(commitById, head, id) : null;
+    // Past-commit edits replay everything after it: no merges on the way, not a merge itself.
+    const parentOf = commitById.get(id)?.parents ?? [];
+    const editable =
+      clean &&
+      onHead &&
+      parentOf.length <= 1 &&
+      (isHead || !parentOf.length || typeof rebaseRange(commitById, head!, parentOf[0]) !== "string");
     return [
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(id) },
       { label: t("menu.tagHere"), onSelect: () => askTagAt(id) },
@@ -703,6 +774,12 @@ export function RepoView({
         disabled: !clean || !onHead || isHead,
         onSelect: () => askReset(id),
       },
+      "separator" as const,
+      ...(["reword", "author", "split"] as const).map((mode) => ({
+        label: t(`edit.${mode}.menu`),
+        disabled: !editable,
+        onSelect: () => openEdit(mode, id),
+      })),
       {
         label: t("menu.rebase"),
         hint: typeof range === "string" ? t("menu.rebase.hasMerge") : undefined,
@@ -831,6 +908,11 @@ export function RepoView({
                 onStep={(d) => goToMatch(search.index + d)}
                 onClose={() => setSearch(null)}
               />
+            )}
+            {animate && nova.n > 0 && nova.at && (
+              <div className="fx-clip" aria-hidden key={`nova-${nova.n}`}>
+                <div className="nova" style={{ left: nova.at.x, top: nova.at.y }} />
+              </div>
             )}
             {animate && dust.n > 0 && (
               <div className="fx-clip" aria-hidden key={`dust-${dust.n}`}>
@@ -1197,6 +1279,7 @@ export function RepoView({
             onOpenFile={(file) =>
               loadDiff({ kind: "commit", id: selectedCommit.id }, selectedCommit.summary || selectedCommit.id, file)
             }
+            onFileMenu={(file, x, y) => fileMenu(selectedCommit, file, x, y)}
             onCheckout={(name) => run(t("checkout.done", { name }), () => api.checkout(path, name))}
             onCreateBranch={(name, at) =>
               run(t("branch.new.done", { name }), () => api.createBranch(path, name, at, true))
@@ -1249,6 +1332,19 @@ export function RepoView({
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
 
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
+
+      {editReq && commitById.get(editReq.id) && (
+        <EditCommitDialog
+          mode={editReq.mode}
+          commit={commitById.get(editReq.id)!}
+          files={editReq.files}
+          rewrites={editReq.rewrites}
+          pushed={editReq.pushed}
+          busy={busy}
+          onCancel={() => setEditReq(null)}
+          onSubmit={(edit) => void applyEdit(editReq.id, edit)}
+        />
+      )}
 
       {resetReq && (
         <ResetDialog
