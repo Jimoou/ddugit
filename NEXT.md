@@ -7,22 +7,21 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #5(hunk 스테이징)를 squash merge했다(`3c20d93`).
+- PR #6(충돌 해결 화면)을 squash merge했다(`6f8978a`). Windows 러너의 전역 `core.autocrlf=true` 때문에 테스트가 실패해서, 테스트 저장소에 `core.autocrlf=false`를 고정했다.
 
 ## 지금 하는 일
 
-M2 · 충돌 해결 화면 완료 → PR #6에서 CI 대기 (10분 뒤 확인 예약)
+진행 중 병합을 그래프에 표시 → PR #7에서 CI 대기 (10분 뒤 확인 예약)
 
-- 백엔드 `git/conflict.rs`, 테스트 40
-- `src/conflict.ts`: 마커 파서와 `resolveText`, vitest 6 (diff3, CRLF, 끝나지 않은 블록 포함)
-- `ConflictSheet`: 블록 선택, 파일 전체 선택, 바이너리 처리. `run()`이 conflict 상태를 받으면 자동으로 열리고, 배너의 "충돌 해결" 버튼과 커밋 작성기의 충돌 파일 클릭으로도 열림
-- 데모: `window.__otgitDemo.conflictNext = true` 후 병합하면 충돌 파일 2개가 생김
+- 스냅샷에 `incoming`(MERGE_HEAD / CHERRY_PICK_HEAD / REVERT_HEAD)을 추가하고 revwalk에도 넣었다(어떤 ref에도 없는 SHA도 보이도록). 테스트 41
+- 렌더러: 들어오는 커밋 → ＋ 노드를 빨간 점선으로 잇고, "병합 대기" 문구를 넣고, ＋ 노드를 빨간색으로 표시. `ALERT` 색은 `scene.ts`에 둔다
+- 알림(toast)을 화면 아래로 옮겼다(배너 버튼을 가리지 않도록)
 
 ## 다음 단계
 
-1. 그래프에 진행 중인 병합 표시 (HEAD 옆에 "병합 중" 점선 노드와 들어오는 쪽 연결선)
-2. 충돌 블록 직접 편집
-3. M3 시작: 이전 이력 더 불러오기, 파일 감시로 자동 새로고침
+1. M3 · 이전 이력 더 불러오기 (3000개 제한 → 끝에 "더 보기" 노드, limit 증가)
+2. M3 · 파일 감시로 자동 새로고침 (notify crate → Tauri 이벤트)
+3. 충돌 블록 직접 편집, 줄 단위 스테이징
 
 ## 막힌 것 / 결정 필요
 

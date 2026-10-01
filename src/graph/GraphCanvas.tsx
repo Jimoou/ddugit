@@ -43,6 +43,7 @@ interface Props {
   onDrop(source: string, target: string, mode: Drag["mode"]): void;
   canDropOn(target: string, source: string): boolean;
   onNodeMenu(id: string, x: number, y: number): void;
+  incoming: string | null;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
   onZoomChange?(k: number): void;
 }
@@ -264,6 +265,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         stashHover: s.stashHover,
         stashSelected: p.selectedStash,
         labelHits: s.labelHits,
+        incoming: p.incoming,
       });
       const hint = !s.drag ? null : (`${s.drag.mode}:${s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle"}` as const);
       setDragHint((h) => (h === hint ? h : hint));

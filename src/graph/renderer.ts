@@ -1,6 +1,6 @@
 import { stashTitle } from "../format";
 import type { RefInfo, StashInfo } from "../types";
-import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf } from "./scene";
+import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 
 export interface View {
   k: number;
@@ -41,6 +41,8 @@ export interface DrawState {
   stashes: StashMark[];
   stashHover: number | null;
   stashSelected: number | null;
+  /** Commit being merged / picked in while the operation waits on conflicts. */
+  incoming: string | null;
   /** Output: screen rects of the ref badges drawn this frame, for hit testing. */
   labelHits: LabelHit[];
 }
@@ -433,10 +435,39 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     }
   }
 
+  // --- pending merge: incoming commit → [+] ---------------------------------------
+  const inNode = s.incoming ? scene.layout.byId.get(s.incoming) : undefined;
+  if (inNode) {
+    const a = toScreen(view, { x: xOf(inNode.row, n), y: yOf(inNode.lane) });
+    const mx = (a.x + plusS.x) / 2;
+    const c = ALERT;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = s.animate ? -time * 30 : 0;
+    for (const [lw, al] of [
+      [8, 0.12],
+      [2, 0.9],
+    ] as const) {
+      ctx.strokeStyle = alpha(c, al);
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.bezierCurveTo(mx, a.y, mx, plusS.y, plusS.x, plusS.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.font = `700 11px ${SANS}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = c;
+    ctx.fillText("병합 대기 · 충돌 해결 후 커밋", plusS.x, plusS.y + 22);
+  }
+
   // --- [+] node ---------------------------------------------------------------
   {
     const pr = Math.max(9, Math.min(15, 12 * k));
-    const c = headNode ? NEON[headNode.color] : NEON[0];
+    const c = inNode ? ALERT : headNode ? NEON[headNode.color] : NEON[0];
     const pulse = s.animate && s.changeCount ? (Math.sin(time * 4) + 1) / 2 : 0;
     ctx.globalCompositeOperation = "lighter";
     const g = ctx.createRadialGradient(plusS.x, plusS.y, 0, plusS.x, plusS.y, pr * (2.4 + pulse));

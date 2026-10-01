@@ -81,6 +81,9 @@ pub struct RepoSnapshot {
     pub stashes: Vec<super::stash::StashInfo>,
     /// `clean`, `merge`, `rebase`, `cherry-pick`, `revert`, ...
     pub state: String,
+    /// Commit being brought in by a stopped merge / cherry-pick / revert
+    /// (`MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`).
+    pub incoming: Option<String>,
     /// True when history was cut at `limit`.
     pub truncated: bool,
 }
@@ -107,6 +110,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
         changes,
         stashes: super::stash::read_stashes(path)?,
         state: state_name(repo.state()).to_string(),
+        incoming: incoming(&repo),
         truncated,
     })
 }
@@ -216,6 +220,10 @@ fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, boo
     for pattern in ["refs/heads", "refs/remotes", "refs/tags"] {
         let _ = walk.push_glob(pattern);
     }
+    // A merged-in SHA may not be on any ref; keep it visible while the merge is pending.
+    for special in IN_PROGRESS_HEADS {
+        let _ = walk.push_ref(special);
+    }
 
     let mut commits = Vec::new();
     let mut truncated = false;
@@ -238,6 +246,15 @@ fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, boo
         });
     }
     Ok((commits, truncated))
+}
+
+const IN_PROGRESS_HEADS: [&str; 3] = ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"];
+
+fn incoming(repo: &Repository) -> Option<String> {
+    IN_PROGRESS_HEADS
+        .iter()
+        .find_map(|r| repo.revparse_single(r).ok())
+        .map(|o| o.id().to_string())
 }
 
 pub(super) fn read_changes(repo: &Repository) -> Result<Vec<FileChange>> {
@@ -315,5 +332,24 @@ mod tests {
         let snap = snapshot(s(d.path()), 3).unwrap();
         assert_eq!(snap.commits.len(), 3);
         assert!(snap.truncated);
+    }
+
+    #[test]
+    fn stopped_merge_reports_incoming_commit() {
+        use super::super::write::{checkout, create_branch, merge};
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "base", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "a.txt", "feature", "feature");
+        let feature = snapshot(p, 1).unwrap().head.target.unwrap();
+        checkout(p, "main").unwrap();
+        assert!(snapshot(p, 5).unwrap().incoming.is_none());
+        commit_file(d.path(), "a.txt", "main", "main");
+        merge(p, "feature", None).unwrap();
+        assert_eq!(
+            snapshot(p, 5).unwrap().incoming.as_deref(),
+            Some(feature.as_str())
+        );
     }
 }

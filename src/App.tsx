@@ -633,6 +633,7 @@ export default function App() {
                   return setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
                 confirmPick(sourceId, target);
               }}
+              incoming={snap.incoming}
               onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
               onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}

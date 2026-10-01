@@ -769,7 +769,7 @@ textarea:focus {
 .toasts {
   position: fixed;
   right: 16px;
-  top: 56px;
+  bottom: 130px; /* above the HUD; never over the top bar or banners */
   display: flex;
   flex-direction: column;
   gap: 8px;
