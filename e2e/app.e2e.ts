@@ -486,6 +486,8 @@ test("hunts down the commit that broke something with bisect", async ({ demo }) 
   // Bring HEAD into view at normal zoom (fitting would fold the straight run into a bar).
   await page.locator(".app:not([hidden]) .graph-area canvas").focus();
   await page.keyboard.press("h");
+  // The move eases in over a few frames; give it a moment to start before sampling positions.
+  await page.waitForTimeout(150);
 
   for (const [id, label] of [
     [bad, "버그가 있는 커밋으로 표시"],

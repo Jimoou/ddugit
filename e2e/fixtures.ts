@@ -43,11 +43,14 @@ export class Demo {
 
   /** Screen position of a commit once the camera has stopped moving (it eases after loads). */
   async screenOf(id: string) {
+    // Still for four samples in a row: one equal pair can land before a
+    // camera move (e.g. right after a key press) has started.
     let last = await this.rawScreenOf(id);
-    for (let i = 0; i < 40; i++) {
+    let still = 0;
+    for (let i = 0; i < 60 && still < 4; i++) {
       await this.page.waitForTimeout(50);
       const now = await this.rawScreenOf(id);
-      if (now && last && Math.abs(now.x - last.x) < 0.5 && Math.abs(now.y - last.y) < 0.5) return now;
+      still = now && last && Math.abs(now.x - last.x) < 0.5 && Math.abs(now.y - last.y) < 0.5 ? still + 1 : 0;
       last = now;
     }
     return last;
