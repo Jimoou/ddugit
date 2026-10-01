@@ -25,26 +25,25 @@ const SIDES: Record<string, [ours: string, theirs: string]> = {
 
 /** Bottom sheet for resolving conflicts block by block (or a whole file at once). */
 export function ConflictSheet({ path, files, state, initialFile, busy, onResolve, onClose }: Props) {
-  const [file, setFile] = useState(initialFile ?? files[0]);
-  const [data, setData] = useState<ConflictFile | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [picks, setPicks] = useState<(Pick | undefined)[]>([]);
+  const [wanted, setFile] = useState(initialFile ?? files[0]);
+  // Move on when the current file gets resolved.
+  const file = wanted && files.includes(wanted) ? wanted : files[0];
+  // What was loaded / picked belongs to one file; another file starts empty.
+  const [loaded, setLoaded] = useState<{ file: string; data: ConflictFile | null; error: string | null } | null>(null);
+  const [picked, setPicked] = useState<{ file: string; picks: (Pick | undefined)[] } | null>(null);
+  // `file` is undefined once everything is resolved: compare against a real entry only.
+  const mine = loaded && loaded.file === file ? loaded : null;
+  const data = mine?.data ?? null;
+  const error = mine?.error ?? null;
+  const picks = picked && picked.file === file ? picked.picks : [];
   const [ours, theirs] = SIDES[state] ?? ["ours", "theirs"];
 
-  // Move on when the current file gets resolved.
   useEffect(() => {
-    if (!file || !files.includes(file)) setFile(files[0]);
-  }, [files, file]);
-
-  useEffect(() => {
-    setData(null);
-    setError(null);
-    setPicks([]);
     if (!file) return;
     let live = true;
     api.conflictFile(path, file).then(
-      (d) => live && setData(d),
-      (e) => live && setError(String(e)),
+      (d) => live && setLoaded({ file, data: d, error: null }),
+      (e) => live && setLoaded({ file, data: null, error: String(e) }),
     );
     return () => {
       live = false;
@@ -117,7 +116,7 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
               const n = ++blockNo;
               const pick = picks[n];
               const editing = typeof pick === "object";
-              const choose = (p: Pick) => setPicks((ps) => Object.assign([...ps], { [n]: p }));
+              const choose = (p: Pick) => setPicked({ file: file!, picks: Object.assign([...picks], { [n]: p }) });
               // Start editing from the current choice, or from both sides.
               const edit = () => choose({ text: blockText(s, pick ?? "both").replace(/\r\n/g, "\n") });
               const keeps = (side: "ours" | "theirs") =>

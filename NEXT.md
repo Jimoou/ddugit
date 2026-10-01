@@ -7,24 +7,25 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #17(interactive rebase)을 squash merge했다(`5a95888`). Windows에서도 `sequence.editor=cp`가 동작하는 것을 CI로 확인했다.
+- PR #18(강제 push)을 squash merge했다(`d6bf590`).
 
 ## 지금 하는 일
 
-강제 push → PR #18에서 CI 대기 (10분 뒤 확인 예약)
+M5 · React Compiler 린트 규칙 켜기 → PR #19에서 CI 대기 (10분 뒤 확인 예약)
 
-- `RemoteOp::ForcePush` = `push --force-with-lease --progress`. 거부되면 `Rejected`
-- `SyncDialog`(Push 거부됨)에 세 번째 선택 "덮어쓰기 (강제 push)"를 붙였다. 원격에만 있는 커밋 N개가 지워진다고 밝힌다
-  - 주의: 거부되면 App이 바로 fetch하므로, lease가 지켜 주는 것은 **이 창을 연 뒤에** 올라온 커밋뿐이다. 문구도 그렇게 썼다
-- 테스트
-  - Rust: amend 후 일반 push는 거부되고 강제 push는 성공한다. 다른 사람이 push한 뒤 fetch 없이 강제 push하면 거부된다
-  - e2e: push → amend → 거부 → 덮어쓰기
+- `eslint.config.js`: `reactHooks.configs.recommended.rules`를 전부 켰다(`exhaustive-deps`는 error)
+- effect 안에서 setState하던 9곳을 정리했다
+  - 렌더 중에 조정: App 경로 변경 초기화, Composer 부분 스테이지 감지, DiffSheet 바깥에서 고른 파일
+  - 키와 함께 저장: App 사이드 패널 파일(`panel.id`), ConflictSheet 불러온 파일과 블록 선택, DiffSheet 줄 선택(diff 객체가 키)
+  - ConflictSheet: 해결된 파일에서 다음 파일로 넘어가는 것을 effect 대신 파생 값으로 처리한다
+  - App: diff 다시 불러오기를 `fetchDiff`(비동기 setState만)와 `loadDiff`(시트 열기)로 나눴다. 첫 스냅샷 로드는 promise로 바꾸고, 저장소를 바꾼 뒤 늦게 온 응답은 버린다
+- e2e가 실제 버그를 하나 잡았다. 파일이 아직 없을 때 `loaded?.file === file`이 `undefined === undefined`로 참이 돼서 충돌 시트가 죽었다. 고치고 CONVENTIONS에 적었다
 
 ## 다음 단계
 
-1. M5 · React Compiler 규칙 켜기 (setState-in-effect 8곳 정리)
-2. 백포트: 여러 대상 한눈에 보기 (고객사별 미반영 개수 표)
-3. M5 · 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
+1. 백포트: 여러 대상 한눈에 보기 (고객사별 미반영 개수 표)
+2. M5 · 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
+3. M5 · 키보드로 노드 이동(접근성)
 
 ## 막힌 것 / 결정 필요
 

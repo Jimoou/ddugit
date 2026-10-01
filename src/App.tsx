@@ -79,7 +79,7 @@ export default function App() {
   const [remoteBusy, setRemoteBusy] = useState<RemoteOp | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedStash, setSelectedStash] = useState<number | null>(null);
-  const [panelFiles, setPanelFiles] = useState<FileDiff[] | null>(null);
+  const [panel, setPanel] = useState<{ id: string; files: FileDiff[] } | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [focusRef, setFocusRef] = useState<RefInfo | null>(null);
   const [composer, setComposer] = useState<false | { amend: boolean }>(false);
@@ -117,19 +117,20 @@ export default function App() {
     void api.initialRepo().then((p) => p && setPath(p));
   }, []);
 
+  const applySnapshot = useCallback((s: RepoSnapshot) => {
+    setSnap(s);
+    setLoadError(null);
+  }, []);
   const refresh = useCallback(async () => {
     if (!path) return;
-    try {
-      const s = await api.snapshot(path, limit);
-      setSnap(s);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(String(e));
-    }
-  }, [path, limit]);
+    await api.snapshot(path, limit).then(applySnapshot, (e) => setLoadError(String(e)));
+  }, [path, limit, applySnapshot]);
 
-  // New repository: start from a clean slate.
-  useEffect(() => {
+  // New repository: start from a clean slate (adjusted while rendering, not in
+  // an effect, so the old repo's state never paints against the new path).
+  const [shownPath, setShownPath] = useState(path);
+  if (shownPath !== path) {
+    setShownPath(path);
     setSnap(null);
     setSelected(null);
     setSelectedStash(null);
@@ -138,11 +139,21 @@ export default function App() {
     setBackport(null);
     setRebaseFrom(null);
     setLimit(HISTORY_PAGE);
-  }, [path]);
+  }
 
+  // First load for a repo / history size. A response for a repo we have since
+  // left is dropped.
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!path) return;
+    let live = true;
+    api.snapshot(path, limit).then(
+      (s) => live && applySnapshot(s),
+      (e) => live && setLoadError(String(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [path, limit, applySnapshot]);
 
   // Files and refs changed on disk (editor, terminal git) → refresh.
   useEffect(() => {
@@ -179,25 +190,24 @@ export default function App() {
   // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
   const panelId = stashSel?.id ?? selected;
   useEffect(() => {
-    setPanelFiles(null);
     if (!path || !panelId) return;
     let live = true;
     api
       .commitDiff(path, panelId)
-      .then((f) => live && setPanelFiles(f))
-      .catch(() => live && setPanelFiles([]));
+      .then((files) => live && setPanel({ id: panelId, files }))
+      .catch(() => live && setPanel({ id: panelId, files: [] }));
     return () => {
       live = false;
     };
   }, [path, panelId]);
+  // Files loaded for another commit don't count: show "loading" until ours arrive.
+  const panelFiles = panel && panel.id === panelId ? panel.files : null;
 
-  const loadDiff = useCallback(
-    (source: DiffSource, title: string, file?: string) => {
+  /** Fetch the files for the open diff; only the latest request may land. */
+  const fetchDiff = useCallback(
+    (source: DiffSource) => {
       if (!path) return;
       const req = ++diffReq.current;
-      setBackport(null);
-      setRebaseFrom(null);
-      setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
       const load =
         source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
       load.then(
@@ -208,9 +218,20 @@ export default function App() {
     [path],
   );
 
-  // The working-tree diff follows the files on disk.
+  const loadDiff = useCallback(
+    (source: DiffSource, title: string, file?: string) => {
+      setBackport(null);
+      setRebaseFrom(null);
+      setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
+      fetchDiff(source);
+    },
+    [fetchDiff],
+  );
+
+  // The working-tree diff follows the files on disk (only the files are refetched).
+  const worktreeSource = diff?.source.kind === "worktree" ? diff.source : null;
   useEffect(() => {
-    if (diff?.source.kind === "worktree") loadDiff(diff.source, diff.title, diff.path);
+    if (worktreeSource) fetchDiff(worktreeSource);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap]);
 

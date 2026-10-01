@@ -40,9 +40,12 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
   const drag = useRef<{ y: number; h: number } | null>(null);
   const body = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // A new file asked for from outside (e.g. the composer) wins over the user's pick.
+  const [askedPath, setAskedPath] = useState(initialPath);
+  if (askedPath !== initialPath) {
+    setAskedPath(initialPath);
     setPath(initialPath);
-  }, [initialPath]);
+  }
 
   const current = useMemo(() => files?.find((f) => f.path === path) ?? files?.[0], [files, path]);
   const totals = useMemo(
@@ -157,10 +160,11 @@ interface LinePick {
 }
 
 function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
-  const [pick, setPick] = useState<LinePick | null>(null);
-  useEffect(() => {
-    setPick(null);
-  }, [file]);
+  // Picks belong to the diff they were made on; a reloaded diff starts clean.
+  const [picked, setPicked] = useState<{ file: FileDiff; pick: LinePick | null }>({ file, pick: null });
+  const pick = picked.file === file ? picked.pick : null;
+  const setPick = (next: (p: LinePick | null) => LinePick | null) =>
+    setPicked((cur) => ({ file, pick: next(cur.file === file ? cur.pick : null) }));
 
   if (file.binary) return <p className="muted pad">바이너리 파일이라 내용을 표시하지 않아요.</p>;
   if (file.hunks.length === 0) return <p className="muted pad">내용 변경 없음 (권한·이름만 바뀜)</p>;

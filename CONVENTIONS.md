@@ -48,6 +48,9 @@ otgit의 모든 코드(사람과 AI 모두)가 따르는 규칙입니다. 포맷
 - 함수 컴포넌트만 씁니다. Props는 파일 안의 `interface Props`로 정의합니다.
 - **프레임마다 바뀌는 상태(카메라, 호버, 드래그)는 `useRef`에 둡니다.** `requestAnimationFrame` 루프 안에서 `setState`를 매 프레임 부르지 않습니다. 값이 바뀔 때만 부릅니다.
 - 파생 값은 `useMemo`로 계산합니다. 상태로 복제하지 않습니다.
+- effect 안에서 상태를 바로 바꾸지 않습니다(ESLint `set-state-in-effect`).
+  - prop이 바뀔 때 상태 초기화 → 이전 값을 상태로 두고 **렌더 중에** 비교해서 고칩니다(`if (seen !== prop) { setSeen(prop); … }`)
+  - "불러오는 중" 초기화 → 불러온 결과를 **무엇에 대한 것인지(키)와 함께** 저장하고, 키가 다르면 없는 것으로 봅니다(`loaded && loaded.id === id ? loaded.data : null`). `loaded?.id === id`는 둘 다 undefined일 때 참이 되니 쓰지 않습니다
 - effect 콜백은 항상 블록 본문으로 씁니다(`useEffect(() => { f(); }, …)`). 식 본문은 그 값을 정리 함수로 돌려줍니다. 최신 Chromium의 `scrollTo`가 Promise를 돌려줘서 실제로 화면이 깨진 적이 있습니다. ESLint가 막습니다.
 - 이름 규칙:
   - 컴포넌트 파일: `PascalCase.tsx`
