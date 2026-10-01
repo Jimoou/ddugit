@@ -4,7 +4,7 @@ import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
-import { FxLayer, useFx } from "./components/Fx";
+import { type Effect, FxLayer, useFx } from "./components/Fx";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -31,6 +31,7 @@ import type { Settings } from "./settings";
 import { isKey, type Key, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import type { Drag, NodeBadge } from "./graph/renderer";
+import type { Pt } from "./graph/scene";
 import type {
   BisectState,
   CommitEdit,
@@ -52,6 +53,9 @@ import type {
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
 type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
 type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
+
+/** Longest wait for the camera to settle before an effect plays anyway. */
+const SETTLE_MAX_MS = 1500;
 
 const REMOTE_DONE: Record<RemoteOp, Key> = {
   fetch: "remote.done.fetch",
@@ -171,6 +175,31 @@ export function RepoView({
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
   const { playing: fx, play } = useFx(animate);
+  /**
+   * Play an effect once the new snapshot is drawn and the camera has come to rest
+   * (an operation may also center on HEAD): `make` is asked for the effect on each
+   * animation frame, and it plays once three frames in a row give the same answer
+   * (the camera moves every frame while it eases).
+   */
+  const playAfterDraw = (make: (at: (id: string | null | undefined) => Pt | null) => Effect | null) => {
+    const at = (id: string | null | undefined) => (id ? (graph.current?.screenOf(id) ?? null) : null);
+    let last = "";
+    let still = 0;
+    const started = performance.now();
+    const tick = () => {
+      const e = make(at);
+      const key = JSON.stringify(e);
+      still = key === last ? still + 1 : 0;
+      last = key;
+      if (still >= 2 || performance.now() - started > SETTLE_MAX_MS) {
+        if (e) play(e);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    // Let a camera move queued right after the operation (centering on HEAD) begin first.
+    setTimeout(tick, 100);
+  };
   // A new page size from the settings applies to every open repository.
   const [shownPage, setShownPage] = useState(page);
   if (shownPage !== page) {
@@ -459,17 +488,15 @@ export function RepoView({
       const r = await run(t(REMOTE_DONE[op]), () => api.remote(path, op, setProgress));
       if (r.status === "ok") {
         const head = latest.current?.head.target;
-        // Wait a frame or two so the new layout is drawn before reading positions.
         const fresh = pushing ? [] : (latest.current?.commits ?? []).filter((c) => !known.has(c.id));
-        setTimeout(() => {
+        playAfterDraw((at) => {
           if (pushing) {
-            const from = head && graph.current?.screenOf(head);
-            if (from) play({ kind: "launch", from });
-          } else {
-            const to = fresh.flatMap((c) => graph.current?.screenOf(c.id) ?? []);
-            if (to.length) play({ kind: "meteors", to });
+            const from = at(head);
+            return from && { kind: "launch", from };
           }
-        }, 80);
+          const to = fresh.flatMap((c) => at(c.id) ?? []);
+          return to.length ? { kind: "meteors", to } : null;
+        });
       }
       if (r.status === "auth") setAuth({ op, output: r.output });
       if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
@@ -509,7 +536,15 @@ export function RepoView({
           t("pick.done", { target }),
           () => api.pick(path, "cherryPick", id, target),
           () => setTimeout(() => graph.current?.centerOnHead(), 60),
-        );
+        ).then((r) => {
+          if (r.status !== "ok") return;
+          const copy = latest.current?.head.target;
+          playAfterDraw((at) => {
+            const from = at(id),
+              to = at(copy);
+            return from && to ? { kind: "comet", from, to } : null;
+          });
+        });
       },
     });
   };
@@ -695,6 +730,15 @@ export function RepoView({
         setTimeout(() => graph.current?.centerOnHead(), 60);
       },
     );
+
+  /** After a rebase onto `base`: the commits now on HEAD above it, oldest first. */
+  const replayedSince = (base: string) => {
+    const byId = new Map(latest.current?.commits.map((c) => [c.id, c]));
+    const out: string[] = [];
+    for (let id = latest.current?.head.target; id && id !== base && out.length < 200; id = byId.get(id)?.parents[0])
+      out.push(id);
+    return out.reverse();
+  };
 
   /** Is `id` already on the upstream branch (so rewriting it needs a force push)? */
   const pushedCommit = (id: string) => {
@@ -1229,13 +1273,21 @@ export function RepoView({
               initial={rebaseInit}
               unpushed={snap.head.upstream ? snap.head.ahead : null}
               busy={busy}
-              onApply={(steps) =>
+              onApply={(steps) => {
+                const base = rebaseFrom!;
                 void run(
                   t("rebase.done"),
-                  () => api.rebase(path, rebaseFrom!, steps),
+                  () => api.rebase(path, base, steps),
                   () => setRebaseFrom(null),
-                )
-              }
+                ).then((r) => {
+                  if (r.status !== "ok") return;
+                  const replayed = replayedSince(base);
+                  playAfterDraw((at) => {
+                    const pts = replayed.flatMap((id) => at(id) ?? []);
+                    return pts.length ? { kind: "constellation", at: pts } : null;
+                  });
+                });
+              }}
               onClose={() => setRebaseFrom(null)}
             />
           )}
@@ -1592,9 +1644,15 @@ export function RepoView({
           onConfirm={() =>
             run(t("merge.done", { source: mergeReq.source, target: mergeReq.target }), () =>
               api.merge(path, mergeReq.source, mergeReq.target),
-            ).then(() => {
+            ).then((r) => {
               setMergeReq(null);
               setTimeout(() => graph.current?.centerOnHead(), 60);
+              if (r.status !== "ok") return;
+              const merged = latest.current?.head.target;
+              playAfterDraw((at) => {
+                const p = at(merged);
+                return p && { kind: "fusion", at: p };
+              });
             })
           }
         />

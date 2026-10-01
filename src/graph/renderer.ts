@@ -556,6 +556,9 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.beginPath();
       ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
       ctx.fill();
+      const dst = s.drag.valid && s.drag.target ? scene.layout.byId.get(s.drag.target) : undefined;
+      if (dst)
+        drawGravityWell(ctx, toScreen(view, { x: xOf(dst.row, n), y: yOf(dst.lane) }), cable, s.animate ? time : 0);
     }
   }
 
@@ -636,6 +639,33 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.fillText(label, bx + bw / 2, by + 8);
     }
   }
+}
+
+/** A valid drop target pulls the dragged star in: dashed rings that turn and shrink into it. */
+function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: number) {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const R = 46;
+  for (let i = 0; i < 3; i++) {
+    const f = (time * 0.7 + i / 3) % 1; // 0 = outer edge, 1 = swallowed
+    const r = R * (1 - f) + 6;
+    ctx.strokeStyle = alpha(c, 0.75 * Math.sin(f * Math.PI));
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 7]);
+    ctx.lineDashOffset = -time * 40 * (i % 2 ? 1 : -1);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+  g.addColorStop(0, alpha(c, 0.35));
+  g.addColorStop(1, alpha(c, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 const TRAIL = "#ffd479";
