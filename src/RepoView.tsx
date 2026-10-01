@@ -3,6 +3,7 @@ import { api } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
+import { CleanupSheet } from "./components/Cleanup";
 import { RebaseSheet } from "./components/RebaseSheet";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
@@ -139,6 +140,9 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  /** Where deleted branch tips were, to scatter them as stardust (bumped id replays it). */
+  const [dust, setDust] = useState<{ n: number; at: { x: number; y: number }[] }>({ n: 0, at: [] });
   /** Bumped after a reset to replay the rewind effect. */
   const [rewind, setRewind] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -497,6 +501,16 @@ export function RepoView({
       },
     });
 
+  /** Delete branches together; their tips scatter as stardust where they were drawn. */
+  const deleteBranches = (names: string[], tips: string[], force: boolean) => {
+    const at = tips.flatMap((id) => graph.current?.screenOf(id) ?? []);
+    return run(
+      t("clean.done", { n: names.length }),
+      () => api.deleteBranches(path, names, force),
+      () => setDust((d) => ({ n: d.n + 1, at })),
+    );
+  };
+
   /** Move the branch to `target` with `mode`, then play the rewind. */
   const doReset = (target: string, mode: ResetMode, label = t("undo.done", { branch: snap?.head.branch ?? "HEAD" })) =>
     run(
@@ -745,6 +759,7 @@ export function RepoView({
             setDiff(null);
             setBackport(null);
             setRebaseFrom(null);
+            setCleanupOpen(false);
             setReflogOpen((o) => !o);
           }}
           onRemote={(op) => void remote(op)}
@@ -785,6 +800,13 @@ export function RepoView({
           }}
           onCheckout={checkoutRef}
           onAddRemote={askRemote}
+          onCleanup={() => {
+            setDiff(null);
+            setBackport(null);
+            setRebaseFrom(null);
+            setReflogOpen(false);
+            setCleanupOpen((o) => !o);
+          }}
           onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
           stashes={snap.stashes}
           selectedStash={selectedStash}
@@ -809,6 +831,23 @@ export function RepoView({
                 onStep={(d) => goToMatch(search.index + d)}
                 onClose={() => setSearch(null)}
               />
+            )}
+            {animate && dust.n > 0 && (
+              <div className="fx-clip" aria-hidden key={`dust-${dust.n}`}>
+                {dust.at.map((p, i) => (
+                  <div key={i} className="stardust" style={{ left: p.x, top: p.y }}>
+                    {Array.from({ length: 16 }, (_, j) => (
+                      <i
+                        key={j}
+                        style={{
+                          ["--a" as string]: `${j * 22.5}deg`,
+                          ["--d" as string]: `${44 + ((j * 7) % 5) * 13}px`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
             )}
             {animate && rewind > 0 && (
               <div className="fx-clip" aria-hidden>
@@ -961,6 +1000,52 @@ export function RepoView({
             />
           )}
 
+          {cleanupOpen && !conflictSheet && !backport && !rebase && !reflogOpen && (
+            <CleanupSheet
+              path={path}
+              version={snap}
+              busy={busy}
+              colorOf={colorOf}
+              onSelect={(id) => {
+                show({ commit: id });
+                graph.current?.centerOn(id);
+              }}
+              onDelete={(branches, unmerged) => {
+                const names = branches.map((b) => b.name);
+                const go = () =>
+                  void deleteBranches(
+                    names,
+                    branches.map((b) => b.tip),
+                    unmerged,
+                  );
+                if (!unmerged) return go();
+                setConfirm({
+                  title: t("clean.force.title"),
+                  danger: true,
+                  confirmLabel: t("clean.force.go"),
+                  body: (
+                    <p>
+                      <Rich
+                        k="clean.force.body"
+                        vars={{
+                          names: branches
+                            .filter((b) => !b.merged)
+                            .map((b) => b.name)
+                            .join(", "),
+                        }}
+                      />
+                    </p>
+                  ),
+                  onConfirm: () => {
+                    setConfirm(null);
+                    go();
+                  },
+                });
+              }}
+              onClose={() => setCleanupOpen(false)}
+            />
+          )}
+
           {reflogOpen && !conflictSheet && !backport && !rebase && (
             <ReflogSheet
               path={path}
@@ -993,7 +1078,7 @@ export function RepoView({
             />
           )}
 
-          {diff && !conflictSheet && !backport && !rebase && !reflogOpen && (
+          {diff && !conflictSheet && !backport && !rebase && !reflogOpen && !cleanupOpen && (
             <DiffSheet
               title={diff.title}
               files={diff.files}

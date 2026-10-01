@@ -505,4 +505,23 @@ export const en: Record<Key, string> = {
 
   // undo: move
   "undo.moveTo": "Moves <b>{branch}</b> to <b>“{summary}”</b>.",
+
+  // branch cleanup
+  "clean.open": "Clean up branches",
+  "clean.title": "Branch cleanup",
+  "clean.base": "against {base}",
+  "clean.merged": "Merged",
+  "clean.merged.hint": "Fully in the base branch. Deleting keeps the commits",
+  "clean.gone": "Gone from the remote",
+  "clean.gone.hint": "The remote branch it tracked was deleted (pruned on fetch)",
+  "clean.stale": "Stale",
+  "clean.stale.hint": "No commits for over {days} days",
+  "clean.none": "Nothing to clean up. All tidy ✨",
+  "clean.footer": "A deleted branch can come back if its commits are on the remote or in the undo history (⏱)",
+  "clean.delete": "Delete {n} selected",
+  "clean.done": "Cleaned up {n} branches",
+  "clean.force.title": "Includes unmerged branches",
+  "clean.force.body":
+    "<b>{names}</b> have commits the base branch lacks. Deleting them removes those commits from the graph (recoverable only from the undo history).",
+  "clean.force.go": "Delete anyway",
 };

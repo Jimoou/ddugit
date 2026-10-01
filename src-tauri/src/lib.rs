@@ -76,6 +76,9 @@ command!(git_reset(path: String, target: String, mode: git::undo::ResetMode) -> 
     => git::undo::reset(&path, &target, mode));
 command!(git_reflog(path: String, limit: Option<usize>) -> Vec<git::undo::ReflogEntry>
     => git::undo::reflog(&path, limit.unwrap_or(100)));
+command!(branch_report(path: String) -> git::cleanup::BranchReport => git::cleanup::report(&path));
+command!(git_delete_branches(path: String, names: Vec<String>, force: bool) -> OpResult
+    => git::cleanup::delete_branches(&path, &names, force));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
 command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
     => git::stash::stash_push(&path, &message, &paths));
@@ -149,6 +152,8 @@ pub fn run() {
             git_remote,
             git_reset,
             git_reflog,
+            branch_report,
+            git_delete_branches,
             git_discard,
             git_stash_push,
             git_stash,

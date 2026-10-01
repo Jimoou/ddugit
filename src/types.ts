@@ -50,6 +50,20 @@ export type StashOp = "apply" | "pop" | "drop";
 export type PickOp = "cherryPick" | "revert";
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
+/** One local branch for housekeeping (see `git/cleanup.rs`). */
+export interface BranchHealth {
+  name: string;
+  tip: string;
+  time: number;
+  merged: boolean;
+  gone: boolean;
+  upstream: string | null;
+}
+export interface BranchReport {
+  base: string | null;
+  branches: BranchHealth[];
+}
+
 /** What a reset does with the changes of the commits it moves past. */
 export type ResetMode = "soft" | "mixed" | "hard";
 

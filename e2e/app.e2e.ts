@@ -105,7 +105,7 @@ test("backports a missing commit and then counts it as applied", async ({ demo }
 
 test("adds the original project as a remote and lists its fixes to backport", async ({ demo }) => {
   const { page } = demo;
-  await page.click(".sidebar .h3-add");
+  await page.locator(".sidebar").getByTitle("원격 저장소 추가").click();
   await page.fill(".dialog input >> nth=0", "upstream");
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
@@ -406,4 +406,24 @@ test("undoes the last commit, goes back hard, then rescues the lost commit from 
   await demo.toast("rescued 브랜치로 살렸어요");
   expect((await demo.snapshot()).refs.find((r) => r.name === "rescued")?.target).toBe(head);
   await expect(page.locator(".reflog-list li.lost").filter({ hasText: head.slice(0, 7) })).toHaveCount(0);
+});
+
+test("cleans up merged and gone branches from the sidebar", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => {
+    (d as unknown as { goneBranches: string[] }).goneBranches = ["feature/theme"];
+  });
+  await page.getByRole("button", { name: "브랜치 정리" }).click();
+  const sheet = page.locator(".cleanup-sheet");
+  await expect(sheet).toContainText("병합 완료");
+  await expect(sheet).toContainText("원격에서 사라짐");
+  // Merged ones start selected; also pick the one whose remote branch is gone.
+  const merged = await sheet.locator(".clean-group").first().locator("li").count();
+  await sheet.getByRole("checkbox", { name: "feature/theme" }).check();
+  await sheet.getByRole("button", { name: `선택한 ${merged + 1}개 삭제` }).click();
+  await page.getByRole("button", { name: "그래도 삭제" }).click();
+  await demo.toast(`브랜치 ${merged + 1}개를 정리했어요`);
+  const names = (await demo.snapshot()).refs.filter((r) => r.kind === "local").map((r) => r.name);
+  expect(names).not.toContain("feature/theme");
+  expect(names).not.toContain("feature/login");
 });
