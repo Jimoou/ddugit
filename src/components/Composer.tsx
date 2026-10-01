@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FileChange } from "../types";
+import { t } from "../i18n";
 
 interface Props {
   changes: FileChange[];
@@ -94,18 +95,18 @@ export function Composer(props: Props) {
     <aside className="panel composer">
       <header>
         <div>
-          <div className="eyebrow">{amend ? "마지막 커밋 수정" : "새 체크포인트"}</div>
+          <div className="eyebrow">{amend ? t("composer.amend") : t("composer.new")}</div>
           <h2>
             {!amend && useBranch && newBranch ? newBranch : (branch ?? "detached HEAD")}
-            <span className="muted">{amend ? " 의 마지막 커밋" : " 에 커밋"}</span>
+            <span className="muted">{amend ? t("composer.onAmend") : t("composer.onCommit")}</span>
           </h2>
         </div>
-        <button className="icon" onClick={onClose} title="닫기 (Esc)">
+        <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
           ✕
         </button>
       </header>
 
-      {merging && <div className="note warn">병합 진행 중 — 모든 변경을 한 번에 커밋해 병합을 완료합니다.</div>}
+      {merging && <div className="note warn">{t("composer.merging")}</div>}
 
       <div className="files-head">
         <label className="check">
@@ -115,13 +116,13 @@ export function Composer(props: Props) {
             disabled={merging}
             onChange={() => setPicked(all ? new Set() : new Set(changes.map((c) => c.path)))}
           />
-          <span>변경된 파일 {changes.length}개</span>
+          <span>{t("composer.files", { n: changes.length })}</span>
         </label>
-        <span className="muted">{picked.size}개 선택</span>
+        <span className="muted">{t("composer.picked", { n: picked.size })}</span>
       </div>
 
       <ul className="files">
-        {changes.length === 0 && <li className="empty">변경 사항이 없어요. 파일을 수정하면 여기에 나타납니다.</li>}
+        {changes.length === 0 && <li className="empty">{t("composer.empty")}</li>}
         {changes.map((c) => {
           const k = kind(c);
           return (
@@ -142,13 +143,13 @@ export function Composer(props: Props) {
                 />
                 <span className={`chip k-${k}`}>{k === "conflict" ? "!" : (LABEL[k] ?? "M")}</span>
                 {c.staged && c.unstaged && (
-                  <span className="chip staged" title="일부만 스테이지됨">
+                  <span className="chip staged" title={t("composer.partial")}>
                     ½
                   </span>
                 )}
                 <span
                   className="path link"
-                  title={`${c.path} — 클릭해서 diff 보기`}
+                  title={t("composer.openDiff", { path: c.path })}
                   onClick={(e) => {
                     e.preventDefault(); // don't toggle the checkbox
                     onOpenFile(c.path);
@@ -165,7 +166,7 @@ export function Composer(props: Props) {
       <textarea
         ref={msgRef}
         className="message"
-        placeholder="무엇을 바꿨나요? (첫 줄은 요약)"
+        placeholder={t("composer.message")}
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={(e) => {
@@ -178,7 +179,7 @@ export function Composer(props: Props) {
       {!merging && anyStaged && (
         <label className="check">
           <input type="checkbox" checked={stagedOnly} onChange={(e) => setStagedOnly(e.target.checked)} />
-          <span>스테이지된 변경만 커밋 (diff 시트에서 고른 부분)</span>
+          <span>{t("composer.stagedOnly")}</span>
         </label>
       )}
 
@@ -192,18 +193,16 @@ export function Composer(props: Props) {
               if (e.target.checked && !message.trim()) setMessage(headMessage.trim());
             }}
           />
-          <span>마지막 커밋 수정 (amend) — 선택한 파일 없이 메시지만 바꿀 수도 있어요</span>
+          <span>{t("composer.amendOpt")}</span>
         </label>
       )}
-      {amend && headPushed && (
-        <div className="note warn">이 커밋은 이미 push됐어요. 수정하면 다시 올릴 때 강제 push가 필요합니다.</div>
-      )}
+      {amend && headPushed && <div className="note warn">{t("composer.pushed")}</div>}
 
       {!merging && !amend && (
         <div className="branch-opt">
           <label className="check">
             <input type="checkbox" checked={useBranch} onChange={(e) => setUseBranch(e.target.checked)} />
-            <span>새 브랜치로 갈라져서 커밋</span>
+            <span>{t("composer.newBranch")}</span>
           </label>
           {useBranch && (
             <input
@@ -220,24 +219,24 @@ export function Composer(props: Props) {
         <div className="row side-actions">
           <button
             disabled={busy || picked.size === 0}
-            title="선택한 변경을 스태시에 보관하고 작업 트리에서 치웁니다"
+            title={t("composer.stash.title")}
             onClick={() => onStash(message.trim(), all ? [] : [...picked])}
           >
-            ◇ 스태시에 보관
+            {t("composer.stash")}
           </button>
           <button
             className="danger ghost"
             disabled={busy || picked.size === 0}
-            title="선택한 파일의 변경을 버립니다 (되돌릴 수 없음)"
+            title={t("composer.discard.title")}
             onClick={() => onDiscard([...picked])}
           >
-            선택 버리기
+            {t("composer.discard")}
           </button>
         </div>
       )}
 
       <button className="primary" disabled={!canCommit} onClick={submit}>
-        {busy ? "커밋 중…" : amend ? "커밋 수정" : "체크포인트 추가"}
+        {busy ? t("composer.committing") : amend ? t("composer.amendGo") : t("composer.commitGo")}
         <kbd>⌘/Ctrl ⏎</kbd>
       </button>
     </aside>

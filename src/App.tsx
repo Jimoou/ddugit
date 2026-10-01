@@ -24,7 +24,8 @@ import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { planMove, rebaseRange } from "./rebasePlan";
 import { defaults, parseSettings, type Settings } from "./settings";
-import { resolveLocale, setLocale, t } from "./i18n";
+import { isKey, type Key, resolveLocale, setLocale, t } from "./i18n";
+import { Rich } from "./i18n/Rich";
 import type { Drag } from "./graph/renderer";
 import type {
   FileDiff,
@@ -61,21 +62,28 @@ function loadSettings(): Settings {
   return settings;
 }
 
-const REMOTE_DONE: Record<RemoteOp, string> = {
-  fetch: "원격 커밋을 가져왔어요",
-  pull: "최신 상태로 받았어요",
-  pullMerge: "병합해서 받았어요",
-  pullRebase: "리베이스해서 받았어요",
-  push: "원격에 올렸어요",
-  forcePush: "원격을 내 이력으로 덮어썼어요",
+const REMOTE_DONE: Record<RemoteOp, Key> = {
+  fetch: "remote.done.fetch",
+  pull: "remote.done.pull",
+  pullMerge: "remote.done.pullMerge",
+  pullRebase: "remote.done.pullRebase",
+  push: "remote.done.push",
+  forcePush: "remote.done.forcePush",
 };
 
-/** In-progress operations: banner name, how to finish, and whether "계속" applies. */
-const IN_PROGRESS: Record<string, { name: string; hint: string; canContinue: boolean }> = {
-  merge: { name: "병합", hint: "해결 후 ＋ 로 커밋하면 병합이 완료됩니다.", canContinue: false },
-  rebase: { name: "리베이스", hint: "파일을 고친 뒤 '계속'을 누르면 리베이스를 이어갑니다.", canContinue: true },
-  "cherry-pick": { name: "cherry-pick", hint: "파일을 고친 뒤 '계속'을 누르면 복사를 마칩니다.", canContinue: true },
-  revert: { name: "되돌리기", hint: "파일을 고친 뒤 '계속'을 누르면 되돌리기를 마칩니다.", canContinue: true },
+/** In-progress operations (`state.<name>` and `.hint` in the dictionary) and whether "continue" applies. */
+const IN_PROGRESS: Record<string, { canContinue: boolean }> = {
+  merge: { canContinue: false },
+  rebase: { canContinue: true },
+  "cherry-pick": { canContinue: true },
+  revert: { canContinue: true },
+};
+
+/** Banner name and hint for a repository state; unknown states show as-is. */
+const stateText = (state: string) => {
+  const name = `state.${state}`;
+  const hint = `state.${state}.hint`;
+  return { name: isKey(name) ? t(name) : state, hint: isKey(hint) ? t(hint) : "" };
 };
 
 /** URL of the remote behind HEAD's upstream (else `origin`, else the first remote). */
@@ -155,7 +163,7 @@ export default function App() {
   const startGitPath = useRef(settings.gitPath);
   useEffect(() => {
     if (startGitPath.current && isTauri)
-      api.setGitPath(startGitPath.current).catch((e) => toast("err", `설정한 git을 쓸 수 없어요: ${e}`));
+      api.setGitPath(startGitPath.current).catch((e) => toast("err", t("app.gitPathError", { error: String(e) })));
   }, [toast]);
 
   const applySnapshot = useCallback((s: RepoSnapshot) => {
@@ -374,9 +382,9 @@ export default function App() {
         toast("ok", label);
         after?.();
       } else if (r.status === "conflict") {
-        toast("err", "충돌이 났어요. 아래 충돌 해결 화면에서 고르거나 취소하세요.");
+        toast("err", t("app.conflict"));
         setConflictSheet({});
-      } else if (r.status === "failed") toast("err", r.output || `${label} 실패`);
+      } else if (r.status === "failed") toast("err", r.output || t("app.failed", { label }));
     } catch (e) {
       toast("err", String(e));
     } finally {
@@ -390,7 +398,7 @@ export default function App() {
     setRemoteBusy(op);
     setProgress(null);
     try {
-      const r = await run(REMOTE_DONE[op], () => api.remote(path!, op, setProgress));
+      const r = await run(t(REMOTE_DONE[op]), () => api.remote(path!, op, setProgress));
       if (r.status === "auth") setAuth({ op, output: r.output });
       if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
       // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
@@ -414,20 +422,19 @@ export default function App() {
     const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
     setConfirm({
       title: "cherry-pick",
-      confirmLabel: "복사",
+      confirmLabel: t("pick.copy"),
       body: (
         <>
           <p>
-            <b>“{summary}”</b> 커밋의 변경을 <b>{target}</b>에 새 커밋으로 복사합니다. 원래 커밋 SHA가 메시지에
-            기록돼요.
+            <Rich k="pick.body" vars={{ summary, target }} />
           </p>
-          {snap?.head.branch !== target && <p className="note">먼저 {target}(으)로 체크아웃해요.</p>}
+          {snap?.head.branch !== target && <p className="note">{t("pick.switch", { target })}</p>}
         </>
       ),
       onConfirm: () => {
         setConfirm(null);
         void run(
-          `${target}에 복사했어요`,
+          t("pick.done", { target }),
           () => api.pick(path!, "cherryPick", id, target),
           () => setTimeout(() => graph.current?.centerOnHead(), 60),
         );
@@ -439,42 +446,44 @@ export default function App() {
 
   const checkoutRef = (r: RefInfo) =>
     r.kind === "remote"
-      ? refRun(`${r.name}을(를) 로컬로 가져와 이동했어요`, { kind: "checkoutRemote", remoteRef: r.name })
-      : run(`${r.name}(으)로 이동했어요`, () => api.checkout(path!, r.name));
+      ? refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name })
+      : run(t("checkout.done", { name: r.name }), () => api.checkout(path!, r.name));
 
   const askBranchAt = (at: string) =>
     setNameReq({
-      title: `${at.slice(0, 7)}에서 새 브랜치`,
+      title: t("branch.new.title", { sha: at.slice(0, 7) }),
       placeholder: "feature/my-idea",
-      confirmLabel: "만들고 이동",
+      confirmLabel: t("branch.new.go"),
       onSubmit: (name) => {
         setNameReq(null);
-        void run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path!, name, at, true));
+        void run(t("branch.new.done", { name }), () => api.createBranch(path!, name, at, true));
       },
     });
 
   const askTagAt = (at: string) =>
     setNameReq({
-      title: `${at.slice(0, 7)}에 태그`,
+      title: t("tag.new.title", { sha: at.slice(0, 7) }),
       placeholder: "v1.0.0",
-      confirmLabel: "태그 만들기",
-      extra: { placeholder: "설명 (비워 두면 가벼운 태그, 쓰면 주석 태그)", multiline: true },
+      confirmLabel: t("tag.new.go"),
+      extra: { placeholder: t("tag.new.message"), multiline: true },
       onSubmit: (name, message) => {
         setNameReq(null);
-        void refRun(`${name} 태그를 만들었어요`, { kind: "createTag", name, at, message });
+        void refRun(t("tag.new.done", { name }), { kind: "createTag", name, at, message });
       },
     });
 
   /** Add another repository (e.g. the original project) as a remote and fetch it. */
   const askRemote = () =>
     setNameReq({
-      title: "원격 저장소 추가",
-      placeholder: snap?.remotes.some((r) => r.name === "upstream") ? "이름" : "이름 (예: upstream)",
-      extra: { placeholder: "URL (https://… 또는 git@…:…)", required: true },
-      confirmLabel: "추가하고 가져오기",
+      title: t("remote.add.title"),
+      placeholder: snap?.remotes.some((r) => r.name === "upstream")
+        ? t("remote.add.name")
+        : t("remote.add.nameExample"),
+      extra: { placeholder: t("remote.add.url"), required: true },
+      confirmLabel: t("remote.add.go"),
       onSubmit: async (name, url) => {
         setNameReq(null);
-        const r = await refRun(`원격 ${name}을(를) 추가했어요`, { kind: "addRemote", name, url });
+        const r = await refRun(t("remote.add.done", { name }), { kind: "addRemote", name, url });
         if (r.status === "ok") await remote("fetch");
       },
     });
@@ -482,31 +491,30 @@ export default function App() {
   /** Delete a local branch; if git says it's unmerged, ask again before forcing. */
   const deleteBranch = (name: string) =>
     setConfirm({
-      title: "브랜치 삭제",
+      title: t("branch.delete.title"),
       danger: true,
-      confirmLabel: "삭제",
+      confirmLabel: t("common.delete"),
       body: (
         <p>
-          로컬 브랜치 <b>{name}</b>을(를) 지웁니다. 원격 브랜치는 그대로예요.
+          <Rich k="branch.delete.body" vars={{ name }} />
         </p>
       ),
       onConfirm: async () => {
         setConfirm(null);
-        const r = await refRun(`${name} 브랜치를 지웠어요`, { kind: "deleteBranch", name, force: false });
+        const r = await refRun(t("branch.delete.done", { name }), { kind: "deleteBranch", name, force: false });
         if (r.status !== "unmerged") return;
         setConfirm({
-          title: "병합되지 않은 브랜치",
+          title: t("branch.unmerged.title"),
           danger: true,
-          confirmLabel: "그래도 삭제",
+          confirmLabel: t("branch.unmerged.go"),
           body: (
             <p>
-              <b>{name}</b>에는 다른 브랜치에 병합되지 않은 커밋이 있어요. 지우면 그 커밋들은 그래프에서
-              사라집니다(reflog로만 복구 가능).
+              <Rich k="branch.unmerged.body" vars={{ name }} />
             </p>
           ),
           onConfirm: () => {
             setConfirm(null);
-            void refRun(`${name} 브랜치를 지웠어요`, { kind: "deleteBranch", name, force: true });
+            void refRun(t("branch.delete.done", { name }), { kind: "deleteBranch", name, force: true });
           },
         });
       },
@@ -519,14 +527,14 @@ export default function App() {
     const canMerge =
       !!snap.head.branch && !isHead && r.kind !== "tag" && canDropOn(snap.head.target ?? "", r.target, "merge");
     const merge: MenuItem = {
-      label: snap.head.branch ? `${snap.head.branch}에 병합` : "HEAD에 병합",
+      label: snap.head.branch ? t("menu.mergeInto", { branch: snap.head.branch }) : t("menu.mergeIntoHead"),
       disabled: !canMerge,
       onSelect: () =>
         setMergeReq({ sourceId: r.target, targetId: snap.head.target!, source: r.name, target: snap.head.branch! }),
     };
     const compare: MenuItem = {
-      label: snap.head.branch ? `${snap.head.branch}에 없는 커밋 보기` : "현재 브랜치에 없는 커밋 보기",
-      hint: "백포트",
+      label: snap.head.branch ? t("menu.compare", { branch: snap.head.branch }) : t("menu.compareHead"),
+      hint: t("menu.compare.hint"),
       disabled: !snap.head.branch || isHead,
       onSelect: () => {
         setDiff(null);
@@ -536,24 +544,24 @@ export default function App() {
     };
     if (r.kind === "tag")
       return [
-        { label: "태그 위치로 이동", onSelect: () => graph.current?.centerOn(r.target) },
+        { label: t("menu.tag.goto"), onSelect: () => graph.current?.centerOn(r.target) },
         "separator",
         {
-          label: "태그 삭제",
+          label: t("tag.delete.title"),
           danger: true,
           onSelect: () =>
             setConfirm({
-              title: "태그 삭제",
+              title: t("tag.delete.title"),
               danger: true,
-              confirmLabel: "삭제",
+              confirmLabel: t("common.delete"),
               body: (
                 <p>
-                  로컬 태그 <b>{r.name}</b>을(를) 지웁니다.
+                  <Rich k="tag.delete.body" vars={{ name: r.name }} />
                 </p>
               ),
               onConfirm: () => {
                 setConfirm(null);
-                void refRun(`${r.name} 태그를 지웠어요`, { kind: "deleteTag", name: r.name });
+                void refRun(t("tag.delete.done", { name: r.name }), { kind: "deleteTag", name: r.name });
               },
             }),
         },
@@ -561,56 +569,55 @@ export default function App() {
     if (r.kind === "remote") {
       const name = snap.remotes.map((x) => x.name).find((n) => r.name.startsWith(`${n}/`)) ?? r.name.split("/")[0];
       return [
-        { label: "로컬 브랜치로 체크아웃", hint: "추적", onSelect: () => void checkoutRef(r) },
+        { label: t("menu.checkoutLocal"), hint: t("menu.checkoutLocal.hint"), onSelect: () => void checkoutRef(r) },
         merge,
         compare,
         "separator",
-        { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(r.target) },
+        { label: t("menu.branchHere"), onSelect: () => askBranchAt(r.target) },
         "separator",
         {
-          label: `원격 ${name} 삭제…`,
+          label: t("remote.delete.menu", { name }),
           danger: true,
           onSelect: () =>
             setConfirm({
-              title: "원격 삭제",
+              title: t("remote.delete.title"),
               danger: true,
-              confirmLabel: "삭제",
+              confirmLabel: t("common.delete"),
               body: (
                 <p>
-                  원격 <b>{name}</b>과(와) 그 원격 브랜치 목록을 이 저장소에서 지웁니다. 원격 저장소 자체와 로컬
-                  브랜치는 그대로예요.
+                  <Rich k="remote.delete.body" vars={{ name }} />
                 </p>
               ),
               onConfirm: () => {
                 setConfirm(null);
-                void refRun(`원격 ${name}을(를) 지웠어요`, { kind: "removeRemote", name });
+                void refRun(t("remote.delete.done", { name }), { kind: "removeRemote", name });
               },
             }),
         },
       ];
     }
     return [
-      { label: "체크아웃", disabled: isHead, onSelect: () => void checkoutRef(r) },
+      { label: t("menu.checkout"), disabled: isHead, onSelect: () => void checkoutRef(r) },
       merge,
       compare,
       "separator",
       {
-        label: "이름 변경…",
+        label: t("menu.rename"),
         onSelect: () =>
           setNameReq({
-            title: "브랜치 이름 변경",
-            placeholder: "새 이름",
-            confirmLabel: "변경",
+            title: t("branch.rename.title"),
+            placeholder: t("branch.rename.placeholder"),
+            confirmLabel: t("branch.rename.go"),
             initial: r.name,
             onSubmit: (to) => {
               setNameReq(null);
-              void refRun(`${to}(으)로 이름을 바꿨어요`, { kind: "renameBranch", from: r.name, to });
+              void refRun(t("branch.rename.done", { name: to }), { kind: "renameBranch", from: r.name, to });
             },
           }),
       },
-      { label: "여기에 태그…", onSelect: () => askTagAt(r.target) },
+      { label: t("menu.tagHere"), onSelect: () => askTagAt(r.target) },
       "separator",
-      { label: "브랜치 삭제…", danger: true, disabled: isHead, onSelect: () => deleteBranch(r.name) },
+      { label: t("menu.deleteBranch"), danger: true, disabled: isHead, onSelect: () => deleteBranch(r.name) },
     ];
   };
 
@@ -625,46 +632,45 @@ export default function App() {
     const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
     const range = onHead && !isHead && head ? rebaseRange(commitById, head, id) : null;
     return [
-      { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(id) },
-      { label: "여기에 태그…", onSelect: () => askTagAt(id) },
+      { label: t("menu.branchHere"), onSelect: () => askBranchAt(id) },
+      { label: t("menu.tagHere"), onSelect: () => askTagAt(id) },
       ...locals.map((r) => ({
-        label: `${r.name} 체크아웃`,
-        onSelect: () => void run(`${r.name}(으)로 이동했어요`, () => api.checkout(path, r.name)),
+        label: t("menu.checkoutName", { name: r.name }),
+        onSelect: () => void run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name)),
       })),
       "separator" as const,
       {
-        label: snap.head.branch ? `${snap.head.branch}에 cherry-pick` : "HEAD에 cherry-pick",
-        hint: "⌥ 드래그",
+        label: snap.head.branch ? t("menu.pickInto", { branch: snap.head.branch }) : t("menu.pickIntoHead"),
+        hint: t("menu.pick.hint"),
         disabled: !clean || onHead || !snap.head.branch,
         onSelect: () => confirmPick(id, snap.head.branch!),
       },
       {
-        label: "되돌리는 커밋 만들기 (revert)",
+        label: t("menu.revert"),
         disabled: !clean || !onHead,
         onSelect: () =>
           setConfirm({
             title: "revert",
-            confirmLabel: "되돌리기",
+            confirmLabel: t("revert.go"),
             body: (
               <p>
-                <b>“{summary}”</b>의 변경을 거꾸로 적용하는 새 커밋을 {snap.head.branch ?? "HEAD"}에 만듭니다. 이력은
-                지워지지 않아요.
+                <Rich k="revert.body" vars={{ summary, branch: snap.head.branch ?? "HEAD" }} />
               </p>
             ),
             onConfirm: () => {
               setConfirm(null);
-              void run("되돌리는 커밋을 만들었어요", () => api.pick(path, "revert", id, null));
+              void run(t("revert.done"), () => api.pick(path, "revert", id, null));
             },
           }),
       },
       {
-        label: "마지막 커밋 수정 (amend)",
+        label: t("menu.amend"),
         disabled: !isHead || !clean,
         onSelect: () => show({ composer: true, amend: true }),
       },
       {
-        label: "이 다음 커밋들 정리… (rebase -i)",
-        hint: typeof range === "string" ? "병합 있음" : undefined,
+        label: t("menu.rebase"),
+        hint: typeof range === "string" ? t("menu.rebase.hasMerge") : undefined,
         disabled: !clean || !snap.head.branch || !onHead || isHead || typeof range === "string",
         onSelect: () => {
           setDiff(null);
@@ -674,7 +680,7 @@ export default function App() {
         },
       },
       "separator" as const,
-      { label: "SHA 복사", hint: id.slice(0, 7), onSelect: () => void navigator.clipboard?.writeText(id) },
+      { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => void navigator.clipboard?.writeText(id) },
     ];
   };
 
@@ -692,18 +698,18 @@ export default function App() {
         <h1 className="wordmark">
           otgit<span>옷깃</span>
         </h1>
-        <p>그래프로 보고, 그래프로 다루는 Git.</p>
+        <p>{t("app.tagline")}</p>
         {loadError && <p className="note warn">{loadError}</p>}
         <div className="row">
           <button className="primary" onClick={openRepo}>
-            저장소 열기
+            {t("app.open")}
           </button>
-          <button onClick={() => setPath(DEMO_PATH)}>데모 둘러보기</button>
+          <button onClick={() => setPath(DEMO_PATH)}>{t("app.demo")}</button>
         </div>
       </div>
     );
   }
-  if (!snap || !layout) return <div className="welcome loading">불러오는 중…</div>;
+  if (!snap || !layout) return <div className="welcome loading">{t("app.loading")}</div>;
 
   const selectedCommit = selected ? commitById.get(selected) : undefined;
   const conflicts = snap.changes.filter((c) => c.conflicted).length;
@@ -732,18 +738,18 @@ export default function App() {
       {snap.state !== "clean" && (
         <div className="banner">
           <span>
-            {IN_PROGRESS[snap.state]?.name ?? snap.state} 진행 중{conflicts > 0 && ` — 충돌 파일 ${conflicts}개`}.{" "}
-            {IN_PROGRESS[snap.state]?.hint ?? ""}
+            {t("state.banner", { name: stateText(snap.state).name })}
+            {conflicts > 0 && t("state.conflicts", { n: conflicts })}. {stateText(snap.state).hint}
           </span>
           <span className="row">
-            {conflicts > 0 && <button onClick={() => setConflictSheet({})}>충돌 해결</button>}
+            {conflicts > 0 && <button onClick={() => setConflictSheet({})}>{t("state.resolve")}</button>}
             {IN_PROGRESS[snap.state]?.canContinue && (
-              <button disabled={busy} onClick={() => run("이어서 마쳤어요", () => api.continueOp(path))}>
-                계속
+              <button disabled={busy} onClick={() => run(t("state.continued"), () => api.continueOp(path))}>
+                {t("state.continue")}
               </button>
             )}
-            <button disabled={busy} onClick={() => run("취소했어요", () => api.abort(path))}>
-              취소
+            <button disabled={busy} onClick={() => run(t("state.aborted"), () => api.abort(path))}>
+              {t("common.cancel")}
             </button>
           </span>
         </div>
@@ -828,22 +834,22 @@ export default function App() {
 
             {snap.commits.length === 0 && (
               <div className="empty-hint">
-                아직 체크포인트가 없어요. <b>＋</b> 를 눌러 첫 커밋을 만들어 보세요.
+                <Rich k="app.empty" />
               </div>
             )}
 
             <div className="hud">
-              <button onClick={() => graph.current?.zoomBy(0.8)} title="축소 (-)">
+              <button onClick={() => graph.current?.zoomBy(0.8)} title={t("hud.zoomOut")}>
                 −
               </button>
               <span className="zoom">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => graph.current?.zoomBy(1.25)} title="확대 (+)">
+              <button onClick={() => graph.current?.zoomBy(1.25)} title={t("hud.zoomIn")}>
                 ＋
               </button>
-              <button onClick={() => graph.current?.fit()} title="전체 보기 (0)">
+              <button onClick={() => graph.current?.fit()} title={t("hud.fit")}>
                 ⤢
               </button>
-              <button onClick={() => graph.current?.centerOnHead()} title="HEAD로 (H)">
+              <button onClick={() => graph.current?.centerOnHead()} title={t("hud.head")}>
                 ◉
               </button>
             </div>
@@ -853,9 +859,9 @@ export default function App() {
             </div>
             {/* Inside the graph area so bottom sheets never cover them. */}
             <div className="toasts">
-              {toasts.map((t) => (
-                <div key={t.id} className={`toast ${t.kind}`}>
-                  {t.text}
+              {toasts.map((item) => (
+                <div key={item.id} className={`toast ${item.kind}`}>
+                  {item.text}
                 </div>
               ))}
             </div>
@@ -868,7 +874,7 @@ export default function App() {
               state={snap.state}
               initialFile={conflictSheet.file}
               busy={busy}
-              onResolve={(file, how) => void run(`${file} 해결했어요`, () => api.resolve(path, file, how))}
+              onResolve={(file, how) => void run(t("conflict.resolved", { file }), () => api.resolve(path, file, how))}
               onClose={() => setConflictSheet(null)}
             />
           )}
@@ -885,7 +891,7 @@ export default function App() {
               busy={busy}
               onApply={(steps) =>
                 void run(
-                  "커밋을 정리했어요",
+                  t("rebase.done"),
                   () => api.rebase(path, rebaseFrom!, steps),
                   () => setRebaseFrom(null),
                 )
@@ -912,27 +918,29 @@ export default function App() {
               }}
               onApply={(ids) =>
                 setConfirm({
-                  title: "백포트",
-                  confirmLabel: `${ids.length}개 cherry-pick`,
+                  title: t("backport.confirm.title"),
+                  confirmLabel: t("backport.confirm.go", { n: ids.length }),
                   body: (
                     <p>
-                      <b>{backport.source}</b>의 커밋 {ids.length}개를 오래된 것부터 <b>{backport.target}</b>에
-                      cherry-pick합니다. 원본 커밋은 메시지에 <code>-x</code>로 기록돼서 나중에 고쳐 반영해도 반영됨으로
-                      인식돼요.
-                      {snap.head.branch !== backport.target && ` 먼저 ${backport.target}(으)로 체크아웃합니다.`}
+                      <Rich
+                        k="backport.confirm.body"
+                        vars={{ source: backport.source, target: backport.target, n: ids.length }}
+                      />
+                      {snap.head.branch !== backport.target &&
+                        t("backport.confirm.switch", { target: backport.target })}
                     </p>
                   ),
                   onConfirm: () => {
                     setConfirm(null);
-                    void run(`${ids.length}개 커밋을 ${backport.target}에 가져왔어요`, () =>
+                    void run(t("backport.done", { n: ids.length, target: backport.target }), () =>
                       api.backportApply(path, ids, backport.target),
                     );
                   },
                 })
               }
               onExport={async (ids) => {
-                const dir = await api.pickFolder("패치를 저장할 폴더");
-                if (dir) void run(`패치 ${ids.length}개를 저장했어요`, () => api.backportExport(path, ids, dir));
+                const dir = await api.pickFolder(t("backport.exportFolder"));
+                if (dir) void run(t("backport.exported", { n: ids.length }), () => api.backportExport(path, ids, dir));
               }}
               onClose={() => setBackport(null)}
             />
@@ -953,8 +961,8 @@ export default function App() {
                       onHunk: (file, hunk, lines) =>
                         void run(
                           diff.source.kind === "worktree" && diff.source.scope === "staged"
-                            ? "스테이지에서 내렸어요"
-                            : "스테이지했어요",
+                            ? t("stage.unstaged")
+                            : t("stage.staged"),
                           () =>
                             api.stageHunks(
                               path,
@@ -986,11 +994,11 @@ export default function App() {
               const c = snap.changes.find((x) => x.path === file);
               if (c?.conflicted) return setConflictSheet({ file });
               // Fully staged files have nothing in the "unstaged" view.
-              loadDiff({ kind: "worktree", scope: c?.unstaged ? "unstaged" : "staged" }, "작업 중인 변경", file);
+              loadDiff({ kind: "worktree", scope: c?.unstaged ? "unstaged" : "staged" }, t("diff.worktree"), file);
             }}
             onStash={(message, paths) =>
               run(
-                "스태시에 보관했어요",
+                t("stash.saved"),
                 () => api.stashPush(path, message, paths),
                 () => {
                   show({});
@@ -1000,14 +1008,13 @@ export default function App() {
             }
             onDiscard={(paths) =>
               setConfirm({
-                title: "변경 버리기",
+                title: t("discard.title"),
                 danger: true,
-                confirmLabel: `${paths.length}개 파일 버리기`,
+                confirmLabel: t("discard.go", { n: paths.length }),
                 body: (
                   <>
                     <p>
-                      아래 파일의 변경을 마지막 커밋 상태로 되돌립니다. 새로 만든 파일은 <b>삭제</b>돼요.
-                      <b> 되돌릴 수 없습니다.</b> 확실하지 않으면 스태시로 치워두세요.
+                      <Rich k="discard.body" /> <b>{t("discard.warn")}</b> {t("discard.hint")}
                     </p>
                     <ul>
                       {paths.map((p) => (
@@ -1018,13 +1025,13 @@ export default function App() {
                 ),
                 onConfirm: () => {
                   setConfirm(null);
-                  void run("변경을 버렸어요", () => api.discard(path, paths));
+                  void run(t("discard.done"), () => api.discard(path, paths));
                 },
               })
             }
             onCommit={(message, paths, newBranch, amend, stagedOnly) =>
               run(
-                amend ? "마지막 커밋을 수정했어요" : "체크포인트를 추가했어요",
+                amend ? t("commit.amended") : t("commit.done"),
                 async () => {
                   if (newBranch) {
                     const r = await api.createBranch(path, newBranch, null, true);
@@ -1058,9 +1065,9 @@ export default function App() {
             onOpenFile={(file) =>
               loadDiff({ kind: "commit", id: selectedCommit.id }, selectedCommit.summary || selectedCommit.id, file)
             }
-            onCheckout={(name) => run(`${name}(으)로 이동했어요`, () => api.checkout(path, name))}
+            onCheckout={(name) => run(t("checkout.done", { name }), () => api.checkout(path, name))}
             onCreateBranch={(name, at) =>
-              run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true))
+              run(t("branch.new.done", { name }), () => api.createBranch(path, name, at, true))
             }
           />
         )}
@@ -1077,22 +1084,22 @@ export default function App() {
             onOpenFile={(file) => loadDiff({ kind: "commit", id: stashSel.id }, stashTitle(stashSel.message), file)}
             onPop={() =>
               run(
-                "스태시를 꺼냈어요",
+                t("stash.popped"),
                 () => api.stash(path, "pop", stashSel.index),
                 () => show({}),
               )
             }
-            onApply={() => run("스태시를 적용했어요", () => api.stash(path, "apply", stashSel.index))}
+            onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.index))}
             onDrop={() =>
               setConfirm({
-                title: "스태시 삭제",
+                title: t("stash.delete.title"),
                 danger: true,
-                confirmLabel: "삭제",
-                body: <p>“{stashTitle(stashSel.message)}” 스태시를 지웁니다. 되돌릴 수 없어요.</p>,
+                confirmLabel: t("common.delete"),
+                body: <p>{t("stash.delete.body", { name: stashTitle(stashSel.message) })}</p>,
                 onConfirm: () => {
                   setConfirm(null);
                   void run(
-                    "스태시를 삭제했어요",
+                    t("stash.deleted"),
                     () => api.stash(path, "drop", stashSel.index),
                     () => show({}),
                   );
@@ -1122,7 +1129,7 @@ export default function App() {
           busy={busy}
           onCancel={() => setMergeReq(null)}
           onConfirm={() =>
-            run(`${mergeReq.source} → ${mergeReq.target} 병합 완료`, () =>
+            run(t("merge.done", { source: mergeReq.source, target: mergeReq.target }), () =>
               api.merge(path, mergeReq.source, mergeReq.target),
             ).then(() => {
               setMergeReq(null);
