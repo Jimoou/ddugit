@@ -7,25 +7,23 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #8(이전 이력 더 불러오기)을 squash merge했다(`fd705ac`).
+- PR #9(파일 감시 자동 새로고침)를 squash merge했다(`f440e4b`).
 
 ## 지금 하는 일
 
-M3 · 파일 감시 자동 새로고침 → PR #9에서 CI 대기 (10분 뒤 확인 예약)
+M3 · 라벨 겹침 회피 → PR #10에서 CI 대기 (10분 뒤 확인 예약)
 
-- `git/watch.rs`
-  - `notify-debouncer-mini`(300ms)로 작업 트리 전체를 감시한다
-  - `relevant()`가 무시할 경로를 걸러낸다: `.gitignore`된 경로, `.git/objects`, `.git/logs`, `*.lock`
-  - macOS의 `/var` ↔ `/private/var` 경로 차이 때문에 루트를 원래 경로와 canonical 경로 둘 다 확인한다
-- `lib.rs`: `watch_repo` 명령, `Watching` 상태(새로 감시를 시작하면 이전 감시는 drop되어 멈춤), `repo-changed` 이벤트
-- 프런트: `api.watch(path, onChange)` → `listen` + `invoke`. 데모에서는 아무 일도 하지 않는다
-- 테스트 43. 실제 앱(Xvfb)에서 터미널로 커밋하면 클릭 없이 그래프에 바로 나타나는 것을 확인했다
+- `graph/labels.ts` `placeBadges()`: 화면 좌표를 받아 배지 사각형을 돌려주는 순수 함수 (vitest 5)
+  - HEAD 노드 그룹을 먼저 놓아서 HEAD 라벨은 움직이지 않는다
+  - 겹치면 0..3단계 위로 올리고, renderer가 노드에서 배지까지 점선 연결선을 그린다
+  - 그래도 자리가 없으면 첫 배지 + "+N" 칩으로 접는다
+- `renderer.ts`: 라벨을 노드별로 재서 그룹을 만들고 배치 결과대로 그린다. 히트 영역(`labelHits`)에는 실제 ref만 넣는다
 
 ## 다음 단계
 
-1. 라벨 겹침 회피 (인접 노드 배지가 가로로 겹침)
-2. 충돌 블록 직접 편집, 줄 단위 스테이징
-3. M3 · 시맨틱 줌 확장 (일직선 구간을 접기)
+1. 충돌 블록 직접 편집, 줄 단위 스테이징
+2. M3 · 시맨틱 줌 확장 (일직선 구간을 접기)
+3. M3 · 대형 저장소 성능 (레이아웃 Web Worker, diff 가상 스크롤)
 
 ## 막힌 것 / 결정 필요
 

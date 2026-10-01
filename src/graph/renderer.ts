@@ -1,4 +1,5 @@
 import { stashTitle } from "../format";
+import { placeBadges } from "./labels";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 
@@ -95,6 +96,9 @@ export function stashMarks(scene: Scene, stashes: StashInfo[]): StashMark[] {
 }
 
 export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
+
+/** Ref badge height (must match `placeBadges`' default). */
+const BADGE_H = 18;
 
 /** Zoom thresholds for semantic zoom. */
 export const ZOOM = { dots: 0.35, branches: 0.55, allRefs: 0.8, summaries: 1.25 };
@@ -409,37 +413,61 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   // --- labels (semantic zoom) -------------------------------------------------
   if (k >= ZOOM.branches) {
-    for (const L of labelQueue) {
-      const refs = s.refs.get(L.id);
-      let y = L.y - r - 10;
-      if (refs) {
-        const shown = refs.filter((rf) => k >= ZOOM.allRefs || rf.kind === "local" || rf.name === s.headBranch);
-        ctx.font = `600 11px ${SANS}`;
-        for (const rf of shown) {
-          const isHead = rf.kind === "local" && rf.name === s.headBranch && L.id === s.headId;
-          const label = (isHead ? "◉ " : rf.kind === "remote" ? "☁ " : rf.kind === "tag" ? "◆ " : "") + rf.name;
-          const tw = Math.min(ctx.measureText(label).width, 160);
-          const bw = tw + 14,
-            bh = 18;
-          const bx = L.x - bw / 2,
-            by = y - bh;
-          const col = rf.kind === "tag" ? NEON[3] : L.color;
-          ctx.globalAlpha = L.d ? 0.3 : rf.kind === "remote" ? 0.75 : 1;
-          roundRect(ctx, bx, by, bw, bh, 9);
-          ctx.fillStyle = isHead ? col : "rgba(10,8,20,0.85)";
-          ctx.fill();
-          ctx.strokeStyle = col;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          ctx.fillStyle = isHead ? "#07060d" : col;
-          ctx.textBaseline = "middle";
-          ctx.textAlign = "center";
-          ctx.fillText(truncate(ctx, label, 160), L.x, by + bh / 2 + 0.5);
-          ctx.globalAlpha = 1;
-          s.labelHits.push({ x: bx, y: by, w: bw, h: bh, ref: rf });
-          y -= bh + 4;
-        }
+    // Measure every node's badges, then place them all at once so neighbours
+    // don't overlap (stacks get lifted, or folded into "+N").
+    ctx.font = `600 11px ${SANS}`;
+    const groups = labelQueue.map((L) => {
+      const shown = (s.refs.get(L.id) ?? []).filter(
+        (rf) => k >= ZOOM.allRefs || rf.kind === "local" || rf.name === s.headBranch,
+      );
+      const labels = shown.map((rf) => {
+        const isHead = rf.kind === "local" && rf.name === s.headBranch && L.id === s.headId;
+        const text = (isHead ? "◉ " : rf.kind === "remote" ? "☁ " : rf.kind === "tag" ? "◆ " : "") + rf.name;
+        return { rf, isHead, text, w: Math.min(ctx.measureText(text).width, 160) + 14 };
+      });
+      return { L, labels };
+    });
+    const placed = placeBadges(
+      groups.map(({ L, labels }) => ({
+        x: L.x,
+        baseY: L.y - r - 10,
+        widths: labels.map((l) => l.w),
+        priority: L.id === s.headId,
+      })),
+    );
+
+    groups.forEach(({ L, labels }, gi) => {
+      const pg = placed[gi];
+      if (pg.lift > 0 && pg.badges.length) {
+        // Leader line from the node up to its lifted stack.
+        ctx.strokeStyle = alpha(L.color, L.d ? 0.15 : 0.45);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(L.x, L.y - r - 2);
+        ctx.lineTo(L.x, pg.badges[0].y + BADGE_H);
+        ctx.stroke();
       }
+      for (const b of pg.badges) {
+        const item = b.index >= 0 ? labels[b.index] : null;
+        const col = item?.rf.kind === "tag" ? NEON[3] : L.color;
+        ctx.globalAlpha = L.d ? 0.3 : item?.rf.kind === "remote" || !item ? 0.75 : 1;
+        roundRect(ctx, b.x, b.y, b.w, BADGE_H, 9);
+        ctx.fillStyle = item?.isHead ? col : "rgba(10,8,20,0.85)";
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = item?.isHead ? "#07060d" : col;
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "center";
+        ctx.font = `600 11px ${SANS}`;
+        ctx.fillText(item ? truncate(ctx, item.text, 160) : `+${pg.hidden}`, b.x + b.w / 2, b.y + BADGE_H / 2 + 0.5);
+        ctx.globalAlpha = 1;
+        if (item) s.labelHits.push({ x: b.x, y: b.y, w: b.w, h: BADGE_H, ref: item.rf });
+      }
+    });
+
+    for (const L of labelQueue) {
       if (k >= ZOOM.summaries || L.id === s.selected || L.id === s.hovered) {
         const text = s.summaries.get(L.id) ?? "";
         ctx.font = `12px ${SANS}`;
