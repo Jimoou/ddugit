@@ -57,6 +57,14 @@ describe("resolveText", () => {
     expect(out).toContain("<<<<<<< HEAD\na\n=======\nb\n>>>>>>> feature\n");
   });
 
+  it("uses hand-edited text with the file's line ending and a trailing newline", () => {
+    const segs = parseConflicts(file);
+    expect(resolveText(segs, [{ text: "merged" }, "ours"])).toBe("keep 1\nmerged\nkeep 2\na\n");
+    expect(resolveText(segs, [{ text: "" }, "ours"])).toBe("keep 1\nkeep 2\na\n");
+    const crlf = parseConflicts("<<<<<<< HEAD\r\no\r\n=======\r\nt\r\n>>>>>>> f\r\n");
+    expect(resolveText(crlf, [{ text: "x\ny\n" }])).toBe("x\r\ny\r\n");
+  });
+
   it("handles CRLF files", () => {
     const crlf = "x\r\n<<<<<<< HEAD\r\no\r\n=======\r\nt\r\n>>>>>>> f\r\ny\r\n";
     expect(resolveText(parseConflicts(crlf), ["theirs"])).toBe("x\r\nt\r\ny\r\n");

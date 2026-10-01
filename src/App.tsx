@@ -692,6 +692,14 @@ export default function App() {
               드래그 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
               {snap.truncated && ` · 최근 ${snap.commits.length}개 표시 중`}
             </div>
+            {/* Inside the graph area so bottom sheets never cover them. */}
+            <div className="toasts">
+              {toasts.map((t) => (
+                <div key={t.id} className={`toast ${t.kind}`}>
+                  {t.text}
+                </div>
+              ))}
+            </div>
           </div>
 
           {conflictSheet && (
@@ -718,7 +726,7 @@ export default function App() {
                       scope: diff.source.scope,
                       busy,
                       onScope: (scope) => loadDiff({ kind: "worktree", scope }, diff.title, diff.path),
-                      onHunk: (file, hunk) =>
+                      onHunk: (file, hunk, lines) =>
                         void run(
                           diff.source.kind === "worktree" && diff.source.scope === "staged"
                             ? "스테이지에서 내렸어요"
@@ -729,6 +737,7 @@ export default function App() {
                               file,
                               [hunk],
                               diff.source.kind === "worktree" && diff.source.scope === "staged",
+                              lines,
                             ),
                         ),
                     }
@@ -928,14 +937,6 @@ export default function App() {
           }}
         />
       )}
-
-      <div className="toasts">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.kind}`}>
-            {t.text}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

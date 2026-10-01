@@ -767,9 +767,9 @@ textarea:focus {
 
 /* ------------------------------------------------------------------ toasts */
 .toasts {
-  position: fixed;
-  right: 16px;
-  bottom: 130px; /* above the HUD; never over the top bar or banners */
+  position: absolute;
+  right: 14px;
+  bottom: 120px; /* above the HUD, inside the graph area */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1222,6 +1222,21 @@ table.diff tr.hunk td {
 .hunk-btn:hover:not(:disabled) {
   box-shadow: 0 0 10px rgba(34, 232, 255, 0.3);
 }
+table.diff.pickable tr.ins td[title],
+table.diff.pickable tr.rem td[title] {
+  cursor: pointer;
+}
+table.diff tr.picked td:first-child {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+table.diff tr.picked {
+  outline: 1px solid rgba(34, 232, 255, 0.35);
+  outline-offset: -1px;
+}
+table.diff tr.picked .no {
+  color: var(--cyan);
+  opacity: 1;
+}
 .chip.staged {
   margin-left: -4px;
   color: #07060d;
@@ -1312,6 +1327,20 @@ table.diff tr.hunk td {
 .side.drop {
   opacity: 0.35;
   text-decoration: line-through;
+}
+.block-edit {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  font: 12px/1.55 var(--mono);
+  color: var(--text);
+  background: rgba(61, 255, 197, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(61, 255, 197, 0.35);
 }
 .conflict-foot {
   display: flex;

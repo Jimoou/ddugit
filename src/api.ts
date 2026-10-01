@@ -29,7 +29,10 @@ export interface Commands {
   initial_repo: [Record<string, never>, string | null];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
   git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
-  git_stage_hunks: [{ path: string; file: string; hunks: number[]; unstage: boolean }, OpResult];
+  git_stage_hunks: [
+    { path: string; file: string; hunks: number[]; lines: number[] | null; unstage: boolean },
+    OpResult,
+  ];
   git_merge: [{ path: string; source: string; target: string | null }, OpResult];
   git_abort: [{ path: string }, OpResult];
   git_continue: [{ path: string }, OpResult];
@@ -64,8 +67,8 @@ export const api = {
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
   commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
     call("git_commit", { path, message, paths, amend, stagedOnly }),
-  stageHunks: (path: string, file: string, hunks: number[], unstage: boolean) =>
-    call("git_stage_hunks", { path, file, hunks, unstage }),
+  stageHunks: (path: string, file: string, hunks: number[], unstage: boolean, lines?: number[]) =>
+    call("git_stage_hunks", { path, file, hunks, lines: lines ?? null, unstage }),
   merge: (path: string, source: string, target: string | null) => call("git_merge", { path, source, target }),
   abort: (path: string) => call("git_abort", { path }),
   continueOp: (path: string) => call("git_continue", { path }),

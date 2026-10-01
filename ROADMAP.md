@@ -23,15 +23,15 @@
 - [x] 원격 작업 진행률 표시 (`--progress` 파싱)
 - [x] 인증 실패 시 안내 (credential helper / SSH agent 설정 가이드)
 
-## M2 · 일상 작업 완성 (남은 것: 줄 단위 스테이징, 충돌 직접 편집)
+## M2 · 일상 작업 완성 ✅
 
 - [x] hunk 단위 스테이징 (diff 시트 "변경 / 스테이지됨" 탭, hunk마다 스테이지·내리기, 스테이지된 것만 커밋)
-- [ ] 줄 단위 스테이징
+- [x] 줄 단위 스테이징 (diff 줄 번호를 눌러 고르기, Shift로 범위, 내리기도 같은 방식)
 - [x] 변경 버리기(discard), stash 저장·적용·꺼내기·삭제 (그래프에 기준 커밋 옆 마름모로 표시)
 - [x] amend, revert, cherry-pick (⌥/Alt를 누른 채 끌어 놓으면 cherry-pick, `-x`로 원본 기록)
 - [x] 브랜치 이름 변경 / 삭제(병합 안 됐으면 한 번 더 확인), 태그 생성·삭제, 원격 브랜치 체크아웃(추적 브랜치 생성)
 - [x] 충돌 해결 화면: 블록마다 현재 쪽 / 들어오는 쪽 / 둘 다, 파일 전체 선택, 바이너리, 리베이스 시 라벨 반전
-- [ ] 충돌 해결: 직접 편집 (블록 안 텍스트 수정)
+- [x] 충돌 해결: 직접 편집 (블록 안 텍스트 수정)
 - [x] 진행 중인 병합 / cherry-pick / revert를 그래프에 표시 (들어오는 커밋 → ＋ 빨간 점선)
 - [x] 커밋 검색 (메시지, 작성자, SHA, 브랜치 이름), 그래프에서 하이라이트 · ⌘/Ctrl+F, Enter로 결과 이동
 - [x] 우클릭 컨텍스트 메뉴: 커밋 노드
@@ -64,19 +64,20 @@
 
 ## 작업 기록 (append-only)
 
-| 날짜       | 내용                                                                                                                                                                                           |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-01 | M0 완료: 골격, git 백엔드(테스트 6), 레이아웃(테스트 8), 네온 렌더러, ＋ 커밋, 끌어서 병합, 미니맵                                                                                             |
-| 2026-10-01 | 워크플로우 도입: CLAUDE.md / CONVENTIONS.md / ROADMAP / NEXT, CI(ubuntu·macos·windows), Prettier·rustfmt                                                                                       |
-| 2026-10-01 | M1: fetch/pull/push(+ahead/behind, 갈라짐·거부 처리), diff 시트(커밋/작업 트리), git 모듈 분리(테스트 17)                                                                                      |
-| 2026-10-01 | `main` 생성(골격 커밋), 첫 PR #1. M1 완료: 원격 진행률(`--progress` → Tauri Channel), 인증 실패 분류 + OS별 안내 다이얼로그(테스트 20)                                                         |
-| 2026-10-01 | M2: discard(확인 필수) + stash push/apply/pop/drop, 그래프 스태시 마커·패널·사이드바, ChangedFiles/format 공통화(테스트 25)                                                                    |
-| 2026-10-01 | PR #1 squash merge(`e588fba`). M2: cherry-pick/revert(`git/pick.rs`)/amend, 노드 우클릭 메뉴, ⌥ 드래그 cherry-pick, 배너 계속/취소 일반화(테스트 29)                                           |
-| 2026-10-01 | PR #2 squash merge(`a0bff0b`). M2: 브랜치·태그 관리(`git/refs.rs`, `RefOp` 표 하나), 배지/사이드바 우클릭 메뉴, `NameDialog` 일반화(테스트 33)                                                 |
-| 2026-10-01 | PR #3 squash merge(`0db48ef`). M2: 커밋 검색(`graph/search.ts` + vitest 5, `SearchBar`, 일치 항목만 밝게 표시). PR 운영: GitGuardian 때문에 완료 이벤트가 오지 않아 10분 뒤 확인 예약으로 전환 |
-| 2026-10-01 | PR #4 squash merge(`021d5c5`). M2: hunk 스테이징(`git/stage.rs`: 패치에서 hunk 골라 `git apply --cached`), `DiffScope`(all/unstaged/staged), `commit_index`(테스트 37)                         |
-| 2026-10-01 | PR #5 squash merge(`3c20d93`). M2: 충돌 해결(`git/conflict.rs`, `src/conflict.ts` 마커 파서 + vitest 6, `ConflictSheet`, 충돌이 나면 자동으로 열림)(테스트 40)                                 |
-| 2026-10-01 | PR #6 squash merge(`6f8978a`, Windows CRLF 테스트 수정 포함). 그래프에 진행 중 병합 표시(`incoming`, MERGE/CHERRY_PICK/REVERT_HEAD), 알림 위치를 아래로(테스트 41)                             |
-| 2026-10-01 | PR #7 squash merge(`fed643f`). M3: 이전 이력 더 불러오기(그래프 꼬리 버튼, `limit` 상태, 레이아웃이 바뀌어도 최신 커밋 기준으로 카메라 고정, 불러온 이력에는 반짝임 효과 없음)                 |
-| 2026-10-01 | PR #8 squash merge(`fd705ac`). M3: 파일 감시(`git/watch.rs`, notify-debouncer-mini, `repo-changed` 이벤트), 실제 앱에서 터미널 커밋이 바로 반영되는 것 확인(테스트 43)                         |
-| 2026-10-01 | PR #9 squash merge(`f440e4b`). M3: 라벨 겹침 회피(`graph/labels.ts` `placeBadges`: HEAD 우선, 겹치면 위로 올리고 연결선, 그래도 안 되면 "+N" 칩)(vitest 24)                                    |
+| 날짜       | 내용                                                                                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-01 | M0 완료: 골격, git 백엔드(테스트 6), 레이아웃(테스트 8), 네온 렌더러, ＋ 커밋, 끌어서 병합, 미니맵                                                                                                                    |
+| 2026-10-01 | 워크플로우 도입: CLAUDE.md / CONVENTIONS.md / ROADMAP / NEXT, CI(ubuntu·macos·windows), Prettier·rustfmt                                                                                                              |
+| 2026-10-01 | M1: fetch/pull/push(+ahead/behind, 갈라짐·거부 처리), diff 시트(커밋/작업 트리), git 모듈 분리(테스트 17)                                                                                                             |
+| 2026-10-01 | `main` 생성(골격 커밋), 첫 PR #1. M1 완료: 원격 진행률(`--progress` → Tauri Channel), 인증 실패 분류 + OS별 안내 다이얼로그(테스트 20)                                                                                |
+| 2026-10-01 | M2: discard(확인 필수) + stash push/apply/pop/drop, 그래프 스태시 마커·패널·사이드바, ChangedFiles/format 공통화(테스트 25)                                                                                           |
+| 2026-10-01 | PR #1 squash merge(`e588fba`). M2: cherry-pick/revert(`git/pick.rs`)/amend, 노드 우클릭 메뉴, ⌥ 드래그 cherry-pick, 배너 계속/취소 일반화(테스트 29)                                                                  |
+| 2026-10-01 | PR #2 squash merge(`a0bff0b`). M2: 브랜치·태그 관리(`git/refs.rs`, `RefOp` 표 하나), 배지/사이드바 우클릭 메뉴, `NameDialog` 일반화(테스트 33)                                                                        |
+| 2026-10-01 | PR #3 squash merge(`0db48ef`). M2: 커밋 검색(`graph/search.ts` + vitest 5, `SearchBar`, 일치 항목만 밝게 표시). PR 운영: GitGuardian 때문에 완료 이벤트가 오지 않아 10분 뒤 확인 예약으로 전환                        |
+| 2026-10-01 | PR #4 squash merge(`021d5c5`). M2: hunk 스테이징(`git/stage.rs`: 패치에서 hunk 골라 `git apply --cached`), `DiffScope`(all/unstaged/staged), `commit_index`(테스트 37)                                                |
+| 2026-10-01 | PR #5 squash merge(`3c20d93`). M2: 충돌 해결(`git/conflict.rs`, `src/conflict.ts` 마커 파서 + vitest 6, `ConflictSheet`, 충돌이 나면 자동으로 열림)(테스트 40)                                                        |
+| 2026-10-01 | PR #6 squash merge(`6f8978a`, Windows CRLF 테스트 수정 포함). 그래프에 진행 중 병합 표시(`incoming`, MERGE/CHERRY_PICK/REVERT_HEAD), 알림 위치를 아래로(테스트 41)                                                    |
+| 2026-10-01 | PR #7 squash merge(`fed643f`). M3: 이전 이력 더 불러오기(그래프 꼬리 버튼, `limit` 상태, 레이아웃이 바뀌어도 최신 커밋 기준으로 카메라 고정, 불러온 이력에는 반짝임 효과 없음)                                        |
+| 2026-10-01 | PR #8 squash merge(`fd705ac`). M3: 파일 감시(`git/watch.rs`, notify-debouncer-mini, `repo-changed` 이벤트), 실제 앱에서 터미널 커밋이 바로 반영되는 것 확인(테스트 43)                                                |
+| 2026-10-01 | PR #9 squash merge(`f440e4b`). M3: 라벨 겹침 회피(`graph/labels.ts` `placeBadges`: HEAD 우선, 겹치면 위로 올리고 연결선, 그래도 안 되면 "+N" 칩)(vitest 24)                                                           |
+| 2026-10-01 | PR #10 squash merge(`3f4e8f7`). M2 마무리: 줄 단위 스테이징(`select_lines`: 고르지 않은 `-`는 문맥으로, `+`는 버림, 내리기는 반대), 충돌 블록 직접 편집(줄바꿈 보존), 알림을 그래프 영역 안으로(테스트 47, vitest 25) |
