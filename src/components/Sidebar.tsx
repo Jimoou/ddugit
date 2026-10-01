@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { stashTitle } from "../format";
 import type { RefInfo, StashInfo } from "../types";
+import { type Key, t } from "../i18n";
 
 interface Props {
   refs: RefInfo[];
@@ -16,10 +17,10 @@ interface Props {
   onAddRemote(): void;
 }
 
-const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
-  { kind: "local", title: "브랜치" },
-  { kind: "remote", title: "원격" },
-  { kind: "tag", title: "태그" },
+const GROUPS: { kind: RefInfo["kind"]; title: Key }[] = [
+  { kind: "local", title: "side.local" },
+  { kind: "remote", title: "side.remote" },
+  { kind: "tag", title: "side.tag" },
 ];
 
 export function Sidebar(props: Props) {
@@ -34,7 +35,7 @@ export function Sidebar(props: Props) {
 
   return (
     <nav className="sidebar">
-      <input className="text search" placeholder="브랜치 찾기" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="text search" placeholder={t("side.search")} value={q} onChange={(e) => setQ(e.target.value)} />
       {GROUPS.map((g) => {
         const items = filtered.filter((r) => r.kind === g.kind);
         // The remote group stays (with its add button) even before any remote exists.
@@ -42,9 +43,9 @@ export function Sidebar(props: Props) {
         return (
           <section key={g.kind}>
             <h3>
-              {g.title} <span className="muted">{items.length}</span>
+              {t(g.title)} <span className="muted">{items.length}</span>
               {g.kind === "remote" && (
-                <button className="h3-add" title="원격 저장소 추가" onClick={props.onAddRemote}>
+                <button className="h3-add" title={t("side.addRemote")} onClick={props.onAddRemote}>
                   ＋
                 </button>
               )}
@@ -57,11 +58,7 @@ export function Sidebar(props: Props) {
                   <li
                     key={key}
                     className={`${focused === key ? "focused" : ""} ${isHead ? "head" : ""}`}
-                    title={
-                      r.kind === "tag"
-                        ? "클릭: 집중해서 보기 · 우클릭: 메뉴"
-                        : "클릭: 집중해서 보기 · 더블클릭: 체크아웃 · 우클릭: 메뉴"
-                    }
+                    title={r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}
                     onClick={() => onFocus(focused === key ? null : r)}
                     onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
                     onContextMenu={(e) => {
@@ -82,7 +79,7 @@ export function Sidebar(props: Props) {
       {stashes.length > 0 && (
         <section>
           <h3>
-            스태시 <span className="muted">{stashes.length}</span>
+            {t("side.stash")} <span className="muted">{stashes.length}</span>
           </h3>
           <ul>
             {stashes.map((st) => (

@@ -4,6 +4,7 @@ import { drawSpace } from "./space";
 import type { Run } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
+import { t } from "../i18n";
 
 export interface View {
   k: number;
@@ -262,7 +263,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.stroke();
     ctx.restore();
     ctx.font = `600 11px ${SANS}`;
-    const label = "⋯ 이전 이력 더 불러오기";
+    const label = t("graph.loadMore");
     const bw = ctx.measureText(label).width + 18,
       bh = 22;
     const rect = { x: b.x - bw / 2, y: b.y - bh / 2, w: bw, h: bh };
@@ -399,7 +400,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       }
       if (on) {
         ctx.fillStyle = c;
-        ctx.fillText(`커밋 ${run.ids.length}개 · 눌러서 펼치기`, (a.x + b.x) / 2, a.y - rr - 10);
+        ctx.fillText(t("graph.run", { n: run.ids.length }), (a.x + b.x) / 2, a.y - rr - 10);
       }
     }
   }
@@ -574,7 +575,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillStyle = c;
-    ctx.fillText("병합 대기 · 충돌 해결 후 커밋", plusS.x, plusS.y + 22);
+    ctx.fillText(t("graph.pending"), plusS.x, plusS.y + 22);
   }
 
   // --- [+] node ---------------------------------------------------------------

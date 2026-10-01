@@ -1,3 +1,6 @@
+import { t } from "../i18n";
+import { Rich } from "../i18n/Rich";
+
 interface Props {
   source: string;
   target: string;
@@ -18,7 +21,7 @@ export function MergeDialog(p: Props) {
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
       >
-        <div className="eyebrow">병합</div>
+        <div className="eyebrow">{t("merge.title")}</div>
         <div className="merge-flow">
           <span className="chip-lg" style={{ ["--c" as string]: p.sourceColor }}>
             {p.source}
@@ -31,18 +34,14 @@ export function MergeDialog(p: Props) {
           </span>
         </div>
         <p>
-          <b>{p.source}</b>의 체크포인트들을 <b>{p.target}</b>에 이어 붙여 새 병합 커밋을 만듭니다.
+          <Rich k="merge.body" vars={{ source: p.source, target: p.target }} />
         </p>
-        {p.switchesBranch && <p className="note">먼저 {p.target} 브랜치로 체크아웃한 뒤 병합해요.</p>}
-        {p.dirty > 0 && (
-          <p className="note warn">
-            커밋하지 않은 변경 {p.dirty}개가 있어요. 충돌하면 git이 병합을 거부할 수 있습니다.
-          </p>
-        )}
+        {p.switchesBranch && <p className="note">{t("merge.switch", { target: p.target })}</p>}
+        {p.dirty > 0 && <p className="note warn">{t("merge.dirty", { n: p.dirty })}</p>}
         <div className="dialog-actions">
-          <button onClick={p.onCancel}>취소</button>
+          <button onClick={p.onCancel}>{t("common.cancel")}</button>
           <button className="primary" autoFocus disabled={p.busy} onClick={p.onConfirm}>
-            {p.busy ? "병합 중…" : "병합"}
+            {p.busy ? t("merge.going") : t("merge.go")}
           </button>
         </div>
       </div>

@@ -24,6 +24,7 @@ import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { planMove, rebaseRange } from "./rebasePlan";
 import { defaults, parseSettings, type Settings } from "./settings";
+import { resolveLocale, setLocale, t } from "./i18n";
 import type { Drag } from "./graph/renderer";
 import type {
   FileDiff,
@@ -55,7 +56,9 @@ function loadSettings(): Settings {
   const base = defaults(!!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const legacy = store(LEGACY_ANIMATE);
   if (legacy !== null) base.animate = legacy === "1";
-  return parseSettings(store(SETTINGS), base);
+  const settings = parseSettings(store(SETTINGS), base);
+  setLocale(resolveLocale(settings.language));
+  return settings;
 }
 
 const REMOTE_DONE: Record<RemoteOp, string> = {
@@ -131,6 +134,8 @@ export default function App() {
     setSettings(next);
     store(SETTINGS, JSON.stringify(next));
     if (patch.historyPage) setLimit(PAGE_OVERRIDE ?? patch.historyPage);
+    // Every component reads the locale while rendering, so this re-render switches them all.
+    if (patch.language) setLocale(resolveLocale(patch.language));
   };
   const graph = useRef<GraphHandle>(null);
   const toastId = useRef(0);
@@ -843,9 +848,8 @@ export default function App() {
               </button>
             </div>
             <div className="hint">
-              드래그 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 끌어 다른 브랜치 끝에 놓으면 병합 · Shift+끌기 순서
-              옮기기
-              {snap.truncated && ` · 최근 ${snap.commits.length}개 표시 중`}
+              {t("graph.hint")}
+              {snap.truncated && t("graph.hint.truncated", { n: snap.commits.length })}
             </div>
             {/* Inside the graph area so bottom sheets never cover them. */}
             <div className="toasts">

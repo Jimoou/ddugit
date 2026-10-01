@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { HISTORY_PAGES, type Settings, SHORTCUTS } from "../settings";
+import { isKey, t } from "../i18n";
+import { Rich } from "../i18n/Rich";
+import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
 
 interface Props {
   settings: Settings;
   onChange(patch: Partial<Settings>): void;
   onClose(): void;
 }
+
+/** Language names are shown in their own language so anyone can find theirs. */
+const LANGUAGE_NAMES = { ko: "한국어", en: "English" } as const;
+
+const label = (text: string) => (isKey(text) ? t(text) : text);
 
 /** Settings plus the shortcut table (opened with ? or the ⚙ button). */
 export function SettingsDialog({ settings, onChange, onClose }: Props) {
@@ -38,25 +45,43 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
 
   return (
     <div className="scrim" onClick={onClose}>
-      <div className="dialog settings" role="dialog" aria-label="설정" onClick={(e) => e.stopPropagation()}>
-        <div className="eyebrow">설정</div>
+      <div
+        className="dialog settings"
+        role="dialog"
+        aria-label={t("settings.title")}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="eyebrow">{t("settings.title")}</div>
 
         <section>
-          <h4>화면</h4>
+          <h4>{t("settings.screen")}</h4>
+          <label className="field">
+            {t("settings.language")}
+            <select
+              value={settings.language}
+              onChange={(e) => onChange({ language: LANGUAGES.find((l) => l === e.target.value) ?? "system" })}
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l} value={l}>
+                  {l === "system" ? t("settings.language.system") : LANGUAGE_NAMES[l]}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="check">
             <input
               type="checkbox"
               checked={settings.animate}
               onChange={(e) => onChange({ animate: e.target.checked })}
             />
-            반짝임 효과 (선을 따라 흐르는 빛, 새 커밋 터짐)
+            {t("settings.sparkle")}
           </label>
           <label className="field">
-            한 번에 불러올 커밋
+            {t("settings.page")}
             <select value={settings.historyPage} onChange={(e) => onChange({ historyPage: Number(e.target.value) })}>
               {HISTORY_PAGES.map((n) => (
                 <option key={n} value={n}>
-                  {n.toLocaleString()}개
+                  {t("settings.pageN", { n: n.toLocaleString() })}
                 </option>
               ))}
             </select>
@@ -66,10 +91,10 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
         <section>
           <h4>git</h4>
           <label className="field">
-            실행 파일
+            {t("settings.gitPath")}
             <input
               className="text"
-              placeholder="비워 두면 PATH의 git"
+              placeholder={t("settings.gitPath.placeholder")}
               value={gitPath}
               onChange={(e) => {
                 setGitPath(e.target.value);
@@ -78,29 +103,28 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
               onKeyDown={(e) => e.key === "Enter" && void applyGit()}
             />
             <button disabled={checking} onClick={() => void applyGit()}>
-              확인하고 적용
+              {t("settings.gitPath.apply")}
             </button>
           </label>
           {gitStatus && <p className={`note ${gitStatus.ok ? "" : "warn"}`}>{gitStatus.text}</p>}
           <p className="muted small">
-            macOS에서 Finder로 실행하면 터미널의 PATH를 모를 수 있어요. 이럴 때 <code>/opt/homebrew/bin/git</code>처럼
-            직접 지정하세요.
+            <Rich k="settings.gitPath.hint" />
           </p>
         </section>
 
         <section>
-          <h4>단축키</h4>
+          <h4>{t("settings.shortcuts")}</h4>
           <div className="shortcuts">
             {SHORTCUTS.map((g) => (
               <table key={g.group}>
-                <caption>{g.group}</caption>
+                <caption>{t(g.group)}</caption>
                 <tbody>
                   {g.items.map((s) => (
                     <tr key={s.keys}>
                       <td>
-                        <kbd>{s.keys}</kbd>
+                        <kbd>{label(s.keys)}</kbd>
                       </td>
-                      <td>{s.what}</td>
+                      <td>{label(s.what)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -111,7 +135,7 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
 
         <div className="dialog-actions">
           <button className="primary" onClick={onClose}>
-            닫기
+            {t("common.close")}
           </button>
         </div>
       </div>

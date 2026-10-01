@@ -13,6 +13,8 @@ export default defineConfig({
     baseURL: "http://localhost:1420",
     viewport: { width: 1400, height: 860 },
     trace: "retain-on-failure",
+    // The default language follows the system; tests read Korean unless they switch.
+    locale: "ko-KR",
   },
   projects: [
     {

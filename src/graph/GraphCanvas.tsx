@@ -21,6 +21,7 @@ import { type Step, stepFrom } from "./navigate";
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
 import { Minimap } from "./Minimap";
+import { t } from "../i18n";
 
 export interface GraphHandle {
   centerOn(id: string, zoom?: number): void;
@@ -56,17 +57,7 @@ interface Props {
   onZoomChange?(k: number): void;
 }
 
-const HINTS = {
-  "merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt: cherry-pick · Shift: 순서 옮기기",
-  "merge:ok": "놓으면 병합합니다",
-  "merge:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
-  "pick:idle": "이 커밋을 복사할 브랜치 끝으로 끌어다 놓으세요",
-  "pick:ok": "놓으면 이 커밋을 복사(cherry-pick)합니다",
-  "pick:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
-  "move:idle": "현재 브랜치의 다른 커밋에 놓으면 그 바로 다음으로 옮겨요",
-  "move:ok": "놓으면 순서 정리 화면이 열려요",
-  "move:bad": "현재 브랜치의 일직선 구간 안에서만 옮길 수 있어요",
-} as const;
+type DragHint = `${"merge" | "pick" | "move"}:${"idle" | "ok" | "bad"}`;
 
 const ARROWS: Record<string, Step> = { ArrowLeft: "older", ArrowRight: "newer", ArrowUp: "up", ArrowDown: "down" };
 
@@ -107,7 +98,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
 
   const announced = props.selected
     ? [
-        `커밋 ${props.selected.slice(0, 7)}`,
+        t("graph.commit", { sha: props.selected.slice(0, 7) }),
         props.summaries.get(props.selected),
         refsByCommit
           .get(props.selected)
@@ -143,7 +134,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const [cursor, setCursor] = useState("grab");
-  const [dragHint, setDragHint] = useState<keyof typeof HINTS | null>(null);
+  const [dragHint, setDragHint] = useState<DragHint | null>(null);
   const lastK = useRef(1);
 
   const now = () => performance.now() / 1000;
@@ -555,7 +546,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           style={{ cursor }}
           tabIndex={0}
           role="application"
-          aria-label="커밋 그래프. 화살표로 커밋 이동, Enter로 메뉴, + - 0 H로 확대·전체·HEAD"
+          aria-label={t("graph.aria")}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -581,7 +572,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         {announced}
       </div>
       {dragHint && (
-        <div className={`drag-hint ${dragHint.split(":")[1]} ${dragHint.split(":")[0]}`}>{HINTS[dragHint]}</div>
+        <div className={`drag-hint ${dragHint.split(":")[1]} ${dragHint.split(":")[0]}`}>{t(`drag.${dragHint}`)}</div>
       )}
       <Minimap
         scene={scene}
