@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { CommitInfo, RefInfo } from "../types";
+import type { CommitInfo, FileDiff, RefInfo } from "../types";
 
 interface Props {
   commit: CommitInfo;
   refs: RefInfo[];
+  /** Changed files; `null` while loading. */
+  files: FileDiff[] | null;
   color: string;
   isHead: boolean;
   busy: boolean;
@@ -11,6 +13,7 @@ interface Props {
   onCheckout(branch: string): void;
   onCreateBranch(name: string, at: string): void;
   onSelect(id: string): void;
+  onOpenFile(path: string): void;
 }
 
 function fmt(t: number) {
@@ -23,7 +26,8 @@ function fmt(t: number) {
   });
 }
 
-export function Inspector({ commit, refs, color, isHead, busy, onClose, onCheckout, onCreateBranch, onSelect }: Props) {
+export function Inspector(props: Props) {
+  const { commit, refs, files, color, isHead, busy, onClose, onCheckout, onCreateBranch, onSelect, onOpenFile } = props;
   const [name, setName] = useState("");
   const body = commit.message.split("\n").slice(1).join("\n").trim();
   const locals = refs.filter((r) => r.kind === "local");
@@ -79,6 +83,24 @@ export function Inspector({ commit, refs, color, isHead, busy, onClose, onChecko
           </>
         )}
       </dl>
+
+      <section className="changed">
+        <h3>
+          변경 파일 <span className="muted">{files ? files.length : "…"}</span>
+        </h3>
+        <ul>
+          {files?.map((f) => (
+            <li key={f.path} onClick={() => onOpenFile(f.path)} title="diff 보기">
+              <span className={`chip k-${f.status}`}>{f.status[0].toUpperCase()}</span>
+              <span className="path">{f.path}</span>
+              <span className="stat">
+                {f.additions > 0 && <span className="add">+{f.additions}</span>}
+                {f.deletions > 0 && <span className="del">−{f.deletions}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {locals.length > 0 && (
         <div className="actions">

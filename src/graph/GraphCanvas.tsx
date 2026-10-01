@@ -164,10 +164,18 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       c.height = Math.round(r.height * dpr);
       c.style.width = `${r.width}px`;
       c.style.height = `${r.height}px`;
-      st.current.size = { w: r.width, h: r.height };
-      if (!st.current.initialized && r.width > 0) {
-        st.current.initialized = true;
-        st.current.view = viewFor(headWorld(1), 1);
+      const s = st.current;
+      if (s.initialized) {
+        // Keep the same world point at the centre when panels open or close.
+        const dx = (r.width - s.size.w) / 2,
+          dy = (r.height - s.size.h) / 2;
+        s.view = { ...s.view, tx: s.view.tx + dx, ty: s.view.ty + dy };
+        if (s.target) s.target = { ...s.target, tx: s.target.tx + dx, ty: s.target.ty + dy };
+      }
+      s.size = { w: r.width, h: r.height };
+      if (!s.initialized && r.width > 0) {
+        s.initialized = true;
+        s.view = viewFor(headWorld(1), 1);
       }
     });
     ro.observe(el);

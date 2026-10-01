@@ -31,9 +31,13 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 ## 구조
 
-- `src-tauri/src/git.rs`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`git()` 헬퍼).
-- `src-tauri/src/lib.rs`: Tauri 명령. 얇게 유지하고 로직은 `git.rs`에 둔다.
-- `src/api.ts`: 백엔드 호출의 유일한 통로. 브라우저에서는 `mock.ts`로 연결된다.
+- `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼)
+  - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태)
+  - `write.rs`: commit, merge, abort, checkout, branch
+  - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블)
+  - `diff.rs`: 커밋 diff, 작업 트리 diff
+- `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
+- `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.
 - `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`
 - `src/components/`: 패널과 다이얼로그
@@ -61,4 +65,4 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - UI 문자열은 한국어, 코드·주석·커밋은 영어.
 - 렌더 루프(rAF) 안에서 매 프레임 `setState`를 부르지 않는다. 프레임 상태는 ref에 둔다.
 - git CLI는 `GIT_TERMINAL_PROMPT=0`, stdin을 닫은 상태로 실행한다. 프롬프트에서 멈추면 GUI가 굳는다.
-- 새 git 쓰기 작업에는 반드시 임시 저장소 테스트(`git.rs` 하단)를 붙인다.
+- 새 git 쓰기 작업에는 반드시 임시 저장소 테스트(각 `git/*.rs` 하단, `testutil` 사용)를 붙인다. 원격 작업은 로컬 bare 저장소로 테스트한다.

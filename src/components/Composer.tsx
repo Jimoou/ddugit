@@ -7,6 +7,7 @@ interface Props {
   merging: boolean;
   busy: boolean;
   onClose(): void;
+  onOpenFile(path: string): void;
   onCommit(message: string, paths: string[], newBranch: string | null): void;
 }
 
@@ -25,7 +26,7 @@ function kind(c: FileChange): string {
 }
 
 /** Panel opened from the [+] node after HEAD: pick files, write a message, commit. */
-export function Composer({ changes, branch, merging, busy, onClose, onCommit }: Props) {
+export function Composer({ changes, branch, merging, busy, onClose, onOpenFile, onCommit }: Props) {
   const [picked, setPicked] = useState<Set<string>>(() => new Set(changes.map((c) => c.path)));
   const [message, setMessage] = useState("");
   const [newBranch, setNewBranch] = useState("");
@@ -106,7 +107,14 @@ export function Composer({ changes, branch, merging, busy, onClose, onCommit }: 
                   }
                 />
                 <span className={`chip k-${k}`}>{k === "conflict" ? "!" : (LABEL[k] ?? "M")}</span>
-                <span className="path" title={c.path}>
+                <span
+                  className="path link"
+                  title={`${c.path} — 클릭해서 diff 보기`}
+                  onClick={(e) => {
+                    e.preventDefault(); // don't toggle the checkbox
+                    onOpenFile(c.path);
+                  }}
+                >
                   {c.path}
                 </span>
               </label>

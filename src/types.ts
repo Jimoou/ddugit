@@ -22,6 +22,10 @@ export interface RefInfo {
 export interface HeadInfo {
   branch: string | null;
   target: string | null;
+  /** Tracking branch, e.g. `origin/main`. */
+  upstream: string | null;
+  ahead: number;
+  behind: number;
 }
 
 export interface FileChange {
@@ -42,8 +46,34 @@ export interface RepoSnapshot {
   truncated: boolean;
 }
 
+export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected";
+
 export interface OpResult {
-  ok: boolean;
-  conflict: boolean;
+  status: OpStatus;
   output: string;
+}
+
+export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push";
+
+export interface DiffLine {
+  kind: "+" | "-" | " ";
+  old: number | null;
+  new: number | null;
+  text: string;
+}
+
+export interface DiffHunk {
+  header: string;
+  lines: DiffLine[];
+}
+
+export interface FileDiff {
+  path: string;
+  oldPath: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  truncated: boolean;
+  hunks: DiffHunk[];
 }

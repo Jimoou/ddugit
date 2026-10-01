@@ -16,9 +16,10 @@
 ## M1 · 원격과 diff 🚧
 
 - [x] 개발 워크플로우: CLAUDE.md, CONVENTIONS.md, ROADMAP/NEXT, CI(3개 OS), PR 템플릿, Prettier/rustfmt
-- [ ] fetch / pull / push (+ upstream 없으면 `-u origin <branch>`), ahead/behind 표시
-- [ ] pull 갈라짐 처리: ff-only 실패 시 merge/rebase 선택
-- [ ] diff 보기: 커밋 diff(첫 부모 기준), 작업 트리 파일 diff
+- [x] fetch / pull / push (+ upstream 없으면 `-u origin <branch>`), ahead/behind 표시
+- [x] pull 갈라짐 처리: ff-only 실패 시 merge/rebase 선택
+- [x] diff 보기: 커밋 diff(첫 부모 기준), 작업 트리 파일 diff
+- [x] push 거부 시 fetch 후 병합/리베이스하고 다시 push, 리베이스 충돌 시 계속/취소
 - [ ] 원격 작업 진행률 표시 (`--progress` 파싱)
 - [ ] 인증 실패 시 안내 (credential helper / SSH agent 설정 가이드)
 
@@ -58,7 +59,8 @@
 
 ## 작업 기록 (append-only)
 
-| 날짜       | 내용                                                                                                     |
-| ---------- | -------------------------------------------------------------------------------------------------------- |
-| 2026-10-01 | M0 완료: 골격, git 백엔드(테스트 6), 레이아웃(테스트 8), 네온 렌더러, ＋ 커밋, 끌어서 병합, 미니맵       |
-| 2026-10-01 | 워크플로우 도입: CLAUDE.md / CONVENTIONS.md / ROADMAP / NEXT, CI(ubuntu·macos·windows), Prettier·rustfmt |
+| 날짜       | 내용                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------- |
+| 2026-10-01 | M0 완료: 골격, git 백엔드(테스트 6), 레이아웃(테스트 8), 네온 렌더러, ＋ 커밋, 끌어서 병합, 미니맵        |
+| 2026-10-01 | 워크플로우 도입: CLAUDE.md / CONVENTIONS.md / ROADMAP / NEXT, CI(ubuntu·macos·windows), Prettier·rustfmt  |
+| 2026-10-01 | M1: fetch/pull/push(+ahead/behind, 갈라짐·거부 처리), diff 시트(커밋/작업 트리), git 모듈 분리(테스트 17) |
