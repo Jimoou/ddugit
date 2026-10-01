@@ -38,6 +38,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `refs.rs`: 브랜치 이름 변경·삭제, 태그, 원격 브랜치 체크아웃 (`RefOp` 태그 enum 하나)
   - `stash.rs`: discard, stash
   - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블)
+  - `watch.rs`: 파일 감시 (관련 경로만 걸러 `repo-changed` 이벤트, `lib.rs`의 `Watching` 상태가 하나만 유지)
   - `diff.rs`: 커밋 diff, 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
   - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
   - `stage.rs`: hunk 스테이지·내리기 (패치에서 hunk만 골라 `git apply --cached`)

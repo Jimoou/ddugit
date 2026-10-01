@@ -23,6 +23,7 @@ serde_json = "1"
 # Read path only (log, refs, status). Writes go through the git CLI so hooks,
 # credentials, signing and LFS behave exactly like the user's own git.
 git2 = { version = "0.20", default-features = false }
+notify-debouncer-mini = "0.7.0"
 
 [dev-dependencies]
 tempfile = "3"

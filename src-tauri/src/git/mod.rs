@@ -12,6 +12,7 @@ pub mod refs;
 pub mod remote;
 pub mod stage;
 pub mod stash;
+pub mod watch;
 pub mod write;
 
 use std::path::{Path, PathBuf};
