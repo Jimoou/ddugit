@@ -289,11 +289,14 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
   return res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`);
 }
 
-/** Dev/e2e switch: make the next remote call fail authentication. */
+/** Dev/e2e hooks, exposed as `window.__otgitDemo`. */
 export const demoControls = {
+  /** Make the next remote call fail authentication. */
   failNextRemote: null as null | "https" | "ssh",
   /** Make the next merge stop on a conflict in two files. */
   conflictNext: false,
+  /** Current demo state, read synchronously (e2e assertions). */
+  snapshot: () => repo.snapshot(),
   /** Append `n` commits to the current branch (long straight runs for the graph). */
   grow(n: number) {
     for (let i = 0; i < n; i++) repo.add(repo.head, `Step ${i + 1} of ${n}`);

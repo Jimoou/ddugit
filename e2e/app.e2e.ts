@@ -1,0 +1,82 @@
+import { expect, test } from "./fixtures";
+
+test("adds a checkpoint from the + composer", async ({ demo }) => {
+  const { page } = demo;
+  await page.click("text=＋ 커밋");
+  await page.fill("textarea.message", "Wire up minimap jump");
+  await page.keyboard.press("Control+Enter");
+  await demo.toast("체크포인트를 추가했어요");
+  const snap = await demo.snapshot();
+  const head = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect(head.summary).toBe("Wire up minimap jump");
+  expect(snap.changes).toEqual([]);
+});
+
+test("merges by dragging a branch tip onto HEAD", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const tip = before.refs.find((r) => r.kind === "local" && r.name === "feature/theme")!.target;
+  const a = (await demo.screenOf(tip))!;
+  const z = (await demo.screenOf(before.head.target!))!;
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 60, a.y - 10, { steps: 8 });
+  await page.mouse.move(z.x, z.y, { steps: 12 });
+  await page.mouse.up();
+  await page.click(".dialog button.primary");
+  await expect.poll(async () => (await demo.snapshot()).head.target).not.toBe(before.head.target);
+  const snap = await demo.snapshot();
+  expect(snap.commits.find((c) => c.id === snap.head.target)!.parents).toEqual([before.head.target, tip]);
+});
+
+test("resolves a conflict block by editing it by hand", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => (d.conflictNext = true));
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  await page.click(".dialog button.primary");
+  await expect(page.locator(".conflict-sheet")).toBeVisible();
+  await expect(page.locator(".conflict-sheet header")).toContainText("남은 파일 2개");
+
+  await page.locator(".block").nth(0).getByRole("button", { name: "직접 편집" }).click();
+  await page.fill(".block-edit", "hand merged line");
+  await page.locator(".block").nth(1).getByRole("button", { name: "둘 다" }).click();
+  await page.click("text=이 파일 해결 완료");
+  await expect(page.locator(".conflict-sheet header")).toContainText("남은 파일 1개");
+});
+
+test("stages single lines picked in the diff", async ({ demo }) => {
+  const { page } = demo;
+  await page.click("text=＋ 커밋");
+  await page.locator(".composer .path").first().click();
+  const signs = page.locator("table.diff tr.ins td.sign, table.diff tr.rem td.sign");
+  await signs.nth(0).click();
+  await signs.nth(2).click({ modifiers: ["Shift"] });
+  await expect(page.locator("tr.picked")).toHaveCount(3);
+  await expect(page.locator(".hunk-btn").first()).toHaveText("＋ 선택한 3줄 스테이지");
+  // Read the file before staging: the list refreshes (and may drop it) afterwards.
+  const file = (await page.locator(".diff-sheet .file-list li.on .path").textContent())!;
+  await page.locator(".hunk-btn").first().click();
+  await demo.toast("스테이지했어요");
+  expect((await demo.snapshot()).changes.find((c) => c.path === file)?.staged).toBeTruthy();
+});
+
+test("folds a straight run when zoomed out and unfolds it on click", async ({ demo }) => {
+  const { page } = demo;
+  const before = (await demo.snapshot()).commits.length;
+  await demo.mutate((d) => d.grow(7));
+  expect((await demo.snapshot()).commits.length).toBe(before + 7);
+  const hud = page.locator(".hud button");
+  for (let i = 0; i < 4; i++) await hud.nth(0).click();
+  await expect.poll(() => demo.zoom()).toBeLessThan(50);
+
+  // The commits between the old tip and HEAD form the run.
+  const snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  let id = byId.get(snap.head.target!)!.parents[0];
+  const run: string[] = [];
+  for (let i = 0; i < 6; i++, id = byId.get(id)!.parents[0]) run.push(id);
+  const [newest, oldest] = [(await demo.screenOf(run[0]))!, (await demo.screenOf(run[5]))!];
+  await page.mouse.click((newest.x + oldest.x) / 2, newest.y);
+  await expect.poll(() => demo.zoom()).toBeGreaterThanOrEqual(65);
+});

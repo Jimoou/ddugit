@@ -7,29 +7,27 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #11(줄 단위 스테이징, 충돌 직접 편집)을 squash merge했다(`d3461b1`). M2를 완료했다.
+- PR #12(일직선 구간 접기)를 squash merge했다(`0dea355`).
+- 대형 저장소 성능을 측정했고, 지금은 손댈 필요가 없어서 보류했다. 수치는 ROADMAP M3에 적었다.
 
 ## 지금 하는 일
 
-M3 · 시맨틱 줌 확장(일직선 구간 접기) → PR #12에서 CI 대기 (10분 뒤 확인 예약)
+M5 · Playwright e2e를 CI에 추가 → PR #13에서 CI 대기 (10분 뒤 확인 예약)
 
-- `graph/runs.ts` `straightRuns(layout, keep, min = 4)`
-  - 연속된 행에서 같은 레인을 따라가며 부모도 자식도 하나뿐인 커밋을 묶는다
-  - ref, HEAD, stash 기준, 병합 대기 커밋은 `keep`으로 빠진다
-- `renderer.ts`
-  - `ZOOM.fold = 0.5`보다 작으면 묶인 구간을 막대 하나와 커밋 개수로 그린다
-  - 막대에 마우스를 올리면 "커밋 N개 · 눌러서 펼치기"가 뜬다
-  - `foldedRun()`이 정하는 예외: 검색 중이면 아무것도 접지 않고, 선택된 커밋이 있는 구간은 펼친 채로 둔다
-- `GraphCanvas`
-  - 접힌 노드는 클릭 대상에서 뺀다
-  - 막대를 누르면(`runAt` → `openRun`) 그 구간이 펼쳐지는 배율까지 확대한다
-- 데모: `window.__otgitDemo.grow(n)`이 현재 브랜치에 커밋 n개를 붙인다
+- `playwright.config.ts`: `npm run dev`(데모)를 띄우고 `e2e/*.e2e.ts`를 실행한다. vitest와 겹치지 않도록 확장자를 `.e2e.ts`로 했다
+- `e2e/fixtures.ts`
+  - `demo` fixture가 페이지 오류를 모으고, 오류가 있으면 테스트를 실패시킨다
+  - `snapshot()`, `mutate()`, `screenOf()`, `toast()`, `zoom()`을 제공한다
+- `e2e/app.e2e.ts`: 커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기
+- CI에 `E2E (Playwright · demo)` 잡을 추가했다. 실패하면 trace를 artifact로 올린다
+- 로컬(샌드박스) 실행: `PW_CHROMIUM=/opt/pw-browsers/chromium npm run e2e`
+- `--repeat-each=3`으로 4번 돌려 60회 모두 통과했다. 줄 스테이징 테스트의 경쟁 상태 하나를 고쳤다
 
 ## 다음 단계
 
-1. M3 · 대형 저장소 성능 (레이아웃 Web Worker, diff 가상 스크롤)
-2. M5 · ESLint + Playwright e2e를 CI에 추가 (지금은 스크래치 스크립트로만 확인)
-3. M4 · 멀티 레포 백포트 트래커 (원래 질문: 원본 ↔ 고객사 레포 공통 수정 반영)
+1. M5 · ESLint (typescript-eslint + react-hooks), CI에 추가
+2. M4 · 멀티 레포 백포트 트래커 (원래 질문: 원본 ↔ 고객사 레포 공통 수정 반영)
+3. M4 · 드래그로 interactive rebase
 
 ## 막힌 것 / 결정 필요
 
