@@ -17,7 +17,7 @@
         "height": 880,
         "minWidth": 900,
         "minHeight": 560,
-        "backgroundColor": "#07060d"
+        "backgroundColor": "#05040e"
       }
     ],
     "security": {
@@ -26,13 +26,32 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "dmg",
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Graph-first Git client",
+    "copyright": "© otgit",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": true,
+        "languages": [
+          "Korean",
+          "English"
+        ]
+      }
+    }
   }
 }

@@ -1,0 +1,64 @@
+name: Release
+
+# Push a tag like v0.2.0 to build the installers and attach them to a draft
+# GitHub Release: macOS .dmg (universal: Apple silicon + Intel) and Windows
+# .exe (NSIS). Unsigned for now, so first launch shows Gatekeeper /
+# SmartScreen warnings; signing is on the roadmap for later.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS dmg
+            os: macos-latest
+            args: --target universal-apple-darwin --bundles dmg
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+          - name: Windows exe
+            os: windows-latest
+            args: --bundles nsis
+            rust-targets: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: "otgit ${{ github.ref_name }}"
+          releaseBody: |
+            macOS: otgit_*_universal.dmg · Windows: otgit_*_x64-setup.exe
+
+            Unsigned build: on macOS right-click → Open the first time; on Windows choose "More info → Run anyway".
+          releaseDraft: true
+          args: ${{ matrix.args }}
+      # Manual runs (no tag) keep the installers as workflow artifacts instead.
+      - if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: otgit-${{ matrix.os }}
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
