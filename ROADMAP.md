@@ -41,7 +41,7 @@
 
 - [x] 이전 이력 더 불러오기 (그래프 왼쪽 끝 "⋯ 이전 이력 더 불러오기", 3000개씩, 카메라 위치 유지)
 - [x] 파일 감시(notify)로 자동 새로고침 (`.gitignore`된 경로와 `.git/objects` 등은 무시, 300ms 디바운스)
-- [ ] 시맨틱 줌 확장: 일직선 구간을 막대로 접기
+- [x] 시맨틱 줌 확장: 일직선 구간을 막대로 접기 (50% 미만에서 4개 이상 직선 구간 → 개수 막대, 누르면 펼쳐 확대)
 - [x] 라벨 겹침 회피 (인접 노드의 브랜치 배지가 가로로 겹침)
 - [ ] 레이아웃 Web Worker 이동, 필요하면 WebGL 렌더러
 - [ ] diff 가상 스크롤 (큰 파일)
@@ -81,3 +81,4 @@
 | 2026-10-01 | PR #8 squash merge(`fd705ac`). M3: 파일 감시(`git/watch.rs`, notify-debouncer-mini, `repo-changed` 이벤트), 실제 앱에서 터미널 커밋이 바로 반영되는 것 확인(테스트 43)                                                |
 | 2026-10-01 | PR #9 squash merge(`f440e4b`). M3: 라벨 겹침 회피(`graph/labels.ts` `placeBadges`: HEAD 우선, 겹치면 위로 올리고 연결선, 그래도 안 되면 "+N" 칩)(vitest 24)                                                           |
 | 2026-10-01 | PR #10 squash merge(`3f4e8f7`). M2 마무리: 줄 단위 스테이징(`select_lines`: 고르지 않은 `-`는 문맥으로, `+`는 버림, 내리기는 반대), 충돌 블록 직접 편집(줄바꿈 보존), 알림을 그래프 영역 안으로(테스트 47, vitest 25) |
+| 2026-10-01 | PR #11 squash merge(`d3461b1`). M3: 일직선 구간 접기(`graph/runs.ts` `straightRuns`, ref·HEAD·stash·병합 대기 커밋은 접지 않음, 검색 중이거나 선택된 구간은 펼친 채로), 데모 `__otgitDemo.grow(n)`(vitest 28)         |

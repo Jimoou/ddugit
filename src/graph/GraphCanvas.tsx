@@ -5,15 +5,19 @@ import {
   draw,
   type Drag,
   type DrawState,
+  foldedRun,
   type LabelHit,
   nodeRadius,
   plusPosition,
+  runRadius,
   stashMarks,
   stashRadius,
   toScreen,
   toWorld,
   type View,
+  ZOOM,
 } from "./renderer";
+import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
 import { Minimap } from "./Minimap";
 
@@ -84,6 +88,17 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     return m;
   }, [props.refs]);
 
+  // Commits that carry something to show (refs, HEAD, stashes, an incoming
+  // merge) never fold into a run.
+  const runs = useMemo(() => {
+    const bases = new Set(props.stashes.map((x) => x.base));
+    const keep = (id: string) => refsByCommit.has(id) || id === props.headId || id === props.incoming || bases.has(id);
+    return straightRuns(scene.layout, keep);
+  }, [scene, refsByCommit, props.headId, props.incoming, props.stashes]);
+  const runOf = useMemo(() => runIndex(runs), [runs]);
+  const runsRef = useRef({ runs, runOf });
+  runsRef.current = { runs, runOf };
+
   // Mutable interaction state lives in a ref so pointer moves never re-render React.
   const st = useRef({
     view: { k: 1, tx: 0, ty: 0 } as View,
@@ -92,6 +107,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     hovered: null as string | null,
     plusHover: false,
     stashHover: null as number | null,
+    runHover: null as Run | null,
     labelHits: [] as LabelHit[],
     moreHit: { rect: null } as DrawState["moreHit"],
     drag: null as Drag | null,
@@ -284,6 +300,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         incoming: p.incoming,
         truncated: p.truncated,
         moreHit: s.moreHit,
+        runs: runsRef.current.runs,
+        runOf: runsRef.current.runOf,
+        runHover: s.runHover,
       });
       const hint = !s.drag ? null : (`${s.drag.mode}:${s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle"}` as const);
       setDragHint((h) => (h === hint ? h : hint));
@@ -303,12 +322,38 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const r = nodeRadius(s.view.k) + 6;
     for (const dr of [0, -1, 1]) {
       const id = sc.grid.get(`${row + dr}:${lane}`);
-      if (!id) continue;
+      if (!id || foldedRun(foldState(), id)) continue;
       const node = sc.layout.byId.get(id)!;
       const sp = toScreen(s.view, { x: xOf(node.row, n), y: yOf(node.lane) });
       if (Math.hypot(sp.x - p.x, sp.y - p.y) <= r) return id;
     }
     return null;
+  }
+  const foldState = () => ({
+    view: st.current.view,
+    focus: propsRef.current.focus,
+    selected: propsRef.current.selected,
+    runOf: runsRef.current.runOf,
+  });
+  /** The folded run whose bar is under `p`. */
+  function runAt(p: Pt): Run | null {
+    const v = st.current.view;
+    if (v.k >= ZOOM.fold) return null;
+    const sc = sceneRef.current;
+    const n = sc.layout.rowCount;
+    const node = sc.layout.nodes[Math.round(n - 1 - toWorld(v, p).x / COL)];
+    const run = node && foldedRun(foldState(), node.id);
+    if (!run) return null;
+    const y = toScreen(v, { x: 0, y: yOf(run.lane) }).y;
+    return Math.abs(y - p.y) <= runRadius(v.k) + 4 ? run : null;
+  }
+  /** Zoom in far enough that the run unfolds, framing as much of it as fits. */
+  function openRun(run: Run) {
+    const sc = sceneRef.current;
+    const n = sc.layout.rowCount;
+    const [x0, x1] = [xOf(run.last, n), xOf(run.first, n)];
+    const k = clampK(Math.max(ZOOM.fold * 1.3, Math.min(1, (st.current.size.w - 200) / Math.max(x1 - x0, 1))));
+    st.current.target = viewFor({ x: (x0 + x1) / 2, y: yOf(run.lane) }, k);
   }
   function stashAt(p: Pt): number | null {
     const v = st.current.view;
@@ -355,6 +400,12 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       s.press = { id, x: p.x, y: p.y };
       return;
     }
+    const run = runAt(p);
+    if (run) {
+      s.runHover = null;
+      openRun(run);
+      return;
+    }
     s.pan = { x: p.x, y: p.y, tx: s.view.tx, ty: s.view.ty, moved: false };
     setCursor("grabbing");
   };
@@ -384,7 +435,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     s.plusHover = onPlus(p);
     s.stashHover = s.plusHover ? null : stashAt(p);
     s.hovered = s.plusHover || s.stashHover !== null ? null : nodeAt(p);
-    setCursor(s.plusHover || s.hovered || s.stashHover !== null ? "pointer" : "grab");
+    s.runHover = s.plusHover || s.hovered || s.stashHover !== null ? null : runAt(p);
+    setCursor(s.plusHover || s.hovered || s.runHover || s.stashHover !== null ? "pointer" : "grab");
   };
 
   const onPointerUp = (e: React.PointerEvent) => {

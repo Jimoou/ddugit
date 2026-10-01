@@ -7,29 +7,29 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #10(라벨 겹침 회피)을 squash merge했다(`3f4e8f7`).
+- PR #11(줄 단위 스테이징, 충돌 직접 편집)을 squash merge했다(`d3461b1`). M2를 완료했다.
 
 ## 지금 하는 일
 
-M2 마무리 · 줄 단위 스테이징 + 충돌 블록 직접 편집 → PR #11에서 CI 대기 (10분 뒤 확인 예약)
+M3 · 시맨틱 줌 확장(일직선 구간 접기) → PR #12에서 CI 대기 (10분 뒤 확인 예약)
 
-- `git/stage.rs`
-  - `stage_hunks(.., lines: Option<&[usize]>, ..)`: hunk 하나 안에서 고른 줄만 옮긴다
-  - `select_lines()`: 고르지 않은 `-`는 문맥으로 남기고 고르지 않은 `+`는 버린다. 내리기(`--reverse`)는 반대로 한다
-  - hunk 헤더의 줄 수를 다시 계산한다. 한쪽이 비면 git 표기대로 시작 줄을 하나 앞으로 당긴다
-  - 줄 번호는 **지금 보이는 diff 기준**이다. 스테이지한 뒤에는 diff가 바뀐다
-- `DiffSheet`: 바뀐 줄의 번호/부호 칸을 누르면 고르고, Shift를 누르면 범위로 고른다. 줄을 고르면 hunk 버튼이 "선택한 N줄 스테이지"로 바뀐다
-- `conflict.ts`
-  - `Pick`에 `{ text }`(직접 편집)를 추가했다
-  - `blockText()`가 블록의 줄바꿈(CRLF)을 지키고 끝에 줄바꿈을 붙인다
-  - `ConflictSheet`에 "직접 편집" 버튼과 textarea를 붙였다
-- 알림(toast)을 `.stage-graph` 안으로 옮겼다. 이제 아래 시트가 알림을 가리지 않는다
+- `graph/runs.ts` `straightRuns(layout, keep, min = 4)`
+  - 연속된 행에서 같은 레인을 따라가며 부모도 자식도 하나뿐인 커밋을 묶는다
+  - ref, HEAD, stash 기준, 병합 대기 커밋은 `keep`으로 빠진다
+- `renderer.ts`
+  - `ZOOM.fold = 0.5`보다 작으면 묶인 구간을 막대 하나와 커밋 개수로 그린다
+  - 막대에 마우스를 올리면 "커밋 N개 · 눌러서 펼치기"가 뜬다
+  - `foldedRun()`이 정하는 예외: 검색 중이면 아무것도 접지 않고, 선택된 커밋이 있는 구간은 펼친 채로 둔다
+- `GraphCanvas`
+  - 접힌 노드는 클릭 대상에서 뺀다
+  - 막대를 누르면(`runAt` → `openRun`) 그 구간이 펼쳐지는 배율까지 확대한다
+- 데모: `window.__otgitDemo.grow(n)`이 현재 브랜치에 커밋 n개를 붙인다
 
 ## 다음 단계
 
-1. M3 · 시맨틱 줌 확장 (일직선 구간을 막대로 접기)
-2. M3 · 대형 저장소 성능 (레이아웃 Web Worker, diff 가상 스크롤)
-3. M5 · ESLint + Playwright e2e를 CI에 추가 (지금은 스크래치 스크립트로만 확인)
+1. M3 · 대형 저장소 성능 (레이아웃 Web Worker, diff 가상 스크롤)
+2. M5 · ESLint + Playwright e2e를 CI에 추가 (지금은 스크래치 스크립트로만 확인)
+3. M4 · 멀티 레포 백포트 트래커 (원래 질문: 원본 ↔ 고객사 레포 공통 수정 반영)
 
 ## 막힌 것 / 결정 필요
 
@@ -47,6 +47,8 @@ M2 마무리 · 줄 단위 스테이징 + 충돌 블록 직접 편집 → PR #11
   - e2e 좌표: `window.__otgit.screenOf(id)`
   - 데모 상태: `import("/src/mock.ts")`
   - 인증 실패 재현: `window.__otgitDemo.failNextRemote = "https" | "ssh"`
+  - 긴 직선 이력 만들기: `window.__otgitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
+- mock.ts를 고친 뒤에는 vite를 다시 띄운다. 그러지 않으면 `import("/src/mock.ts")`가 앱과 다른 모듈 인스턴스를 가져온다(HMR `?t=`)
 - 데모의 첫 Fetch는 `origin/main`과 현재 브랜치의 upstream에 동료 커밋을 하나씩 추가한다.
 - 실제 앱을 Linux에서 확인하는 법: Xvfb로 띄우고 `xdotool`로 클릭, `import -window root`로 스크린샷.
 - `pkill -f "vite --port 1420"`은 셸 자신까지 죽인다. `pkill -f "[v]ite --port 1420"`을 쓴다.

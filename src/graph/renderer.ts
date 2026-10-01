@@ -1,5 +1,6 @@
 import { stashTitle } from "../format";
 import { placeBadges } from "./labels";
+import type { Run } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 
@@ -50,6 +51,10 @@ export interface DrawState {
   moreHit: { rect: Rect | null };
   /** Output: screen rects of the ref badges drawn this frame, for hit testing. */
   labelHits: LabelHit[];
+  /** Straight runs of plain commits, folded into bars below `ZOOM.fold`. */
+  runs: Run[];
+  runOf: Map<string, Run>;
+  runHover: Run | null;
 }
 
 export interface Rect {
@@ -101,7 +106,20 @@ export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
 const BADGE_H = 18;
 
 /** Zoom thresholds for semantic zoom. */
-export const ZOOM = { dots: 0.35, branches: 0.55, allRefs: 0.8, summaries: 1.25 };
+export const ZOOM = { dots: 0.35, fold: 0.5, branches: 0.55, allRefs: 0.8, summaries: 1.25 };
+
+/**
+ * The run drawn as a bar instead of dots for `id`, if any. Nothing folds while
+ * a search highlights single commits, and the selected commit's run stays open.
+ */
+export function foldedRun(s: Pick<DrawState, "view" | "focus" | "runOf" | "selected">, id: string): Run | undefined {
+  if (s.view.k >= ZOOM.fold || s.focus) return undefined;
+  const run = s.runOf.get(id);
+  return run && (!s.selected || s.runOf.get(s.selected) !== run) ? run : undefined;
+}
+
+/** Bar half-height for folded runs. */
+export const runRadius = (k: number) => nodeRadius(k) + 2;
 
 const BG_TOP = "#0b0916";
 const BG_BOTTOM = "#05040a";
@@ -303,7 +321,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   for (let row = firstCol; row <= lastCol; row++) {
     const node = nodes[row];
-    if (!node) continue;
+    if (!node || foldedRun(s, node.id)) continue;
     const p = toScreen(view, { x: xOf(node.row, n), y: yOf(node.lane) });
     if (p.y < -30 || p.y > h + 30) continue;
     const c = NEON[node.color];
@@ -365,6 +383,39 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.stroke();
     }
     labelQueue.push({ x: p.x, y: p.y, id: node.id, color: c, d });
+  }
+
+  // --- folded runs ------------------------------------------------------------
+  if (k < ZOOM.fold && !s.focus) {
+    const rr = runRadius(k);
+    ctx.font = `600 10px ${SANS}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const run of s.runs) {
+      if (run.last < firstCol || run.first > lastCol || !foldedRun(s, run.ids[0])) continue;
+      const a = toScreen(view, { x: xOf(run.last, n), y: yOf(run.lane) });
+      const b = toScreen(view, { x: xOf(run.first, n), y: yOf(run.lane) });
+      if (a.y < -30 || a.y > h + 30) continue;
+      const c = NEON[run.color];
+      const on = run === s.runHover;
+      const x = a.x - rr,
+        bw = b.x - a.x + rr * 2;
+      roundRect(ctx, x, a.y - rr, bw, rr * 2, rr);
+      ctx.fillStyle = on ? alpha(c, 0.3) : "#0a0814";
+      ctx.fill();
+      ctx.lineWidth = on ? 2 : 1.5;
+      ctx.strokeStyle = c;
+      ctx.stroke();
+      const label = `${run.ids.length}`;
+      if (ctx.measureText(label).width + 10 < bw) {
+        ctx.fillStyle = on ? "#ffffff" : c;
+        ctx.fillText(label, (a.x + b.x) / 2, a.y + 0.5);
+      }
+      if (on) {
+        ctx.fillStyle = c;
+        ctx.fillText(`커밋 ${run.ids.length}개 · 눌러서 펼치기`, (a.x + b.x) / 2, a.y - rr - 10);
+      }
+    }
   }
 
   // --- stashes ----------------------------------------------------------------
