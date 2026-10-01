@@ -7,25 +7,24 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- v0.1.0 초안 Release: Release 수동 실행(`release: true`)이 성공했다. 초안 하나에 dmg/exe가 붙었다. **사용자가 GitHub에서 내용을 확인하고 Publish하면 `v0.1.0` 태그가 생긴다**
-- PR #30(이동 범위 제한, 하늘 회전, 브랜드)을 squash merge했다(`034e64b`).
+- PR #31(저장소 연결: clone, 최근 목록·즐겨찾기, init, 끌어다 놓기)을 squash merge했다(`b7620a3`).
+- v0.1.0 초안 Release가 있다(빌드 성공). 사용자가 Publish하면 태그가 생긴다.
 
 ## 지금 하는 일
 
-M6 저장소 연결 → PR CI 대기
+M6 멀티탭 → PR CI 대기
 
-- Rust `git/setup.rs`: `clone`(진행률, `Auth` 구분), `init`(`-b main`), `repo_root`(파일·폴더가 속한 저장소)
-- `recent.ts`(최근 12개 + 즐겨찾기는 항상), `components/Connect.tsx`(`useRecent`, `RepoMenu`, `RecentList`, `ConnectActions`, `CloneDialog`)
-- App: `openPath`가 모든 진입점을 받는다. 스냅샷을 읽는 데 성공하면 최근 목록에 올린다. clone이 인증에 실패하면 `AuthDialog`(`fetchCmd`=`git clone …`)를 띄우고, 다시 시도하면 값이 채워진 clone 창이 열린다
-- 끌어다 놓기: Tauri `onDragDropEvent` → `repo_root` → 열기, 저장소가 아니면 init을 확인받는다. 데모에서는 시험할 수 없다
-- 데모: `__otgitDemo.nextFolder`로 다음 폴더 선택 결과를 정한다(e2e)
+- `App.tsx` = 탭 셸: 탭 목록(`tabs.ts`: openIn·addEmpty·closeTab·cycle·selectAt·저장), 설정, 연결(clone·init·끌어다 놓기), 알림(`toasts floating`), 워프
+- `RepoView.tsx` = 예전 App 본문. 탭마다 하나씩 떠 있다. `active`가 아니면 `hidden`이고 키 입력·파일 감시·탑바가 없다. 탭에 돌아오면 새로고침한다
+- 숨은 탭: `GraphCanvas`·`Minimap`은 캔버스가 0×0이면 그리지 않는다. 다시 보일 때 카메라를 옮기지 않는다
+- 데스크톱은 `otgit.tabs`에 열린 탭을 저장한다(예전 `otgit.lastRepo`도 이어받음). 데모는 데모 탭 하나로 시작한다
 
 ## 다음 단계 (M6 순서, ROADMAP 참고)
 
-1. 멀티탭
-2. 고급 git 작업: 실수 되돌리기 → 브랜치 정리 → 과거 커밋 손보기 → bisect·blame
-3. 게임 같은 우주 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌·되돌리기·탭 전환. 각 기능 PR에 그 기능의 연출을 함께 넣고, 기존 기능 연출은 별도 PR
-4. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
+1. 고급 git 작업: 실수 되돌리기(reset soft/mixed/hard, 마지막 커밋 취소, reflog 복구) → 브랜치 정리 → 과거 커밋 손보기 → bisect·blame. 각 기능에 맞는 우주 연출을 함께 넣는다(되돌리기 = 시간을 감는 효과)
+2. 기존 기능의 게임 같은 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌
+3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
+4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다
 
 ## 막힌 것 / 결정 필요
 

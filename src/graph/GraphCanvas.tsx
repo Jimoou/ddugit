@@ -259,7 +259,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       c.style.width = `${r.width}px`;
       c.style.height = `${r.height}px`;
       const s = st.current;
-      if (s.initialized) {
+      // A hidden tab measures 0×0; coming back must not shift the camera.
+      if (r.width === 0 || r.height === 0) return;
+      if (s.initialized && s.size.w > 0) {
         // Keep the same world point at the centre when panels open or close.
         const dx = (r.width - s.size.w) / 2,
           dy = (r.height - s.size.h) / 2;
@@ -284,7 +286,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       raf = requestAnimationFrame(frame);
       const s = st.current;
       const p = propsRef.current;
-      if (s.size.w === 0) return;
+      if (s.size.w === 0 || ctx.canvas.width === 0) return; // not laid out, or a hidden tab
       if (s.target) {
         const v = s.view,
           t = s.target;

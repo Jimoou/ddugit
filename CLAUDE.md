@@ -54,7 +54,8 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`
 - `src/components/`: 패널과 다이얼로그
 - `e2e/`: Playwright e2e (`*.e2e.ts`). 데모 모드를 대상으로 돌리고, `fixtures.ts`의 `demo`로 데모 상태를 읽거나 바꾼다(`window.__otgitDemo`). 페이지 오류가 하나라도 나면 실패한다
-- `src/App.tsx`: 화면 조립과 git 작업 흐름. 모든 작업은 `run()`을 거친다.
+- `src/App.tsx`: 창(탭 셸). 탭(`tabs.ts`, 순수 함수), 설정, 저장소 연결(clone·init·끌어다 놓기), 알림. 탭마다 `RepoView`를 띄워 두고 안 보이는 탭은 `hidden`으로 숨긴다(상태 유지). 단축키 중 창 전체 것(탭, `?`)은 여기서 처리한다
+- `src/RepoView.tsx`: 저장소 하나의 화면 조립과 git 작업 흐름. 모든 작업은 `run()`을 거친다. 보이는 탭(`active`)만 키 입력·파일 감시·탑바를 갖는다
 
 ## Git 워크플로우
 

@@ -455,4 +455,15 @@ export const en: Record<Key, string> = {
   "connect.notRepo.title": "Not a git repository",
   "connect.notRepo.body": "Create a new repository in <b>{path}</b>?",
   "connect.notRepo.go": "Create here",
+
+  // tabs
+  "tabs.label": "Open repositories",
+  "tabs.new": "New tab",
+  "tabs.newTab": "New tab (⌘/Ctrl+T)",
+  "tabs.close": "Close {name}",
+  "keys.tabs": "Tabs",
+  "keys.tabNew.what": "New tab (open, clone or create)",
+  "keys.tabClose.what": "Close tab",
+  "keys.tabCycle.what": "Next / previous tab",
+  "keys.tabPick.what": "Go to tab n",
 };
