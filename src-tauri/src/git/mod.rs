@@ -15,6 +15,7 @@ pub mod remote;
 pub mod setup;
 pub mod stage;
 pub mod stash;
+pub mod undo;
 pub mod watch;
 pub mod write;
 

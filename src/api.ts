@@ -9,6 +9,8 @@ import type {
   OpResult,
   PickOp,
   RebaseStep,
+  ReflogEntry,
+  ResetMode,
   Progress,
   RefOp,
   RemoteOp,
@@ -48,6 +50,8 @@ export interface Commands {
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
   git_ref: [{ path: string; op: RefOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
+  git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
+  git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
   git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
@@ -110,6 +114,10 @@ export const api = {
   remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
     return call("git_remote", { path, op, onProgress: progressSink(onProgress, path) });
   },
+  /** Move the current branch to `target`; `mode` decides what happens to the changes passed over. */
+  reset: (path: string, target: string, mode: ResetMode) => call("git_reset", { path, target, mode }),
+  /** Where HEAD has been, newest first. */
+  reflog: (path: string, limit?: number) => call("git_reflog", { path, limit }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
   stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),

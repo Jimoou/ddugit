@@ -72,6 +72,10 @@ command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) 
 command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
     => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
 command!(git_init(dir: String) -> OpResult => git::setup::init(&dir));
+command!(git_reset(path: String, target: String, mode: git::undo::ResetMode) -> OpResult
+    => git::undo::reset(&path, &target, mode));
+command!(git_reflog(path: String, limit: Option<usize>) -> Vec<git::undo::ReflogEntry>
+    => git::undo::reflog(&path, limit.unwrap_or(100)));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
 command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
     => git::stash::stash_push(&path, &message, &paths));
@@ -143,6 +147,8 @@ pub fn run() {
             git_create_branch,
             git_ref,
             git_remote,
+            git_reset,
+            git_reflog,
             git_discard,
             git_stash_push,
             git_stash,

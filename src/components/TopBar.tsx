@@ -20,6 +20,8 @@ interface Props {
   repoMenu?: ReactNode;
   onCompose(): void;
   onRefresh(): void;
+  /** Open the undo history (reflog). */
+  onUndoHistory(): void;
   onRemote(op: RemoteOp): void;
   onToggleAnimate(): void;
   onSettings(): void;
@@ -84,6 +86,9 @@ export function TopBar(p: Props) {
 
       <button className="ghost" onClick={p.onCompose} disabled={p.busy}>
         {t("top.commit")} {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
+      </button>
+      <button className="ghost" onClick={p.onUndoHistory} title={t("undo.log.open")} aria-label={t("undo.log.open")}>
+        ⏱
       </button>
       <button className="ghost" onClick={p.onRefresh} title={t("top.refresh")}>
         ⟲

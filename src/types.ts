@@ -50,6 +50,19 @@ export type StashOp = "apply" | "pop" | "drop";
 export type PickOp = "cherryPick" | "revert";
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
+/** What a reset does with the changes of the commits it moves past. */
+export type ResetMode = "soft" | "mixed" | "hard";
+
+/** One move of HEAD (newest first). `lost`: only the reflog still reaches it. */
+export interface ReflogEntry {
+  id: string;
+  prev: string;
+  message: string;
+  summary: string;
+  time: number;
+  lost: boolean;
+}
+
 export type RebaseAction = "pick" | "squash" | "fixup" | "drop";
 export interface RebaseStep {
   id: string;

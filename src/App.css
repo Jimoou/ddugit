@@ -1883,3 +1883,107 @@ kbd {
   font-size: 18px;
   pointer-events: none;
 }
+
+/* ----------------------------------------------------------------- undo */
+.dialog.reset .choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.dialog.reset .choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dialog.reset .choice.on {
+  border-color: var(--focus);
+  background: var(--ui-soft);
+}
+.dialog.reset .choice.danger.on {
+  border-color: rgba(229, 72, 95, 0.7);
+  background: rgba(229, 72, 95, 0.12);
+}
+.dialog.reset .choice input {
+  margin-top: 3px;
+  accent-color: var(--ui);
+}
+.reflog-list li {
+  cursor: default;
+}
+.reflog-list li > * {
+  flex-shrink: 0;
+}
+.reflog-list li > .summary {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.reflog-list .when {
+  width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reflog-list .what {
+  width: 84px;
+  color: var(--text-2);
+}
+.reflog-list li.lost {
+  border-color: rgba(255, 184, 77, 0.45);
+}
+.reflog-list .chip.lost {
+  width: auto;
+  font: 600 11px/18px var(--sans);
+  color: var(--amber);
+  border: 1px solid rgba(255, 184, 77, 0.5);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.reflog-list li.here {
+  border-color: var(--focus);
+}
+.reflog-list .row {
+  display: flex;
+  gap: 6px;
+}
+.reflog-list .row button {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+/* Effects over the graph stay inside it. */
+.fx-clip {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Going back in time: the sky winds backwards and pulls inward, once. */
+.rewind {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(34, 232, 255, 0.35) 0deg 0.8deg, transparent 0.8deg 9deg),
+    radial-gradient(circle, rgba(34, 232, 255, 0.12), transparent 60%);
+  mask-image: radial-gradient(circle, transparent 0 6%, #000 28%, transparent 75%);
+  animation: rewind 0.65s ease-in forwards;
+}
+@keyframes rewind {
+  from {
+    opacity: 0;
+    transform: scale(2.4) rotate(0deg);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.3) rotate(-220deg);
+  }
+}
