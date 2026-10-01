@@ -67,6 +67,8 @@
 - [x] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표 — 반짝임, 한 번에 불러올 커밋 수, git 실행 파일(`--version`으로 확인 후 적용), 단축키 표, `?`/⚙로 열기
   - [ ] 테마 (지금은 네온 다크 하나)
 - [ ] i18n (영어), 접근성 (키보드로 노드 이동, 스크린리더 라벨)
+  - [x] 접근성: ←→ 부모/자식, ↑↓ 옆 레인, Enter 메뉴, 선택한 커밋을 aria-live로 읽어 줌, 캔버스 포커스 가능
+  - [ ] i18n (영어)
 - [x] ESLint, Playwright e2e를 CI에 추가
   - [x] Playwright e2e: 데모 모드 대상 5개 흐름(커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기), CI `E2E` 잡
   - [x] ESLint: typescript-eslint 권장 + react-hooks(`rules-of-hooks`, `exhaustive-deps`) + effect 식 본문 금지. CI Web 잡에서 실행
@@ -103,3 +105,4 @@
 | 2026-10-01 | PR #18 squash merge(`d6bf590`). M5: react-hooks 권장 규칙 전부 켬. effect 안 setState 9곳 → 렌더 중 조정(경로·초기 파일·부분 스테이지), 데이터를 키와 함께 저장(패널 파일·충돌 파일·줄 선택), diff 다시 불러오기를 fetch만 하도록 분리, 첫 로드에 늦게 온 응답 무시     |
 | 2026-10-01 | PR #19 squash merge(`74f7924`). 백포트: 제외를 받는 쪽별 config(`otgit.<target>.backportIgnored`, 예전 저장소 전체 키도 읽음), `backport_summary` + "대상별" 탭(테스트 56, e2e 10)                                                                                      |
 | 2026-10-01 | PR #20 squash merge(`1d0ac4e`). M5: 설정 화면(`settings.ts` 파싱 + vitest 3, `SettingsDialog`, `git::set_program` 전역 git 경로를 검증 후 적용, 예전 `otgit.animate` 키 이어받음)(테스트 57, e2e 11)                                                                    |
+| 2026-10-01 | PR #21 squash merge(`62759c0`). M5: 키보드로 커밋 이동(`graph/navigate.ts` `stepFrom` + vitest 2, 화면 밖이면 배율 유지하며 따라감, 입력·목록에 포커스가 있을 땐 화살표를 가로채지 않음), 스크린리더 안내(e2e 12)                                                       |

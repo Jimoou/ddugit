@@ -1621,3 +1621,17 @@ kbd {
   background: rgba(255, 255, 255, 0.04);
   white-space: nowrap;
 }
+
+/* Visually hidden, still read by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.graph-area canvas:focus-visible {
+  outline: 1px solid rgba(34, 232, 255, 0.4);
+  outline-offset: -1px;
+}
