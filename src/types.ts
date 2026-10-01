@@ -47,6 +47,8 @@ export interface StashInfo {
 
 export type StashOp = "apply" | "pop" | "drop";
 
+export type PickOp = "cherryPick" | "revert";
+
 export interface RepoSnapshot {
   path: string;
   name: string;

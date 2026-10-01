@@ -1,6 +1,7 @@
 mod git;
 
 use git::diff::FileDiff;
+use git::pick::PickOp;
 use git::read::RepoSnapshot;
 use git::remote::{Progress, RemoteOp};
 use git::stash::StashOp;
@@ -31,12 +32,14 @@ macro_rules! command {
 
 command!(repo_snapshot(path: String, limit: Option<usize>) -> RepoSnapshot
     => git::read::snapshot(&path, limit.unwrap_or(3000)));
-command!(git_commit(path: String, message: String, paths: Vec<String>) -> OpResult
-    => git::write::commit(&path, &message, &paths));
+command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool) -> OpResult
+    => git::write::commit(&path, &message, &paths, amend));
 command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
     => git::write::merge(&path, &source, target.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
-command!(git_continue_rebase(path: String) -> OpResult => git::write::continue_rebase(&path));
+command!(git_continue(path: String) -> OpResult => git::write::continue_op(&path));
+command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) -> OpResult
+    => git::pick::pick(&path, op, &id, target.as_deref()));
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
@@ -70,7 +73,8 @@ pub fn run() {
             git_commit,
             git_merge,
             git_abort,
-            git_continue_rebase,
+            git_continue,
+            git_pick,
             git_checkout,
             git_create_branch,
             git_remote,

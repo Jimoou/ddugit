@@ -14,6 +14,8 @@ export interface Drag {
   to: Pt;
   target: string | null;
   valid: boolean;
+  /** Plain drag merges; with ⌥/Alt held it cherry-picks. */
+  mode: "merge" | "pick";
 }
 
 export interface DrawState {
@@ -389,13 +391,14 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     }
   }
 
-  // --- drag-to-merge cable ----------------------------------------------------
+  // --- drag cable (merge / cherry-pick) ------------------------------------------------
   if (s.drag) {
     const src = scene.layout.byId.get(s.drag.from);
     if (src) {
       const a = toScreen(view, { x: xOf(src.row, n), y: yOf(src.lane) });
       const b = s.drag.to;
       const c = s.drag.valid ? "#ffffff" : NEON[src.color];
+      const cable = s.drag.mode === "pick" ? NEON[3] : s.drag.valid ? NEON[6] : NEON[src.color];
       const mx = (a.x + b.x) / 2;
       ctx.globalCompositeOperation = "lighter";
       for (const [lw, al] of [
@@ -403,7 +406,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         [5, 0.3],
         [2, 1],
       ] as const) {
-        ctx.strokeStyle = alpha(s.drag.valid ? NEON[6] : NEON[src.color], al);
+        ctx.strokeStyle = alpha(cable, s.drag.mode === "pick" && !s.drag.valid ? al * 0.6 : al);
         ctx.lineWidth = lw;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);

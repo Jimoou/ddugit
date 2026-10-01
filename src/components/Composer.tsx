@@ -8,7 +8,13 @@ interface Props {
   busy: boolean;
   onClose(): void;
   onOpenFile(path: string): void;
-  onCommit(message: string, paths: string[], newBranch: string | null): void;
+  /** Full message of HEAD, prefilled when switching to amend; `null` without commits. */
+  headMessage: string | null;
+  /** Open in amend mode (from the HEAD node's context menu). */
+  startAmend?: boolean;
+  /** HEAD is already on the upstream: amending rewrites shared history. */
+  headPushed: boolean;
+  onCommit(message: string, paths: string[], newBranch: string | null, amend: boolean): void;
   /** Put the picked files away in a stash (message may be empty). */
   onStash(message: string, paths: string[]): void;
   /** Throw the picked files' changes away (caller confirms). */
@@ -32,8 +38,11 @@ function kind(c: FileChange): string {
 /** Panel opened from the [+] node after HEAD: pick files, write a message, commit. */
 export function Composer(props: Props) {
   const { changes, branch, merging, busy, onClose, onOpenFile, onCommit, onStash, onDiscard } = props;
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(changes.map((c) => c.path)));
-  const [message, setMessage] = useState("");
+  const { headMessage, startAmend = false, headPushed } = props;
+  const [amend, setAmend] = useState(startAmend && headMessage !== null);
+  // Amend from the menu = reword: nothing picked until the user chooses files.
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(amend ? [] : changes.map((c) => c.path)));
+  const [message, setMessage] = useState(amend ? (headMessage ?? "").trim() : "");
   const [newBranch, setNewBranch] = useState("");
   const [useBranch, setUseBranch] = useState(false);
   const msgRef = useRef<HTMLTextAreaElement>(null);
@@ -54,21 +63,24 @@ export function Composer(props: Props) {
 
   const all = picked.size === changes.length && changes.length > 0;
   const canCommit =
-    !busy && message.trim() !== "" && (merging || picked.size > 0) && (!useBranch || newBranch.trim() !== "");
+    !busy &&
+    message.trim() !== "" &&
+    (merging || amend || picked.size > 0) &&
+    (amend || !useBranch || newBranch.trim() !== "");
 
   const submit = () => {
     if (!canCommit) return;
-    onCommit(message.trim(), merging ? [] : [...picked], useBranch ? newBranch.trim() : null);
+    onCommit(message.trim(), merging ? [] : [...picked], !amend && useBranch ? newBranch.trim() : null, amend);
   };
 
   return (
     <aside className="panel composer">
       <header>
         <div>
-          <div className="eyebrow">새 체크포인트</div>
+          <div className="eyebrow">{amend ? "마지막 커밋 수정" : "새 체크포인트"}</div>
           <h2>
-            {useBranch && newBranch ? newBranch : (branch ?? "detached HEAD")}
-            <span className="muted"> 에 커밋</span>
+            {!amend && useBranch && newBranch ? newBranch : (branch ?? "detached HEAD")}
+            <span className="muted">{amend ? " 의 마지막 커밋" : " 에 커밋"}</span>
           </h2>
         </div>
         <button className="icon" onClick={onClose} title="닫기 (Esc)">
@@ -141,7 +153,24 @@ export function Composer(props: Props) {
         rows={4}
       />
 
-      {!merging && (
+      {!merging && headMessage !== null && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={amend}
+            onChange={(e) => {
+              setAmend(e.target.checked);
+              if (e.target.checked && !message.trim()) setMessage(headMessage.trim());
+            }}
+          />
+          <span>마지막 커밋 수정 (amend) — 선택한 파일 없이 메시지만 바꿀 수도 있어요</span>
+        </label>
+      )}
+      {amend && headPushed && (
+        <div className="note warn">이 커밋은 이미 push됐어요. 수정하면 다시 올릴 때 강제 push가 필요합니다.</div>
+      )}
+
+      {!merging && !amend && (
         <div className="branch-opt">
           <label className="check">
             <input type="checkbox" checked={useBranch} onChange={(e) => setUseBranch(e.target.checked)} />
@@ -179,7 +208,7 @@ export function Composer(props: Props) {
       )}
 
       <button className="primary" disabled={!canCommit} onClick={submit}>
-        {busy ? "커밋 중…" : "체크포인트 추가"}
+        {busy ? "커밋 중…" : amend ? "커밋 수정" : "체크포인트 추가"}
         <kbd>⌘/Ctrl ⏎</kbd>
       </button>
     </aside>

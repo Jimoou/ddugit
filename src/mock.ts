@@ -297,11 +297,16 @@ export const mock: Table = {
   initial_repo: () => delay(null, 0),
   repo_snapshot: () => delay(repo.snapshot()),
 
-  git_commit({ message, paths }) {
+  git_commit({ message, paths, amend }) {
     if (!message.trim()) return fail("Commit message is empty");
-    const set = new Set(paths.length ? paths : repo.changes.map((c) => c.path));
-    if (!repo.changes.some((c) => set.has(c.path))) return fail("Nothing to commit");
-    repo.add(repo.head, message.split("\n")[0]);
+    const set = new Set(paths.length || amend ? paths : repo.changes.map((c) => c.path));
+    if (!amend && !repo.changes.some((c) => set.has(c.path))) return fail("Nothing to commit");
+    if (amend) {
+      // Replace the tip with a new commit that has the same parents.
+      const old = repo.commits.get(repo.branches.get(repo.head)!)!;
+      const id = repo.commit(old.parents, message.split("\n")[0], old.author);
+      repo.branches.set(repo.head, id);
+    } else repo.add(repo.head, message.split("\n")[0]);
     repo.changes = repo.changes.filter((c) => !set.has(c.path));
     return delay(res("ok", `[${repo.head}] ${message}`));
   },
@@ -320,7 +325,17 @@ export const mock: Table = {
     return delay(res("ok"));
   },
 
-  git_continue_rebase() {
+  git_pick({ op, id, target }) {
+    const c = repo.commits.get(id);
+    if (!c) return fail(`Unknown commit ${id}`);
+    const t = target ?? repo.head;
+    if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
+    repo.head = t;
+    repo.add(t, op === "revert" ? `Revert "${c.summary}"` : c.summary);
+    return delay(res("ok"));
+  },
+
+  git_continue() {
     repo.state = "clean";
     return delay(res("ok"));
   },

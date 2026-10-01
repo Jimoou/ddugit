@@ -3,6 +3,8 @@ import { api, DEMO_PATH, isTauri } from "./api";
 import { Composer } from "./components/Composer";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
+import { ContextMenu, type MenuItem } from "./components/ContextMenu";
+import { NameDialog } from "./components/NameDialog";
 import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
@@ -33,9 +35,12 @@ const REMOTE_DONE: Record<RemoteOp, string> = {
   push: "원격에 올렸어요",
 };
 
-const CONFLICT_HINT: Record<string, string> = {
-  merge: "해결 후 ＋ 로 커밋하면 병합이 완료됩니다.",
-  rebase: "파일을 고친 뒤 '계속'을 누르면 리베이스를 이어갑니다.",
+/** In-progress operations: banner name, how to finish, and whether "계속" applies. */
+const IN_PROGRESS: Record<string, { name: string; hint: string; canContinue: boolean }> = {
+  merge: { name: "병합", hint: "해결 후 ＋ 로 커밋하면 병합이 완료됩니다.", canContinue: false },
+  rebase: { name: "리베이스", hint: "파일을 고친 뒤 '계속'을 누르면 리베이스를 이어갑니다.", canContinue: true },
+  "cherry-pick": { name: "cherry-pick", hint: "파일을 고친 뒤 '계속'을 누르면 복사를 마칩니다.", canContinue: true },
+  revert: { name: "되돌리기", hint: "파일을 고친 뒤 '계속'을 누르면 되돌리기를 마칩니다.", canContinue: true },
 };
 
 /** URL of the remote behind HEAD's upstream (else `origin`, else the first remote). */
@@ -67,7 +72,9 @@ export default function App() {
   const [panelFiles, setPanelFiles] = useState<FileDiff[] | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [focusRef, setFocusRef] = useState<RefInfo | null>(null);
-  const [composer, setComposer] = useState(false);
+  const [composer, setComposer] = useState<false | { amend: boolean }>(false);
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [branchAtId, setBranchAtId] = useState<string | null>(null);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
   const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
   const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
@@ -123,10 +130,10 @@ export default function App() {
 
   const stashSel = selectedStash !== null ? snap?.stashes[selectedStash] : undefined;
   /** The right panel shows one thing: composer, a stash, or a commit. */
-  const show = (what: { commit?: string | null; stash?: number | null; composer?: boolean }) => {
+  const show = (what: { commit?: string | null; stash?: number | null; composer?: boolean; amend?: boolean }) => {
     setSelected(what.commit ?? null);
     setSelectedStash(what.stash ?? null);
-    setComposer(what.composer ?? false);
+    setComposer(what.composer ? { amend: what.amend ?? false } : false);
   };
 
   // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
@@ -182,16 +189,21 @@ export default function App() {
 
   const ancestorCache = useRef(new Map<string, Set<string>>());
   useEffect(() => ancestorCache.current.clear(), [snap]);
-  const canMergeInto = useCallback(
+  const isAncestor = (anc: string, of: string | null) => {
+    if (!snap || !of) return false;
+    let set = ancestorCache.current.get(of);
+    if (!set) {
+      set = ancestors(snap.commits, of);
+      ancestorCache.current.set(of, set);
+    }
+    return set.has(anc);
+  };
+  const canDropOn = useCallback(
     (target: string, source: string) => {
       if (!snap || snap.state !== "clean" || !branchAt(target)) return false;
-      let anc = ancestorCache.current.get(target);
-      if (!anc) {
-        anc = ancestors(snap.commits, target);
-        ancestorCache.current.set(target, anc);
-      }
-      return !anc.has(source); // already merged otherwise
+      return !isAncestor(source, target); // already contained otherwise
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [snap, branchAt],
   );
 
@@ -244,6 +256,83 @@ export default function App() {
     const wasRejected = sync === "rejected";
     setSync(null);
     if ((await remote(op)) === "ok" && wasRejected) await remote("push");
+  };
+
+  /** Copy commit `id` onto branch `target` (checked out first), after confirming. */
+  const confirmPick = (id: string, target: string) => {
+    const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
+    setConfirm({
+      title: "cherry-pick",
+      confirmLabel: "복사",
+      body: (
+        <>
+          <p>
+            <b>“{summary}”</b> 커밋의 변경을 <b>{target}</b>에 새 커밋으로 복사합니다. 원래 커밋 SHA가 메시지에
+            기록돼요.
+          </p>
+          {snap?.head.branch !== target && <p className="note">먼저 {target}(으)로 체크아웃해요.</p>}
+        </>
+      ),
+      onConfirm: () => {
+        setConfirm(null);
+        void run(
+          `${target}에 복사했어요`,
+          () => api.pick(path!, "cherryPick", id, target),
+          () => setTimeout(() => graph.current?.centerOnHead(), 60),
+        );
+      },
+    });
+  };
+
+  /** Right-click menu for a commit node; entries that don't apply are disabled, not hidden. */
+  const nodeMenu = (id: string): MenuItem[] => {
+    if (!snap || !path) return [];
+    const head = snap.head.target;
+    const isHead = id === head;
+    const onHead = isAncestor(id, head);
+    const clean = snap.state === "clean";
+    const locals = snap.refs.filter((r) => r.kind === "local" && r.target === id && r.name !== snap.head.branch);
+    const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
+    return [
+      { label: "여기서 새 브랜치…", onSelect: () => setBranchAtId(id) },
+      ...locals.map((r) => ({
+        label: `${r.name} 체크아웃`,
+        onSelect: () => void run(`${r.name}(으)로 이동했어요`, () => api.checkout(path, r.name)),
+      })),
+      "separator" as const,
+      {
+        label: snap.head.branch ? `${snap.head.branch}에 cherry-pick` : "HEAD에 cherry-pick",
+        hint: "⌥ 드래그",
+        disabled: !clean || onHead || !snap.head.branch,
+        onSelect: () => confirmPick(id, snap.head.branch!),
+      },
+      {
+        label: "되돌리는 커밋 만들기 (revert)",
+        disabled: !clean || !onHead,
+        onSelect: () =>
+          setConfirm({
+            title: "revert",
+            confirmLabel: "되돌리기",
+            body: (
+              <p>
+                <b>“{summary}”</b>의 변경을 거꾸로 적용하는 새 커밋을 {snap.head.branch ?? "HEAD"}에 만듭니다. 이력은
+                지워지지 않아요.
+              </p>
+            ),
+            onConfirm: () => {
+              setConfirm(null);
+              void run("되돌리는 커밋을 만들었어요", () => api.pick(path, "revert", id, null));
+            },
+          }),
+      },
+      {
+        label: "마지막 커밋 수정 (amend)",
+        disabled: !isHead || !clean,
+        onSelect: () => show({ composer: true, amend: true }),
+      },
+      "separator" as const,
+      { label: "SHA 복사", hint: id.slice(0, 7), onSelect: () => void navigator.clipboard?.writeText(id) },
+    ];
   };
 
   const openRepo = async () => {
@@ -302,12 +391,12 @@ export default function App() {
       {snap.state !== "clean" && (
         <div className="banner">
           <span>
-            {snap.state === "merge" ? "병합" : snap.state === "rebase" ? "리베이스" : snap.state} 진행 중
-            {conflicts > 0 && ` — 충돌 파일 ${conflicts}개`}. {CONFLICT_HINT[snap.state] ?? ""}
+            {IN_PROGRESS[snap.state]?.name ?? snap.state} 진행 중{conflicts > 0 && ` — 충돌 파일 ${conflicts}개`}.{" "}
+            {IN_PROGRESS[snap.state]?.hint ?? ""}
           </span>
           <span className="row">
-            {snap.state === "rebase" && (
-              <button disabled={busy} onClick={() => run("리베이스를 이어갔어요", () => api.continueRebase(path))}>
+            {IN_PROGRESS[snap.state]?.canContinue && (
+              <button disabled={busy} onClick={() => run("이어서 마쳤어요", () => api.continueOp(path))}>
                 계속
               </button>
             )}
@@ -356,11 +445,14 @@ export default function App() {
               stashes={snap.stashes}
               selectedStash={selectedStash}
               onStash={(i) => show({ stash: i })}
-              canMergeInto={canMergeInto}
-              onMerge={(sourceId, targetId) => {
+              canDropOn={canDropOn}
+              onDrop={(sourceId, targetId, mode) => {
                 const target = branchAt(targetId)!;
-                setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
+                if (mode === "merge")
+                  return setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
+                confirmPick(sourceId, target);
               }}
+              onNodeMenu={(id, x, y) => setMenu({ id, x, y })}
               onZoomChange={setZoom}
             />
 
@@ -408,6 +500,9 @@ export default function App() {
             branch={snap.head.branch}
             merging={snap.state === "merge"}
             busy={busy}
+            headMessage={snap.head.target ? (commitById.get(snap.head.target)?.message ?? "") : null}
+            startAmend={composer.amend}
+            headPushed={!!snap.head.upstream && snap.head.ahead === 0}
             onClose={() => setComposer(false)}
             onOpenFile={(file) => loadDiff({ kind: "worktree" }, "작업 중인 변경", file)}
             onStash={(message, paths) =>
@@ -415,6 +510,7 @@ export default function App() {
                 "스태시에 보관했어요",
                 () => api.stashPush(path, message, paths),
                 () => {
+                  show({});
                   setDiff((d) => (d?.source.kind === "worktree" ? null : d));
                 },
               )
@@ -443,15 +539,15 @@ export default function App() {
                 },
               })
             }
-            onCommit={(message, paths, newBranch) =>
+            onCommit={(message, paths, newBranch, amend) =>
               run(
-                "체크포인트를 추가했어요",
+                amend ? "마지막 커밋을 수정했어요" : "체크포인트를 추가했어요",
                 async () => {
                   if (newBranch) {
                     const r = await api.createBranch(path, newBranch, null, true);
                     if (r.status !== "ok") return r;
                   }
-                  return api.commit(path, message, paths);
+                  return api.commit(path, message, paths, amend);
                 },
                 () => {
                   setComposer(false);
@@ -523,6 +619,31 @@ export default function App() {
           />
         )}
       </div>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          title={commitById.get(menu.id)?.summary}
+          items={nodeMenu(menu.id)}
+          onClose={() => setMenu(null)}
+        />
+      )}
+
+      {branchAtId && (
+        <NameDialog
+          title={`${branchAtId.slice(0, 7)}에서 새 브랜치`}
+          placeholder="feature/my-idea"
+          confirmLabel="만들고 이동"
+          busy={busy}
+          onCancel={() => setBranchAtId(null)}
+          onSubmit={(name) => {
+            const at = branchAtId;
+            setBranchAtId(null);
+            void run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true));
+          }}
+        />
+      )}
 
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
 

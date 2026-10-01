@@ -1,4 +1,6 @@
-//! Local writes through the git CLI: commit, merge, abort/continue, checkout, branch.
+//! Local writes through the git CLI: commit/amend, merge, abort/continue, checkout, branch.
+
+use std::path::PathBuf;
 
 use git2::{BranchType, Oid, RepositoryState};
 
@@ -8,27 +10,35 @@ use super::{
 };
 
 /// Commit the given paths (exactly those, regardless of what else is staged).
-/// An empty `paths` commits everything that has changed.
-pub fn commit(path: &str, message: &str, paths: &[String]) -> Result<OpResult> {
+/// An empty `paths` commits everything that has changed — except with `amend`,
+/// where it means "only reword the last commit".
+pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Result<OpResult> {
     if message.trim().is_empty() {
         return Err("Commit message is empty".into());
     }
     let dir = repo_dir(path)?;
-    let mut add: Vec<&str> = vec!["add", "-A", "--"];
+    let ps: Vec<&str> = paths.iter().map(String::as_str).collect();
     let mut commit: Vec<&str> = vec!["commit", "-m", message];
-    if !paths.is_empty() {
-        let ps: Vec<&str> = paths.iter().map(String::as_str).collect();
-        add.extend(&ps);
-        commit.push("--");
-        commit.extend(&ps);
+    if amend {
+        commit.push("--amend");
     }
-    git_ok(&dir, &add)?;
+    if amend && ps.is_empty() {
+        commit.push("--only"); // reword: ignore whatever is staged
+    } else {
+        let mut add = vec!["add", "-A", "--"];
+        add.extend(&ps);
+        git_ok(&dir, &add)?;
+        if !ps.is_empty() {
+            commit.push("--");
+            commit.extend(&ps);
+        }
+    }
     Ok(git(&dir, &commit)?.into())
 }
 
-/// Merge `source` (branch name or commit id) into `target` branch.
-/// When `target` isn't the current branch it is checked out first.
-pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult> {
+/// Refuse to start while another operation is half-done, then check out
+/// `target` if it isn't already HEAD. Shared by merge and cherry-pick.
+pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     if repo.state() != RepositoryState::Clean {
@@ -38,11 +48,17 @@ pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult>
         ));
     }
     if let Some(t) = target {
-        let current = read_head(&repo).branch;
-        if current.as_deref() != Some(t) {
+        if read_head(&repo).branch.as_deref() != Some(t) {
             git_ok(&dir, &["checkout", t])?;
         }
     }
+    Ok(dir)
+}
+
+/// Merge `source` (branch name or commit id) into `target` branch.
+/// When `target` isn't the current branch it is checked out first.
+pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult> {
+    let dir = prepare_on(path, target)?;
     let o = git(&dir, &["merge", "--no-ff", "--no-edit", source])?;
     Ok(conflict_aware(path, o))
 }
@@ -71,12 +87,17 @@ pub fn abort(path: &str) -> Result<OpResult> {
     Ok(git(&workdir(&repo)?, args)?.into())
 }
 
-/// Continue a rebase after conflicts were resolved (stages everything first).
-/// A merge is concluded by committing instead.
-pub fn continue_rebase(path: &str) -> Result<OpResult> {
-    let dir = repo_dir(path)?;
+/// Continue a rebase / cherry-pick / revert after conflicts were resolved
+/// (stages everything first). A merge is concluded by committing instead.
+pub fn continue_op(path: &str) -> Result<OpResult> {
+    let repo = open(path)?;
+    let state = state_name(repo.state());
+    if !matches!(state, "rebase" | "cherry-pick" | "revert") {
+        return Err(format!("Nothing to continue ({state})"));
+    }
+    let dir = workdir(&repo)?;
     git_ok(&dir, &["add", "-A"])?;
-    let o = git(&dir, &["rebase", "--continue"])?;
+    let o = git(&dir, &[state, "--continue"])?;
     Ok(conflict_aware(path, o))
 }
 
@@ -124,7 +145,7 @@ mod tests {
         let d = repo();
         fs::write(d.path().join("a.txt"), "a").unwrap();
         fs::write(d.path().join("b.txt"), "b").unwrap();
-        let r = commit(s(d.path()), "add a", &["a.txt".into()]).unwrap();
+        let r = commit(s(d.path()), "add a", &["a.txt".into()], false).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
 
         let snap = snapshot(s(d.path()), 100).unwrap();
@@ -187,5 +208,30 @@ mod tests {
 
         assert_eq!(abort(p).unwrap().status, OpStatus::Ok);
         assert_eq!(snapshot(p, 100).unwrap().state, "clean");
+    }
+
+    #[test]
+    fn amend_rewords_or_adds_files() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "first");
+        commit_file(d.path(), "b.txt", "b", "typo mesage");
+        fs::write(d.path().join("c.txt"), "c").unwrap();
+
+        // Reword only: the untracked c.txt must not sneak in.
+        assert_eq!(commit(p, "typo message", &[], true).unwrap().status, OpStatus::Ok);
+        let snap = snapshot(p, 10).unwrap();
+        assert_eq!(snap.commits.len(), 2);
+        assert_eq!(snap.commits[0].summary, "typo message");
+        assert_eq!(snap.changes.len(), 1);
+
+        // Amend with a file.
+        assert_eq!(
+            commit(p, "typo message", &["c.txt".into()], true).unwrap().status,
+            OpStatus::Ok
+        );
+        let snap = snapshot(p, 10).unwrap();
+        assert_eq!(snap.commits.len(), 2);
+        assert!(snap.changes.is_empty());
     }
 }
