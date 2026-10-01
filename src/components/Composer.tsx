@@ -47,7 +47,8 @@ export function Composer({ changes, branch, merging, busy, onClose, onCommit }: 
   useEffect(() => msgRef.current?.focus(), []);
 
   const all = picked.size === changes.length && changes.length > 0;
-  const canCommit = !busy && message.trim() !== "" && (merging || picked.size > 0) && (!useBranch || newBranch.trim() !== "");
+  const canCommit =
+    !busy && message.trim() !== "" && (merging || picked.size > 0) && (!useBranch || newBranch.trim() !== "");
 
   const submit = () => {
     if (!canCommit) return;
@@ -60,7 +61,7 @@ export function Composer({ changes, branch, merging, busy, onClose, onCommit }: 
         <div>
           <div className="eyebrow">새 체크포인트</div>
           <h2>
-            {useBranch && newBranch ? newBranch : branch ?? "detached HEAD"}
+            {useBranch && newBranch ? newBranch : (branch ?? "detached HEAD")}
             <span className="muted"> 에 커밋</span>
           </h2>
         </div>
@@ -104,7 +105,7 @@ export function Composer({ changes, branch, merging, busy, onClose, onCommit }: 
                     })
                   }
                 />
-                <span className={`chip k-${k}`}>{k === "conflict" ? "!" : LABEL[k] ?? "M"}</span>
+                <span className={`chip k-${k}`}>{k === "conflict" ? "!" : (LABEL[k] ?? "M")}</span>
                 <span className="path" title={c.path}>
                   {c.path}
                 </span>

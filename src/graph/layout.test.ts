@@ -3,7 +3,13 @@ import type { CommitInfo, RefInfo } from "../types";
 import { ancestors, colorForBranch, computeLayout } from "./layout";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
-  id, parents, summary: id, message: id, author: "a", email: "a@a", time: 0,
+  id,
+  parents,
+  summary: id,
+  message: id,
+  author: "a",
+  email: "a@a",
+  time: 0,
 });
 const local = (name: string, target: string): RefInfo => ({ name, kind: "local", target });
 
@@ -57,7 +63,13 @@ describe("computeLayout", () => {
   it("frees lanes so unrelated branches reuse them", () => {
     // Two short-lived side branches at different times should share lane 1.
     const commits = [
-      c("m2", "m1", "s2"), c("s2", "m1b"), c("m1", "m1b"), c("m1b", "m0", "s1"), c("s1", "r"), c("m0", "r"), c("r"),
+      c("m2", "m1", "s2"),
+      c("s2", "m1b"),
+      c("m1", "m1b"),
+      c("m1b", "m0", "s1"),
+      c("s1", "r"),
+      c("m0", "r"),
+      c("r"),
     ];
     const l = computeLayout(commits, [local("main", "m2")], { branch: "main", target: "m2" });
     expect(l.byId.get("s1")!.lane).toBe(1);

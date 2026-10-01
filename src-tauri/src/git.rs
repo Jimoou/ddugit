@@ -127,7 +127,11 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
 fn read_head(repo: &Repository) -> HeadInfo {
     match repo.head() {
         Ok(h) => HeadInfo {
-            branch: if h.is_branch() { h.shorthand().map(str::to_string) } else { None },
+            branch: if h.is_branch() {
+                h.shorthand().map(str::to_string)
+            } else {
+                None
+            },
             target: h.target().map(|o| o.to_string()),
         },
         // Unborn branch: HEAD points at refs/heads/<name> that doesn't exist yet.
@@ -300,7 +304,10 @@ fn git(dir: &Path, args: &[&str]) -> Result<Output> {
         }
         text.push_str(stderr.trim_end());
     }
-    Ok(Output { ok: out.status.success(), text: text.trim().to_string() })
+    Ok(Output {
+        ok: out.status.success(),
+        text: text.trim().to_string(),
+    })
 }
 
 fn git_ok(dir: &Path, args: &[&str]) -> Result<String> {
@@ -333,7 +340,11 @@ pub fn commit(path: &str, message: &str, paths: &[String]) -> Result<OpResult> {
     }
     git_ok(&dir, &add)?;
     let o = git(&dir, &commit)?;
-    Ok(OpResult { ok: o.ok, conflict: false, output: o.text })
+    Ok(OpResult {
+        ok: o.ok,
+        conflict: false,
+        output: o.text,
+    })
 }
 
 /// Merge `source` (branch name or commit id) into `target` branch.
@@ -355,19 +366,31 @@ pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult>
     }
     let o = git(&dir, &["merge", "--no-ff", "--no-edit", source])?;
     let conflict = !o.ok && open(path)?.state() == RepositoryState::Merge;
-    Ok(OpResult { ok: o.ok, conflict, output: o.text })
+    Ok(OpResult {
+        ok: o.ok,
+        conflict,
+        output: o.text,
+    })
 }
 
 pub fn merge_abort(path: &str) -> Result<OpResult> {
     let dir = repo_dir(path)?;
     let o = git(&dir, &["merge", "--abort"])?;
-    Ok(OpResult { ok: o.ok, conflict: false, output: o.text })
+    Ok(OpResult {
+        ok: o.ok,
+        conflict: false,
+        output: o.text,
+    })
 }
 
 pub fn checkout(path: &str, target: &str) -> Result<OpResult> {
     let dir = repo_dir(path)?;
     let o = git(&dir, &["checkout", target])?;
-    Ok(OpResult { ok: o.ok, conflict: false, output: o.text })
+    Ok(OpResult {
+        ok: o.ok,
+        conflict: false,
+        output: o.text,
+    })
 }
 
 pub fn create_branch(path: &str, name: &str, at: Option<&str>, switch: bool) -> Result<OpResult> {
@@ -386,12 +409,20 @@ pub fn create_branch(path: &str, name: &str, at: Option<&str>, switch: bool) -> 
         Oid::from_str(at)
             .ok()
             .and_then(|o| repo.find_commit(o).ok())
-            .or_else(|| repo.revparse_single(at).ok().and_then(|o| o.peel_to_commit().ok()))
+            .or_else(|| {
+                repo.revparse_single(at)
+                    .ok()
+                    .and_then(|o| o.peel_to_commit().ok())
+            })
             .ok_or_else(|| format!("Unknown commit '{at}'"))?;
         args.push(at);
     }
     let o = git(&dir, &args)?;
-    Ok(OpResult { ok: o.ok, conflict: false, output: o.text })
+    Ok(OpResult {
+        ok: o.ok,
+        conflict: false,
+        output: o.text,
+    })
 }
 
 #[cfg(test)]
@@ -456,7 +487,10 @@ mod tests {
         let snap = snapshot(p, 100).unwrap();
         assert_eq!(snap.commits[0].parents.len(), 2);
         assert_eq!(snap.head.branch.as_deref(), Some("main"));
-        assert!(snap.refs.iter().any(|r| r.name == "feature" && r.kind == RefKind::Local));
+        assert!(snap
+            .refs
+            .iter()
+            .any(|r| r.name == "feature" && r.kind == RefKind::Local));
     }
 
     #[test]

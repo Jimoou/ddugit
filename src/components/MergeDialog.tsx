@@ -35,7 +35,9 @@ export function MergeDialog(p: Props) {
         </p>
         {p.switchesBranch && <p className="note">먼저 {p.target} 브랜치로 체크아웃한 뒤 병합해요.</p>}
         {p.dirty > 0 && (
-          <p className="note warn">커밋하지 않은 변경 {p.dirty}개가 있어요. 충돌하면 git이 병합을 거부할 수 있습니다.</p>
+          <p className="note warn">
+            커밋하지 않은 변경 {p.dirty}개가 있어요. 충돌하면 git이 병합을 거부할 수 있습니다.
+          </p>
         )}
         <div className="dialog-actions">
           <button onClick={p.onCancel}>취소</button>

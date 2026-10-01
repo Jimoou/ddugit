@@ -105,8 +105,7 @@ export function computeLayout(commits: CommitInfo[], refs: RefInfo[], head: Head
   // First-parent chain of the trunk.
   const trunk = new Set<string>();
   const tn = trunkName(refs, head);
-  let cursor =
-    (tn && refs.find((r) => r.kind === "local" && r.name === tn)?.target) || head.target || null;
+  let cursor = (tn && refs.find((r) => r.kind === "local" && r.name === tn)?.target) || head.target || null;
   while (cursor && index.has(cursor) && !trunk.has(cursor)) {
     trunk.add(cursor);
     cursor = commits[index.get(cursor)!].parents[0] ?? null;

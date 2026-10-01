@@ -32,9 +32,7 @@ export function Inspector({ commit, refs, color, isHead, busy, onClose, onChecko
     <aside className="panel inspector" style={{ ["--accent" as string]: color }}>
       <header>
         <div>
-          <div className="eyebrow">
-            체크포인트 {isHead && <span className="head-pill">HEAD</span>}
-          </div>
+          <div className="eyebrow">체크포인트 {isHead && <span className="head-pill">HEAD</span>}</div>
           <h2>{commit.summary || "(메시지 없음)"}</h2>
         </div>
         <button className="icon" onClick={onClose} title="닫기 (Esc)">

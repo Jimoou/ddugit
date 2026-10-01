@@ -83,14 +83,8 @@ export default function App() {
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
-  const focus = useMemo(
-    () => (snap && focusRef ? ancestors(snap.commits, focusRef.target) : null),
-    [snap, focusRef],
-  );
-  const colorOf = useCallback(
-    (id: string) => NEON[layout?.byId.get(id)?.color ?? 0],
-    [layout],
-  );
+  const focus = useMemo(() => (snap && focusRef ? ancestors(snap.commits, focusRef.target) : null), [snap, focusRef]);
+  const colorOf = useCallback((id: string) => NEON[layout?.byId.get(id)?.color ?? 0], [layout]);
 
   /** Local branch a merge can land on at commit `id`. */
   const branchAt = useCallback(
@@ -307,10 +301,14 @@ export default function App() {
                   return toast("err", String(e));
                 }
               }
-              await run("체크포인트를 추가했어요", () => api.commit(path, message, paths), () => {
-                setComposer(false);
-                setTimeout(() => graph.current?.centerOnHead(), 60);
-              });
+              await run(
+                "체크포인트를 추가했어요",
+                () => api.commit(path, message, paths),
+                () => {
+                  setComposer(false);
+                  setTimeout(() => graph.current?.centerOnHead(), 60);
+                },
+              );
             }}
           />
         )}
@@ -328,7 +326,9 @@ export default function App() {
               graph.current?.centerOn(id);
             }}
             onCheckout={(name) => run(`${name}(으)로 이동했어요`, () => api.checkout(path, name))}
-            onCreateBranch={(name, at) => run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true))}
+            onCreateBranch={(name, at) =>
+              run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true))
+            }
           />
         )}
       </div>

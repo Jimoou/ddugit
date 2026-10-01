@@ -44,7 +44,10 @@ button {
   border-radius: 8px;
   padding: 6px 12px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    box-shadow 0.15s;
 }
 button:hover:not(:disabled) {
   border-color: var(--line-strong);
@@ -59,10 +62,14 @@ button.primary {
   border: none;
   color: #07060d;
   font-weight: 700;
-  box-shadow: 0 0 18px rgba(34, 232, 255, 0.35), 0 0 32px rgba(255, 61, 242, 0.15);
+  box-shadow:
+    0 0 18px rgba(34, 232, 255, 0.35),
+    0 0 32px rgba(255, 61, 242, 0.15);
 }
 button.primary:hover:not(:disabled) {
-  box-shadow: 0 0 24px rgba(34, 232, 255, 0.55), 0 0 44px rgba(255, 61, 242, 0.3);
+  box-shadow:
+    0 0 24px rgba(34, 232, 255, 0.55),
+    0 0 44px rgba(255, 61, 242, 0.3);
 }
 button.ghost {
   background: transparent;
@@ -486,11 +493,28 @@ textarea:focus {
   border-radius: 4px;
   flex-shrink: 0;
 }
-.k-modified { color: var(--amber); background: rgba(255, 184, 77, 0.12); }
-.k-untracked, .k-added { color: var(--lime); background: rgba(166, 255, 77, 0.12); }
-.k-deleted { color: var(--red); background: rgba(255, 77, 109, 0.12); }
-.k-renamed, .k-typechange { color: #9b7bff; background: rgba(155, 123, 255, 0.14); }
-.k-conflict { color: #07060d; background: var(--red); }
+.k-modified {
+  color: var(--amber);
+  background: rgba(255, 184, 77, 0.12);
+}
+.k-untracked,
+.k-added {
+  color: var(--lime);
+  background: rgba(166, 255, 77, 0.12);
+}
+.k-deleted {
+  color: var(--red);
+  background: rgba(255, 77, 109, 0.12);
+}
+.k-renamed,
+.k-typechange {
+  color: #9b7bff;
+  background: rgba(155, 123, 255, 0.14);
+}
+.k-conflict {
+  color: #07060d;
+  background: var(--red);
+}
 
 .message {
   resize: vertical;
@@ -632,7 +656,9 @@ textarea:focus {
   height: 6px;
   border-radius: 3px;
   background: #fff;
-  box-shadow: 0 0 10px #fff, 0 0 18px var(--cyan);
+  box-shadow:
+    0 0 10px #fff,
+    0 0 18px var(--cyan);
   animation: flow 1.2s linear infinite;
 }
 @keyframes flow {

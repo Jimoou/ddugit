@@ -113,7 +113,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     fit() {
       const sc = sceneRef.current;
       const { w, h } = st.current.size;
-      const k = clampK(Math.min((w - 160) / Math.max(sc.width + COL, 1), (h - 160) / Math.max(sc.height + LANE, 1), 1.2));
+      const k = clampK(
+        Math.min((w - 160) / Math.max(sc.width + COL, 1), (h - 160) / Math.max(sc.height + LANE, 1), 1.2),
+      );
       st.current.target = viewFor({ x: (sc.width + COL) / 2, y: sc.height / 2 }, k);
     },
     zoomBy(f) {
@@ -183,7 +185,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       const p = propsRef.current;
       if (s.size.w === 0) return;
       if (s.target) {
-        const v = s.view, t = s.target;
+        const v = s.view,
+          t = s.target;
         const a = 0.2;
         // Interpolate in log-zoom space so zooming feels even.
         const k = Math.exp(Math.log(v.k) + (Math.log(t.k) - Math.log(v.k)) * a);
@@ -278,7 +281,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const p = local(e);
     const s = st.current;
     if (s.pan) {
-      const dx = p.x - s.pan.x, dy = p.y - s.pan.y;
+      const dx = p.x - s.pan.x,
+        dy = p.y - s.pan.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) s.pan.moved = true;
       s.view = { ...s.view, tx: s.pan.tx + dx, ty: s.pan.ty + dy };
       return;
@@ -356,7 +360,6 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-
 
   return (
     <div className="graph">

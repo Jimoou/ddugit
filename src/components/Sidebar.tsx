@@ -19,7 +19,8 @@ const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
 export function Sidebar({ refs, headBranch, colorOf, focused, onFocus, onCheckout }: Props) {
   const [q, setQ] = useState("");
   const filtered = useMemo(
-    () => refs.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      refs.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)),
     [refs, q],
   );
 
