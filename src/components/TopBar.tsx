@@ -17,6 +17,7 @@ interface Props {
   onRefresh(): void;
   onRemote(op: RemoteOp): void;
   onToggleAnimate(): void;
+  onSettings(): void;
 }
 
 /** git's progress phases in Korean; unknown phases are shown as-is. */
@@ -88,6 +89,9 @@ export function TopBar(p: Props) {
       </button>
       <button className={`ghost ${p.animate ? "on" : ""}`} title="반짝임 효과" onClick={p.onToggleAnimate}>
         ✦
+      </button>
+      <button className="ghost" title="설정과 단축키 (?)" aria-label="설정" onClick={p.onSettings}>
+        ⚙
       </button>
     </header>
   );

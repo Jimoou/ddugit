@@ -51,6 +51,7 @@ export interface Commands {
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
+  set_git_path: [{ gitPath: string | null }, string];
   git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
   backport_ignore: [{ path: string; target: string; id: string; ignore: boolean }, null];
@@ -112,6 +113,8 @@ export const api = {
     }
     return hit;
   },
+  /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
+  setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
   /** Rewrite the commits after `base` as `steps` (oldest first) say. */
   rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
   backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),

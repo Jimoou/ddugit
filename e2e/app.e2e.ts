@@ -195,3 +195,30 @@ test("ignores are per target and the overview counts each branch", async ({ demo
   await expect(sheet.getByRole("combobox", { name: "받는 쪽" })).toHaveValue("feature/login");
   await expect(sheet.getByRole("tab", { name: "미반영" })).toHaveAttribute("aria-selected", "true");
 });
+
+test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
+  const { page } = demo;
+  await page
+    .locator("canvas")
+    .first()
+    .click({ position: { x: 40, y: 40 } });
+  await page.keyboard.press("?");
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("kbd", { hasText: "⌘/Ctrl + F" })).toBeVisible();
+
+  await dialog.getByRole("checkbox").uncheck();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("otgit.settings")!).animate)).toBe(false);
+  await expect(page.locator(".topbar button[title='반짝임 효과']")).not.toHaveClass(/\bon\b/);
+
+  const git = dialog.getByPlaceholder("비워 두면 PATH의 git");
+  await git.fill("/usr/bin/nope");
+  await dialog.getByRole("button", { name: "확인하고 적용" }).click();
+  await expect(dialog.locator(".note.warn")).toContainText("not a git executable");
+  await git.fill("/opt/homebrew/bin/git");
+  await dialog.getByRole("button", { name: "확인하고 적용" }).click();
+  await expect(dialog.locator(".note")).toContainText("git version");
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});

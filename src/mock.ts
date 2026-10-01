@@ -605,6 +605,12 @@ export const mock: Table = {
     return delay(res("ok"));
   },
 
+  set_git_path({ gitPath }) {
+    // Nothing runs in the demo; accept anything that looks like a git binary.
+    if (gitPath && !/git(\.exe)?$/i.test(gitPath)) return fail(`'${gitPath}' is not a git executable`);
+    return delay("git version 2.47.0 (demo)");
+  },
+
   git_rebase({ base, steps }) {
     if (repo.state !== "clean") return fail("Repository is in the middle of an operation");
     // Rebuild the branch on `base`: squash / fixup fold into the previous commit.
