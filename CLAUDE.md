@@ -68,7 +68,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - scope 예: `graph` `git` `ui` `diff` `remote` `mock` `ci`
   - 예: `feat(remote): add fetch/pull/push with ahead/behind badges`
 - PR: `.github/pull_request_template.md`를 채운다. CI(web + e2e + rust × ubuntu/macos/windows)가 통과해야 merge한다. merge는 squash로 한다.
-- 릴리스: `main`에 `vX.Y.Z` 태그(SemVer)를 push한다. 0.x 동안은 minor = 마일스톤. 태그를 push하면 `.github/workflows/release.yml`이 macOS universal `.dmg`와 Windows NSIS `.exe`를 만들어 **초안** Release에 올린다. 내용을 확인한 뒤 공개한다. 배포 형식은 dmg/exe만 쓴다(`bundle.targets`). 서명과 자동 업데이트는 나중에 한다. 버전은 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` 세 곳을 함께 올린다
+- 릴리스: `main`에 `vX.Y.Z` 태그(SemVer)를 push한다. 0.x 동안은 minor = 마일스톤. 태그를 push하면 `.github/workflows/release.yml`이 macOS universal `.dmg`와 Windows NSIS `.exe`를 만들어 **초안** Release에 올린다. 내용을 확인한 뒤 공개한다. 태그를 push할 수 없으면(예: 세션 브랜치만 push되는 환경) Actions에서 Release를 `release` 체크하고 수동 실행한다. 그러면 `v<버전>` 초안이 만들어지고, 공개할 때 GitHub가 태그를 만든다. 배포 형식은 dmg/exe만 쓴다(`bundle.targets`). 서명과 자동 업데이트는 나중에 한다. 버전은 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` 세 곳을 함께 올린다
 - push 전에 반드시 `npm run check`와 `cargo fmt --check && cargo clippy && cargo test`를 통과시킨다. UI 흐름을 바꿨으면 `npm run e2e`도 돌린다.
 
 ## 주의

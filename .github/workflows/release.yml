@@ -1,13 +1,20 @@
 name: Release
 
-# Push a tag like v0.2.0 to build the installers and attach them to a draft
-# GitHub Release: macOS .dmg (universal: Apple silicon + Intel) and Windows
-# .exe (NSIS). Unsigned for now, so first launch shows Gatekeeper /
-# SmartScreen warnings; signing is on the roadmap for later.
+# Push a tag like v0.2.0 (or run it manually with "release" checked) to build
+# the installers and attach them to a draft GitHub Release: macOS .dmg
+# (universal: Apple silicon + Intel) and Windows .exe (NSIS). A manual release
+# names itself v<version from tauri.conf.json>; GitHub creates that tag on the
+# run's commit when the draft is published. Unsigned for now, so first launch
+# shows Gatekeeper / SmartScreen warnings; signing is on the roadmap for later.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Create a draft release v<version> (otherwise keep the installers as artifacts)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -45,16 +52,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-          releaseName: "otgit ${{ github.ref_name }}"
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || (inputs.release && 'v__VERSION__' || '') }}
+          releaseName: ${{ github.ref_type == 'tag' && format('otgit {0}', github.ref_name) || 'otgit v__VERSION__' }}
+          releaseCommitish: ${{ github.sha }}
           releaseBody: |
             macOS: otgit_*_universal.dmg · Windows: otgit_*_x64-setup.exe
 
             Unsigned build: on macOS right-click → Open the first time; on Windows choose "More info → Run anyway".
           releaseDraft: true
           args: ${{ matrix.args }}
-      # Manual runs (no tag) keep the installers as workflow artifacts instead.
-      - if: github.ref_type != 'tag'
+      # Other manual runs keep the installers as workflow artifacts instead.
+      - if: github.ref_type != 'tag' && !inputs.release
         uses: actions/upload-artifact@v4
         with:
           name: otgit-${{ matrix.os }}

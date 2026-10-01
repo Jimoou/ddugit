@@ -7,22 +7,24 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #27(i18n B: App 알림·메뉴, 커밋·스태시 패널)을 squash merge했다(`c46fd83`).
-- main에서 Release 워크플로를 수동 실행했다(run 36838768528). macOS dmg artifact(6.6MB)는 나왔다. Windows exe는 확인 중이다.
+- 영어 번역 완료: PR #26, #27, #28을 squash merge했다(`78ed8a8`).
+- Release 수동 실행 시험: dmg(6.6MB)와 exe(2.2MB) artifact가 나왔다(run 36838768528, 번역 전 코드).
 
 ## 지금 하는 일
 
-영어 번역 PR C(마지막) → CI 대기
+v0.1.0 초안 Release
 
-- Backport·Conflict·Diff·Rebase 시트, Auth·Sync 다이얼로그, `rebasePlan`의 사유와 동작 이름
-- `<Rich bold="bp-missing">`: e2e와 CSS가 쓰는 `<b>` 클래스를 지킨다
-- 이제 `src/` 안의 한국어는 사전(`src/i18n/ko.ts`)과 언어 이름 "한국어", 브랜드 "옷깃"뿐이다
+- 이 세션에서는 태그 push가 막힌다(git 프록시가 세션 브랜치만 받는다)
+- 그래서 `release.yml` 수동 실행에 `release` 옵션을 추가했다. 켜면 `tauri-action`이 `v__VERSION__`(= v0.1.0) 초안 Release를 만들고 dmg/exe를 올린다
+- 사용자가 초안을 공개하면 GitHub가 그 커밋에 `v0.1.0` 태그를 만든다
+- merge 후 main에서 `release: true`로 실행하고, 초안에 파일 두 개가 붙었는지 확인한다
 
-## 다음 단계
+## 다음 단계 (남은 ROADMAP)
 
-1. Release 결과 확인: Windows exe artifact
-2. (나중에) 서명, 자동 업데이트
-3. ROADMAP의 남은 항목에서 다음 작업을 고른다
+1. M4: GitHub / GitLab PR 연동(그래프에 PR 상태 표시). 토큰 저장 방식을 정해야 한다
+2. M4: 병합이 섞인 구간 rebase(`--rebase-merges`)
+3. M3(보류): 레이아웃 Web Worker / WebGL, diff 가상 스크롤. 측정상 지금은 필요 없다
+4. M5(나중에): 서명·공증, 자동 업데이트. 계정과 인증서가 필요하다
 
 ## 막힌 것 / 결정 필요
 
