@@ -3,6 +3,7 @@ import { demoControls, mock } from "./mock";
 import type {
   BackportItem,
   BackportTally,
+  BranchReport,
   ConflictFile,
   DiffScope,
   FileDiff,
@@ -52,6 +53,8 @@ export interface Commands {
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
+  branch_report: [{ path: string }, BranchReport];
+  git_delete_branches: [{ path: string; names: string[]; force: boolean }, OpResult];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
   git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
@@ -118,6 +121,11 @@ export const api = {
   reset: (path: string, target: string, mode: ResetMode) => call("git_reset", { path, target, mode }),
   /** Where HEAD has been, newest first. */
   reflog: (path: string, limit?: number) => call("git_reflog", { path, limit }),
+  /** Local branches with merged / gone (upstream deleted) flags, for cleaning up. */
+  branchReport: (path: string) => call("branch_report", { path }),
+  /** Delete many local branches; without `force` unmerged ones are refused (`unmerged`). */
+  deleteBranches: (path: string, names: string[], force: boolean) =>
+    call("git_delete_branches", { path, names, force }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
   stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),

@@ -7,24 +7,27 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #32(멀티탭, 탭 전환 워프)를 squash merge했다(`cfe8e36`).
+- PR #33(실수 되돌리기: reset·reflog, 되감기 연출)을 squash merge했다(`96a6026`).
 
 ## 지금 하는 일
 
-M6 고급 git 1단계 "실수 되돌리기" → PR CI 대기
+M6 고급 git 2단계 "브랜치 정리" → PR CI 대기
 
-- Rust `git/undo.rs`
-  - `reset(path, target, mode)`: 진행 중인 작업이 있으면 거부한다
-  - `reflog(path, limit)`: `lost`는 revwalk(push id, hide refs/* 와 HEAD)로 계산한다
-- 화면
-  - 커밋 우클릭 "마지막 커밋 취소"(soft, 이미 push됐으면 창으로 경고)와 "이 커밋으로 되돌리기…"(`ResetDialog`)
-  - 탑바 ⏱ → `ReflogSheet`(브랜치로 살리기 = createBranch 전환 없음, 여기로 되돌리기 = ResetDialog)
-- 연출: reset이 성공하면 `.rewind`(청록 줄무늬가 거꾸로 감기며 안으로 빨려 듦, 0.65초)가 `.fx-clip` 안에서 재생된다
-- 데모: 명령이 끝날 때마다 `noteHead`가 HEAD 이동을 reflog에 남긴다
+- Rust `git/cleanup.rs`
+  - `report`: 기준 = origin/HEAD → main/master → 현재 브랜치. 현재 브랜치와 기준은 목록에서 뺀다
+  - gone = `branch.<name>.merge` 설정은 있는데 upstream이 없을 때
+  - `delete_branches(names, force)`: force가 없으면 병합 안 된 브랜치를 `Unmerged`로 거부한다
+- `components/Cleanup.tsx`
+  - `groupOf`: 병합 완료 > 원격에서 사라짐 > 오래됨(90일)
+  - 병합 완료는 기본 선택이고, 병합 안 된 브랜치가 섞이면 확인 창을 띄운다
+- 사이드바 "브랜치" 옆 ✧로 연다. 되돌리기 기록과 시트 자리를 나눠 쓴다
+- 연출: 지우기 전에 `graph.screenOf(tip)`로 자리를 잡아 두고, 성공하면 `.stardust`(가운데 섬광 + 16개 입자, 앞 절반은 밝게 유지)
+- 데모: `__otgitDemo.goneBranches`로 원격에서 사라진 브랜치를 흉내 낸다
+- 기존 e2e의 `.sidebar .h3-add`가 정리 버튼까지 잡아서 title로 구분했다
 
 ## 다음 단계 (M6 순서, ROADMAP 참고)
 
-1. 고급 git 작업: 브랜치 정리 → 과거 커밋 손보기 → bisect·blame. 각 기능에 맞는 우주 연출을 함께 넣는다
+1. 고급 git 작업: 과거 커밋 손보기(reword, 작성자, 나누기, 파일 하나 되돌리기) → bisect·blame. 각 기능에 맞는 우주 연출을 함께 넣는다
 2. 기존 기능의 게임 같은 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌
 3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
 4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다

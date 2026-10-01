@@ -503,6 +503,25 @@ export const ko = {
 
   // undo: move
   "undo.moveTo": "<b>{branch}</b>을(를) <b>“{summary}”</b>(으)로 옮깁니다.",
+
+  // branch cleanup
+  "clean.open": "브랜치 정리",
+  "clean.title": "브랜치 정리",
+  "clean.base": "{base} 기준",
+  "clean.merged": "병합 완료",
+  "clean.merged.hint": "기준 브랜치에 모두 들어가 있어요. 지워도 커밋은 남아요",
+  "clean.gone": "원격에서 사라짐",
+  "clean.gone.hint": "따라가던 원격 브랜치가 지워졌어요(fetch로 정리됨)",
+  "clean.stale": "오래됨",
+  "clean.stale.hint": "{days}일 넘게 커밋이 없어요",
+  "clean.none": "정리할 브랜치가 없어요. 깔끔해요 ✨",
+  "clean.footer": "지운 브랜치의 커밋이 원격이나 되돌리기 기록(⏱)에 남아 있으면 다시 살릴 수 있어요",
+  "clean.delete": "선택한 {n}개 삭제",
+  "clean.done": "브랜치 {n}개를 정리했어요",
+  "clean.force.title": "병합되지 않은 브랜치 포함",
+  "clean.force.body":
+    "<b>{names}</b>에는 기준 브랜치에 없는 커밋이 있어요. 지우면 그 커밋들은 그래프에서 사라집니다(되돌리기 기록으로만 복구 가능).",
+  "clean.force.go": "그래도 삭제",
 } as const;
 
 export type Key = keyof typeof ko;

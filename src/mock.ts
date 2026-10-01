@@ -336,6 +336,8 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
 export const demoControls = {
   /** Make the next remote call fail authentication. */
   failNextRemote: null as null | "https" | "ssh",
+  /** Local branches the demo reports as deleted on the remote. */
+  goneBranches: [] as string[],
   /** Folder the next "choose folder" dialog returns (default: the demo repository). */
   nextFolder: null as string | null,
   /** Make the next merge stop on a conflict in two files. */
@@ -720,6 +722,32 @@ const mockTable: Table = {
     const inScope = (c: FileChange) => scope === "all" || (scope === "staged" ? !!c.staged : !!c.unstaged);
     const list = repo.changes.filter((c) => (!file || c.path === file) && inScope(c));
     return delay(list.map((c) => fakeFile(c.path, hash(c.path), "work in progress", c.unstaged ?? c.staged ?? "")));
+  },
+
+  branch_report() {
+    const base = repo.branches.has("main") ? "main" : repo.head;
+    const inBase = repo.ancestors(repo.branches.get(base)!);
+    const branches = [...repo.branches]
+      .filter(([name]) => name !== base && name !== repo.head)
+      .map(([name, tip]) => ({
+        name,
+        tip,
+        time: repo.commits.get(tip)!.time,
+        merged: inBase.has(tip),
+        gone: demoControls.goneBranches.includes(name),
+        upstream: repo.remotes.has(`origin/${name}`) ? `origin/${name}` : null,
+      }))
+      .sort((a, b) => a.time - b.time);
+    return delay({ base, branches });
+  },
+
+  git_delete_branches({ names, force }) {
+    const base = repo.ancestors(repo.branches.get("main") ?? repo.branches.get(repo.head)!);
+    const unmerged = names.filter((n) => !base.has(repo.branches.get(n) ?? ""));
+    if (!force && unmerged.length)
+      return delay(res("unmerged", `error: the branch '${unmerged[0]}' is not fully merged.`));
+    for (const n of names) repo.branches.delete(n);
+    return delay(res("ok", names.map((n) => `Deleted branch ${n}`).join("\n")));
   },
 
   git_reset({ target, mode }) {

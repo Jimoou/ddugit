@@ -1987,3 +1987,92 @@ kbd {
     transform: scale(0.3) rotate(-220deg);
   }
 }
+
+/* ---------------------------------------------------------- branch cleanup */
+.clean-group {
+  padding: 6px 14px;
+}
+.clean-group h4 {
+  margin: 6px 0;
+  font-size: 12.5px;
+}
+.clean-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.clean-group li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.clean-group li:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.clean-group .check {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.clean-group .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* A deleted branch's tip scatters into stardust. */
+.stardust {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+/* A brief flash where the tip was. */
+.stardust::before {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  margin: -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(207, 198, 255, 0.35) 40%, transparent 70%);
+  animation: stardust-flash 0.5s ease-out forwards;
+}
+@keyframes stardust-flash {
+  from {
+    opacity: 1;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+.stardust i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px 2px rgba(207, 198, 255, 0.95);
+  animation: stardust 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes stardust {
+  from {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(0) scale(1.6);
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(var(--d)) scale(0.4);
+  }
+}

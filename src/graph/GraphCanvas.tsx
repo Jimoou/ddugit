@@ -29,6 +29,8 @@ export interface GraphHandle {
   centerOnHead(): void;
   fit(): void;
   zoomBy(f: number): void;
+  /** Where a commit is drawn, relative to the canvas (null if not loaded). */
+  screenOf(id: string): Pt | null;
 }
 
 interface Props {
@@ -215,6 +217,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       const { w, h } = st.current.size;
       zoomAt({ x: w / 2, y: h / 2 }, f, true);
     },
+    screenOf,
   };
   useImperativeHandle(ref, () => api);
 

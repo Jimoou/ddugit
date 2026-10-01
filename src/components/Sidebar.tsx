@@ -15,6 +15,8 @@ interface Props {
   selectedStash: number | null;
   onStash(index: number): void;
   onAddRemote(): void;
+  /** Open branch housekeeping (merged, gone, stale). */
+  onCleanup(): void;
 }
 
 const GROUPS: { kind: RefInfo["kind"]; title: Key }[] = [
@@ -47,6 +49,16 @@ export function Sidebar(props: Props) {
               {g.kind === "remote" && (
                 <button className="h3-add" title={t("side.addRemote")} onClick={props.onAddRemote}>
                   ＋
+                </button>
+              )}
+              {g.kind === "local" && (
+                <button
+                  className="h3-add"
+                  title={t("clean.open")}
+                  aria-label={t("clean.open")}
+                  onClick={props.onCleanup}
+                >
+                  ✧
                 </button>
               )}
             </h3>
