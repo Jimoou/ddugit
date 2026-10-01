@@ -453,6 +453,17 @@ export const ko = {
   "connect.notRepo.title": "git 저장소가 아니에요",
   "connect.notRepo.body": "<b>{path}</b>에 새 저장소를 만들까요?",
   "connect.notRepo.go": "여기에 만들기",
+
+  // tabs
+  "tabs.label": "열린 저장소",
+  "tabs.new": "새 탭",
+  "tabs.newTab": "새 탭 (⌘/Ctrl+T)",
+  "tabs.close": "{name} 닫기",
+  "keys.tabs": "탭",
+  "keys.tabNew.what": "새 탭 (저장소 열기·clone·만들기)",
+  "keys.tabClose.what": "탭 닫기",
+  "keys.tabCycle.what": "다음 / 이전 탭",
+  "keys.tabPick.what": "n번째 탭으로",
 } as const;
 
 export type Key = keyof typeof ko;

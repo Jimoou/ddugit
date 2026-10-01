@@ -335,3 +335,35 @@ test("creates a new repository in a plain folder", async ({ demo }) => {
   await page.locator(".topbar .repo").click();
   await expect(page.locator(".repo-menu .recent-list li.on")).toContainText("/tmp/not-a-repo");
 });
+
+test("opens repositories in tabs and keeps each tab's state", async ({ demo }) => {
+  const { page } = demo;
+  const tabs = page.locator(".tabbar .tab");
+  await expect(tabs).toHaveCount(1);
+
+  // Select a commit in the first tab so we can see it survive a switch.
+  const snap = await demo.snapshot();
+  const head = snap.head.target!;
+  const at = (await demo.screenOf(head))!;
+  await page.mouse.click(at.x, at.y);
+  await expect(page.locator(".inspector")).toBeVisible();
+
+  await page.locator(".tab-new").click();
+  await expect(tabs).toHaveCount(2);
+  await expect(page.locator(".welcome")).toContainText("최근 저장소");
+  await page.evaluate(
+    () => ((window as unknown as { __otgitDemo: { nextFolder: string } }).__otgitDemo.nextFolder = "/work/second"),
+  );
+  await page
+    .locator(".welcome")
+    .getByRole("button", { name: /폴더 열기/ })
+    .click();
+  await expect(tabs.nth(1)).toContainText("second");
+  await expect(page.locator(".app:not([hidden]) .inspector")).toHaveCount(0);
+
+  await tabs.nth(0).click();
+  await expect(page.locator(".app:not([hidden]) .inspector")).toBeVisible();
+
+  await tabs.nth(1).getByRole("button", { name: /닫기/ }).click();
+  await expect(tabs).toHaveCount(1);
+});

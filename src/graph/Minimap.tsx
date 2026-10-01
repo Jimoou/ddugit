@@ -79,7 +79,8 @@ export function Minimap({ scene, getView, getSize, onJump }: Props) {
     const frame = () => {
       raf = requestAnimationFrame(frame);
       const c = ref.current;
-      if (!c || !cache.current) return;
+      // Nothing to draw before layout or while the tab is hidden (0×0).
+      if (!c || !cache.current || cache.current.width === 0 || c.width === 0) return;
       const ctx = c.getContext("2d")!;
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(1, 0, 0, 1, 0, 0);

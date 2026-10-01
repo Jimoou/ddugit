@@ -190,10 +190,108 @@ textarea:focus {
 }
 
 /* --------------------------------------------------------------- app shell */
-.app {
+.shell {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+.shell > .welcome {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Inactive tabs stay mounted (their state survives) but take no space. */
+.app[hidden],
+.welcome[hidden] {
+  display: none;
+}
+
+/* --------------------------------------------------------------- tab bar */
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 34px;
+  padding: 4px 8px 0;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 0 6px 0 12px;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: 0;
+}
+.tab:hover {
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.04);
+}
+.tab.on {
+  color: var(--text);
+  background: var(--bg-2);
+  border-color: var(--line);
+  box-shadow: inset 0 2px 0 var(--ui);
+}
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.tab-close,
+.tab-new {
+  padding: 0 6px;
+  height: 22px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 11px;
+  opacity: 0.6;
+}
+.tab-close:hover,
+.tab-new:hover {
+  opacity: 1;
+}
+.tab-new {
+  align-self: center;
+  font-size: 14px;
+}
+
+/* Tab switch: a quick jump to lightspeed, stars streaking from the centre. */
+.warp {
+  position: fixed;
+  inset: 34px 0 0;
+  z-index: 25;
+  pointer-events: none;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(207, 198, 255, 0.55) 0deg 0.6deg, transparent 0.6deg 7deg),
+    radial-gradient(circle at 50% 50%, rgba(5, 4, 14, 0) 0 18%, rgba(5, 4, 14, 0.85) 70%);
+  mask-image: radial-gradient(circle at 50% 50%, transparent 0 8%, #000 30%);
+  animation: warp 0.42s ease-out forwards;
+}
+@keyframes warp {
+  from {
+    opacity: 0.9;
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
 }
 
 .topbar {
@@ -1767,6 +1865,9 @@ kbd {
 }
 .toasts.floating {
   position: fixed;
+  bottom: 140px; /* above the HUD and minimap */
+}
+.toasts.floating.welcome-toasts {
   bottom: 24px;
 }
 .drop-zone {
