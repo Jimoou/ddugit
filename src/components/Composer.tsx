@@ -14,7 +14,7 @@ interface Props {
   startAmend?: boolean;
   /** HEAD is already on the upstream: amending rewrites shared history. */
   headPushed: boolean;
-  onCommit(message: string, paths: string[], newBranch: string | null, amend: boolean): void;
+  onCommit(message: string, paths: string[], newBranch: string | null, amend: boolean, stagedOnly: boolean): void;
   /** Put the picked files away in a stash (message may be empty). */
   onStash(message: string, paths: string[]): void;
   /** Throw the picked files' changes away (caller confirms). */
@@ -62,15 +62,28 @@ export function Composer(props: Props) {
   useEffect(() => msgRef.current?.focus(), []);
 
   const all = picked.size === changes.length && changes.length > 0;
+  const anyStaged = changes.some((c) => c.staged);
+  // Hunk staging leaves a file both staged and unstaged: default to committing just the staged part.
+  const [stagedOnly, setStagedOnly] = useState(() => changes.some((c) => c.staged && c.unstaged));
+  const partialKey = changes
+    .filter((c) => c.staged && c.unstaged)
+    .map((c) => c.path)
+    .join("\n");
+  // A newly partially-staged file (from the diff sheet) switches the mode on.
+  useEffect(() => {
+    if (partialKey) setStagedOnly(true);
+  }, [partialKey]);
+  const useStaged = stagedOnly && anyStaged && !merging;
   const canCommit =
     !busy &&
     message.trim() !== "" &&
-    (merging || amend || picked.size > 0) &&
+    (merging || amend || (useStaged ? anyStaged : picked.size > 0)) &&
     (amend || !useBranch || newBranch.trim() !== "");
 
   const submit = () => {
     if (!canCommit) return;
-    onCommit(message.trim(), merging ? [] : [...picked], !amend && useBranch ? newBranch.trim() : null, amend);
+    const files = merging || useStaged ? [] : [...picked];
+    onCommit(message.trim(), files, !amend && useBranch ? newBranch.trim() : null, amend, useStaged);
   };
 
   return (
@@ -112,8 +125,8 @@ export function Composer(props: Props) {
               <label className="check">
                 <input
                   type="checkbox"
-                  disabled={merging}
-                  checked={merging || picked.has(c.path)}
+                  disabled={merging || useStaged}
+                  checked={merging || (useStaged ? !!c.staged : picked.has(c.path))}
                   onChange={() =>
                     setPicked((s) => {
                       const n = new Set(s);
@@ -124,6 +137,11 @@ export function Composer(props: Props) {
                   }
                 />
                 <span className={`chip k-${k}`}>{k === "conflict" ? "!" : (LABEL[k] ?? "M")}</span>
+                {c.staged && c.unstaged && (
+                  <span className="chip staged" title="일부만 스테이지됨">
+                    ½
+                  </span>
+                )}
                 <span
                   className="path link"
                   title={`${c.path} — 클릭해서 diff 보기`}
@@ -152,6 +170,13 @@ export function Composer(props: Props) {
         }}
         rows={4}
       />
+
+      {!merging && anyStaged && (
+        <label className="check">
+          <input type="checkbox" checked={stagedOnly} onChange={(e) => setStagedOnly(e.target.checked)} />
+          <span>스테이지된 변경만 커밋 (diff 시트에서 고른 부분)</span>
+        </label>
+      )}
 
       {!merging && headMessage !== null && (
         <label className="check">

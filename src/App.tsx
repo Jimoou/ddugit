@@ -23,7 +23,7 @@ import "./App.css";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
-type DiffSource = { kind: "commit"; id: string } | { kind: "worktree" };
+type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
 type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
 
 const LAST_REPO = "otgit.lastRepo";
@@ -159,7 +159,8 @@ export default function App() {
       if (!path) return;
       const req = ++diffReq.current;
       setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
-      const load = source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path);
+      const load =
+        source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
       load.then(
         (files) => req === diffReq.current && setDiff((d) => d && { ...d, files }),
         (e) => req === diffReq.current && setDiff((d) => d && { ...d, files: [], error: String(e) }),
@@ -665,6 +666,28 @@ export default function App() {
               files={diff.files}
               error={diff.error}
               initialPath={diff.path}
+              stage={
+                diff.source.kind === "worktree"
+                  ? {
+                      scope: diff.source.scope,
+                      busy,
+                      onScope: (scope) => loadDiff({ kind: "worktree", scope }, diff.title, diff.path),
+                      onHunk: (file, hunk) =>
+                        void run(
+                          diff.source.kind === "worktree" && diff.source.scope === "staged"
+                            ? "스테이지에서 내렸어요"
+                            : "스테이지했어요",
+                          () =>
+                            api.stageHunks(
+                              path,
+                              file,
+                              [hunk],
+                              diff.source.kind === "worktree" && diff.source.scope === "staged",
+                            ),
+                        ),
+                    }
+                  : undefined
+              }
               onClose={() => setDiff(null)}
             />
           )}
@@ -680,7 +703,11 @@ export default function App() {
             startAmend={composer.amend}
             headPushed={!!snap.head.upstream && snap.head.ahead === 0}
             onClose={() => setComposer(false)}
-            onOpenFile={(file) => loadDiff({ kind: "worktree" }, "작업 중인 변경", file)}
+            onOpenFile={(file) => {
+              // Fully staged files have nothing in the "unstaged" view.
+              const c = snap.changes.find((x) => x.path === file);
+              loadDiff({ kind: "worktree", scope: c?.unstaged ? "unstaged" : "staged" }, "작업 중인 변경", file);
+            }}
             onStash={(message, paths) =>
               run(
                 "스태시에 보관했어요",
@@ -715,7 +742,7 @@ export default function App() {
                 },
               })
             }
-            onCommit={(message, paths, newBranch, amend) =>
+            onCommit={(message, paths, newBranch, amend, stagedOnly) =>
               run(
                 amend ? "마지막 커밋을 수정했어요" : "체크포인트를 추가했어요",
                 async () => {
@@ -723,7 +750,7 @@ export default function App() {
                     const r = await api.createBranch(path, newBranch, null, true);
                     if (r.status !== "ok") return r;
                   }
-                  return api.commit(path, message, paths, amend);
+                  return api.commit(path, message, paths, amend, stagedOnly);
                 },
                 () => {
                   setComposer(false);

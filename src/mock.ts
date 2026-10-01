@@ -297,8 +297,14 @@ export const mock: Table = {
   initial_repo: () => delay(null, 0),
   repo_snapshot: () => delay(repo.snapshot()),
 
-  git_commit({ message, paths, amend }) {
+  git_commit({ message, paths, amend, stagedOnly }) {
     if (!message.trim()) return fail("Commit message is empty");
+    if (stagedOnly) {
+      if (!repo.changes.some((c) => c.staged)) return fail("nothing added to commit");
+      repo.add(repo.head, message.split("\n")[0]);
+      repo.changes = repo.changes.map((c) => ({ ...c, staged: null })).filter((c) => c.unstaged);
+      return delay(res("ok"));
+    }
     const set = new Set(paths.length || amend ? paths : repo.changes.map((c) => c.path));
     if (!amend && !repo.changes.some((c) => set.has(c.path))) return fail("Nothing to commit");
     if (amend) {
@@ -451,8 +457,21 @@ export const mock: Table = {
     return delay([...new Set(files)].map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
   },
 
-  worktree_diff({ file }) {
-    const list = repo.changes.filter((c) => !file || c.path === file);
+  git_stage_hunks({ file, unstage }) {
+    // Demo files have one hunk, so staging a hunk moves the whole file.
+    const c = repo.changes.find((x) => x.path === file);
+    if (!c) return fail(`No changes to '${file}'`);
+    const kind = c.unstaged ?? c.staged ?? "modified";
+    Object.assign(
+      c,
+      unstage ? { staged: null, unstaged: kind } : { staged: kind === "untracked" ? "added" : kind, unstaged: null },
+    );
+    return delay(res("ok"));
+  },
+
+  worktree_diff({ file, scope }) {
+    const inScope = (c: FileChange) => scope === "all" || (scope === "staged" ? !!c.staged : !!c.unstaged);
+    const list = repo.changes.filter((c) => (!file || c.path === file) && inScope(c));
     return delay(list.map((c) => fakeFile(c.path, hash(c.path), "work in progress", c.unstaged ?? c.staged ?? "")));
   },
 };

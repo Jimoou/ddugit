@@ -7,20 +7,23 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #3(브랜치·태그 관리 + 배지/사이드바 우클릭 메뉴)을 squash merge했다(`0db48ef`).
+- PR #4(커밋 검색)를 squash merge했다(`021d5c5`).
 
 ## 지금 하는 일
 
-M2 · 커밋 검색 완료 → PR #4에서 CI 대기 (10분 뒤 확인 예약)
+M2 · hunk 스테이징 완료 → PR #5에서 CI 대기 (10분 뒤 확인 예약)
 
-- ⌘/Ctrl+F로 그래프 위에 검색창을 띄운다. 메시지·작성자·SHA·브랜치 이름으로 찾는다.
-- 맞는 커밋만 밝게 표시하고 나머지는 흐리게 한다(기존 `focus` 집합 재사용). Enter / Shift+Enter로 다음·이전 결과로 카메라가 이동한다.
-- 순수 함수 `searchCommits`에 vitest를 붙인다.
+- 백엔드
+  - `git/stage.rs`: 단일 파일 패치에서 `@@` hunk만 골라 `git apply --cached [--reverse]` (stdin은 `git_input`)
+  - `diff.rs`: `DiffScope`, `local_diff`(표시와 스테이징이 같은 diff 옵션을 써서 hunk 번호가 일치)
+  - `write.rs`: `commit_index`
+  - 테스트 37
+- UI: `DiffSheet`의 `stage` prop(범위 탭, hunk 버튼), 커밋 작성기의 "스테이지된 변경만 커밋"(일부만 스테이지된 파일이 생기면 자동으로 켜짐, ½ 배지)
 
 ## 다음 단계
 
-1. hunk 단위 스테이징 (diff 시트에서 hunk 선택 → 부분 커밋)
-2. 충돌 해결 화면
+1. 충돌 해결 화면 (ours / theirs / 수동, 충돌 파일 목록 → 해결 표시)
+2. 줄 단위 스테이징 (hunk 안에서 줄 선택 → 패치 재작성)
 
 ## 막힌 것 / 결정 필요
 

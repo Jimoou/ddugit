@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
-import type { FileDiff, OpResult, PickOp, Progress, RefOp, RemoteOp, RepoSnapshot, StashOp } from "./types";
+import type { DiffScope, FileDiff, OpResult, PickOp, Progress, RefOp, RemoteOp, RepoSnapshot, StashOp } from "./types";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -16,7 +16,8 @@ export interface Sink<T> {
 export interface Commands {
   initial_repo: [Record<string, never>, string | null];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
-  git_commit: [{ path: string; message: string; paths: string[]; amend: boolean }, OpResult];
+  git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
+  git_stage_hunks: [{ path: string; file: string; hunks: number[]; unstage: boolean }, OpResult];
   git_merge: [{ path: string; source: string; target: string | null }, OpResult];
   git_abort: [{ path: string }, OpResult];
   git_continue: [{ path: string }, OpResult];
@@ -29,7 +30,7 @@ export interface Commands {
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
   git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
-  worktree_diff: [{ path: string; file: string | null }, FileDiff[]];
+  worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
 }
 export type Command = keyof Commands;
 export type Args<C extends Command> = Commands[C][0];
@@ -47,8 +48,10 @@ const diffCache = new Map<string, Promise<FileDiff[]>>();
 export const api = {
   initialRepo: () => (isTauri ? call("initial_repo", {}) : Promise.resolve(null)),
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
-  commit: (path: string, message: string, paths: string[], amend = false) =>
-    call("git_commit", { path, message, paths, amend }),
+  commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
+    call("git_commit", { path, message, paths, amend, stagedOnly }),
+  stageHunks: (path: string, file: string, hunks: number[], unstage: boolean) =>
+    call("git_stage_hunks", { path, file, hunks, unstage }),
   merge: (path: string, source: string, target: string | null) => call("git_merge", { path, source, target }),
   abort: (path: string) => call("git_abort", { path }),
   continueOp: (path: string) => call("git_continue", { path }),
@@ -69,7 +72,8 @@ export const api = {
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
   stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),
-  worktreeDiff: (path: string, file: string | null = null) => call("worktree_diff", { path, file }),
+  worktreeDiff: (path: string, file: string | null = null, scope: DiffScope = "all") =>
+    call("worktree_diff", { path, file, scope }),
   commitDiff(path: string, id: string): Promise<FileDiff[]> {
     const key = `${path}\n${id}`;
     let hit = diffCache.get(key);
