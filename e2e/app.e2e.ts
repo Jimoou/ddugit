@@ -151,3 +151,28 @@ test("reorders and folds commits with the interactive rebase sheet", async ({ de
   expect(prev.parents[0]).toBe(base);
   await expect(page.locator(".rebase-sheet")).toHaveCount(0);
 });
+
+test("overwrites the upstream after rewriting a pushed commit", async ({ demo }) => {
+  const { page } = demo;
+  const push = page.locator(".topbar button", { hasText: "Push" });
+  await push.click();
+  await demo.toast("원격에 올렸어요");
+
+  // Reword the (now pushed) HEAD commit.
+  const head = (await demo.snapshot()).head.target!;
+  const at = (await demo.screenOf(head))!;
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await page.click(".context-menu >> text=마지막 커밋 수정");
+  await page.fill("textarea.message", "Reworded after review");
+  await page.keyboard.press("Control+Enter");
+  await expect.poll(async () => (await demo.snapshot()).head.target).not.toBe(head);
+
+  await push.click();
+  const dialog = page.locator(".dialog", { hasText: "Push 거부됨" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: /덮어쓰기/ }).click();
+  await demo.toast("원격을 내 이력으로 덮어썼어요");
+  const snap = await demo.snapshot();
+  const upstream = snap.refs.find((r) => r.kind === "remote" && r.name === snap.head.upstream)!;
+  expect(upstream.target).toBe(snap.head.target);
+});

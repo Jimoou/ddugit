@@ -7,30 +7,24 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #16(앱 안에서 원격 추가·삭제)을 squash merge했다(`fac2a73`).
+- PR #17(interactive rebase)을 squash merge했다(`5a95888`). Windows에서도 `sequence.editor=cp`가 동작하는 것을 CI로 확인했다.
 
 ## 지금 하는 일
 
-M4 · interactive rebase → PR #17에서 CI 대기 (10분 뒤 확인 예약)
+강제 push → PR #18에서 CI 대기 (10분 뒤 확인 예약)
 
-- `git/rebase.rs` `rebase(path, base, steps)`
-  - todo 파일(`.git/otgit-rebase-todo`)을 직접 쓰고 `git -c "sequence.editor=cp '<file>'" rebase -i <base>`로 넣는다. 메시지 편집기는 기존의 `GIT_EDITOR=true`가 처리한다
-  - 거부하는 경우: `base..HEAD`에 병합 커밋이 있을 때, 계획이 그 범위의 커밋을 정확히 한 번씩 담지 않았을 때(빠뜨리면 조용히 사라지므로), 처음 남는 커밋이 squash/fixup일 때
-  - 충돌은 `conflict_aware`로 기존 충돌 해결 흐름(계속/취소)을 탄다
-- `src/rebasePlan.ts`
-  - `rebaseRange`: 첫 부모를 따라가며 목록을 만들고, 병합 커밋이 있거나 base가 조상이 아니면 이유를 돌려준다
-  - `planProblem`, `resultCount`, `move`
-- `RebaseSheet`
-  - 행을 끌거나 ↑↓로 순서를 바꾸고, 커밋마다 유지 / 합치기(메시지 합침·버림) / 버리기를 고른다
-  - 합칠 커밋은 들여 쓰고, 버릴 커밋은 취소선으로 보여 준다
-  - 이미 push한 커밋까지 바뀌면 강제 push가 필요하다고 경고한다(`ahead`로 판단)
-- 여는 곳: 현재 브랜치 이력의 커밋 우클릭 → "이 다음 커밋들 정리… (rebase -i)" (병합이 섞여 있으면 비활성)
+- `RemoteOp::ForcePush` = `push --force-with-lease --progress`. 거부되면 `Rejected`
+- `SyncDialog`(Push 거부됨)에 세 번째 선택 "덮어쓰기 (강제 push)"를 붙였다. 원격에만 있는 커밋 N개가 지워진다고 밝힌다
+  - 주의: 거부되면 App이 바로 fetch하므로, lease가 지켜 주는 것은 **이 창을 연 뒤에** 올라온 커밋뿐이다. 문구도 그렇게 썼다
+- 테스트
+  - Rust: amend 후 일반 push는 거부되고 강제 push는 성공한다. 다른 사람이 push한 뒤 fetch 없이 강제 push하면 거부된다
+  - e2e: push → amend → 거부 → 덮어쓰기
 
 ## 다음 단계
 
-1. 강제 push 지원 (`--force-with-lease`). rebase 뒤 push가 거절되면 SyncDialog에서 고를 수 있게 한다
-2. M5 · React Compiler 규칙 켜기 (setState-in-effect 8곳 정리)
-3. 백포트: 여러 대상 한눈에 보기
+1. M5 · React Compiler 규칙 켜기 (setState-in-effect 8곳 정리)
+2. 백포트: 여러 대상 한눈에 보기 (고객사별 미반영 개수 표)
+3. M5 · 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
 
 ## 막힌 것 / 결정 필요
 

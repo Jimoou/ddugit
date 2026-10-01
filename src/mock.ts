@@ -358,6 +358,11 @@ function remoteOp(op: RemoteOp): OpResult | string {
     }
     return res("ok", "Fetching origin");
   }
+  if (op === "forcePush") {
+    // The demo has no other pushers, so the lease always holds.
+    repo.remotes.set(repo.upstream() ?? `origin/${repo.head}`, repo.branches.get(repo.head)!);
+    return res("ok", " + forced update");
+  }
   if (op === "push") {
     const local = repo.branches.get(repo.head)!;
     const up = repo.upstream();
@@ -517,7 +522,7 @@ export const mock: Table = {
       await delay(null, 300);
       return res("auth", AUTH_OUTPUT[fake]);
     }
-    for (const phase of PHASES[op === "push" ? "push" : "fetch"]) {
+    for (const phase of PHASES[op === "push" || op === "forcePush" ? "push" : "fetch"]) {
       for (let pct = 0; pct <= 100; pct += 20) {
         onProgress.onmessage({ phase, percent: pct });
         await delay(null, 60);

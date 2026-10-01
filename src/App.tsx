@@ -42,6 +42,7 @@ const REMOTE_DONE: Record<RemoteOp, string> = {
   pullMerge: "병합해서 받았어요",
   pullRebase: "리베이스해서 받았어요",
   push: "원격에 올렸어요",
+  forcePush: "원격을 내 이력으로 덮어썼어요",
 };
 
 /** In-progress operations: banner name, how to finish, and whether "계속" applies. */
@@ -1060,6 +1061,10 @@ export default function App() {
           color={headColor}
           busy={busy}
           onMerge={() => void resolveSync("pullMerge")}
+          onForce={() => {
+            setSync(null);
+            void remote("forcePush");
+          }}
           onRebase={() => void resolveSync("pullRebase")}
           onCancel={() => setSync(null)}
         />
