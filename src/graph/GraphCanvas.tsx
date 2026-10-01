@@ -21,6 +21,7 @@ import { type Step, stepFrom } from "./navigate";
 import type { NodeBadge } from "./renderer";
 
 const NO_BADGES = new Map<string, NodeBadge>();
+const NO_TRAIL: string[] = [];
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView } from "./camera";
@@ -47,6 +48,8 @@ interface Props {
   focus: Set<string> | null;
   /** Marks drawn on commits (bisect). */
   badges?: Map<string, NodeBadge>;
+  /** Commits that touched one file, newest first (file history). */
+  trail?: string[];
   animate: boolean;
   onSelect(id: string | null): void;
   onPlus(): void;
@@ -343,6 +346,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         labelHits: s.labelHits,
         incoming: p.incoming,
         badges: p.badges ?? NO_BADGES,
+        trail: p.trail ?? NO_TRAIL,
         truncated: p.truncated,
         moreHit: s.moreHit,
         runs: runsRef.current.runs,

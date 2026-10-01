@@ -10,6 +10,7 @@ pub mod cleanup;
 pub mod conflict;
 pub mod diff;
 pub mod edit;
+pub mod history;
 pub mod pick;
 pub mod read;
 pub mod rebase;

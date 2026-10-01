@@ -66,6 +66,29 @@ export interface BisectState {
   candidates: string[];
 }
 
+/** A commit that changed a file, and the file's path in it (renames are followed). */
+export interface FileTouch {
+  id: string;
+  path: string;
+}
+
+/** Consecutive lines last changed by the same commit. */
+export interface BlameHunk {
+  commit: string;
+  /** Index of the first line in `Blame.lines`. */
+  start: number;
+  len: number;
+  author: string;
+  /** Seconds since the Unix epoch. */
+  time: number;
+  summary: string;
+}
+
+export interface Blame {
+  lines: string[];
+  hunks: BlameHunk[];
+}
+
 /** A touch-up to one past commit on the current branch (see `git/edit.rs`). */
 export type CommitEdit =
   | { kind: "reword"; message: string }
