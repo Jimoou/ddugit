@@ -54,6 +54,7 @@ export const SHORTCUTS: { group: string; items: Shortcut[] }[] = [
       { keys: "H", what: "HEAD로" },
       { keys: "점 끌어 브랜치 끝에 놓기", what: "병합" },
       { keys: "⌥/Alt + 끌기", what: "cherry-pick" },
+      { keys: "Shift + 끌기", what: "현재 브랜치 커밋 순서 옮기기 (rebase)" },
       { keys: "우클릭", what: "커밋·브랜치 메뉴" },
       { keys: "← / →", what: "이전(부모) / 다음(자식) 커밋 선택" },
       { keys: "↑ / ↓", what: "위 / 아래 레인의 가까운 커밋" },

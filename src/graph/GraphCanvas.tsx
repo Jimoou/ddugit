@@ -47,7 +47,7 @@ interface Props {
   /** Dropped `source` onto `target` — caller decides whether it's a valid merge. */
   /** Dropped `source` onto branch tip `target`: merge, or cherry-pick with ⌥/Alt. */
   onDrop(source: string, target: string, mode: Drag["mode"]): void;
-  canDropOn(target: string, source: string): boolean;
+  canDropOn(target: string, source: string, mode: Drag["mode"]): boolean;
   onNodeMenu(id: string, x: number, y: number): void;
   incoming: string | null;
   truncated: boolean;
@@ -57,12 +57,15 @@ interface Props {
 }
 
 const HINTS = {
-  "merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt를 누르면 cherry-pick",
+  "merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt: cherry-pick · Shift: 순서 옮기기",
   "merge:ok": "놓으면 병합합니다",
   "merge:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
   "pick:idle": "이 커밋을 복사할 브랜치 끝으로 끌어다 놓으세요",
   "pick:ok": "놓으면 이 커밋을 복사(cherry-pick)합니다",
   "pick:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
+  "move:idle": "현재 브랜치의 다른 커밋에 놓으면 그 바로 다음으로 옮겨요",
+  "move:ok": "놓으면 순서 정리 화면이 열려요",
+  "move:bad": "현재 브랜치의 일직선 구간 안에서만 옮길 수 있어요",
 } as const;
 
 const ARROWS: Record<string, Step> = { ArrowLeft: "older", ArrowRight: "newer", ArrowUp: "up", ArrowDown: "down" };
@@ -456,8 +459,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       const t = nodeAt(p);
       s.drag.to = p;
       s.drag.target = t && t !== s.drag.from ? t : null;
-      s.drag.mode = e.altKey ? "pick" : "merge";
-      s.drag.valid = !!s.drag.target && propsRef.current.canDropOn(s.drag.target, s.drag.from);
+      s.drag.mode = e.shiftKey ? "move" : e.altKey ? "pick" : "merge";
+      s.drag.valid = !!s.drag.target && propsRef.current.canDropOn(s.drag.target, s.drag.from, s.drag.mode);
       setCursor(s.drag.valid ? "copy" : s.drag.target ? "not-allowed" : "crosshair");
       return;
     }

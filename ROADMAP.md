@@ -55,7 +55,7 @@
   - [x] 앱 안에서 원격 추가 (사이드바 원격 ＋, 추가 후 바로 Fetch) · 원격 브랜치 우클릭으로 원격 삭제
   - [x] 여러 대상 한눈에 보기 (고객사가 여럿일 때 브랜치별 미반영 개수 표) · 제외는 받는 쪽마다 따로
 - [x] 드래그로 interactive rebase (순서 바꾸기, squash) — 커밋 우클릭 → "이 다음 커밋들 정리", 목록 끌어서 순서 · 유지/합치기/버리기
-  - [ ] 그래프 위에서 노드를 끌어 바로 순서 바꾸기 (지금은 시트의 목록에서)
+  - [x] 그래프 위에서 노드를 끌어 바로 순서 바꾸기 (Shift+끌기 → 옮긴 계획으로 정리 화면이 열림)
   - [ ] 병합이 섞인 구간(`--rebase-merges`)
   - [x] 정리한 뒤 강제 push: Push 거부 화면에 "덮어쓰기"(`--force-with-lease`)
 - [ ] GitHub / GitLab PR 연동 (그래프에 PR 상태 표시)
@@ -106,3 +106,4 @@
 | 2026-10-01 | PR #19 squash merge(`74f7924`). 백포트: 제외를 받는 쪽별 config(`otgit.<target>.backportIgnored`, 예전 저장소 전체 키도 읽음), `backport_summary` + "대상별" 탭(테스트 56, e2e 10)                                                                                      |
 | 2026-10-01 | PR #20 squash merge(`1d0ac4e`). M5: 설정 화면(`settings.ts` 파싱 + vitest 3, `SettingsDialog`, `git::set_program` 전역 git 경로를 검증 후 적용, 예전 `otgit.animate` 키 이어받음)(테스트 57, e2e 11)                                                                    |
 | 2026-10-01 | PR #21 squash merge(`62759c0`). M5: 키보드로 커밋 이동(`graph/navigate.ts` `stepFrom` + vitest 2, 화면 밖이면 배율 유지하며 따라감, 입력·목록에 포커스가 있을 땐 화살표를 가로채지 않음), 스크린리더 안내(e2e 12)                                                       |
+| 2026-10-01 | PR #22 squash merge(`2aa0abf`). M4: Shift+끌기로 커밋 순서 옮기기(`planMove` + vitest 3, 드래그 모드 `move`, 확인은 기존 RebaseSheet에서)(e2e 13)                                                                                                                       |
