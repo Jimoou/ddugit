@@ -39,12 +39,23 @@ test("resolves a conflict block by editing it by hand", async ({ demo }) => {
   await page.click(".dialog button.primary");
   await expect(page.locator(".conflict-sheet")).toBeVisible();
   await expect(page.locator(".conflict-sheet header")).toContainText("남은 파일 2개");
+  // A red nebula hangs over the graph while anything is in conflict.
+  const nebula = page.locator(".stage-graph .nebula");
+  await expect(nebula).toHaveClass(/\bon\b/);
 
   await page.locator(".block").nth(0).getByRole("button", { name: "직접 편집" }).click();
   await page.fill(".block-edit", "hand merged line");
   await page.locator(".block").nth(1).getByRole("button", { name: "둘 다" }).click();
   await page.click("text=이 파일 해결 완료");
   await expect(page.locator(".conflict-sheet header")).toContainText("남은 파일 1개");
+  await expect(nebula).toHaveClass(/\bon\b/);
+
+  // Resolving the last file clears the nebula.
+  await page
+    .getByRole("button", { name: /파일 전체:/ })
+    .first()
+    .click();
+  await expect(nebula).not.toHaveClass(/\bon\b/);
 });
 
 test("stages single lines picked in the diff", async ({ demo }) => {
