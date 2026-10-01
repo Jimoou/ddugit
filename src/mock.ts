@@ -30,6 +30,8 @@ class MockRepo {
   state = "clean";
   clock = Math.floor(Date.now() / 1000) - 86400 * 40;
   fetched = false;
+  /** In-progress demo merge: source commit and the conflicted files' marked-up text. */
+  pending: { source: string; label: string; files: Map<string, string> } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
 
   commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
@@ -217,6 +219,38 @@ function hash(s: string) {
   return h;
 }
 
+// --- demo conflicts ------------------------------------------------------------
+
+const DEMO_CONFLICT_CSS = `:root {
+  --bg: #07060d;
+<<<<<<< HEAD
+  --cyan: #22e8ff;
+  --glow: 0 0 12px var(--cyan);
+=======
+  --cyan: #19d3ff;
+  --glow: 0 0 18px var(--cyan), 0 0 32px var(--magenta);
+>>>>>>> {theirs}
+  --magenta: #ff3df2;
+}
+
+.panel {
+<<<<<<< HEAD
+  border-radius: 12px;
+=======
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+>>>>>>> {theirs}
+}
+`;
+
+const DEMO_CONFLICT_TS = `export const COL = 84;
+<<<<<<< HEAD
+export const LANE = 46;
+=======
+export const LANE = 52;
+>>>>>>> {theirs}
+`;
+
 // --- command table ------------------------------------------------------------
 
 const repo = seed();
@@ -254,7 +288,11 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
 }
 
 /** Dev/e2e switch: make the next remote call fail authentication. */
-export const demoControls = { failNextRemote: null as null | "https" | "ssh" };
+export const demoControls = {
+  failNextRemote: null as null | "https" | "ssh",
+  /** Make the next merge stop on a conflict in two files. */
+  conflictNext: false,
+};
 if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__otgitDemo = demoControls;
 }
@@ -299,6 +337,16 @@ export const mock: Table = {
 
   git_commit({ message, paths, amend, stagedOnly }) {
     if (!message.trim()) return fail("Commit message is empty");
+    if (repo.pending) {
+      // Concluding a merge: needs every conflict resolved, then a two-parent commit.
+      if (repo.changes.some((c) => c.conflicted))
+        return fail("Committing is not possible because you have unmerged files.");
+      repo.add(repo.head, message.split("\n")[0], [repo.pending.source]);
+      repo.pending = null;
+      repo.state = "clean";
+      repo.changes = repo.changes.filter((c) => c.unstaged && !c.staged);
+      return delay(res("ok"));
+    }
     if (stagedOnly) {
       if (!repo.changes.some((c) => c.staged)) return fail("nothing added to commit");
       repo.add(repo.head, message.split("\n")[0]);
@@ -321,12 +369,26 @@ export const mock: Table = {
     const t = target ?? repo.head;
     if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
+    if (demoControls.conflictNext) {
+      demoControls.conflictNext = false;
+      const files = new Map([
+        ["src/App.css", DEMO_CONFLICT_CSS.replaceAll("{theirs}", source)],
+        ["src/graph/scene.ts", DEMO_CONFLICT_TS.replaceAll("{theirs}", source)],
+      ]);
+      repo.pending = { source: repo.branches.get(source) ?? source, label: source, files };
+      repo.state = "merge";
+      for (const path of files.keys())
+        repo.changes.push({ path, staged: null, unstaged: "modified", conflicted: true });
+      return delay(res("conflict", "CONFLICT (content): Merge conflict in src/App.css"));
+    }
     const named = repo.branches.has(source) || repo.remotes.has(source);
     repo.merge(source, t, `Merge ${named ? `branch '${source}'` : `commit ${source.slice(0, 7)}`} into ${t}`);
     return delay(res("ok", "Merge made by the 'ort' strategy."));
   },
 
   git_abort() {
+    if (repo.pending) repo.changes = repo.changes.filter((c) => !repo.pending!.files.has(c.path));
+    repo.pending = null;
     repo.state = "clean";
     return delay(res("ok"));
   },
@@ -441,6 +503,21 @@ export const mock: Table = {
       repo.changes.push(...st.changes.filter((c) => !have.has(c.path)));
     }
     if (op !== "apply") repo.stashes.splice(index, 1);
+    return delay(res("ok"));
+  },
+
+  conflict_file({ file }) {
+    const merged = repo.pending?.files.get(file);
+    if (merged === undefined) return fail(`'${file}' is not in conflict`);
+    const side = (pick: 1 | 2) => merged.replace(/<<<<<<< .*\n([\s\S]*?)=======\n([\s\S]*?)>>>>>>> .*\n/g, `$${pick}`);
+    return delay({ path: file, base: null, ours: side(1), theirs: side(2), merged, binary: false });
+  },
+
+  git_resolve({ file, how }) {
+    const c = repo.changes.find((x) => x.path === file && x.conflicted);
+    if (!c) return fail(`'${file}' is not in conflict`);
+    Object.assign(c, { conflicted: false, staged: "modified", unstaged: null });
+    void how;
     return delay(res("ok"));
   },
 

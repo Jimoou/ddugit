@@ -115,3 +115,18 @@ export interface FileDiff {
   truncated: boolean;
   hunks: DiffHunk[];
 }
+
+export interface ConflictFile {
+  path: string;
+  base: string | null;
+  /** HEAD's side (during a rebase: the branch being rebased onto). */
+  ours: string | null;
+  /** The incoming side. */
+  theirs: string | null;
+  /** Working-tree file with conflict markers. */
+  merged: string;
+  binary: boolean;
+}
+
+/** Mirrors `Resolution` in git/conflict.rs. */
+export type Resolution = { kind: "ours" } | { kind: "theirs" } | { kind: "content"; text: string };
