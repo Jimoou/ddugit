@@ -38,10 +38,21 @@ interface Props {
   selectedStash: number | null;
   onStash(index: number | null): void;
   /** Dropped `source` onto `target` — caller decides whether it's a valid merge. */
-  onMerge(source: string, target: string): void;
-  canMergeInto(target: string, source: string): boolean;
+  /** Dropped `source` onto branch tip `target`: merge, or cherry-pick with ⌥/Alt. */
+  onDrop(source: string, target: string, mode: Drag["mode"]): void;
+  canDropOn(target: string, source: string): boolean;
+  onNodeMenu(id: string, x: number, y: number): void;
   onZoomChange?(k: number): void;
 }
+
+const HINTS = {
+  "merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt를 누르면 cherry-pick",
+  "merge:ok": "놓으면 병합합니다",
+  "merge:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
+  "pick:idle": "이 커밋을 복사할 브랜치 끝으로 끌어다 놓으세요",
+  "pick:ok": "놓으면 이 커밋을 복사(cherry-pick)합니다",
+  "pick:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
+} as const;
 
 const MIN_K = 0.08;
 const MAX_K = 3;
@@ -87,7 +98,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
   const [cursor, setCursor] = useState("grab");
-  const [dragHint, setDragHint] = useState<null | "idle" | "ok" | "bad">(null);
+  const [dragHint, setDragHint] = useState<keyof typeof HINTS | null>(null);
   const lastK = useRef(1);
 
   const now = () => performance.now() / 1000;
@@ -250,7 +261,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         stashHover: s.stashHover,
         stashSelected: p.selectedStash,
       });
-      const hint = !s.drag ? null : s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle";
+      const hint = !s.drag ? null : (`${s.drag.mode}:${s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle"}` as const);
       setDragHint((h) => (h === hint ? h : hint));
     };
     raf = requestAnimationFrame(frame);
@@ -330,13 +341,14 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       return;
     }
     if (s.press && !s.drag && Math.hypot(p.x - s.press.x, p.y - s.press.y) > 6) {
-      s.drag = { from: s.press.id, to: p, target: null, valid: false };
+      s.drag = { from: s.press.id, to: p, target: null, valid: false, mode: "merge" };
     }
     if (s.drag) {
       const t = nodeAt(p);
       s.drag.to = p;
       s.drag.target = t && t !== s.drag.from ? t : null;
-      s.drag.valid = !!s.drag.target && propsRef.current.canMergeInto(s.drag.target, s.drag.from);
+      s.drag.mode = e.altKey ? "pick" : "merge";
+      s.drag.valid = !!s.drag.target && propsRef.current.canDropOn(s.drag.target, s.drag.from);
       setCursor(s.drag.valid ? "copy" : s.drag.target ? "not-allowed" : "crosshair");
       return;
     }
@@ -350,7 +362,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const s = st.current;
     const p = local(e);
     if (s.drag) {
-      if (s.drag.valid && s.drag.target) propsRef.current.onMerge(s.drag.from, s.drag.target);
+      if (s.drag.valid && s.drag.target) propsRef.current.onDrop(s.drag.from, s.drag.target, s.drag.mode);
       s.drag = null;
     } else if (s.press) {
       propsRef.current.onSelect(s.press.id === propsRef.current.selected ? null : s.press.id);
@@ -413,6 +425,11 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            const id = nodeAt(local(e));
+            if (id) propsRef.current.onNodeMenu(id, e.clientX, e.clientY);
+          }}
           onPointerLeave={() => {
             st.current.hovered = null;
             st.current.plusHover = false;
@@ -420,13 +437,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         />
       </div>
       {dragHint && (
-        <div className={`drag-hint ${dragHint}`}>
-          {dragHint === "ok"
-            ? "놓으면 병합합니다"
-            : dragHint === "bad"
-              ? "브랜치 끝(체크포인트)에만 병합할 수 있어요"
-              : "병합할 브랜치 끝으로 끌어다 놓으세요"}
-        </div>
+        <div className={`drag-hint ${dragHint.split(":")[1]} ${dragHint.split(":")[0]}`}>{HINTS[dragHint]}</div>
       )}
       <Minimap
         scene={scene}

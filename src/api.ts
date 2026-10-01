@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
-import type { FileDiff, OpResult, Progress, RemoteOp, RepoSnapshot, StashOp } from "./types";
+import type { FileDiff, OpResult, PickOp, Progress, RemoteOp, RepoSnapshot, StashOp } from "./types";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -16,10 +16,11 @@ export interface Sink<T> {
 export interface Commands {
   initial_repo: [Record<string, never>, string | null];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
-  git_commit: [{ path: string; message: string; paths: string[] }, OpResult];
+  git_commit: [{ path: string; message: string; paths: string[]; amend: boolean }, OpResult];
   git_merge: [{ path: string; source: string; target: string | null }, OpResult];
   git_abort: [{ path: string }, OpResult];
-  git_continue_rebase: [{ path: string }, OpResult];
+  git_continue: [{ path: string }, OpResult];
+  git_pick: [{ path: string; op: PickOp; id: string; target: string | null }, OpResult];
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
@@ -45,10 +46,12 @@ const diffCache = new Map<string, Promise<FileDiff[]>>();
 export const api = {
   initialRepo: () => (isTauri ? call("initial_repo", {}) : Promise.resolve(null)),
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
-  commit: (path: string, message: string, paths: string[]) => call("git_commit", { path, message, paths }),
+  commit: (path: string, message: string, paths: string[], amend = false) =>
+    call("git_commit", { path, message, paths, amend }),
   merge: (path: string, source: string, target: string | null) => call("git_merge", { path, source, target }),
   abort: (path: string) => call("git_abort", { path }),
-  continueRebase: (path: string) => call("git_continue_rebase", { path }),
+  continueOp: (path: string) => call("git_continue", { path }),
+  pick: (path: string, op: PickOp, id: string, target: string | null) => call("git_pick", { path, op, id, target }),
   checkout: (path: string, target: string) => call("git_checkout", { path, target }),
   createBranch: (path: string, name: string, at: string | null, switchTo: boolean) =>
     call("git_create_branch", { path, name, at, switch: switchTo }),

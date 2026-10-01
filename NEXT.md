@@ -8,21 +8,20 @@ _마지막 갱신: 2026-10-01_
 ## 방금 끝난 것
 
 - PR [Jimoou/otgit#1](https://github.com/Jimoou/otgit/pull/1)을 squash merge했다(`e588fba`). CI는 3개 OS 모두 통과. 작업 브랜치는 `main`에서 다시 시작했다.
+- push 팁: CI는 새 push가 오면 이전 실행을 취소한다(Windows 약 8분). CI 결과가 필요할 때는 push를 몰아서 한다.
 
 ## 지금 하는 일
 
-M2 · 커밋 조작 + 우클릭 메뉴 (PR #2 예정)
+M2 · 커밋 조작 + 우클릭 메뉴 완료 → PR #2에서 CI 대기
 
-- [x] 백엔드
-  - `git/pick.rs`: cherry-pick(`-x`) / revert, 병합 커밋은 `-m 1`, 대상 브랜치 자동 체크아웃(`prepare_on`)
-  - `commit(…, amend)`, `continue_op`(rebase / cherry-pick / revert)
-  - 테스트 29
-- [ ] 프런트
-  - `api`: `git_commit.amend`, `git_continue`, `git_pick` + `mock` 구현
-  - `ContextMenu`: 노드 우클릭 → 여기서 브랜치 / 체크아웃 / HEAD에 cherry-pick / revert / amend(HEAD일 때) / SHA 복사
-  - Alt(⌥)를 누른 채 끌어서 놓으면 cherry-pick (그냥 끌면 merge)
-  - 커밋 작성기에 amend 모드, 배너에 cherry-pick/revert 계속·취소
-- [ ] PR 올리고 CI 통과 확인
+- 백엔드: `git/pick.rs`(cherry-pick `-x` / revert, 병합 커밋 `-m 1`), `commit(…, amend)`, `continue_op`
+- UI: 노드 우클릭 `ContextMenu`(브랜치 만들기 `NameDialog` / 체크아웃 / cherry-pick / revert / amend / SHA 복사), ⌥ 드래그 cherry-pick(주황 케이블), 커밋 작성기 amend 모드(이미 push된 커밋이면 경고), 배너 계속/취소를 `IN_PROGRESS` 표로 일반화
+
+## 다음 단계 (추천 순서)
+
+1. PR #2 CI 통과 → squash merge → `main`에서 다시 시작
+2. 브랜치 관리: 이름 변경 / 삭제, 태그 생성, 원격 브랜치 체크아웃(추적 브랜치), 브랜치 라벨 우클릭 메뉴(라벨 히트 테스트 필요)
+3. 커밋 검색(메시지·작성자·SHA)과 그래프 하이라이트
 
 ## 막힌 것 / 결정 필요
 

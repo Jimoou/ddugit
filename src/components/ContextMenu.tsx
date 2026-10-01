@@ -1,0 +1,70 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+export type MenuItem =
+  { label: string; hint?: string; danger?: boolean; disabled?: boolean; onSelect(): void } | "separator";
+
+interface Props {
+  x: number;
+  y: number;
+  title?: string;
+  items: MenuItem[];
+  onClose(): void;
+}
+
+/** Floating menu at the cursor; closes on outside click, Esc, scroll or after a choice. */
+export function ContextMenu({ x, y, title, items, onClose }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x, y });
+
+  // Keep the menu inside the window.
+  useLayoutEffect(() => {
+    const r = ref.current!.getBoundingClientRect();
+    setPos({
+      x: Math.min(x, window.innerWidth - r.width - 8),
+      y: Math.min(y, window.innerHeight - r.height - 8),
+    });
+  }, [x, y]);
+
+  useEffect(() => {
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
+      if (e.type === "pointerdown" && ref.current?.contains(e.target as Node)) return;
+      onClose();
+    };
+    window.addEventListener("pointerdown", close, true);
+    window.addEventListener("keydown", close);
+    window.addEventListener("wheel", close, true);
+    window.addEventListener("blur", close);
+    return () => {
+      window.removeEventListener("pointerdown", close, true);
+      window.removeEventListener("keydown", close);
+      window.removeEventListener("wheel", close, true);
+      window.removeEventListener("blur", close);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="context-menu" ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
+      {title && <div className="menu-title">{title}</div>}
+      {items.map((it, i) =>
+        it === "separator" ? (
+          <hr key={i} />
+        ) : (
+          <button
+            key={i}
+            role="menuitem"
+            className={it.danger ? "danger-text" : ""}
+            disabled={it.disabled}
+            onClick={() => {
+              onClose();
+              it.onSelect();
+            }}
+          >
+            <span>{it.label}</span>
+            {it.hint && <kbd>{it.hint}</kbd>}
+          </button>
+        ),
+      )}
+    </div>
+  );
+}

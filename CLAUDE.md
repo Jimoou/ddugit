@@ -33,7 +33,9 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 - `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼)
   - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태)
-  - `write.rs`: commit, merge, abort, checkout, branch
+  - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃)
+  - `pick.rs`: cherry-pick / revert
+  - `stash.rs`: discard, stash
   - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블)
   - `diff.rs`: 커밋 diff, 작업 트리 diff
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
