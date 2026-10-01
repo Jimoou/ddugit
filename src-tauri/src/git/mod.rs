@@ -257,6 +257,8 @@ mod testutil {
         git_ok(p, &["config", "user.name", "Test"]).unwrap();
         git_ok(p, &["config", "user.email", "t@example.com"]).unwrap();
         git_ok(p, &["config", "commit.gpgsign", "false"]).unwrap();
+        // Runners (e.g. Windows) may set core.autocrlf globally; tests compare exact bytes.
+        git_ok(p, &["config", "core.autocrlf", "false"]).unwrap();
     }
 
     pub fn s(p: &Path) -> &str {
