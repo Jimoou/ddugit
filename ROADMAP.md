@@ -69,7 +69,7 @@
 - [x] ESLint, Playwright e2e를 CI에 추가
   - [x] Playwright e2e: 데모 모드 대상 5개 흐름(커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기), CI `E2E` 잡
   - [x] ESLint: typescript-eslint 권장 + react-hooks(`rules-of-hooks`, `exhaustive-deps`) + effect 식 본문 금지. CI Web 잡에서 실행
-  - [ ] react-hooks v7의 React Compiler 규칙(`set-state-in-effect` 등) 켜기. 지금 코드에서 8곳이 걸린다(prop이 바뀔 때 상태를 초기화하는 effect). `key`로 리셋하거나 렌더 중에 조정하는 방식으로 옮겨야 한다
+  - [x] react-hooks v7의 React Compiler 규칙(`set-state-in-effect` 등) 켜기. 지금 코드에서 8곳이 걸린다(prop이 바뀔 때 상태를 초기화하는 effect). `key`로 리셋하거나 렌더 중에 조정하는 방식으로 옮겨야 한다
 
 ---
 
@@ -99,3 +99,4 @@
 | 2026-10-01 | PR #15 squash merge(`91920f1`). 원격 추가·삭제(`RefOp::AddRemote/RemoveRemote`, 사이드바 ＋, `NameDialog` 두 번째 칸 일반화, 백포트 시트 안내를 버튼으로)(테스트 51, e2e 7)                                                                                             |
 | 2026-10-01 | PR #16 squash merge(`fac2a73`). M4: interactive rebase(`git/rebase.rs`: 미리 쓴 todo를 `sequence.editor=cp`로 넣음, 빠진 커밋·맨 앞 squash 거부, 충돌은 기존 흐름; `rebasePlan.ts` + vitest 4; `RebaseSheet`)(테스트 54, e2e 8)                                         |
 | 2026-10-01 | PR #17 squash merge(`5a95888`). 강제 push(`RemoteOp::ForcePush` = `push --force-with-lease`, 거부 화면 세 번째 선택, 그사이 남이 올린 커밋은 lease가 막는 것을 bare 저장소로 테스트)(테스트 55, e2e 9)                                                                  |
+| 2026-10-01 | PR #18 squash merge(`d6bf590`). M5: react-hooks 권장 규칙 전부 켬. effect 안 setState 9곳 → 렌더 중 조정(경로·초기 파일·부분 스테이지), 데이터를 키와 함께 저장(패널 파일·충돌 파일·줄 선택), diff 다시 불러오기를 fetch만 하도록 분리, 첫 로드에 늦게 온 응답 무시     |

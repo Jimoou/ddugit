@@ -72,9 +72,11 @@ export function Composer(props: Props) {
     .map((c) => c.path)
     .join("\n");
   // A newly partially-staged file (from the diff sheet) switches the mode on.
-  useEffect(() => {
+  const [seenPartial, setSeenPartial] = useState(partialKey);
+  if (seenPartial !== partialKey) {
+    setSeenPartial(partialKey);
     if (partialKey) setStagedOnly(true);
-  }, [partialKey]);
+  }
   const useStaged = stagedOnly && anyStaged && !merging;
   const canCommit =
     !busy &&
