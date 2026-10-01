@@ -7,21 +7,25 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- 영어 번역 완료: PR #26, #27, #28을 squash merge했다(`78ed8a8`).
-- Release 수동 실행 시험: dmg(6.6MB)와 exe(2.2MB) artifact가 나왔다(run 36838768528, 번역 전 코드).
+- v0.1.0 초안 Release: Release 수동 실행(`release: true`)이 성공했다. 초안 하나에 dmg/exe가 붙었다. **사용자가 GitHub에서 내용을 확인하고 Publish하면 `v0.1.0` 태그가 생긴다**
+- PR #30(이동 범위 제한, 하늘 회전, 브랜드)을 squash merge했다(`034e64b`).
 
 ## 지금 하는 일
 
-1. PR #29를 merge했다(`080b09d`). main에서 `release: true`로 실행 중이다. 초안 v0.1.0에 dmg/exe가 붙었는지 확인한다
-2. M6 "우주 다듬기" PR: `graph/camera.ts`(`clampView`: 그래프가 화면에 최소 160px 남도록 렌더 루프에서 view·target 제한), `space.ts`(`skyAngle`: 10분에 한 바퀴, 반짝임 효과가 켜져 있을 때만 각도 누적, 회전해도 모서리가 비지 않게 대각선만큼 더 그림), 브랜드 "옷깃" 삭제
+M6 저장소 연결 → PR CI 대기
+
+- Rust `git/setup.rs`: `clone`(진행률, `Auth` 구분), `init`(`-b main`), `repo_root`(파일·폴더가 속한 저장소)
+- `recent.ts`(최근 12개 + 즐겨찾기는 항상), `components/Connect.tsx`(`useRecent`, `RepoMenu`, `RecentList`, `ConnectActions`, `CloneDialog`)
+- App: `openPath`가 모든 진입점을 받는다. 스냅샷을 읽는 데 성공하면 최근 목록에 올린다. clone이 인증에 실패하면 `AuthDialog`(`fetchCmd`=`git clone …`)를 띄우고, 다시 시도하면 값이 채워진 clone 창이 열린다
+- 끌어다 놓기: Tauri `onDragDropEvent` → `repo_root` → 열기, 저장소가 아니면 init을 확인받는다. 데모에서는 시험할 수 없다
+- 데모: `__otgitDemo.nextFolder`로 다음 폴더 선택 결과를 정한다(e2e)
 
 ## 다음 단계 (M6 순서, ROADMAP 참고)
 
-1. 저장소 연결 방법: clone(URL·진행률), 최근 목록·즐겨찾기, init, 폴더 끌어다 놓기
-2. 멀티탭
-3. 고급 git 작업: 실수 되돌리기 → 브랜치 정리 → 과거 커밋 손보기 → bisect·blame
-4. 게임 같은 우주 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌·되돌리기·탭 전환. 각 기능 PR에 그 기능의 연출을 함께 넣고, 기존 기능 연출은 별도 PR
-5. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
+1. 멀티탭
+2. 고급 git 작업: 실수 되돌리기 → 브랜치 정리 → 과거 커밋 손보기 → bisect·blame
+3. 게임 같은 우주 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌·되돌리기·탭 전환. 각 기능 PR에 그 기능의 연출을 함께 넣고, 기존 기능 연출은 별도 PR
+4. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
 
 ## 막힌 것 / 결정 필요
 

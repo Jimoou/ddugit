@@ -17,7 +17,7 @@ pub struct Progress {
 }
 
 /// `[remote: ]Phase name:  45% (450/1000), 1.2 MiB | ...` → progress.
-fn parse_progress(line: &str) -> Option<Progress> {
+pub(super) fn parse_progress(line: &str) -> Option<Progress> {
     let line = line.trim().trim_start_matches("remote:").trim();
     let (phase, rest) = line.split_once(':')?;
     let digits: String = rest
@@ -51,7 +51,7 @@ const AUTH_FAILURES: &[&str] = &[
     "returned error: 403",
 ];
 
-fn is_auth_failure(text: &str) -> bool {
+pub(super) fn is_auth_failure(text: &str) -> bool {
     AUTH_FAILURES.iter().any(|p| text.contains(p))
 }
 

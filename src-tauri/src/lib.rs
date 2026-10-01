@@ -69,6 +69,9 @@ command!(git_create_branch(path: String, name: String, at: Option<String>, switc
 command!(git_ref(path: String, op: RefOp) -> OpResult => git::refs::apply(&path, &op));
 command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
+command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
+    => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
+command!(git_init(dir: String) -> OpResult => git::setup::init(&dir));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
 command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
     => git::stash::stash_push(&path, &message, &paths));
@@ -95,6 +98,12 @@ fn watch_repo(app: tauri::AppHandle, state: tauri::State<Watching>, path: String
     Ok(())
 }
 
+/// Working tree root of the repository `dir` is in (for dropped files and folders).
+#[tauri::command]
+fn repo_root(dir: String) -> Option<String> {
+    git::setup::repo_root(&dir)
+}
+
 /// Repository passed on the command line (`otgit path/to/repo`), if any.
 #[tauri::command]
 fn initial_repo() -> Option<String> {
@@ -112,6 +121,9 @@ pub fn run() {
         .manage(Watching::default())
         .invoke_handler(tauri::generate_handler![
             initial_repo,
+            repo_root,
+            git_clone,
+            git_init,
             watch_repo,
             repo_snapshot,
             git_commit,

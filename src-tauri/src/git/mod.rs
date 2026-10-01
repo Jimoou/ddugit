@@ -12,6 +12,7 @@ pub mod read;
 pub mod rebase;
 pub mod refs;
 pub mod remote;
+pub mod setup;
 pub mod stage;
 pub mod stash;
 pub mod watch;

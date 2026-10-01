@@ -8,6 +8,8 @@ interface Props {
   /** git's output, used to tell "unknown host key" from "no key". */
   output: string;
   repoPath: string;
+  /** Command that signs in once from a terminal; defaults to fetching `repoPath`. */
+  fetchCmd?: string;
   busy: boolean;
   onRetry(): void;
   onClose(): void;
@@ -28,7 +30,7 @@ function hostOf(url: string | null): string {
   return m?.[1] ?? "github.com";
 }
 
-/** Setup steps per transport and OS. `{host}` / `{repo}` are filled in. */
+/** Setup steps per transport and OS. `{host}` / `{fetch}` are filled in. */
 const GUIDES: Record<string, Step[]> = {
   "https:mac": [
     {
@@ -37,7 +39,7 @@ const GUIDES: Record<string, Step[]> = {
     },
     {
       text: "auth.mac.login",
-      cmd: 'git -C "{repo}" fetch',
+      cmd: "{fetch}",
     },
     { text: "auth.mac.gh", cmd: "gh auth login" },
   ],
@@ -53,7 +55,7 @@ const GUIDES: Record<string, Step[]> = {
       text: "auth.linux.helper",
       cmd: "git config --global credential.helper libsecret",
     },
-    { text: "auth.linux.login", cmd: 'git -C "{repo}" fetch' },
+    { text: "auth.linux.login", cmd: "{fetch}" },
   ],
   "ssh-host": [
     {
@@ -87,12 +89,13 @@ const GUIDES: Record<string, Step[]> = {
   ],
 };
 
-export function AuthDialog({ url, output, repoPath, busy, onRetry, onClose }: Props) {
+export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onClose }: Props) {
   const [copied, setCopied] = useState<number | null>(null);
   const ssh = isSsh(url, output);
   const host = hostOf(url);
   const key = ssh ? (/Host key/i.test(output) ? "ssh-host" : `ssh:${os}`) : `https:${os}`;
-  const fill = (s: string) => s.replaceAll("{host}", host).replaceAll("{repo}", repoPath);
+  const signIn = fetchCmd ?? `git -C "${repoPath}" fetch`;
+  const fill = (s: string) => s.replaceAll("{host}", host).replaceAll("{fetch}", signIn);
 
   return (
     <div className="scrim" onClick={onClose}>
