@@ -7,21 +7,25 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #7(진행 중 병합 표시)을 squash merge했다(`fed643f`).
+- PR #8(이전 이력 더 불러오기)을 squash merge했다(`fd705ac`).
 
 ## 지금 하는 일
 
-M3 · 이전 이력 더 불러오기 → PR #8에서 CI 대기 (10분 뒤 확인 예약)
+M3 · 파일 감시 자동 새로고침 → PR #9에서 CI 대기 (10분 뒤 확인 예약)
 
-- `App`의 `limit` 상태(`HISTORY_PAGE` = 3000, `?page=N`으로 바꿀 수 있음)로 스냅샷을 다시 불러온다
-- 렌더러가 가장 오래된 커밋 왼쪽에 꼬리와 "⋯ 이전 이력 더 불러오기" 버튼을 그린다(`moreHit`). `fit()`도 이 꼬리를 포함한다
-- `GraphCanvas`: 새 레이아웃이 오면 직전 최신 커밋의 x를 기준으로 카메라를 보정한다. 그보다 새로운 커밋만 반짝임 효과를 준다
+- `git/watch.rs`
+  - `notify-debouncer-mini`(300ms)로 작업 트리 전체를 감시한다
+  - `relevant()`가 무시할 경로를 걸러낸다: `.gitignore`된 경로, `.git/objects`, `.git/logs`, `*.lock`
+  - macOS의 `/var` ↔ `/private/var` 경로 차이 때문에 루트를 원래 경로와 canonical 경로 둘 다 확인한다
+- `lib.rs`: `watch_repo` 명령, `Watching` 상태(새로 감시를 시작하면 이전 감시는 drop되어 멈춤), `repo-changed` 이벤트
+- 프런트: `api.watch(path, onChange)` → `listen` + `invoke`. 데모에서는 아무 일도 하지 않는다
+- 테스트 43. 실제 앱(Xvfb)에서 터미널로 커밋하면 클릭 없이 그래프에 바로 나타나는 것을 확인했다
 
 ## 다음 단계
 
-1. M3 · 파일 감시 자동 새로고침: `notify` + `notify-debouncer-mini`, `.gitignore`된 경로는 무시(`repo.is_path_ignored`), Tauri 이벤트 `repo-changed`
+1. 라벨 겹침 회피 (인접 노드 배지가 가로로 겹침)
 2. 충돌 블록 직접 편집, 줄 단위 스테이징
-3. 라벨 겹침 회피
+3. M3 · 시맨틱 줌 확장 (일직선 구간을 접기)
 
 ## 막힌 것 / 결정 필요
 

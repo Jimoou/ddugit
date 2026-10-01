@@ -135,6 +135,23 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
+  // Files and refs changed on disk (editor, terminal git) → refresh.
+  useEffect(() => {
+    if (!path) return;
+    let stop = () => {};
+    let live = true;
+    api
+      .watch(path, () => void refresh())
+      .then(
+        (un) => (live ? (stop = un) : un()),
+        () => {}, // watching is a convenience; focus refresh still works
+      );
+    return () => {
+      live = false;
+      stop();
+    };
+  }, [path, refresh]);
+
   // Pick up edits made in an editor when the user comes back to the window.
   useEffect(() => {
     const onFocus = () => void refresh();

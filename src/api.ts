@@ -100,6 +100,14 @@ export const api = {
     }
     return hit;
   },
+  /** Watch the repo on disk; `onChange` fires (debounced) on relevant edits. Returns an unsubscribe. */
+  async watch(path: string, onChange: () => void): Promise<() => void> {
+    if (!isTauri || path === DEMO_PATH) return () => {};
+    const { listen } = await import("@tauri-apps/api/event");
+    const unlisten = await listen("repo-changed", onChange);
+    await invoke("watch_repo", { path });
+    return unlisten;
+  },
   async pickFolder(): Promise<string | null> {
     if (!isTauri) return DEMO_PATH;
     const { open } = await import("@tauri-apps/plugin-dialog");

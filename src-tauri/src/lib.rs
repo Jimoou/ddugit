@@ -65,6 +65,21 @@ command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::co
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref(), scope));
 
+/// The one repository being watched; replacing it drops (stops) the previous watcher.
+#[derive(Default)]
+struct Watching(std::sync::Mutex<Option<git::watch::RepoWatcher>>);
+
+/// Watch `path` and emit `repo-changed` to the window on relevant changes.
+#[tauri::command]
+fn watch_repo(app: tauri::AppHandle, state: tauri::State<Watching>, path: String) -> Result<(), String> {
+    use tauri::Emitter;
+    let watcher = git::watch::watch(&path, move || {
+        let _ = app.emit("repo-changed", ());
+    })?;
+    *state.0.lock().map_err(|e| e.to_string())? = Some(watcher);
+    Ok(())
+}
+
 /// Repository passed on the command line (`otgit path/to/repo`), if any.
 #[tauri::command]
 fn initial_repo() -> Option<String> {
@@ -79,8 +94,10 @@ fn initial_repo() -> Option<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(Watching::default())
         .invoke_handler(tauri::generate_handler![
             initial_repo,
+            watch_repo,
             repo_snapshot,
             git_commit,
             git_stage_hunks,
