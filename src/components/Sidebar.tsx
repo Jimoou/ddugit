@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import type { RefInfo } from "../types";
+import { stashTitle } from "../format";
+import type { RefInfo, StashInfo } from "../types";
 
 interface Props {
   refs: RefInfo[];
@@ -8,6 +9,9 @@ interface Props {
   focused: string | null;
   onFocus(ref: RefInfo | null): void;
   onCheckout(name: string): void;
+  stashes: StashInfo[];
+  selectedStash: number | null;
+  onStash(index: number): void;
 }
 
 const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
@@ -16,7 +20,8 @@ const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
   { kind: "tag", title: "태그" },
 ];
 
-export function Sidebar({ refs, headBranch, colorOf, focused, onFocus, onCheckout }: Props) {
+export function Sidebar(props: Props) {
+  const { refs, headBranch, colorOf, focused, onFocus, onCheckout, stashes, selectedStash, onStash } = props;
   const [q, setQ] = useState("");
   const filtered = useMemo(
     () =>
@@ -57,6 +62,26 @@ export function Sidebar({ refs, headBranch, colorOf, focused, onFocus, onCheckou
           </section>
         );
       })}
+      {stashes.length > 0 && (
+        <section>
+          <h3>
+            스태시 <span className="muted">{stashes.length}</span>
+          </h3>
+          <ul>
+            {stashes.map((st) => (
+              <li
+                key={st.id}
+                className={selectedStash === st.index ? "focused" : ""}
+                title={st.message}
+                onClick={() => onStash(st.index)}
+              >
+                <span className="diamond" />
+                <span className="name">{stashTitle(st.message)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </nav>
   );
 }

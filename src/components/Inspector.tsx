@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { fmtTime } from "../format";
 import type { CommitInfo, FileDiff, RefInfo } from "../types";
+import { ChangedFiles } from "./ChangedFiles";
 
 interface Props {
   commit: CommitInfo;
@@ -14,16 +16,6 @@ interface Props {
   onCreateBranch(name: string, at: string): void;
   onSelect(id: string): void;
   onOpenFile(path: string): void;
-}
-
-function fmt(t: number) {
-  return new Date(t * 1000).toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export function Inspector(props: Props) {
@@ -63,7 +55,7 @@ export function Inspector(props: Props) {
           {commit.author} <span className="muted">&lt;{commit.email}&gt;</span>
         </dd>
         <dt>시간</dt>
-        <dd>{fmt(commit.time)}</dd>
+        <dd>{fmtTime(commit.time)}</dd>
         <dt>커밋</dt>
         <dd>
           <code className="sha" title="클릭해서 복사" onClick={() => navigator.clipboard?.writeText(commit.id)}>
@@ -84,23 +76,7 @@ export function Inspector(props: Props) {
         )}
       </dl>
 
-      <section className="changed">
-        <h3>
-          변경 파일 <span className="muted">{files ? files.length : "…"}</span>
-        </h3>
-        <ul>
-          {files?.map((f) => (
-            <li key={f.path} onClick={() => onOpenFile(f.path)} title="diff 보기">
-              <span className={`chip k-${f.status}`}>{f.status[0].toUpperCase()}</span>
-              <span className="path">{f.path}</span>
-              <span className="stat">
-                {f.additions > 0 && <span className="add">+{f.additions}</span>}
-                {f.deletions > 0 && <span className="del">−{f.deletions}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <ChangedFiles files={files} onOpen={onOpenFile} />
 
       {locals.length > 0 && (
         <div className="actions">

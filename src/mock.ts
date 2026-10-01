@@ -30,6 +30,7 @@ class MockRepo {
   state = "clean";
   clock = Math.floor(Date.now() / 1000) - 86400 * 40;
   fetched = false;
+  stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
 
   commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
     const id = fakeId();
@@ -114,6 +115,7 @@ class MockRepo {
       refs,
       remotes: [{ name: "origin", url: "https://github.com/otgit/otgit-demo.git" }],
       changes: this.changes.map((c) => ({ ...c })),
+      stashes: this.stashes.map(({ message, id, base, time }, index) => ({ index, message, id, base, time })),
       state: this.state,
       truncated: false,
     };
@@ -152,6 +154,13 @@ function seed(): MockRepo {
   r.remotes.set("origin/feature/theme", r.branches.get("feature/theme")!);
   r.remotes.set("origin/feature/graph-zoom", r.branches.get("feature/graph-zoom")!);
   r.add("feature/graph-zoom", "Zoom to cursor");
+  r.stashes.push({
+    message: "On main: try warmer glow palette",
+    id: fakeId(),
+    base: r.branches.get("main")!,
+    time: r.clock,
+    changes: [{ path: "src/App.css", staged: null, unstaged: "modified", conflicted: false }],
+  });
   r.head = "feature/graph-zoom";
   r.changes = [
     { path: "src/graph/renderer.ts", staged: null, unstaged: "modified", conflicted: false },
@@ -346,7 +355,42 @@ export const mock: Table = {
     return typeof r === "string" ? fail(r) : r;
   },
 
+  git_discard({ paths }) {
+    const set = new Set(paths);
+    repo.changes = repo.changes.filter((c) => !set.has(c.path));
+    return delay(res("ok"));
+  },
+
+  git_stash_push({ message, paths }) {
+    const set = new Set(paths.length ? paths : repo.changes.map((c) => c.path));
+    const moved = repo.changes.filter((c) => set.has(c.path));
+    if (!moved.length) return fail("No local changes to save");
+    repo.changes = repo.changes.filter((c) => !set.has(c.path));
+    repo.stashes.unshift({
+      message: `On ${repo.head}: ${message || "otgit stash"}`,
+      id: fakeId(),
+      base: repo.branches.get(repo.head)!,
+      time: Math.floor(Date.now() / 1000),
+      changes: moved,
+    });
+    return delay(res("ok", "Saved working directory and index state"));
+  },
+
+  git_stash({ op, index }) {
+    const st = repo.stashes[index];
+    if (!st) return fail(`stash@{${index}} does not exist`);
+    if (op !== "drop") {
+      const have = new Set(repo.changes.map((c) => c.path));
+      repo.changes.push(...st.changes.filter((c) => !have.has(c.path)));
+    }
+    if (op !== "apply") repo.stashes.splice(index, 1);
+    return delay(res("ok"));
+  },
+
   commit_diff({ id }) {
+    const st = repo.stashes.find((x) => x.id === id);
+    if (st)
+      return delay(st.changes.map((c) => fakeFile(c.path, hash(c.path), st.message, c.unstaged ?? c.staged ?? "")));
     const c = repo.commits.get(id);
     if (!c) return fail(`Unknown commit ${id}`);
     const h = hash(id);

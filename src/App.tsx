@@ -2,15 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri } from "./api";
 import { Composer } from "./components/Composer";
 import { AuthDialog } from "./components/AuthDialog";
+import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
 import { Sidebar } from "./components/Sidebar";
+import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, computeLayout } from "./graph/layout";
 import { NEON } from "./graph/scene";
+import { stashTitle } from "./format";
 import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RemoteOp, RepoSnapshot } from "./types";
 import "./App.css";
 
@@ -60,7 +63,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [remoteBusy, setRemoteBusy] = useState<RemoteOp | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [commitFiles, setCommitFiles] = useState<FileDiff[] | null>(null);
+  const [selectedStash, setSelectedStash] = useState<number | null>(null);
+  const [panelFiles, setPanelFiles] = useState<FileDiff[] | null>(null);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [focusRef, setFocusRef] = useState<RefInfo | null>(null);
   const [composer, setComposer] = useState(false);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
@@ -103,6 +108,7 @@ export default function App() {
   useEffect(() => {
     setSnap(null);
     setSelected(null);
+    setSelectedStash(null);
     setFocusRef(null);
     setDiff(null);
     void refresh();
@@ -115,19 +121,28 @@ export default function App() {
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
-  // Changed files of the selected commit, for the inspector.
+  const stashSel = selectedStash !== null ? snap?.stashes[selectedStash] : undefined;
+  /** The right panel shows one thing: composer, a stash, or a commit. */
+  const show = (what: { commit?: string | null; stash?: number | null; composer?: boolean }) => {
+    setSelected(what.commit ?? null);
+    setSelectedStash(what.stash ?? null);
+    setComposer(what.composer ?? false);
+  };
+
+  // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
+  const panelId = stashSel?.id ?? selected;
   useEffect(() => {
-    setCommitFiles(null);
-    if (!path || !selected) return;
+    setPanelFiles(null);
+    if (!path || !panelId) return;
     let live = true;
     api
-      .commitDiff(path, selected)
-      .then((f) => live && setCommitFiles(f))
-      .catch(() => live && setCommitFiles([]));
+      .commitDiff(path, panelId)
+      .then((f) => live && setPanelFiles(f))
+      .catch(() => live && setPanelFiles([]));
     return () => {
       live = false;
     };
-  }, [path, selected]);
+  }, [path, panelId]);
 
   const loadDiff = useCallback(
     (source: DiffSource, title: string, file?: string) => {
@@ -275,7 +290,7 @@ export default function App() {
         progress={progress}
         animate={animate}
         onOpenRepo={openRepo}
-        onCompose={() => setComposer(true)}
+        onCompose={() => show({ composer: true })}
         onRefresh={() => void refresh()}
         onRemote={(op) => void remote(op)}
         onToggleAnimate={() => {
@@ -314,6 +329,13 @@ export default function App() {
             if (r) graph.current?.centerOn(r.target);
           }}
           onCheckout={(name) => run(`${name}(으)로 이동했어요`, () => api.checkout(path, name))}
+          stashes={snap.stashes}
+          selectedStash={selectedStash}
+          onStash={(i) => {
+            show({ stash: i });
+            const base = snap.stashes[i]?.base;
+            if (base) graph.current?.centerOn(base);
+          }}
         />
 
         <section className="stage">
@@ -329,14 +351,11 @@ export default function App() {
               selected={selected}
               focus={focus}
               animate={animate}
-              onSelect={(id) => {
-                setSelected(id);
-                if (id) setComposer(false);
-              }}
-              onPlus={() => {
-                setSelected(null);
-                setComposer(true);
-              }}
+              onSelect={(id) => (id || !composer ? show({ commit: id }) : undefined)}
+              onPlus={() => show({ composer: true })}
+              stashes={snap.stashes}
+              selectedStash={selectedStash}
+              onStash={(i) => show({ stash: i })}
               canMergeInto={canMergeInto}
               onMerge={(sourceId, targetId) => {
                 const target = branchAt(targetId)!;
@@ -391,6 +410,39 @@ export default function App() {
             busy={busy}
             onClose={() => setComposer(false)}
             onOpenFile={(file) => loadDiff({ kind: "worktree" }, "작업 중인 변경", file)}
+            onStash={(message, paths) =>
+              run(
+                "스태시에 보관했어요",
+                () => api.stashPush(path, message, paths),
+                () => {
+                  setDiff((d) => (d?.source.kind === "worktree" ? null : d));
+                },
+              )
+            }
+            onDiscard={(paths) =>
+              setConfirm({
+                title: "변경 버리기",
+                danger: true,
+                confirmLabel: `${paths.length}개 파일 버리기`,
+                body: (
+                  <>
+                    <p>
+                      아래 파일의 변경을 마지막 커밋 상태로 되돌립니다. 새로 만든 파일은 <b>삭제</b>돼요.
+                      <b> 되돌릴 수 없습니다.</b> 확실하지 않으면 스태시로 치워두세요.
+                    </p>
+                    <ul>
+                      {paths.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  </>
+                ),
+                onConfirm: () => {
+                  setConfirm(null);
+                  void run("변경을 버렸어요", () => api.discard(path, paths));
+                },
+              })
+            }
             onCommit={(message, paths, newBranch) =>
               run(
                 "체크포인트를 추가했어요",
@@ -415,7 +467,7 @@ export default function App() {
           <Inspector
             commit={selectedCommit}
             refs={snap.refs.filter((r) => r.target === selectedCommit.id)}
-            files={commitFiles}
+            files={panelFiles}
             color={colorOf(selectedCommit.id)}
             isHead={selectedCommit.id === snap.head.target}
             busy={busy}
@@ -433,7 +485,46 @@ export default function App() {
             }
           />
         )}
+        {stashSel && !composer && (
+          <StashPanel
+            stash={stashSel}
+            files={panelFiles}
+            busy={busy}
+            onClose={() => show({})}
+            onSelectBase={() => {
+              show({ commit: stashSel.base });
+              graph.current?.centerOn(stashSel.base);
+            }}
+            onOpenFile={(file) => loadDiff({ kind: "commit", id: stashSel.id }, stashTitle(stashSel.message), file)}
+            onPop={() =>
+              run(
+                "스태시를 꺼냈어요",
+                () => api.stash(path, "pop", stashSel.index),
+                () => show({}),
+              )
+            }
+            onApply={() => run("스태시를 적용했어요", () => api.stash(path, "apply", stashSel.index))}
+            onDrop={() =>
+              setConfirm({
+                title: "스태시 삭제",
+                danger: true,
+                confirmLabel: "삭제",
+                body: <p>“{stashTitle(stashSel.message)}” 스태시를 지웁니다. 되돌릴 수 없어요.</p>,
+                onConfirm: () => {
+                  setConfirm(null);
+                  void run(
+                    "스태시를 삭제했어요",
+                    () => api.stash(path, "drop", stashSel.index),
+                    () => show({}),
+                  );
+                },
+              })
+            }
+          />
+        )}
       </div>
+
+      {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
 
       {mergeReq && (
         <MergeDialog

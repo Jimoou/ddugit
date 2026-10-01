@@ -74,6 +74,23 @@ button.primary:hover:not(:disabled) {
 button.ghost {
   background: transparent;
 }
+button.danger {
+  border-color: rgba(255, 77, 109, 0.5);
+  color: #ffb3c1;
+}
+button.danger:not(.ghost) {
+  background: var(--red);
+  color: #07060d;
+  font-weight: 700;
+  box-shadow: 0 0 18px rgba(255, 77, 109, 0.35);
+}
+button.danger:hover:not(:disabled) {
+  border-color: var(--red);
+  box-shadow: 0 0 14px rgba(255, 77, 109, 0.3);
+}
+.eyebrow.danger {
+  color: var(--red);
+}
 button.ghost.on {
   color: var(--cyan);
   text-shadow: 0 0 8px var(--cyan);
@@ -338,6 +355,14 @@ textarea:focus {
 .sidebar .name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.sidebar .diamond {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--amber);
+  box-shadow: 0 0 6px var(--amber);
 }
 .sidebar .dot {
   width: 8px;
@@ -1047,4 +1072,25 @@ table.diff tr.rem .sign {
   white-space: pre-wrap;
   color: var(--muted);
   user-select: text;
+}
+
+/* ------------------------------------------------------------ stash + misc */
+.side-actions button {
+  flex: 1;
+  white-space: nowrap;
+}
+.confirm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.confirm-body ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 160px;
+  overflow-y: auto;
+  font: 12px var(--mono);
+}
+.stash-panel .eyebrow {
+  color: var(--amber);
 }

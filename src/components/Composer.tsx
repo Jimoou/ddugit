@@ -9,6 +9,10 @@ interface Props {
   onClose(): void;
   onOpenFile(path: string): void;
   onCommit(message: string, paths: string[], newBranch: string | null): void;
+  /** Put the picked files away in a stash (message may be empty). */
+  onStash(message: string, paths: string[]): void;
+  /** Throw the picked files' changes away (caller confirms). */
+  onDiscard(paths: string[]): void;
 }
 
 const LABEL: Record<string, string> = {
@@ -26,7 +30,8 @@ function kind(c: FileChange): string {
 }
 
 /** Panel opened from the [+] node after HEAD: pick files, write a message, commit. */
-export function Composer({ changes, branch, merging, busy, onClose, onOpenFile, onCommit }: Props) {
+export function Composer(props: Props) {
+  const { changes, branch, merging, busy, onClose, onOpenFile, onCommit, onStash, onDiscard } = props;
   const [picked, setPicked] = useState<Set<string>>(() => new Set(changes.map((c) => c.path)));
   const [message, setMessage] = useState("");
   const [newBranch, setNewBranch] = useState("");
@@ -150,6 +155,26 @@ export function Composer({ changes, branch, merging, busy, onClose, onOpenFile, 
               onChange={(e) => setNewBranch(e.target.value.replace(/\s+/g, "-"))}
             />
           )}
+        </div>
+      )}
+
+      {!merging && (
+        <div className="row side-actions">
+          <button
+            disabled={busy || picked.size === 0}
+            title="선택한 변경을 스태시에 보관하고 작업 트리에서 치웁니다"
+            onClick={() => onStash(message.trim(), all ? [] : [...picked])}
+          >
+            ◇ 스태시에 보관
+          </button>
+          <button
+            className="danger ghost"
+            disabled={busy || picked.size === 0}
+            title="선택한 파일의 변경을 버립니다 (되돌릴 수 없음)"
+            onClick={() => onDiscard([...picked])}
+          >
+            선택 버리기
+          </button>
         </div>
       )}
 

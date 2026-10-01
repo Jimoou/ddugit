@@ -1,4 +1,5 @@
-import type { RefInfo } from "../types";
+import { stashTitle } from "../format";
+import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf } from "./scene";
 
 export interface View {
@@ -35,7 +36,40 @@ export interface DrawState {
   summaries: Map<string, string>;
   drag: Drag | null;
   births: Map<string, number>;
+  stashes: StashMark[];
+  stashHover: number | null;
+  stashSelected: number | null;
 }
+
+/** A stash drawn as a small diamond hanging off the commit it was taken on. */
+export interface StashMark {
+  index: number;
+  message: string;
+  base: Pt;
+  pos: Pt;
+}
+
+export function stashMarks(scene: Scene, stashes: StashInfo[]): StashMark[] {
+  const perBase = new Map<string, number>();
+  const n = scene.layout.rowCount;
+  return stashes.flatMap((st) => {
+    const node = scene.layout.byId.get(st.base);
+    if (!node) return []; // base outside the loaded history
+    const i = perBase.get(st.base) ?? 0;
+    perBase.set(st.base, i + 1);
+    const base = { x: xOf(node.row, n), y: yOf(node.lane) };
+    return [
+      {
+        index: st.index,
+        message: stashTitle(st.message),
+        base,
+        pos: { x: base.x + COL * (0.5 + i * 0.3), y: base.y + LANE * 0.45 },
+      },
+    ];
+  });
+}
+
+export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
 
 /** Zoom thresholds for semantic zoom. */
 export const ZOOM = { dots: 0.35, branches: 0.55, allRefs: 0.8, summaries: 1.25 };
@@ -265,6 +299,50 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.stroke();
     }
     labelQueue.push({ x: p.x, y: p.y, id: node.id, color: c, d });
+  }
+
+  // --- stashes ----------------------------------------------------------------
+  for (const m of s.stashes) {
+    const b = toScreen(view, m.base);
+    const p = toScreen(view, m.pos);
+    if (p.x < -40 || p.x > w + 40 || p.y < -40 || p.y > h + 40) continue;
+    const c = NEON[3];
+    const on = m.index === s.stashHover || m.index === s.stashSelected;
+    const sr = stashRadius(k) * (on ? 1.2 : 1);
+    ctx.save();
+    ctx.setLineDash([2, 4]);
+    ctx.strokeStyle = alpha(c, 0.6);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.quadraticCurveTo(p.x, b.y, p.x, p.y);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sr * 3);
+    g.addColorStop(0, alpha(c, on ? 0.6 : 0.35));
+    g.addColorStop(1, alpha(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(p.x - sr * 3, p.y - sr * 3, sr * 6, sr * 6);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - sr);
+    ctx.lineTo(p.x + sr, p.y);
+    ctx.lineTo(p.x, p.y + sr);
+    ctx.lineTo(p.x - sr, p.y);
+    ctx.closePath();
+    ctx.fillStyle = on ? c : "#0a0814";
+    ctx.fill();
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    if (on || k >= ZOOM.summaries) {
+      ctx.font = `600 11px ${SANS}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = c;
+      ctx.fillText(truncate(ctx, `stash · ${m.message}`, 220), p.x + sr + 6, p.y);
+    }
   }
 
   // --- labels (semantic zoom) -------------------------------------------------

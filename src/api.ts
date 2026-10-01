@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
-import type { FileDiff, OpResult, Progress, RemoteOp, RepoSnapshot } from "./types";
+import type { FileDiff, OpResult, Progress, RemoteOp, RepoSnapshot, StashOp } from "./types";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -23,6 +23,9 @@ export interface Commands {
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
+  git_discard: [{ path: string; paths: string[] }, OpResult];
+  git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
+  git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null }, FileDiff[]];
 }
@@ -58,6 +61,9 @@ export const api = {
     }
     return call("git_remote", { path, op, onProgress: sink });
   },
+  discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
+  stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
+  stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),
   worktreeDiff: (path: string, file: string | null = null) => call("worktree_diff", { path, file }),
   commitDiff(path: string, id: string): Promise<FileDiff[]> {
     const key = `${path}\n${id}`;

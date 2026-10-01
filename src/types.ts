@@ -35,6 +35,18 @@ export interface FileChange {
   conflicted: boolean;
 }
 
+export interface StashInfo {
+  /** Position in the stash list: `stash@{index}`. */
+  index: number;
+  message: string;
+  id: string;
+  /** Commit the stash was taken on. */
+  base: string;
+  time: number;
+}
+
+export type StashOp = "apply" | "pop" | "drop";
+
 export interface RepoSnapshot {
   path: string;
   name: string;
@@ -43,6 +55,7 @@ export interface RepoSnapshot {
   refs: RefInfo[];
   remotes: RemoteInfo[];
   changes: FileChange[];
+  stashes: StashInfo[];
   state: string;
   truncated: boolean;
 }

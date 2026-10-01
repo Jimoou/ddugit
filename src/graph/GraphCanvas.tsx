@@ -1,7 +1,17 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { RefInfo } from "../types";
+import type { RefInfo, StashInfo } from "../types";
 import type { Layout } from "./layout";
-import { draw, type Drag, nodeRadius, plusPosition, toScreen, toWorld, type View } from "./renderer";
+import {
+  draw,
+  type Drag,
+  nodeRadius,
+  plusPosition,
+  stashMarks,
+  stashRadius,
+  toScreen,
+  toWorld,
+  type View,
+} from "./renderer";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
 import { Minimap } from "./Minimap";
 
@@ -24,6 +34,9 @@ interface Props {
   animate: boolean;
   onSelect(id: string | null): void;
   onPlus(): void;
+  stashes: StashInfo[];
+  selectedStash: number | null;
+  onStash(index: number | null): void;
   /** Dropped `source` onto `target` — caller decides whether it's a valid merge. */
   onMerge(source: string, target: string): void;
   canMergeInto(target: string, source: string): boolean;
@@ -38,6 +51,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const scene = useMemo(() => buildScene(props.layout), [props.layout]);
+  const marks = useMemo(() => stashMarks(scene, props.stashes), [scene, props.stashes]);
+  const marksRef = useRef(marks);
+  marksRef.current = marks;
 
   const refsByCommit = useMemo(() => {
     const m = new Map<string, RefInfo[]>();
@@ -58,6 +74,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     size: { w: 0, h: 0 },
     hovered: null as string | null,
     plusHover: false,
+    stashHover: null as number | null,
     drag: null as Drag | null,
     pan: null as { x: number; y: number; tx: number; ty: number; moved: boolean } | null,
     press: null as { id: string; x: number; y: number } | null,
@@ -229,6 +246,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         summaries: p.summaries,
         drag: s.drag,
         births: s.births,
+        stashes: marksRef.current,
+        stashHover: s.stashHover,
+        stashSelected: p.selectedStash,
       });
       const hint = !s.drag ? null : s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle";
       setDragHint((h) => (h === hint ? h : hint));
@@ -255,6 +275,15 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     }
     return null;
   }
+  function stashAt(p: Pt): number | null {
+    const v = st.current.view;
+    const r = stashRadius(v.k) + 5;
+    for (const m of marksRef.current) {
+      const sp = toScreen(v, m.pos);
+      if (Math.abs(sp.x - p.x) + Math.abs(sp.y - p.y) <= r) return m.index;
+    }
+    return null;
+  }
   function onPlus(p: Pt): boolean {
     const s = st.current;
     const sp = toScreen(s.view, plusPosition(sceneRef.current, propsRef.current.headId));
@@ -274,6 +303,11 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     s.target = null;
     if (onPlus(p)) {
       propsRef.current.onPlus();
+      return;
+    }
+    const stash = stashAt(p);
+    if (stash !== null) {
+      propsRef.current.onStash(stash === propsRef.current.selectedStash ? null : stash);
       return;
     }
     const id = nodeAt(p);
@@ -307,8 +341,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       return;
     }
     s.plusHover = onPlus(p);
-    s.hovered = s.plusHover ? null : nodeAt(p);
-    setCursor(s.plusHover || s.hovered ? "pointer" : "grab");
+    s.stashHover = s.plusHover ? null : stashAt(p);
+    s.hovered = s.plusHover || s.stashHover !== null ? null : nodeAt(p);
+    setCursor(s.plusHover || s.hovered || s.stashHover !== null ? "pointer" : "grab");
   };
 
   const onPointerUp = (e: React.PointerEvent) => {

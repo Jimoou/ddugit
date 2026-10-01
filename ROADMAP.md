@@ -23,10 +23,10 @@
 - [x] 원격 작업 진행률 표시 (`--progress` 파싱)
 - [x] 인증 실패 시 안내 (credential helper / SSH agent 설정 가이드)
 
-## M2 · 일상 작업 완성
+## M2 · 일상 작업 완성 🚧
 
 - [ ] hunk / 줄 단위 스테이징
-- [ ] 변경 버리기(discard), stash 저장·적용·목록
+- [x] 변경 버리기(discard), stash 저장·적용·꺼내기·삭제 (그래프에 기준 커밋 옆 마름모로 표시)
 - [ ] amend, revert, cherry-pick (점을 끌어 다른 브랜치에 놓을 때 수정키로 선택)
 - [ ] 브랜치 이름 변경 / 삭제, 태그 생성, 원격 브랜치 체크아웃(추적 브랜치 생성)
 - [ ] 충돌 해결 화면 (ours / theirs / 수동 편집, 3-way)
@@ -38,6 +38,7 @@
 - [ ] 이전 이력 더 불러오기 (현재 3000개 제한)
 - [ ] 파일 감시(notify)로 자동 새로고침 (현재는 창 포커스 시에만)
 - [ ] 시맨틱 줌 확장: 일직선 구간을 막대로 접기
+- [ ] 라벨 겹침 회피 (인접 노드의 브랜치 배지가 가로로 겹침)
 - [ ] 레이아웃 Web Worker 이동, 필요하면 WebGL 렌더러
 - [ ] diff 가상 스크롤 (큰 파일)
 
@@ -65,3 +66,4 @@
 | 2026-10-01 | 워크플로우 도입: CLAUDE.md / CONVENTIONS.md / ROADMAP / NEXT, CI(ubuntu·macos·windows), Prettier·rustfmt                               |
 | 2026-10-01 | M1: fetch/pull/push(+ahead/behind, 갈라짐·거부 처리), diff 시트(커밋/작업 트리), git 모듈 분리(테스트 17)                              |
 | 2026-10-01 | `main` 생성(골격 커밋), 첫 PR #1. M1 완료: 원격 진행률(`--progress` → Tauri Channel), 인증 실패 분류 + OS별 안내 다이얼로그(테스트 20) |
+| 2026-10-01 | M2: discard(확인 필수) + stash push/apply/pop/drop, 그래프 스태시 마커·패널·사이드바, ChangedFiles/format 공통화(테스트 25)            |
