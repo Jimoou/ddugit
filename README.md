@@ -15,6 +15,15 @@
 - **diff 시트** — 커밋 상세의 파일이나 커밋 작성기의 파일 이름을 누르면 그래프 아래에서 diff가 올라옵니다 (`[` `]` 파일 이동).
 - 브랜치 색은 이름 기준으로 고정되어 새로고침해도 바뀌지 않으며, main/master는 항상 첫 번째 레인에 놓입니다.
 
+## 설치
+
+[Releases](https://github.com/Jimoou/otgit/releases)에서 받습니다.
+
+- **macOS**: `otgit_<버전>_universal.dmg` (Apple silicon과 Intel 모두 지원). 열어서 otgit을 응용 프로그램으로 끌어 놓습니다.
+- **Windows**: `otgit_<버전>_x64-setup.exe`. 관리자 권한 없이 사용자 계정에 설치합니다.
+
+아직 코드 서명을 하지 않았습니다. 처음 실행할 때 macOS에서는 앱을 우클릭 → **열기**, Windows에서는 SmartScreen에서 **추가 정보 → 실행**을 누릅니다.
+
 ## 조작
 
 | 동작               | 방법                                                                     |
@@ -37,7 +46,7 @@ npm install
 npm run tauri dev            # 데스크톱 앱
 npm run tauri dev -- -- /path/to/repo   # 저장소를 바로 열기
 npm run dev                  # 브라우저 데모 모드 (가상 저장소, http://localhost:1420)
-npm run tauri build          # 설치 파일 (.dmg / .msi / .exe)
+npm run tauri build          # 이 OS의 설치 파일 (macOS: .dmg, Windows: NSIS .exe)
 ```
 
 테스트:

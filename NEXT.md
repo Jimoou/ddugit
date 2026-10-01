@@ -7,31 +7,29 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #23(Shift+끌기로 커밋 순서 옮기기)을 squash merge했다(`0755c5e`).
-- 사용자 결정(2026-10-01)
-  1. 밝은 테마는 만들지 않는다. 대신 **은하계 스타일**로 간다. 그래프 네온과 옷깃 브랜드는 그대로 두고, 기능 버튼에서 네온을 빼서 가독성을 높인다
-  2. **영어 번역** 필요
-  3. 서명과 자동 업데이트는 **나중에**
-  4. 배포는 **dmg / exe**로 한다. Tauri 번들러가 그대로 만든다
+- PR #24(은하계 스타일, 검정 탑바·사이드바)를 squash merge했다(`d284a40`).
 
 ## 지금 하는 일
 
-은하계 스타일 → PR #24에서 CI 대기 (10분 뒤 확인 예약)
+배포 설정(dmg / exe) → PR #25에서 CI 대기
 
-- `graph/space.ts`: 캔버스 배경
-  - 깊은 그라디언트에 성운 세 개(시차 0.02)를 깔고, 별 타일 세 겹을 미리 그려 둔다(시차 0.04/0.1/0.2)
-  - 반짝이는 별 12개는 ✦가 켜져 있을 때만 깜빡인다. 점 격자는 없앴다
-- CSS
-  - 새 토큰: `--space` `--glass` `--glass-strong` `--text-2` `--ui` `--ui-hover` `--ui-soft` `--ui-text` `--focus` `--ok` `--danger`
-  - 조작 요소에서 네온 그라디언트와 발광을 걷어냈다. primary 버튼은 보라 단색에 흰 글자, 켜짐 상태는 채운 배경으로 보여 준다
-  - eyebrow 글자는 `--text-2`, 토스트는 왼쪽 색 막대로 구분한다. panel, dialog, menu, sheet는 유리 표면(blur)으로 바꿨다
-  - topbar와 sidebar는 사용자 요청으로 검정 단색(`--chrome: #000`)이다
-- CONVENTIONS §5에 "네온은 그래프와 데이터 전용" 규칙을 적었다
+- `tauri.conf.json`
+  - `bundle.targets = ["dmg", "nsis"]`
+  - macOS 최소 11.0
+  - NSIS는 `currentUser` 설치이고 설치 화면에서 한국어/영어를 고른다
+  - 창 배경색을 은하계 색으로 바꿨다
+- `.github/workflows/release.yml`
+  - `v*` 태그를 push하면 macOS universal dmg와 Windows x64 exe를 만들어 **초안** Release에 올린다(`tauri-action`)
+  - 수동 실행(`workflow_dispatch`)하면 Release 대신 artifact로 남긴다
+  - 서명은 없다
+- 아이콘: 은하계 배경 + 네온 브랜치 그래프. 1024px 원본을 Playwright로 렌더하고 `npx tauri icon`으로 모든 크기를 만들었다(android/ios는 지움)
+- README에 설치 방법과 서명 전 첫 실행 경고 넘기는 법을 적었다. CLAUDE.md에 릴리스 절차를 적었다
+- merge 후 `workflow_dispatch`로 한 번 돌려서 dmg/exe가 실제로 만들어지는지 확인한다
 
 ## 다음 단계
 
-1. 배포 설정: `bundle.targets = ["dmg", "nsis"]`, 태그를 push하면 Release에 dmg/exe를 올리는 워크플로(서명 없음)
-2. 영어 번역(i18n): 문자열 사전 + 언어 설정. PR을 여러 개로 나눈다(기반 → 화면별)
+1. 영어 번역(i18n): 문자열 사전 + 언어 설정. PR을 여러 개로 나눈다(기반 → 화면별)
+2. (나중에) 서명, 자동 업데이트
 
 ## 막힌 것 / 결정 필요
 
