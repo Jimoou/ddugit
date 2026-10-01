@@ -59,7 +59,9 @@ export function Composer(props: Props) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paths]);
-  useEffect(() => msgRef.current?.focus(), []);
+  useEffect(() => {
+    msgRef.current?.focus();
+  }, []);
 
   const all = picked.size === changes.length && changes.length > 0;
   const anyStaged = changes.some((c) => c.staged);
