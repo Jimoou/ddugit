@@ -7,21 +7,24 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #31(저장소 연결: clone, 최근 목록·즐겨찾기, init, 끌어다 놓기)을 squash merge했다(`b7620a3`).
-- v0.1.0 초안 Release가 있다(빌드 성공). 사용자가 Publish하면 태그가 생긴다.
+- PR #32(멀티탭, 탭 전환 워프)를 squash merge했다(`cfe8e36`).
 
 ## 지금 하는 일
 
-M6 멀티탭 → PR CI 대기
+M6 고급 git 1단계 "실수 되돌리기" → PR CI 대기
 
-- `App.tsx` = 탭 셸: 탭 목록(`tabs.ts`: openIn·addEmpty·closeTab·cycle·selectAt·저장), 설정, 연결(clone·init·끌어다 놓기), 알림(`toasts floating`), 워프
-- `RepoView.tsx` = 예전 App 본문. 탭마다 하나씩 떠 있다. `active`가 아니면 `hidden`이고 키 입력·파일 감시·탑바가 없다. 탭에 돌아오면 새로고침한다
-- 숨은 탭: `GraphCanvas`·`Minimap`은 캔버스가 0×0이면 그리지 않는다. 다시 보일 때 카메라를 옮기지 않는다
-- 데스크톱은 `otgit.tabs`에 열린 탭을 저장한다(예전 `otgit.lastRepo`도 이어받음). 데모는 데모 탭 하나로 시작한다
+- Rust `git/undo.rs`
+  - `reset(path, target, mode)`: 진행 중인 작업이 있으면 거부한다
+  - `reflog(path, limit)`: `lost`는 revwalk(push id, hide refs/* 와 HEAD)로 계산한다
+- 화면
+  - 커밋 우클릭 "마지막 커밋 취소"(soft, 이미 push됐으면 창으로 경고)와 "이 커밋으로 되돌리기…"(`ResetDialog`)
+  - 탑바 ⏱ → `ReflogSheet`(브랜치로 살리기 = createBranch 전환 없음, 여기로 되돌리기 = ResetDialog)
+- 연출: reset이 성공하면 `.rewind`(청록 줄무늬가 거꾸로 감기며 안으로 빨려 듦, 0.65초)가 `.fx-clip` 안에서 재생된다
+- 데모: 명령이 끝날 때마다 `noteHead`가 HEAD 이동을 reflog에 남긴다
 
 ## 다음 단계 (M6 순서, ROADMAP 참고)
 
-1. 고급 git 작업: 실수 되돌리기(reset soft/mixed/hard, 마지막 커밋 취소, reflog 복구) → 브랜치 정리 → 과거 커밋 손보기 → bisect·blame. 각 기능에 맞는 우주 연출을 함께 넣는다(되돌리기 = 시간을 감는 효과)
+1. 고급 git 작업: 브랜치 정리 → 과거 커밋 손보기 → bisect·blame. 각 기능에 맞는 우주 연출을 함께 넣는다
 2. 기존 기능의 게임 같은 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌
 3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
 4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다

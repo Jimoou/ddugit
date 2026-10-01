@@ -367,3 +367,43 @@ test("opens repositories in tabs and keeps each tab's state", async ({ demo }) =
   await tabs.nth(1).getByRole("button", { name: /닫기/ }).click();
   await expect(tabs).toHaveCount(1);
 });
+
+test("undoes the last commit, goes back hard, then rescues the lost commit from the reflog", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => d.grow(2));
+  const before = await demo.snapshot();
+  const head = before.head.target!;
+  const byId = new Map(before.commits.map((c) => [c.id, c]));
+  const parent = byId.get(head)!.parents[0];
+  const grand = byId.get(parent)!.parents[0];
+
+  // Undo the last commit: HEAD moves to its parent, its change comes back staged.
+  await expect.poll(async () => (await demo.screenOf(head)) !== null).toBe(true);
+  let at = (await demo.screenOf(head))!;
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await page.click(".context-menu >> text=마지막 커밋 취소");
+  await demo.toast("마지막 커밋을 취소했어요");
+  await expect.poll(async () => (await demo.snapshot()).head.target).toBe(parent);
+  expect((await demo.snapshot()).changes.some((c) => c.staged)).toBe(true);
+
+  // Go back one more, discarding everything.
+  at = (await demo.screenOf(grand))!;
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  await page.click(".context-menu >> text=이 커밋으로 되돌리기");
+  const dialog = page.getByRole("dialog", { name: "되돌리기" });
+  await dialog.getByText("변경까지 모두 버리기 (hard)").click();
+  await expect(dialog).toContainText("커밋하지 않은 변경");
+  await dialog.getByRole("button", { name: "되돌리기" }).click();
+  await expect.poll(async () => (await demo.snapshot()).head.target).toBe(grand);
+  expect((await demo.snapshot()).changes).toEqual([]);
+
+  // The undone commit is only in the reflog now: rescue it as a branch.
+  await page.getByRole("button", { name: "되돌리기 기록 (reflog)" }).click();
+  const row = page.locator(".reflog-list li.lost").filter({ hasText: head.slice(0, 7) });
+  await row.getByRole("button", { name: "브랜치로 살리기" }).click();
+  await page.locator(".dialog input").fill("rescued");
+  await page.locator(".dialog button.primary").click();
+  await demo.toast("rescued 브랜치로 살렸어요");
+  expect((await demo.snapshot()).refs.find((r) => r.name === "rescued")?.target).toBe(head);
+  await expect(page.locator(".reflog-list li.lost").filter({ hasText: head.slice(0, 7) })).toHaveCount(0);
+});

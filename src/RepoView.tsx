@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { api } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
+import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { RebaseSheet } from "./components/RebaseSheet";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
@@ -32,6 +33,8 @@ import type {
   OpStatus,
   Progress,
   RebaseStep,
+  ReflogEntry,
+  ResetMode,
   RefInfo,
   RefOp,
   RemoteOp,
@@ -127,6 +130,17 @@ export function RepoView({
   const [rebaseFrom, setRebaseFrom] = useState<string | null>(null);
   /** Starting plan for the sheet (from a Shift-drag); null starts with every commit picked in order. */
   const [rebaseInit, setRebaseInit] = useState<RebaseStep[] | null>(null);
+  /** "Go back to this commit": the target and what the dialog needs to explain it. */
+  const [resetReq, setResetReq] = useState<{
+    target: string;
+    summary: string;
+    passed: number;
+    pushed: boolean;
+    initial?: ResetMode;
+  } | null>(null);
+  const [reflogOpen, setReflogOpen] = useState(false);
+  /** Bumped after a reset to replay the rewind effect. */
+  const [rewind, setRewind] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
@@ -483,6 +497,35 @@ export function RepoView({
       },
     });
 
+  /** Move the branch to `target` with `mode`, then play the rewind. */
+  const doReset = (target: string, mode: ResetMode, label = t("undo.done", { branch: snap?.head.branch ?? "HEAD" })) =>
+    run(
+      label,
+      () => api.reset(path, target, mode),
+      () => {
+        setResetReq(null);
+        setRewind((n) => n + 1);
+        setTimeout(() => graph.current?.centerOnHead(), 60);
+      },
+    );
+
+  /** Ask how to go back to `target` (a commit, maybe one only the reflog knows). */
+  const askReset = (target: string, initial?: ResetMode, summary?: string) => {
+    if (!snap?.head.target) return;
+    // Commits leaving the branch; unknown for a commit only the reflog has (it isn't loaded).
+    const passed = commitById.has(target)
+      ? [...ancestors(snap.commits, snap.head.target)].filter((c) => !isAncestor(c, target)).length
+      : 0;
+    setResetReq({
+      target,
+      summary: summary ?? commitById.get(target)?.summary ?? target.slice(0, 7),
+      passed,
+      // More commits leave the branch than are unpushed: some were pushed.
+      pushed: !!snap.head.upstream && passed > snap.head.ahead,
+      initial,
+    });
+  };
+
   /** Right-click menu for a ref badge (graph) or a sidebar row. */
   const refMenu = (r: RefInfo): MenuItem[] => {
     if (!snap) return [];
@@ -632,6 +675,21 @@ export function RepoView({
         onSelect: () => show({ composer: true, amend: true }),
       },
       {
+        label: t("undo.lastCommit"),
+        disabled: !isHead || !clean || !commitById.get(id)?.parents.length,
+        onSelect: () => {
+          const parent = commitById.get(id)!.parents[0];
+          // Already pushed: explain the force push first; otherwise just do it.
+          if (snap.head.upstream && snap.head.ahead === 0) askReset(parent, "soft");
+          else void doReset(parent, "soft", t("undo.lastCommit.done"));
+        },
+      },
+      {
+        label: t("undo.toHere"),
+        disabled: !clean || !onHead || isHead,
+        onSelect: () => askReset(id),
+      },
+      {
         label: t("menu.rebase"),
         hint: typeof range === "string" ? t("menu.rebase.hasMerge") : undefined,
         disabled: !clean || !snap.head.branch || !onHead || isHead || typeof range === "string",
@@ -683,6 +741,12 @@ export function RepoView({
           repoMenu={repoMenu}
           onCompose={() => show({ composer: true })}
           onRefresh={() => void refresh()}
+          onUndoHistory={() => {
+            setDiff(null);
+            setBackport(null);
+            setRebaseFrom(null);
+            setReflogOpen((o) => !o);
+          }}
           onRemote={(op) => void remote(op)}
           onToggleAnimate={onToggleAnimate}
           onSettings={onSettings}
@@ -745,6 +809,11 @@ export function RepoView({
                 onStep={(d) => goToMatch(search.index + d)}
                 onClose={() => setSearch(null)}
               />
+            )}
+            {animate && rewind > 0 && (
+              <div className="fx-clip" aria-hidden>
+                <div key={rewind} className="rewind" />
+              </div>
             )}
             <GraphCanvas
               ref={graph}
@@ -892,7 +961,39 @@ export function RepoView({
             />
           )}
 
-          {diff && !conflictSheet && !backport && !rebase && (
+          {reflogOpen && !conflictSheet && !backport && !rebase && (
+            <ReflogSheet
+              path={path}
+              version={snap}
+              head={snap.head.target}
+              busy={busy}
+              onSelect={(id) => {
+                if (!commitById.has(id)) return;
+                show({ commit: id });
+                graph.current?.centerOn(id);
+              }}
+              onResetTo={(e: ReflogEntry) => askReset(e.id, "mixed", e.summary)}
+              onRescue={(e: ReflogEntry) =>
+                setNameReq({
+                  title: t("undo.log.rescue.title", { sha: e.id.slice(0, 7) }),
+                  placeholder: `rescue/${e.id.slice(0, 7)}`,
+                  initial: "",
+                  confirmLabel: t("undo.log.rescue"),
+                  onSubmit: (name) => {
+                    setNameReq(null);
+                    void run(
+                      t("undo.log.rescued", { name }),
+                      () => api.createBranch(path, name, e.id, false),
+                      () => setTimeout(() => graph.current?.centerOn(e.id), 120),
+                    );
+                  },
+                })
+              }
+              onClose={() => setReflogOpen(false)}
+            />
+          )}
+
+          {diff && !conflictSheet && !backport && !rebase && !reflogOpen && (
             <DiffSheet
               title={diff.title}
               files={diff.files}
@@ -1063,6 +1164,20 @@ export function RepoView({
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
 
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
+
+      {resetReq && (
+        <ResetDialog
+          branch={snap.head.branch ?? "HEAD"}
+          summary={resetReq.summary}
+          passed={resetReq.passed}
+          pushed={resetReq.pushed}
+          dirty={snap.changes.length}
+          initial={resetReq.initial}
+          busy={busy}
+          onCancel={() => setResetReq(null)}
+          onReset={(mode) => void doReset(resetReq.target, mode)}
+        />
+      )}
 
       {mergeReq && (
         <MergeDialog

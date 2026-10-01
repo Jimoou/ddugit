@@ -12,6 +12,7 @@ import type {
   OpStatus,
   RefInfo,
   RemoteOp,
+  ReflogEntry,
   RepoSnapshot,
 } from "./types";
 
@@ -46,6 +47,17 @@ class MockRepo {
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();
   remoteUrls = new Map([["origin", "https://github.com/otgit/otgit-demo.git"]]);
+  /** Where HEAD has been, newest first (like `git reflog`); `lost` is computed on read. */
+  reflog: Omit<ReflogEntry, "lost">[] = [];
+
+  /** Record a HEAD move after a command, if the tip changed. */
+  noteHead(message: string) {
+    const tip = this.branches.get(this.head);
+    const last = this.reflog[0]?.id ?? "0".repeat(40);
+    if (!tip || tip === last) return;
+    const c = this.commits.get(tip)!;
+    this.reflog.unshift({ id: tip, prev: last, message, summary: c.summary, time: Math.floor(Date.now() / 1000) });
+  }
 
   commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
     const id = fakeId();
@@ -378,7 +390,7 @@ function remoteOp(op: RemoteOp): OpResult | string {
 
 type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
 
-export const mock: Table = {
+const mockTable: Table = {
   initial_repo: () => delay(null, 0),
   // Any folder "is" the demo repository, except ones named like a plain folder.
   repo_root: ({ dir }) => delay(/not-a-repo/.test(dir) ? null : dir, 0),
@@ -709,4 +721,45 @@ export const mock: Table = {
     const list = repo.changes.filter((c) => (!file || c.path === file) && inScope(c));
     return delay(list.map((c) => fakeFile(c.path, hash(c.path), "work in progress", c.unstaged ?? c.staged ?? "")));
   },
+
+  git_reset({ target, mode }) {
+    if (repo.state !== "clean") return fail("Finish or cancel the operation in progress first");
+    const tip = repo.branches.get(repo.head)!;
+    const dest = repo.resolve(target);
+    if (!dest) return fail(`unknown revision '${target}'`);
+    const passed = [...repo.ancestors(tip)].filter((id) => !repo.ancestors(dest).has(id));
+    repo.branches.set(repo.head, dest);
+    if (mode === "hard") repo.changes = [];
+    else
+      for (const id of passed) {
+        const file = `${repo.commits.get(id)!.summary.toLowerCase().replace(/\W+/g, "-")}.txt`;
+        repo.changes.push({
+          path: file,
+          staged: mode === "soft" ? "modified" : null,
+          unstaged: mode === "soft" ? null : "modified",
+          conflicted: false,
+        });
+      }
+    return delay(res("ok"));
+  },
+
+  git_reflog({ limit }) {
+    const reach = new Set<string>();
+    for (const t of [...repo.branches.values(), ...repo.remotes.values(), ...repo.tags.values()])
+      for (const id of repo.ancestors(t)) reach.add(id);
+    return delay(repo.reflog.slice(0, limit ?? 100).map((e) => ({ ...e, lost: !reach.has(e.id) })));
+  },
 };
+
+/** Every command, then a reflog entry if it moved HEAD (named like git's). */
+export const mock = Object.fromEntries(
+  Object.entries(mockTable).map(([name, f]) => [
+    name,
+    async (args: never) => {
+      const r = await (f as (a: never) => Promise<unknown>)(args);
+      repo.noteHead(name.replace(/^git_/, "").replace(/_/g, " "));
+      return r;
+    },
+  ]),
+) as Table;
+repo.noteHead("checkout: demo");
