@@ -49,6 +49,14 @@ export type StashOp = "apply" | "pop" | "drop";
 
 export type PickOp = "cherryPick" | "revert";
 
+/** Mirrors `RefOp` in git/refs.rs (`kind` tag, camelCase fields). */
+export type RefOp =
+  | { kind: "renameBranch"; from: string; to: string }
+  | { kind: "deleteBranch"; name: string; force: boolean }
+  | { kind: "createTag"; name: string; at: string; message: string }
+  | { kind: "deleteTag"; name: string }
+  | { kind: "checkoutRemote"; remoteRef: string };
+
 export interface RepoSnapshot {
   path: string;
   name: string;
@@ -62,7 +70,7 @@ export interface RepoSnapshot {
   truncated: boolean;
 }
 
-export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected" | "auth";
+export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected" | "auth" | "unmerged";
 
 export interface OpResult {
   status: OpStatus;

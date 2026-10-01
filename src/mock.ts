@@ -325,6 +325,42 @@ export const mock: Table = {
     return delay(res("ok"));
   },
 
+  git_ref({ op }) {
+    switch (op.kind) {
+      case "renameBranch": {
+        const id = repo.branches.get(op.from);
+        if (!id) return fail(`branch '${op.from}' not found`);
+        if (repo.branches.has(op.to)) return fail(`a branch named '${op.to}' already exists`);
+        repo.branches.delete(op.from);
+        repo.branches.set(op.to, id);
+        if (repo.head === op.from) repo.head = op.to;
+        return delay(res("ok"));
+      }
+      case "deleteBranch": {
+        const id = repo.branches.get(op.name);
+        if (!id) return fail(`branch '${op.name}' not found`);
+        if (op.name === repo.head) return fail(`cannot delete branch '${op.name}' used by HEAD`);
+        const merged = [...repo.branches].some(([n, t]) => n !== op.name && repo.ancestors(t).has(id));
+        if (!merged && !op.force) return delay(res("unmerged", `error: the branch '${op.name}' is not fully merged`));
+        repo.branches.delete(op.name);
+        return delay(res("ok"));
+      }
+      case "createTag":
+        if (repo.tags.has(op.name)) return fail(`tag '${op.name}' already exists`);
+        repo.tags.set(op.name, op.at);
+        return delay(res("ok"));
+      case "deleteTag":
+        repo.tags.delete(op.name);
+        return delay(res("ok"));
+      case "checkoutRemote": {
+        const local = op.remoteRef.replace(/^[^/]+\//, "");
+        if (!repo.branches.has(local)) repo.branches.set(local, repo.remotes.get(op.remoteRef)!);
+        repo.head = local;
+        return delay(res("ok"));
+      }
+    }
+  },
+
   git_pick({ op, id, target }) {
     const c = repo.commits.get(id);
     if (!c) return fail(`Unknown commit ${id}`);

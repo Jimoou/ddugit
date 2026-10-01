@@ -8,7 +8,8 @@ interface Props {
   colorOf(target: string): string;
   focused: string | null;
   onFocus(ref: RefInfo | null): void;
-  onCheckout(name: string): void;
+  onCheckout(ref: RefInfo): void;
+  onRefMenu(ref: RefInfo, x: number, y: number): void;
   stashes: StashInfo[];
   selectedStash: number | null;
   onStash(index: number): void;
@@ -21,7 +22,7 @@ const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
 ];
 
 export function Sidebar(props: Props) {
-  const { refs, headBranch, colorOf, focused, onFocus, onCheckout, stashes, selectedStash, onStash } = props;
+  const { refs, headBranch, colorOf, focused, onFocus, onCheckout, onRefMenu, stashes, selectedStash, onStash } = props;
   const [q, setQ] = useState("");
   const filtered = useMemo(
     () =>
@@ -48,9 +49,17 @@ export function Sidebar(props: Props) {
                   <li
                     key={key}
                     className={`${focused === key ? "focused" : ""} ${isHead ? "head" : ""}`}
-                    title={r.kind === "local" ? "클릭: 집중해서 보기 · 더블클릭: 체크아웃" : "클릭: 집중해서 보기"}
+                    title={
+                      r.kind === "tag"
+                        ? "클릭: 집중해서 보기 · 우클릭: 메뉴"
+                        : "클릭: 집중해서 보기 · 더블클릭: 체크아웃 · 우클릭: 메뉴"
+                    }
                     onClick={() => onFocus(focused === key ? null : r)}
-                    onDoubleClick={() => r.kind === "local" && onCheckout(r.name)}
+                    onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onRefMenu(r, e.clientX, e.clientY);
+                    }}
                   >
                     <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
                     <span className="name">{r.name}</span>
