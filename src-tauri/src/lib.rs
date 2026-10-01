@@ -3,6 +3,7 @@ mod git;
 use git::diff::FileDiff;
 use git::pick::PickOp;
 use git::read::RepoSnapshot;
+use git::refs::RefOp;
 use git::remote::{Progress, RemoteOp};
 use git::stash::StashOp;
 use git::OpResult;
@@ -43,6 +44,7 @@ command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) 
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
+command!(git_ref(path: String, op: RefOp) -> OpResult => git::refs::apply(&path, &op));
 command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
@@ -77,6 +79,7 @@ pub fn run() {
             git_pick,
             git_checkout,
             git_create_branch,
+            git_ref,
             git_remote,
             git_discard,
             git_stash_push,

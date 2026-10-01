@@ -4,7 +4,7 @@ import { Composer } from "./components/Composer";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
-import { NameDialog } from "./components/NameDialog";
+import { NameDialog, type NameRequest } from "./components/NameDialog";
 import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
@@ -16,7 +16,7 @@ import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, computeLayout } from "./graph/layout";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
-import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RemoteOp, RepoSnapshot } from "./types";
+import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RefOp, RemoteOp, RepoSnapshot } from "./types";
 import "./App.css";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
@@ -73,8 +73,8 @@ export default function App() {
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [focusRef, setFocusRef] = useState<RefInfo | null>(null);
   const [composer, setComposer] = useState<false | { amend: boolean }>(false);
-  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [branchAtId, setBranchAtId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; title?: string; items: MenuItem[] } | null>(null);
+  const [nameReq, setNameReq] = useState<NameRequest | null>(null);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
   const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
   const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
@@ -284,6 +284,135 @@ export default function App() {
     });
   };
 
+  const refRun = (label: string, op: RefOp) => run(label, () => api.ref(path!, op));
+
+  const checkoutRef = (r: RefInfo) =>
+    r.kind === "remote"
+      ? refRun(`${r.name}을(를) 로컬로 가져와 이동했어요`, { kind: "checkoutRemote", remoteRef: r.name })
+      : run(`${r.name}(으)로 이동했어요`, () => api.checkout(path!, r.name));
+
+  const askBranchAt = (at: string) =>
+    setNameReq({
+      title: `${at.slice(0, 7)}에서 새 브랜치`,
+      placeholder: "feature/my-idea",
+      confirmLabel: "만들고 이동",
+      onSubmit: (name) => {
+        setNameReq(null);
+        void run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path!, name, at, true));
+      },
+    });
+
+  const askTagAt = (at: string) =>
+    setNameReq({
+      title: `${at.slice(0, 7)}에 태그`,
+      placeholder: "v1.0.0",
+      confirmLabel: "태그 만들기",
+      messagePlaceholder: "설명 (비워 두면 가벼운 태그, 쓰면 주석 태그)",
+      onSubmit: (name, message) => {
+        setNameReq(null);
+        void refRun(`${name} 태그를 만들었어요`, { kind: "createTag", name, at, message });
+      },
+    });
+
+  /** Delete a local branch; if git says it's unmerged, ask again before forcing. */
+  const deleteBranch = (name: string) =>
+    setConfirm({
+      title: "브랜치 삭제",
+      danger: true,
+      confirmLabel: "삭제",
+      body: (
+        <p>
+          로컬 브랜치 <b>{name}</b>을(를) 지웁니다. 원격 브랜치는 그대로예요.
+        </p>
+      ),
+      onConfirm: async () => {
+        setConfirm(null);
+        const r = await refRun(`${name} 브랜치를 지웠어요`, { kind: "deleteBranch", name, force: false });
+        if (r.status !== "unmerged") return;
+        setConfirm({
+          title: "병합되지 않은 브랜치",
+          danger: true,
+          confirmLabel: "그래도 삭제",
+          body: (
+            <p>
+              <b>{name}</b>에는 다른 브랜치에 병합되지 않은 커밋이 있어요. 지우면 그 커밋들은 그래프에서
+              사라집니다(reflog로만 복구 가능).
+            </p>
+          ),
+          onConfirm: () => {
+            setConfirm(null);
+            void refRun(`${name} 브랜치를 지웠어요`, { kind: "deleteBranch", name, force: true });
+          },
+        });
+      },
+    });
+
+  /** Right-click menu for a ref badge (graph) or a sidebar row. */
+  const refMenu = (r: RefInfo): MenuItem[] => {
+    if (!snap || !path) return [];
+    const isHead = r.kind === "local" && r.name === snap.head.branch;
+    const canMerge = !!snap.head.branch && !isHead && r.kind !== "tag" && canDropOn(snap.head.target ?? "", r.target);
+    const merge: MenuItem = {
+      label: snap.head.branch ? `${snap.head.branch}에 병합` : "HEAD에 병합",
+      disabled: !canMerge,
+      onSelect: () =>
+        setMergeReq({ sourceId: r.target, targetId: snap.head.target!, source: r.name, target: snap.head.branch! }),
+    };
+    if (r.kind === "tag")
+      return [
+        { label: "태그 위치로 이동", onSelect: () => graph.current?.centerOn(r.target) },
+        "separator",
+        {
+          label: "태그 삭제",
+          danger: true,
+          onSelect: () =>
+            setConfirm({
+              title: "태그 삭제",
+              danger: true,
+              confirmLabel: "삭제",
+              body: (
+                <p>
+                  로컬 태그 <b>{r.name}</b>을(를) 지웁니다.
+                </p>
+              ),
+              onConfirm: () => {
+                setConfirm(null);
+                void refRun(`${r.name} 태그를 지웠어요`, { kind: "deleteTag", name: r.name });
+              },
+            }),
+        },
+      ];
+    if (r.kind === "remote")
+      return [
+        { label: "로컬 브랜치로 체크아웃", hint: "추적", onSelect: () => void checkoutRef(r) },
+        merge,
+        "separator",
+        { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(r.target) },
+      ];
+    return [
+      { label: "체크아웃", disabled: isHead, onSelect: () => void checkoutRef(r) },
+      merge,
+      "separator",
+      {
+        label: "이름 변경…",
+        onSelect: () =>
+          setNameReq({
+            title: "브랜치 이름 변경",
+            placeholder: "새 이름",
+            confirmLabel: "변경",
+            initial: r.name,
+            onSubmit: (to) => {
+              setNameReq(null);
+              void refRun(`${to}(으)로 이름을 바꿨어요`, { kind: "renameBranch", from: r.name, to });
+            },
+          }),
+      },
+      { label: "여기에 태그…", onSelect: () => askTagAt(r.target) },
+      "separator",
+      { label: "브랜치 삭제…", danger: true, disabled: isHead, onSelect: () => deleteBranch(r.name) },
+    ];
+  };
+
   /** Right-click menu for a commit node; entries that don't apply are disabled, not hidden. */
   const nodeMenu = (id: string): MenuItem[] => {
     if (!snap || !path) return [];
@@ -294,7 +423,8 @@ export default function App() {
     const locals = snap.refs.filter((r) => r.kind === "local" && r.target === id && r.name !== snap.head.branch);
     const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
     return [
-      { label: "여기서 새 브랜치…", onSelect: () => setBranchAtId(id) },
+      { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(id) },
+      { label: "여기에 태그…", onSelect: () => askTagAt(id) },
       ...locals.map((r) => ({
         label: `${r.name} 체크아웃`,
         onSelect: () => void run(`${r.name}(으)로 이동했어요`, () => api.checkout(path, r.name)),
@@ -417,7 +547,8 @@ export default function App() {
             setFocusRef(r);
             if (r) graph.current?.centerOn(r.target);
           }}
-          onCheckout={(name) => run(`${name}(으)로 이동했어요`, () => api.checkout(path, name))}
+          onCheckout={checkoutRef}
+          onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
           stashes={snap.stashes}
           selectedStash={selectedStash}
           onStash={(i) => {
@@ -452,7 +583,8 @@ export default function App() {
                   return setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
                 confirmPick(sourceId, target);
               }}
-              onNodeMenu={(id, x, y) => setMenu({ id, x, y })}
+              onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
+              onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}
             />
 
@@ -621,29 +753,10 @@ export default function App() {
       </div>
 
       {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          title={commitById.get(menu.id)?.summary}
-          items={nodeMenu(menu.id)}
-          onClose={() => setMenu(null)}
-        />
+        <ContextMenu x={menu.x} y={menu.y} title={menu.title} items={menu.items} onClose={() => setMenu(null)} />
       )}
 
-      {branchAtId && (
-        <NameDialog
-          title={`${branchAtId.slice(0, 7)}에서 새 브랜치`}
-          placeholder="feature/my-idea"
-          confirmLabel="만들고 이동"
-          busy={busy}
-          onCancel={() => setBranchAtId(null)}
-          onSubmit={(name) => {
-            const at = branchAtId;
-            setBranchAtId(null);
-            void run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true));
-          }}
-        />
-      )}
+      {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
 
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
 

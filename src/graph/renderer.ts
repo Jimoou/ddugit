@@ -41,6 +41,16 @@ export interface DrawState {
   stashes: StashMark[];
   stashHover: number | null;
   stashSelected: number | null;
+  /** Output: screen rects of the ref badges drawn this frame, for hit testing. */
+  labelHits: LabelHit[];
+}
+
+export interface LabelHit {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  ref: RefInfo;
 }
 
 /** A stash drawn as a small diamond hanging off the commit it was taken on. */
@@ -130,6 +140,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const { scene, view, w, h, dpr, time } = s;
   const { k } = view;
   const n = scene.layout.rowCount;
+  s.labelHits.length = 0;
 
   // --- background -----------------------------------------------------------
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -376,6 +387,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
           ctx.textAlign = "center";
           ctx.fillText(truncate(ctx, label, 160), L.x, by + bh / 2 + 0.5);
           ctx.globalAlpha = 1;
+          s.labelHits.push({ x: bx, y: by, w: bw, h: bh, ref: rf });
           y -= bh + 4;
         }
       }

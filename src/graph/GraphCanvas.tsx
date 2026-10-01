@@ -4,6 +4,7 @@ import type { Layout } from "./layout";
 import {
   draw,
   type Drag,
+  type LabelHit,
   nodeRadius,
   plusPosition,
   stashMarks,
@@ -42,6 +43,7 @@ interface Props {
   onDrop(source: string, target: string, mode: Drag["mode"]): void;
   canDropOn(target: string, source: string): boolean;
   onNodeMenu(id: string, x: number, y: number): void;
+  onRefMenu(ref: RefInfo, x: number, y: number): void;
   onZoomChange?(k: number): void;
 }
 
@@ -86,6 +88,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     hovered: null as string | null,
     plusHover: false,
     stashHover: null as number | null,
+    labelHits: [] as LabelHit[],
     drag: null as Drag | null,
     pan: null as { x: number; y: number; tx: number; ty: number; moved: boolean } | null,
     press: null as { id: string; x: number; y: number } | null,
@@ -260,6 +263,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         stashes: marksRef.current,
         stashHover: s.stashHover,
         stashSelected: p.selectedStash,
+        labelHits: s.labelHits,
       });
       const hint = !s.drag ? null : (`${s.drag.mode}:${s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle"}` as const);
       setDragHint((h) => (h === hint ? h : hint));
@@ -427,7 +431,13 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           onPointerUp={onPointerUp}
           onContextMenu={(e) => {
             e.preventDefault();
-            const id = nodeAt(local(e));
+            const p = local(e);
+            // Badges sit above nodes, so they win.
+            const hit = st.current.labelHits
+              .filter((l) => p.x >= l.x && p.x <= l.x + l.w && p.y >= l.y && p.y <= l.y + l.h)
+              .pop();
+            if (hit) return propsRef.current.onRefMenu(hit.ref, e.clientX, e.clientY);
+            const id = nodeAt(p);
             if (id) propsRef.current.onNodeMenu(id, e.clientX, e.clientY);
           }}
           onPointerLeave={() => {

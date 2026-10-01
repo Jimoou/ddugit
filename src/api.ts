@@ -1,6 +1,6 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
-import type { FileDiff, OpResult, PickOp, Progress, RemoteOp, RepoSnapshot, StashOp } from "./types";
+import type { FileDiff, OpResult, PickOp, Progress, RefOp, RemoteOp, RepoSnapshot, StashOp } from "./types";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -23,6 +23,7 @@ export interface Commands {
   git_pick: [{ path: string; op: PickOp; id: string; target: string | null }, OpResult];
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
+  git_ref: [{ path: string; op: RefOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
@@ -55,6 +56,7 @@ export const api = {
   checkout: (path: string, target: string) => call("git_checkout", { path, target }),
   createBranch: (path: string, name: string, at: string | null, switchTo: boolean) =>
     call("git_create_branch", { path, name, at, switch: switchTo }),
+  ref: (path: string, op: RefOp) => call("git_ref", { path, op }),
   remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
     let sink: Sink<Progress> = { onmessage: onProgress };
     if (isTauri && path !== DEMO_PATH) {

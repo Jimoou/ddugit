@@ -7,6 +7,7 @@
 pub mod diff;
 pub mod pick;
 pub mod read;
+pub mod refs;
 pub mod remote;
 pub mod stash;
 pub mod write;
@@ -32,6 +33,8 @@ pub enum OpStatus {
     Rejected,
     /// Credentials or SSH host trust missing; the UI explains how to set them up.
     Auth,
+    /// Branch delete refused: it has commits not merged anywhere (force needed).
+    Unmerged,
 }
 
 #[derive(Debug, Serialize, Clone)]
