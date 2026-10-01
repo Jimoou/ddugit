@@ -60,9 +60,10 @@
 - [ ] 자동 업데이트 (tauri-plugin-updater)
 - [ ] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
 - [ ] i18n (영어), 접근성 (키보드로 노드 이동, 스크린리더 라벨)
-- [ ] ESLint, Playwright e2e를 CI에 추가
+- [x] ESLint, Playwright e2e를 CI에 추가
   - [x] Playwright e2e: 데모 모드 대상 5개 흐름(커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기), CI `E2E` 잡
-  - [ ] ESLint
+  - [x] ESLint: typescript-eslint 권장 + react-hooks(`rules-of-hooks`, `exhaustive-deps`) + effect 식 본문 금지. CI Web 잡에서 실행
+  - [ ] react-hooks v7의 React Compiler 규칙(`set-state-in-effect` 등) 켜기. 지금 코드에서 8곳이 걸린다(prop이 바뀔 때 상태를 초기화하는 effect). `key`로 리셋하거나 렌더 중에 조정하는 방식으로 옮겨야 한다
 
 ---
 
@@ -87,3 +88,4 @@
 | 2026-10-01 | PR #10 squash merge(`3f4e8f7`). M2 마무리: 줄 단위 스테이징(`select_lines`: 고르지 않은 `-`는 문맥으로, `+`는 버림, 내리기는 반대), 충돌 블록 직접 편집(줄바꿈 보존), 알림을 그래프 영역 안으로(테스트 47, vitest 25) |
 | 2026-10-01 | PR #11 squash merge(`d3461b1`). M3: 일직선 구간 접기(`graph/runs.ts` `straightRuns`, ref·HEAD·stash·병합 대기 커밋은 접지 않음, 검색 중이거나 선택된 구간은 펼친 채로), 데모 `__otgitDemo.grow(n)`(vitest 28)         |
 | 2026-10-01 | PR #12 squash merge(`0dea355`). 성능 항목은 측정 후 보류(수치는 M3에 기록). M5: Playwright e2e(`e2e/`, `npm run e2e`, CI 잡 추가, 반복 60회 안정), 데모 `__otgitDemo.snapshot()`                                      |
+| 2026-10-01 | PR #13 squash merge(`1de7c77`). e2e가 첫 CI에서 실제 버그를 잡았다(최신 Chromium `scrollTo`가 Promise를 돌려줘서 diff 시트가 깨짐, effect 식 본문 → 블록). M5: ESLint 추가, 같은 실수를 막는 규칙                     |

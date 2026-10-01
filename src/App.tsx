@@ -214,7 +214,7 @@ export default function App() {
   const focus = useMemo(() => {
     if (search?.query.trim()) return new Set(matches);
     return snap && focusRef ? ancestors(snap.commits, focusRef.target) : null;
-  }, [snap, focusRef, search?.query, matches]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [snap, focusRef, search?.query, matches]);
 
   /** Select match `i` (wrapping) and fly the camera to it. */
   const goToMatch = (i: number, list = matches) => {

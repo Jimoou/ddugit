@@ -244,7 +244,6 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     });
     ro.observe(el);
     return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Render loop.

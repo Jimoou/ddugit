@@ -8,6 +8,7 @@ otgit의 모든 코드(사람과 AI 모두)가 따르는 규칙입니다. 포맷
 | -------------- | ----------------------------------- | -------------------------------------------------------- |
 | TS/TSX/CSS/MD  | Prettier (`printWidth: 120`)        | `npm run format`                                         |
 | 타입           | `tsc` strict                        | `npm run typecheck`                                      |
+| TS 린트        | ESLint (typescript-eslint, hooks)   | `npm run lint`                                           |
 | Rust 포맷/린트 | rustfmt (`max_width = 110`), clippy | `cargo fmt`, `cargo clippy --all-targets -- -D warnings` |
 | 전체 확인      |                                     | `npm run check` + `cargo test`                           |
 
@@ -47,6 +48,7 @@ otgit의 모든 코드(사람과 AI 모두)가 따르는 규칙입니다. 포맷
 - 함수 컴포넌트만 씁니다. Props는 파일 안의 `interface Props`로 정의합니다.
 - **프레임마다 바뀌는 상태(카메라, 호버, 드래그)는 `useRef`에 둡니다.** `requestAnimationFrame` 루프 안에서 `setState`를 매 프레임 부르지 않습니다. 값이 바뀔 때만 부릅니다.
 - 파생 값은 `useMemo`로 계산합니다. 상태로 복제하지 않습니다.
+- effect 콜백은 항상 블록 본문으로 씁니다(`useEffect(() => { f(); }, …)`). 식 본문은 그 값을 정리 함수로 돌려줍니다. 최신 Chromium의 `scrollTo`가 Promise를 돌려줘서 실제로 화면이 깨진 적이 있습니다. ESLint가 막습니다.
 - 이름 규칙:
   - 컴포넌트 파일: `PascalCase.tsx`
   - 모듈: `camelCase.ts`
@@ -77,6 +79,7 @@ otgit의 모든 코드(사람과 AI 모두)가 따르는 규칙입니다. 포맷
 | 순수 로직 (`layout.ts` 등) | vitest                                 |
 | git 동작                   | `cargo test` (임시 저장소)             |
 | 렌더링과 상호작용          | 데모 모드 + Playwright (스크린샷 확인) |
+| 사용자 흐름                | `e2e/*.e2e.ts` (Playwright, CI)        |
 
 - 버그를 고칠 때는 그 버그를 재현하는 테스트를 먼저 추가합니다.
 - 테스트 헬퍼도 보일러플레이트 규칙을 따릅니다. 픽스처는 짧은 빌더 함수로 만듭니다 (예: `c(id, ...parents)`).
