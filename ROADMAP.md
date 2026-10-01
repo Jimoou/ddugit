@@ -54,7 +54,9 @@
   - 다른 저장소는 원격으로 추가해 비교한다(`git remote add upstream …`). 브랜치 우클릭 → "…에 없는 커밋 보기"
   - [x] 앱 안에서 원격 추가 (사이드바 원격 ＋, 추가 후 바로 Fetch) · 원격 브랜치 우클릭으로 원격 삭제
   - [ ] 여러 대상 한눈에 보기 (고객사가 여럿일 때 브랜치별 미반영 개수 표)
-- [ ] 드래그로 interactive rebase (순서 바꾸기, squash)
+- [x] 드래그로 interactive rebase (순서 바꾸기, squash) — 커밋 우클릭 → "이 다음 커밋들 정리", 목록 끌어서 순서 · 유지/합치기/버리기
+  - [ ] 그래프 위에서 노드를 끌어 바로 순서 바꾸기 (지금은 시트의 목록에서)
+  - [ ] 병합이 섞인 구간(`--rebase-merges`)
 - [ ] GitHub / GitLab PR 연동 (그래프에 PR 상태 표시)
 
 ## M5 · 배포 품질
@@ -94,3 +96,4 @@
 | 2026-10-01 | PR #13 squash merge(`1de7c77`). e2e가 첫 CI에서 실제 버그를 잡았다(최신 Chromium `scrollTo`가 Promise를 돌려줘서 diff 시트가 깨짐, effect 식 본문 → 블록). M5: ESLint 추가, 같은 실수를 막는 규칙                                                                       |
 | 2026-10-01 | PR #14 squash merge(`4b08f67`). M4: 백포트 트래커(`git/backport.rs`: `--cherry-mark`로 같은 패치, `-x` 트레일러로 고쳐서 옮긴 것까지 인식, 제외는 `otgit.backportIgnored` 로컬 config, 일괄 cherry-pick -x, `format-patch` 내보내기, `BackportSheet`)(테스트 50, e2e 6) |
 | 2026-10-01 | PR #15 squash merge(`91920f1`). 원격 추가·삭제(`RefOp::AddRemote/RemoveRemote`, 사이드바 ＋, `NameDialog` 두 번째 칸 일반화, 백포트 시트 안내를 버튼으로)(테스트 51, e2e 7)                                                                                             |
+| 2026-10-01 | PR #16 squash merge(`fac2a73`). M4: interactive rebase(`git/rebase.rs`: 미리 쓴 todo를 `sequence.editor=cp`로 넣음, 빠진 커밋·맨 앞 squash 거부, 충돌은 기존 흐름; `rebasePlan.ts` + vitest 4; `RebaseSheet`)(테스트 54, e2e 8)                                         |

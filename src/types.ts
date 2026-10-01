@@ -49,6 +49,13 @@ export type StashOp = "apply" | "pop" | "drop";
 
 export type PickOp = "cherryPick" | "revert";
 
+/** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
+export type RebaseAction = "pick" | "squash" | "fixup" | "drop";
+export interface RebaseStep {
+  id: string;
+  action: RebaseAction;
+}
+
 /** Mirrors `BackportState` in git/backport.rs (`kind` tag). */
 export type BackportState =
   { kind: "missing" } | { kind: "applied" } | { kind: "picked"; by: string } | { kind: "ignored" };
