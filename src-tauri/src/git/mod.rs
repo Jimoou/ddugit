@@ -7,6 +7,7 @@
 pub mod diff;
 pub mod read;
 pub mod remote;
+pub mod stash;
 pub mod write;
 
 use std::path::{Path, PathBuf};

@@ -12,13 +12,15 @@ _마지막 갱신: 2026-10-01_
   - 원격 작업 진행률: `--progress` stderr를 스트리밍해서(`git_streaming`) 파싱하고, Tauri `Channel`로 보내 버튼 안에 진행 바로 표시
   - 인증 실패: `OpStatus::Auth`로 분류하고 `AuthDialog`에서 HTTPS/SSH × macOS/Windows/Linux별 설정 단계를 보여준 뒤 다시 시도
 
-## 다음 단계 (추천 순서)
+## 지금 하는 일
 
-1. **PR #1의 CI 결과 처리**: macOS/Windows에서 처음 도는 CI다. 빨간불이면 원인을 찾아 고친다.
-2. **M2 시작**: 변경 버리기(discard)와 stash
-   - 백엔드: `git restore`/`git clean`(선택 경로), `git stash push/apply/pop/drop/list`
-   - UI: 작업 트리 diff 시트와 커밋 작성기에 "버리기" 버튼(확인 필수). stash는 그래프에 HEAD 옆 보조 노드로 표시하는 방향 검토
-3. 우클릭 컨텍스트 메뉴 (노드, 브랜치 라벨)
+M2 · 변경 버리기(discard)와 stash. 백엔드 완료(`git/stash.rs`, 테스트 25), 이제 UI 작업.
+
+1. 프런트: `Commands`에 `git_discard` / `git_stash_push` / `git_stash` 추가, `mock` 구현, 스냅샷의 `stashes` 사용
+2. 커밋 작성기: "선택 버리기"(확인 다이얼로그), "스태시로 치워두기"
+3. 그래프: 스태시를 기준 커밋 옆 보조 노드로 표시하고, 클릭하면 스태시 패널(Apply / Pop / Drop + 변경 파일)
+4. 사이드바에 스태시 목록
+5. 그다음: 우클릭 컨텍스트 메뉴. PR #1 CI 이벤트가 오면 그것부터 처리
 
 ## 막힌 것 / 결정 필요
 

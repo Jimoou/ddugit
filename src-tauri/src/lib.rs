@@ -3,6 +3,7 @@ mod git;
 use git::diff::FileDiff;
 use git::read::RepoSnapshot;
 use git::remote::{Progress, RemoteOp};
+use git::stash::StashOp;
 use git::OpResult;
 use tauri::ipc::Channel;
 
@@ -41,6 +42,10 @@ command!(git_create_branch(path: String, name: String, at: Option<String>, switc
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
 command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
+command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
+command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
+    => git::stash::stash_push(&path, &message, &paths));
+command!(git_stash(path: String, op: StashOp, index: usize) -> OpResult => git::stash::stash(&path, op, index));
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
 command!(worktree_diff(path: String, file: Option<String>) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref()));
@@ -69,6 +74,9 @@ pub fn run() {
             git_checkout,
             git_create_branch,
             git_remote,
+            git_discard,
+            git_stash_push,
+            git_stash,
             commit_diff,
             worktree_diff,
         ])

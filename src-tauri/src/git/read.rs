@@ -78,6 +78,7 @@ pub struct RepoSnapshot {
     pub refs: Vec<RefInfo>,
     pub remotes: Vec<RemoteInfo>,
     pub changes: Vec<FileChange>,
+    pub stashes: Vec<super::stash::StashInfo>,
     /// `clean`, `merge`, `rebase`, `cherry-pick`, `revert`, ...
     pub state: String,
     /// True when history was cut at `limit`.
@@ -104,6 +105,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
         refs,
         remotes: read_remotes(&repo),
         changes,
+        stashes: super::stash::read_stashes(path)?,
         state: state_name(repo.state()).to_string(),
         truncated,
     })
@@ -238,7 +240,7 @@ fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, boo
     Ok((commits, truncated))
 }
 
-fn read_changes(repo: &Repository) -> Result<Vec<FileChange>> {
+pub(super) fn read_changes(repo: &Repository) -> Result<Vec<FileChange>> {
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)
