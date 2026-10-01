@@ -294,6 +294,10 @@ export const demoControls = {
   failNextRemote: null as null | "https" | "ssh",
   /** Make the next merge stop on a conflict in two files. */
   conflictNext: false,
+  /** Append `n` commits to the current branch (long straight runs for the graph). */
+  grow(n: number) {
+    for (let i = 0; i < n; i++) repo.add(repo.head, `Step ${i + 1} of ${n}`);
+  },
 };
 if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__otgitDemo = demoControls;
