@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
-import type { BackportItem, BackportState } from "../types";
+import type { BackportItem, BackportState, BackportTally } from "../types";
 
 interface Props {
   path: string;
   /** Local and remote branch names to compare. */
   branches: string[];
+  /** Branches listed in the per-target overview (local ones: each customer's line). */
+  targets: string[];
   source: string;
   target: string;
   /** With fewer than two remotes, explain how to add the other repository. */
@@ -39,8 +41,25 @@ export function BackportSheet(p: Props) {
   const [items, setItems] = useState<BackportItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [all, setAll] = useState(false);
+  const [view, setView] = useState<"missing" | "all" | "targets">("missing");
+  const all = view === "all";
   const [reload, setReload] = useState(0);
+  // Overview rows belong to one source (and repo state); others are stale.
+  const tallyKey = `${source}\n${p.targets.join("\n")}`;
+  const [tallies, setTallies] = useState<{ key: string; version: unknown; rows: BackportTally[] } | null>(null);
+  const rows = tallies && tallies.key === tallyKey && tallies.version === version ? tallies.rows : null;
+
+  useEffect(() => {
+    if (view !== "targets") return;
+    let live = true;
+    api.backportSummary(path, source, p.targets).then(
+      (r) => live && setTallies({ key: tallyKey, version, rows: r }),
+      (e) => live && setError(String(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [view, path, source, p.targets, tallyKey, version]);
 
   useEffect(() => {
     let live = true;
@@ -83,7 +102,7 @@ export function BackportSheet(p: Props) {
       return n;
     });
   const ignore = (id: string, on: boolean) =>
-    api.backportIgnore(path, id, on).then(
+    api.backportIgnore(path, target, id, on).then(
       () => setReload((r) => r + 1),
       (e) => setError(String(e)),
     );
@@ -111,15 +130,21 @@ export function BackportSheet(p: Props) {
           )}
         </div>
         <div className="scope-tabs" role="tablist">
-          {[false, true].map((a) => (
+          {(
+            [
+              ["missing", "미반영"],
+              ["all", "전체"],
+              ["targets", "대상별"],
+            ] as const
+          ).map(([v, label]) => (
             <button
-              key={String(a)}
+              key={v}
               role="tab"
-              aria-selected={all === a}
-              className={all === a ? "on" : ""}
-              onClick={() => setAll(a)}
+              aria-selected={view === v}
+              className={view === v ? "on" : ""}
+              onClick={() => setView(v)}
             >
-              {a ? "전체" : "미반영"}
+              {label}
             </button>
           ))}
         </div>
@@ -130,66 +155,82 @@ export function BackportSheet(p: Props) {
 
       <div className="bp-body">
         {error && <p className="note warn">{error}</p>}
-        {!items && !error && <p className="muted pad">비교하는 중…</p>}
-        {items && !error && shown.length === 0 && (
-          <p className="muted pad">
-            {target}에 {source}의 커밋이 모두 반영돼 있어요.
-            {items.length > 0 && " (전체 탭에서 반영된 커밋을 볼 수 있어요)"}
-          </p>
-        )}
-        {shown.length > 0 && (
-          <table className="bp-list">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    aria-label="미반영 모두 선택"
-                    disabled={missing.length === 0}
-                    checked={missing.length > 0 && missing.every((i) => picked.has(i.id))}
-                    onChange={(e) => setPicked(new Set(e.target.checked ? missing.map((i) => i.id) : []))}
-                  />
-                </th>
-                <th>상태</th>
-                <th>커밋</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((i) => (
-                <tr key={i.id} className={`bp-${i.state.kind}`}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      aria-label={`${i.summary} 선택`}
-                      disabled={i.state.kind !== "missing"}
-                      checked={picked.has(i.id)}
-                      onChange={() => toggle(i.id)}
-                    />
-                  </td>
-                  <td>
-                    <span
-                      className={`chip bp-${i.state.kind}`}
-                      title={i.state.kind === "picked" ? `${i.state.by.slice(0, 7)}에서 -x로 가져옴` : undefined}
-                    >
-                      {STATE[i.state.kind]}
-                    </span>
-                  </td>
-                  <td className="bp-commit" onClick={() => p.onSelect(i.id)} title="그래프에서 보기">
-                    <code>{i.id.slice(0, 7)}</code> <span className="summary">{i.summary}</span>
-                    <span className="muted">
-                      {" "}
-                      · {i.author} · {fmtTime(i.time, false)}
-                    </span>
-                  </td>
-                  <td className="bp-actions">
-                    {i.state.kind === "missing" && <button onClick={() => void ignore(i.id, true)}>제외</button>}
-                    {i.state.kind === "ignored" && <button onClick={() => void ignore(i.id, false)}>제외 취소</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {view === "targets" ? (
+          <Overview
+            source={source}
+            current={target}
+            rows={rows}
+            onOpen={(t) => {
+              p.onPair(source, t);
+              setView("missing");
+            }}
+          />
+        ) : (
+          <>
+            {!items && !error && <p className="muted pad">비교하는 중…</p>}
+            {items && !error && shown.length === 0 && (
+              <p className="muted pad">
+                {target}에 {source}의 커밋이 모두 반영돼 있어요.
+                {items.length > 0 && " (전체 탭에서 반영된 커밋을 볼 수 있어요)"}
+              </p>
+            )}
+            {shown.length > 0 && (
+              <table className="bp-list">
+                <thead>
+                  <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        aria-label="미반영 모두 선택"
+                        disabled={missing.length === 0}
+                        checked={missing.length > 0 && missing.every((i) => picked.has(i.id))}
+                        onChange={(e) => setPicked(new Set(e.target.checked ? missing.map((i) => i.id) : []))}
+                      />
+                    </th>
+                    <th>상태</th>
+                    <th>커밋</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((i) => (
+                    <tr key={i.id} className={`bp-${i.state.kind}`}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={`${i.summary} 선택`}
+                          disabled={i.state.kind !== "missing"}
+                          checked={picked.has(i.id)}
+                          onChange={() => toggle(i.id)}
+                        />
+                      </td>
+                      <td>
+                        <span
+                          className={`chip bp-${i.state.kind}`}
+                          title={i.state.kind === "picked" ? `${i.state.by.slice(0, 7)}에서 -x로 가져옴` : undefined}
+                        >
+                          {STATE[i.state.kind]}
+                        </span>
+                      </td>
+                      <td className="bp-commit" onClick={() => p.onSelect(i.id)} title="그래프에서 보기">
+                        <code>{i.id.slice(0, 7)}</code> <span className="summary">{i.summary}</span>
+                        <span className="muted">
+                          {" "}
+                          · {i.author} · {fmtTime(i.time, false)}
+                        </span>
+                      </td>
+                      <td className="bp-actions">
+                        {i.state.kind === "missing" && <button onClick={() => void ignore(i.id, true)}>제외</button>}
+                        {i.state.kind === "ignored" && (
+                          <button onClick={() => void ignore(i.id, false)}>제외 취소</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
         {p.remoteCount < 2 && (
           <p className="note bp-hint">
@@ -200,19 +241,61 @@ export function BackportSheet(p: Props) {
         )}
       </div>
 
-      <footer className="conflict-foot">
-        <span className="muted">
-          {picked.size
-            ? `${picked.size}개 선택 · 오래된 것부터 적용`
-            : "제외: 받는 쪽에 필요 없는 커밋 (이 저장소에만 기록)"}
-        </span>
-        <button disabled={p.busy || picked.size === 0} onClick={() => p.onExport(chosen())}>
-          패치로 내보내기…
-        </button>
-        <button className="primary" disabled={p.busy || picked.size === 0} onClick={() => p.onApply(chosen())}>
-          {target}에 cherry-pick
-        </button>
-      </footer>
+      {view !== "targets" && (
+        <footer className="conflict-foot">
+          <span className="muted">
+            {picked.size
+              ? `${picked.size}개 선택 · 오래된 것부터 적용`
+              : `제외: ${target}에 필요 없는 커밋 (받는 쪽마다 따로, 이 저장소에만 기록)`}
+          </span>
+          <button disabled={p.busy || picked.size === 0} onClick={() => p.onExport(chosen())}>
+            패치로 내보내기…
+          </button>
+          <button className="primary" disabled={p.busy || picked.size === 0} onClick={() => p.onApply(chosen())}>
+            {target}에 cherry-pick
+          </button>
+        </footer>
+      )}
     </section>
+  );
+}
+
+/** One row per target branch: how much of `source` each still lacks. */
+function Overview(props: {
+  source: string;
+  current: string;
+  rows: BackportTally[] | null;
+  onOpen(target: string): void;
+}) {
+  const { rows } = props;
+  if (!rows) return <p className="muted pad">브랜치마다 비교하는 중…</p>;
+  if (rows.length === 0) return <p className="muted pad">비교할 다른 로컬 브랜치가 없어요.</p>;
+  const sorted = [...rows].sort((a, b) => b.missing - a.missing || a.target.localeCompare(b.target));
+  return (
+    <table className="bp-list bp-overview">
+      <thead>
+        <tr>
+          <th>받는 쪽 ({props.source}에서)</th>
+          <th>미반영</th>
+          <th>반영됨</th>
+          <th>제외</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((r) => (
+          <tr
+            key={r.target}
+            className={r.target === props.current ? "on" : ""}
+            onClick={() => props.onOpen(r.target)}
+            title="이 브랜치의 미반영 목록 보기"
+          >
+            <td className="bp-commit">{r.target}</td>
+            <td>{r.missing > 0 ? <b className="bp-missing">{r.missing}</b> : <span className="muted">0</span>}</td>
+            <td>{r.applied}</td>
+            <td>{r.ignored}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

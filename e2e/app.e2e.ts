@@ -176,3 +176,22 @@ test("overwrites the upstream after rewriting a pushed commit", async ({ demo })
   const upstream = snap.refs.find((r) => r.kind === "remote" && r.name === snap.head.upstream)!;
   expect(upstream.target).toBe(snap.head.target);
 });
+
+test("ignores are per target and the overview counts each branch", async ({ demo }) => {
+  const { page } = demo;
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  await sheet.getByRole("button", { name: "제외", exact: true }).first().click();
+
+  await sheet.getByRole("tab", { name: "대상별" }).click();
+  const row = (name: string) => sheet.locator(".bp-overview tbody tr", { hasText: name });
+  await expect(row("feature/graph-zoom").locator("td").nth(3)).toHaveText("1");
+  await expect(row("feature/login").locator("td").nth(3)).toHaveText("0");
+  await expect(sheet.locator(".bp-overview tbody tr", { hasText: "feature/theme" })).toHaveCount(0);
+
+  // Opening a row switches the target and goes back to its missing list.
+  await row("feature/login").click();
+  await expect(sheet.getByRole("combobox", { name: "받는 쪽" })).toHaveValue("feature/login");
+  await expect(sheet.getByRole("tab", { name: "미반영" })).toHaveAttribute("aria-selected", "true");
+});

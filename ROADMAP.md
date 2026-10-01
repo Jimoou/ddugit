@@ -53,7 +53,7 @@
 - [x] 멀티 레포 백포트 트래커 (원본 ↔ 고객사 레포, 미반영 커밋 목록, cherry-pick/patch 내보내기)
   - 다른 저장소는 원격으로 추가해 비교한다(`git remote add upstream …`). 브랜치 우클릭 → "…에 없는 커밋 보기"
   - [x] 앱 안에서 원격 추가 (사이드바 원격 ＋, 추가 후 바로 Fetch) · 원격 브랜치 우클릭으로 원격 삭제
-  - [ ] 여러 대상 한눈에 보기 (고객사가 여럿일 때 브랜치별 미반영 개수 표)
+  - [x] 여러 대상 한눈에 보기 (고객사가 여럿일 때 브랜치별 미반영 개수 표) · 제외는 받는 쪽마다 따로
 - [x] 드래그로 interactive rebase (순서 바꾸기, squash) — 커밋 우클릭 → "이 다음 커밋들 정리", 목록 끌어서 순서 · 유지/합치기/버리기
   - [ ] 그래프 위에서 노드를 끌어 바로 순서 바꾸기 (지금은 시트의 목록에서)
   - [ ] 병합이 섞인 구간(`--rebase-merges`)
@@ -100,3 +100,4 @@
 | 2026-10-01 | PR #16 squash merge(`fac2a73`). M4: interactive rebase(`git/rebase.rs`: 미리 쓴 todo를 `sequence.editor=cp`로 넣음, 빠진 커밋·맨 앞 squash 거부, 충돌은 기존 흐름; `rebasePlan.ts` + vitest 4; `RebaseSheet`)(테스트 54, e2e 8)                                         |
 | 2026-10-01 | PR #17 squash merge(`5a95888`). 강제 push(`RemoteOp::ForcePush` = `push --force-with-lease`, 거부 화면 세 번째 선택, 그사이 남이 올린 커밋은 lease가 막는 것을 bare 저장소로 테스트)(테스트 55, e2e 9)                                                                  |
 | 2026-10-01 | PR #18 squash merge(`d6bf590`). M5: react-hooks 권장 규칙 전부 켬. effect 안 setState 9곳 → 렌더 중 조정(경로·초기 파일·부분 스테이지), 데이터를 키와 함께 저장(패널 파일·충돌 파일·줄 선택), diff 다시 불러오기를 fetch만 하도록 분리, 첫 로드에 늦게 온 응답 무시     |
+| 2026-10-01 | PR #19 squash merge(`74f7924`). 백포트: 제외를 받는 쪽별 config(`otgit.<target>.backportIgnored`, 예전 저장소 전체 키도 읽음), `backport_summary` + "대상별" 탭(테스트 56, e2e 10)                                                                                      |

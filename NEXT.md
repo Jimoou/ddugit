@@ -7,25 +7,26 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #18(강제 push)을 squash merge했다(`d6bf590`).
+- PR #19(React Compiler 린트 규칙, effect 안 setState 정리)를 squash merge했다(`74f7924`).
 
 ## 지금 하는 일
 
-M5 · React Compiler 린트 규칙 켜기 → PR #19에서 CI 대기 (10분 뒤 확인 예약)
+백포트 · 여러 대상 한눈에 보기 → PR #20에서 CI 대기 (10분 뒤 확인 예약)
 
-- `eslint.config.js`: `reactHooks.configs.recommended.rules`를 전부 켰다(`exhaustive-deps`는 error)
-- effect 안에서 setState하던 9곳을 정리했다
-  - 렌더 중에 조정: App 경로 변경 초기화, Composer 부분 스테이지 감지, DiffSheet 바깥에서 고른 파일
-  - 키와 함께 저장: App 사이드 패널 파일(`panel.id`), ConflictSheet 불러온 파일과 블록 선택, DiffSheet 줄 선택(diff 객체가 키)
-  - ConflictSheet: 해결된 파일에서 다음 파일로 넘어가는 것을 effect 대신 파생 값으로 처리한다
-  - App: diff 다시 불러오기를 `fetchDiff`(비동기 setState만)와 `loadDiff`(시트 열기)로 나눴다. 첫 스냅샷 로드는 promise로 바꾸고, 저장소를 바꾼 뒤 늦게 온 응답은 버린다
-- e2e가 실제 버그를 하나 잡았다. 파일이 아직 없을 때 `loaded?.file === file`이 `undefined === undefined`로 참이 돼서 충돌 시트가 죽었다. 고치고 CONVENTIONS에 적었다
+- 설계 문제를 고쳤다. 제외 표시가 저장소 전체에 하나라서, 한 저장소에 고객사 브랜치가 여럿이면 한 곳에서 제외한 커밋이 다른 곳에서도 제외됐다
+  - 이제 `otgit.<target>.backportIgnored`에 저장한다. git은 키를 첫 점과 마지막 점에서 자르므로 `/`나 `.`가 든 브랜치 이름도 subsection이 된다
+  - 예전 키 `otgit.backportIgnored`도 계속 읽어서 모든 대상에 적용한다. 제외를 풀면 두 키에서 모두 지운다
+- `backport_summary(path, source, targets)`: 대상마다 `compare`를 돌려 미반영/반영됨/제외 개수를 센다. 가져올 쪽 자신은 뺀다
+- `BackportSheet`
+  - 탭을 미반영 / 전체 / **대상별** 세 개로 늘렸다. 대상별 표는 로컬 브랜치를 미반영이 많은 순으로 보여 준다
+  - 행을 누르면 그 브랜치가 받는 쪽이 되고 미반영 탭으로 돌아간다
+- 데모 mock도 받는 쪽별로 제외를 기록한다. e2e 10번째 테스트가 확인한다
 
 ## 다음 단계
 
-1. 백포트: 여러 대상 한눈에 보기 (고객사별 미반영 개수 표)
-2. M5 · 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
-3. M5 · 키보드로 노드 이동(접근성)
+1. M5 · 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
+2. M5 · 키보드로 노드 이동(접근성)
+3. M3 · 그래프 위에서 노드를 끌어 바로 rebase 순서 바꾸기
 
 ## 막힌 것 / 결정 필요
 

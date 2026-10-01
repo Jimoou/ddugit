@@ -1,6 +1,6 @@
 mod git;
 
-use git::backport::BackportItem;
+use git::backport::{BackportItem, BackportTally};
 use git::conflict::{ConflictFile, Resolution};
 use git::diff::{DiffScope, FileDiff};
 use git::pick::PickOp;
@@ -46,8 +46,10 @@ command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, lines: O
     => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
 command!(backport_compare(path: String, source: String, target: String) -> Vec<BackportItem>
     => git::backport::compare(&path, &source, &target));
-command!(backport_ignore(path: String, id: String, ignore: bool) -> ()
-    => git::backport::set_ignored(&path, &id, ignore));
+command!(backport_ignore(path: String, target: String, id: String, ignore: bool) -> ()
+    => git::backport::set_ignored(&path, &target, &id, ignore));
+command!(backport_summary(path: String, source: String, targets: Vec<String>) -> Vec<BackportTally>
+    => git::backport::summary(&path, &source, &targets));
 command!(backport_apply(path: String, ids: Vec<String>, target: String) -> OpResult
     => git::backport::apply(&path, &ids, &target));
 command!(backport_export(path: String, ids: Vec<String>, out_dir: String) -> OpResult
@@ -116,6 +118,7 @@ pub fn run() {
             git_rebase,
             backport_compare,
             backport_ignore,
+            backport_summary,
             backport_apply,
             backport_export,
             git_merge,
