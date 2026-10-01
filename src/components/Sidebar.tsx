@@ -13,6 +13,7 @@ interface Props {
   stashes: StashInfo[];
   selectedStash: number | null;
   onStash(index: number): void;
+  onAddRemote(): void;
 }
 
 const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
@@ -24,6 +25,7 @@ const GROUPS: { kind: RefInfo["kind"]; title: string }[] = [
 export function Sidebar(props: Props) {
   const { refs, headBranch, colorOf, focused, onFocus, onCheckout, onRefMenu, stashes, selectedStash, onStash } = props;
   const [q, setQ] = useState("");
+  const searching = q.trim() !== "";
   const filtered = useMemo(
     () =>
       refs.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)),
@@ -35,11 +37,17 @@ export function Sidebar(props: Props) {
       <input className="text search" placeholder="브랜치 찾기" value={q} onChange={(e) => setQ(e.target.value)} />
       {GROUPS.map((g) => {
         const items = filtered.filter((r) => r.kind === g.kind);
-        if (!items.length) return null;
+        // The remote group stays (with its add button) even before any remote exists.
+        if (!items.length && (g.kind !== "remote" || searching)) return null;
         return (
           <section key={g.kind}>
             <h3>
               {g.title} <span className="muted">{items.length}</span>
+              {g.kind === "remote" && (
+                <button className="h3-add" title="원격 저장소 추가" onClick={props.onAddRemote}>
+                  ＋
+                </button>
+              )}
             </h3>
             <ul>
               {items.map((r) => {

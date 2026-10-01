@@ -70,7 +70,9 @@ export type RefOp =
   | { kind: "deleteBranch"; name: string; force: boolean }
   | { kind: "createTag"; name: string; at: string; message: string }
   | { kind: "deleteTag"; name: string }
-  | { kind: "checkoutRemote"; remoteRef: string };
+  | { kind: "checkoutRemote"; remoteRef: string }
+  | { kind: "addRemote"; name: string; url: string }
+  | { kind: "removeRemote"; name: string };
 
 export interface RepoSnapshot {
   path: string;

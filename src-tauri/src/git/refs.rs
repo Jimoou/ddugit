@@ -31,6 +31,15 @@ pub enum RefOp {
     CheckoutRemote {
         remote_ref: String,
     },
+    /// Another repository to fetch from, e.g. the original project in a customer fork.
+    AddRemote {
+        name: String,
+        url: String,
+    },
+    /// Forget a remote and its remote-tracking branches.
+    RemoveRemote {
+        name: String,
+    },
 }
 
 pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
@@ -67,6 +76,10 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
                 vec!["checkout".into(), "--track".into(), remote_ref.clone()]
             }
         }
+        RefOp::AddRemote { name, url } => {
+            vec!["remote".into(), "add".into(), name.clone(), url.trim().into()]
+        }
+        RefOp::RemoveRemote { name } => vec!["remote".into(), "remove".into(), name.clone()],
     };
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     let o = git(&dir, &argv)?;
@@ -204,5 +217,33 @@ mod tests {
                 force: true
             }
         );
+    }
+
+    #[test]
+    fn add_fetch_and_remove_a_remote() {
+        let upstream = repo();
+        commit_file(upstream.path(), "a.txt", "a", "upstream work");
+        let d = repo();
+        commit_file(d.path(), "b.txt", "b", "fork work");
+        let p = s(d.path());
+        let add = RefOp::AddRemote {
+            name: "upstream".into(),
+            url: format!(" {} ", s(upstream.path())),
+        };
+        assert_eq!(apply(p, &add).unwrap().status, OpStatus::Ok);
+        assert_eq!(apply(p, &add).unwrap().status, OpStatus::Failed, "duplicate name");
+        git_ok(d.path(), &["fetch", "--all"]).unwrap();
+        assert!(has(p, RefKind::Remote, "upstream/main"));
+        assert!(snapshot(p, 10)
+            .unwrap()
+            .remotes
+            .iter()
+            .any(|r| r.name == "upstream"));
+
+        let rm = RefOp::RemoveRemote {
+            name: "upstream".into(),
+        };
+        assert_eq!(apply(p, &rm).unwrap().status, OpStatus::Ok);
+        assert!(!has(p, RefKind::Remote, "upstream/main"));
     }
 }

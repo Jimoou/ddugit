@@ -6,17 +6,17 @@ export interface NameRequest {
   confirmLabel: string;
   /** Prefilled name (rename). */
   initial?: string;
-  /** Shows an optional message field (annotated tag). */
-  messagePlaceholder?: string;
-  onSubmit(name: string, message: string): void;
+  /** A second field: a tag message (multiline, optional) or a remote URL (required). */
+  extra?: { placeholder: string; multiline?: boolean; required?: boolean };
+  onSubmit(name: string, extra: string): void;
 }
 
-/** Asks for a ref-like name (spaces become dashes) and optionally a message. */
+/** Asks for a ref-like name (spaces become dashes) and optionally a second value. */
 export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: boolean; onCancel(): void }) {
-  const { title, placeholder, confirmLabel, initial = "", messagePlaceholder, onSubmit } = req;
+  const { title, placeholder, confirmLabel, initial = "", extra, onSubmit } = req;
   const [name, setName] = useState(initial);
   const [message, setMessage] = useState("");
-  const ok = name.trim() !== "" && name.trim() !== initial && !busy;
+  const ok = name.trim() !== "" && name.trim() !== initial && !busy && (!extra?.required || message.trim() !== "");
   return (
     <div className="scrim" onClick={onCancel}>
       <form
@@ -36,13 +36,22 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
           onChange={(e) => setName(e.target.value.replace(/\s+/g, "-"))}
           onKeyDown={(e) => e.key === "Escape" && onCancel()}
         />
-        {messagePlaceholder && (
+        {extra?.multiline && (
           <textarea
             className="message"
             rows={3}
-            placeholder={messagePlaceholder}
+            placeholder={extra.placeholder}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+          />
+        )}
+        {extra && !extra.multiline && (
+          <input
+            className="text"
+            placeholder={extra.placeholder}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && onCancel()}
           />
         )}
         <div className="dialog-actions">
