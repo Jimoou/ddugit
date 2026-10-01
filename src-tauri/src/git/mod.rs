@@ -5,6 +5,7 @@
 //! hooks, credentials, signing and LFS behave exactly as on the command line.
 
 pub mod backport;
+pub mod bisect;
 pub mod cleanup;
 pub mod conflict;
 pub mod diff;

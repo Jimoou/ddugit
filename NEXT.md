@@ -7,29 +7,27 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #34(브랜치 정리, 별가루 연출)를 squash merge했다(`a874e36`).
+- PR #35(과거 커밋 손보기, 노바 연출)를 squash merge했다(`59571df`).
 
 ## 지금 하는 일
 
-M6 고급 git 3단계 "과거 커밋 손보기" → PR CI 대기
+M6 고급 git 4단계-1 "bisect" → PR CI 대기
 
-- Rust `git/edit.rs`
-  - `edit_commit(id, CommitEdit)`: 부모부터 `rebase -i --autostash`(뿌리 커밋이면 `--root`). todo는 전부 pick하고, 대상 뒤에 `exec` 한 줄을 넣는다
-    - reword: `commit --amend --only -F 파일`
-    - author: `--author='..'`
-    - split: `reset HEAD~1` → 고른 파일 add·commit → 나머지 add·commit
-  - 메시지는 `.git/otgit-edit/`의 파일로 넘기고, sh 인용은 `q()`로 한다
-  - `restore_file(source, file)`: 그 커밋에 파일이 있으면 checkout, 없으면 rm. 결과는 스테이지된 변경이다
-  - serde: `tag = "kind"`, `rename_all_fields = "camelCase"`
-- 화면
-  - 커밋 우클릭 "메시지 고치기…/작성자 바꾸기…/커밋 나누기…": 현재 브랜치 일직선 위이고 병합 커밋이 아닐 때만 켜진다
-  - `EditCommitDialog`: 다시 쓰는 커밋 수와 push 경고를 연 순간에 계산한다(`isAncestor`가 ref 캐시라서 렌더 중에 못 부른다)
-  - Inspector 변경 파일 우클릭: 이 커밋 상태로 / 이전 상태로
-- 연출: 손본 커밋 자리에 `.nova`(빛의 고리 두 겹, 1초)
+- Rust `git/bisect.rs`
+  - `BisectOp`: start{bad,good} / good / bad / skip
+  - `state()`: `.git/BISECT_START`가 있으면 refs/bisect/* 로 bad·good·skip을 읽는다. 후보는 `rev-list bad --not goods`에서 skip을 뺀 것이고, 하나 남으면 그게 범인이다
+  - 끝내기는 기존 `abort`(bisect reset)
+- 그래프: `NodeBadge`(renderer `drawBadge`). 배지가 있는 커밋은 접히지 않는다
+- RepoView
+  - 스냅샷마다 `bisectState`를 읽는다. 새로 확인할 커밋이 나오면 카메라를 옮기고, 범인이 나오면 붉은 노바를 띄운다
+  - 시작 전 고른 범위는 `bisectDraft`에 둔다(우클릭 두 번)
+  - 진행 중에는 일반 배너 대신 bisect 배너를 띄운다
+- 데모: HEAD를 옮기지 않고, 상태의 `current`(후보 가운데)로만 알려 준다
+- e2e는 "0"(전체 보기) 대신 "h"로 HEAD를 맞춘다. 전체 보기 배율에서는 일직선 구간이 막대로 접혀서 커밋을 우클릭할 수 없다
 
 ## 다음 단계 (M6 순서, ROADMAP 참고)
 
-1. 고급 git 작업 마지막: bisect(그래프에서 좋음/나쁨 클릭)·파일 이력·blame. 각 기능에 맞는 우주 연출을 함께 넣는다
+1. 고급 git 작업 마지막: 파일 이력(그래프에서 그 파일을 바꾼 커밋만 밝게)·blame(줄마다 마지막으로 바꾼 커밋)
 2. 기존 기능의 게임 같은 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌
 3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
 4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다

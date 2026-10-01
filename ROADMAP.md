@@ -91,6 +91,8 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
   - [x] 브랜치 정리: 병합 끝난 로컬 브랜치 일괄 삭제, 원격에서 사라진 브랜치 정리(prune), 오래된 브랜치 목록 — 사이드바 "브랜치" 옆 ✧, 지운 브랜치 끝이 별가루로 흩어짐
   - [x] 과거 커밋 손보기: 메시지 고치기(reword), 작성자 바꾸기, 커밋 둘로 나누기, 파일 하나만 특정 커밋 상태로 — 커밋 우클릭, 변경 파일 우클릭, 손본 커밋에 노바(빛의 고리) 연출
   - [ ] 추적·조사: 그래프에서 bisect(좋음/나쁨 클릭), 파일 이력·blame
+    - [x] bisect: 커밋 우클릭으로 범위 고르기, 배너에서 버그 있음/없음/건너뛰기, 후보 밖은 흐리게, 지금 확인할 커밋에 망원경 조준선, 범인에 붉은 노바
+    - [ ] 파일 이력·blame
 - [ ] 게임 같은 우주 연출 (기능마다, 반짝임 효과를 끄면 정적으로)
   - [ ] 원격: push는 HEAD에서 원격 배지로 쏘아 올리는 궤적, pull·fetch는 들어오는 유성, 진행률은 궤도
   - [ ] 그래프 작업: 병합은 끌면 대상 끝에 중력장, 놓으면 두 별이 합쳐지는 섬광 · cherry-pick은 혜성이 복사돼 날아감 · 순서 정리는 별자리가 다시 배열
@@ -142,3 +144,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-01 | PR #32 squash merge(`cfe8e36`). M6 실수 되돌리기: `git/undo.rs`(reset·reflog + 테스트 4), `components/Undo.tsx`(되돌리기 창: 모드별 결과·push·버릴 변경 경고, 되돌리기 기록 시트: 잃어버린 커밋 표시·브랜치로 살리기·여기로 되돌리기), 데모 reflog(명령마다 HEAD 이동 기록), 되감기 연출(그래프 영역 안, `.fx-clip`)(e2e 18)                           |
 | 2026-10-01 | PR #33 squash merge(`96a6026`). M6 브랜치 정리: `git/cleanup.rs`(report·delete_branches + 테스트 2: 병합/gone 판정은 로컬 bare 원격에서 다른 클론이 브랜치를 지우는 상황으로), `CleanupSheet`(병합 완료는 기본 선택, gone, 90일 넘은 오래된 브랜치, 병합 안 된 게 섞이면 확인), `GraphHandle.screenOf`로 지운 끝 자리에 별가루(e2e 19)                 |
 | 2026-10-01 | PR #34 squash merge(`a874e36`). M6 과거 커밋 손보기: `git/edit.rs`(`CommitEdit` reword/author/split + `restore_file`, 테스트 7: 뿌리 커밋, 따옴표·공백 경로, autostash, 가지 밖 거부, UI JSON 모양), `EditCommitDialog`, Inspector 변경 파일 우클릭(이 커밋 상태로 / 이전 상태로), 노바 연출(e2e 20)                                                   |
+| 2026-10-01 | PR #35 squash merge(`59571df`). M6 bisect: `git/bisect.rs`(+테스트 2: 9개 중 범인 찾기, 건너뛰기), 그래프 `NodeBadge`(good/bad 고리, probe 조준선, culprit 맥박), 전용 배너, 후보 밖 흐리게(focus), 데모 bisect(HEAD는 그대로, 상태로만)(e2e 21)                                                                                                       |

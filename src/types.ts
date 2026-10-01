@@ -50,6 +50,22 @@ export type StashOp = "apply" | "pop" | "drop";
 export type PickOp = "cherryPick" | "revert";
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
+/** Driving `git bisect`: mark the ends, then judge the commit checked out now. */
+export type BisectOp =
+  { kind: "start"; bad: string; good: string } | { kind: "good" } | { kind: "bad" } | { kind: "skip" };
+
+/** The bisect in progress (see `git/bisect.rs`). */
+export interface BisectState {
+  bad: string | null;
+  good: string[];
+  skipped: string[];
+  /** The commit to test now, unless the culprit is found. */
+  current: string | null;
+  culprit: string | null;
+  /** Commits that may still be the first bad one, newest first. */
+  candidates: string[];
+}
+
 /** A touch-up to one past commit on the current branch (see `git/edit.rs`). */
 export type CommitEdit =
   | { kind: "reword"; message: string }

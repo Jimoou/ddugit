@@ -18,6 +18,9 @@ import {
   ZOOM,
 } from "./renderer";
 import { type Step, stepFrom } from "./navigate";
+import type { NodeBadge } from "./renderer";
+
+const NO_BADGES = new Map<string, NodeBadge>();
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView } from "./camera";
@@ -42,6 +45,8 @@ interface Props {
   changeCount: number;
   selected: string | null;
   focus: Set<string> | null;
+  /** Marks drawn on commits (bisect). */
+  badges?: Map<string, NodeBadge>;
   animate: boolean;
   onSelect(id: string | null): void;
   onPlus(): void;
@@ -92,9 +97,10 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   // merge) never fold into a run.
   const runs = useMemo(() => {
     const bases = new Set(props.stashes.map((x) => x.base));
-    const keep = (id: string) => refsByCommit.has(id) || id === props.headId || id === props.incoming || bases.has(id);
+    const keep = (id: string) =>
+      refsByCommit.has(id) || id === props.headId || id === props.incoming || bases.has(id) || !!props.badges?.has(id);
     return straightRuns(scene.layout, keep);
-  }, [scene, refsByCommit, props.headId, props.incoming, props.stashes]);
+  }, [scene, refsByCommit, props.headId, props.incoming, props.stashes, props.badges]);
   const runOf = useMemo(() => runIndex(runs), [runs]);
   const runsRef = useRef({ runs, runOf });
   runsRef.current = { runs, runOf };
@@ -336,6 +342,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         stashSelected: p.selectedStash,
         labelHits: s.labelHits,
         incoming: p.incoming,
+        badges: p.badges ?? NO_BADGES,
         truncated: p.truncated,
         moreHit: s.moreHit,
         runs: runsRef.current.runs,

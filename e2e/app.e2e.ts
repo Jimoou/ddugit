@@ -472,3 +472,44 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
   await expect(page.locator(".toast").filter({ hasText: "되돌렸어요" })).toBeVisible();
   expect((await demo.snapshot()).changes.some((c) => c.staged)).toBe(true);
 });
+
+test("hunts down the commit that broke something with bisect", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => d.grow(7));
+  const snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  // HEAD and the 7 grown commits below it, newest first.
+  const line: string[] = [];
+  for (let c: string | undefined = snap.head.target!; c && line.length < 8; c = byId.get(c)?.parents[0]) line.push(c);
+  const [bad, good] = [line[0], line[7]];
+  const culprit = line[4]; // the bug appeared here
+  // Bring HEAD into view at normal zoom (fitting would fold the straight run into a bar).
+  await page.locator(".app:not([hidden]) .graph-area canvas").focus();
+  await page.keyboard.press("h");
+  // The move eases in over a few frames; give it a moment to start before sampling positions.
+  await page.waitForTimeout(150);
+
+  for (const [id, label] of [
+    [bad, "버그가 있는 커밋으로 표시"],
+    [good, "버그가 없는 커밋으로 표시"],
+  ] as const) {
+    await expect.poll(async () => (await demo.screenOf(id)) !== null).toBe(true);
+    const at = (await demo.screenOf(id))!;
+    await page.mouse.click(at.x, at.y, { button: "right" });
+    await page.click(`.context-menu >> text=${label}`);
+  }
+  await demo.toast("버그 찾기를 시작했어요");
+
+  const banner = page.locator(".bisect-banner");
+  for (let i = 0; i < 6 && !(await banner.textContent())?.includes("범인을 찾았어요"); i++) {
+    const text = (await banner.textContent()) ?? "";
+    const sha = /지금 (\w{7})/.exec(text)![1];
+    const idx = line.findIndex((c) => c.startsWith(sha));
+    // Commits from the culprit on (newer, lower index) have the bug.
+    await banner.getByRole("button", { name: idx <= 4 ? "버그 있음" : "버그 없음" }).click();
+    await expect(banner).not.toContainText(`지금 ${sha}`);
+  }
+  await expect(banner).toContainText(`범인을 찾았어요: ${culprit.slice(0, 7)}`);
+  await banner.getByRole("button", { name: "끝내기" }).click();
+  await expect(banner).toHaveCount(0);
+});

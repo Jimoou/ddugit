@@ -28,8 +28,9 @@ import { planMove, rebaseRange } from "./rebasePlan";
 import type { Settings } from "./settings";
 import { isKey, type Key, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
-import type { Drag } from "./graph/renderer";
+import type { Drag, NodeBadge } from "./graph/renderer";
 import type {
+  BisectState,
   CommitEdit,
   CommitInfo,
   FileDiff,
@@ -153,7 +154,14 @@ export function RepoView({
     pushed: boolean;
   } | null>(null);
   /** Where an edited commit was, for a brief nova (bumped id replays it). */
-  const [nova, setNova] = useState<{ n: number; at: { x: number; y: number } | null }>({ n: 0, at: null });
+  const [nova, setNova] = useState<{ n: number; at: { x: number; y: number } | null; red?: boolean }>({
+    n: 0,
+    at: null,
+  });
+  /** Bisect: the ends picked before starting, and git's state once it runs (keyed by snapshot). */
+  const [bisectDraft, setBisectDraft] = useState<{ bad?: string; good?: string } | null>(null);
+  const [bisectLoaded, setBisectLoaded] = useState<{ snap: RepoSnapshot; state: BisectState | null } | null>(null);
+  const lastBisect = useRef<{ current: string | null; culprit: string | null }>({ current: null, culprit: null });
   /** Where deleted branch tips were, to scatter them as stardust (bumped id replays it). */
   const [dust, setDust] = useState<{ n: number; at: { x: number; y: number }[] }>({ n: 0, at: [] });
   /** Bumped after a reset to replay the rewind effect. */
@@ -297,6 +305,53 @@ export function RepoView({
     [snap, search?.query], // eslint-disable-line react-hooks/exhaustive-deps
   );
   // Search highlights its matches; otherwise a focused branch highlights its ancestry.
+  // Bisect state follows every snapshot; fly to each new commit to test, flare when the culprit shows.
+  useEffect(() => {
+    if (!snap) return;
+    let live = true;
+    api.bisectState(path).then(
+      (state) => {
+        if (!live) return;
+        setBisectLoaded({ snap, state });
+        const prev = lastBisect.current;
+        if (state?.culprit && state.culprit !== prev.culprit) {
+          const id = state.culprit;
+          setTimeout(() => {
+            graph.current?.centerOn(id);
+            setTimeout(() => setNova((v) => ({ n: v.n + 1, at: graph.current?.screenOf(id) ?? null, red: true })), 450);
+          }, 60);
+        } else if (state?.current && state.current !== prev.current) {
+          const id = state.current;
+          setTimeout(() => graph.current?.centerOn(id), 60);
+        }
+        lastBisect.current = { current: state?.current ?? null, culprit: state?.culprit ?? null };
+      },
+      () => live && setBisectLoaded({ snap, state: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [path, snap]);
+  const bisect = bisectLoaded && bisectLoaded.snap === snap ? bisectLoaded.state : null;
+  const badges = useMemo(() => {
+    const m = new Map<string, NodeBadge>();
+    if (bisectDraft?.bad) m.set(bisectDraft.bad, "bad");
+    if (bisectDraft?.good) m.set(bisectDraft.good, "good");
+    if (bisect) {
+      for (const g of bisect.good) m.set(g, "good");
+      if (bisect.bad) m.set(bisect.bad, "bad");
+      if (bisect.current) m.set(bisect.current, "probe");
+      if (bisect.culprit) m.set(bisect.culprit, "culprit");
+    }
+    return m;
+  }, [bisect, bisectDraft]);
+
+  /** While hunting, everything that can't be the culprit fades back. */
+  const bisectFocus = useMemo(
+    () => (bisect && !bisect.culprit ? new Set([...bisect.candidates, ...bisect.good]) : null),
+    [bisect],
+  );
+
   const focus = useMemo(() => {
     if (search?.query.trim()) return new Set(matches);
     return snap && focusRef ? ancestors(snap.commits, focusRef.target) : null;
@@ -513,6 +568,18 @@ export function RepoView({
         });
       },
     });
+
+  /** Pick a bisect end; with both picked, start (the bad one must come after the good one). */
+  const markBisect = (draft: { bad?: string; good?: string }) => {
+    if (!draft.bad || !draft.good) return setBisectDraft(draft);
+    if (!isAncestor(draft.good, draft.bad)) {
+      toast("err", t("bisect.order"));
+      return setBisectDraft({ bad: draft.bad });
+    }
+    setBisectDraft(null);
+    void run(t("bisect.started"), () => api.bisect(path, { kind: "start", bad: draft.bad!, good: draft.good! }));
+  };
+  const judge = (kind: "good" | "bad" | "skip") => run(t(`bisect.judged.${kind}`), () => api.bisect(path, { kind }));
 
   /** Open the edit dialog for `id`; splitting needs its files. */
   const openEdit = (mode: EditMode, id: string) => {
@@ -775,6 +842,19 @@ export function RepoView({
         onSelect: () => askReset(id),
       },
       "separator" as const,
+      {
+        label: t("bisect.markBad"),
+        hint: "bisect",
+        disabled: !!bisect || !clean,
+        onSelect: () => markBisect({ ...bisectDraft, bad: id }),
+      },
+      {
+        label: t("bisect.markGood"),
+        hint: "bisect",
+        disabled: !!bisect || !clean,
+        onSelect: () => markBisect({ ...bisectDraft, good: id }),
+      },
+      "separator" as const,
       ...(["reword", "author", "split"] as const).map((mode) => ({
         label: t(`edit.${mode}.menu`),
         disabled: !editable,
@@ -845,7 +925,79 @@ export function RepoView({
         />
       )}
 
-      {snap.state !== "clean" && (
+      {(bisect || bisectDraft) && (
+        <div className="banner bisect-banner">
+          <span>
+            <b className="bisect-eye">🔭 bisect</b>{" "}
+            {!bisect && bisectDraft && (
+              <>
+                {t("bisect.draft")} <span className={bisectDraft.bad ? "ok" : "muted"}>{t("bisect.draft.bad")}</span>
+                {" · "}
+                <span className={bisectDraft.good ? "ok" : "muted"}>{t("bisect.draft.good")}</span>
+              </>
+            )}
+            {bisect && bisect.culprit && (
+              <Rich
+                k="bisect.found"
+                vars={{
+                  sha: bisect.culprit.slice(0, 7),
+                  summary: commitById.get(bisect.culprit)?.summary ?? "",
+                }}
+              />
+            )}
+            {bisect && !bisect.culprit && (
+              <>
+                {t("bisect.left", {
+                  n: bisect.candidates.length,
+                  steps: Math.max(1, Math.ceil(Math.log2(Math.max(bisect.candidates.length, 2)))),
+                })}{" "}
+                {bisect.current && (
+                  <Rich
+                    k="bisect.test"
+                    vars={{
+                      sha: bisect.current.slice(0, 7),
+                      summary: commitById.get(bisect.current)?.summary ?? "",
+                    }}
+                  />
+                )}
+              </>
+            )}
+          </span>
+          <span className="row">
+            {bisect && !bisect.culprit && (
+              <>
+                <button className="good" disabled={busy} onClick={() => void judge("good")}>
+                  {t("bisect.good")}
+                </button>
+                <button className="bad" disabled={busy} onClick={() => void judge("bad")}>
+                  {t("bisect.bad")}
+                </button>
+                <button disabled={busy} onClick={() => void judge("skip")}>
+                  {t("bisect.skip")}
+                </button>
+              </>
+            )}
+            {bisect?.culprit && (
+              <button
+                onClick={() => {
+                  show({ commit: bisect.culprit });
+                  graph.current?.centerOn(bisect.culprit!);
+                }}
+              >
+                {t("bisect.show")}
+              </button>
+            )}
+            <button
+              disabled={busy}
+              onClick={() => (bisect ? void run(t("bisect.done"), () => api.abort(path)) : setBisectDraft(null))}
+            >
+              {bisect ? t("bisect.finish") : t("common.cancel")}
+            </button>
+          </span>
+        </div>
+      )}
+
+      {snap.state !== "clean" && snap.state !== "bisect" && (
         <div className="banner">
           <span>
             {t("state.banner", { name: stateText(snap.state).name })}
@@ -911,7 +1063,7 @@ export function RepoView({
             )}
             {animate && nova.n > 0 && nova.at && (
               <div className="fx-clip" aria-hidden key={`nova-${nova.n}`}>
-                <div className="nova" style={{ left: nova.at.x, top: nova.at.y }} />
+                <div className={`nova ${nova.red ? "red" : ""}`} style={{ left: nova.at.x, top: nova.at.y }} />
               </div>
             )}
             {animate && dust.n > 0 && (
@@ -945,7 +1097,8 @@ export function RepoView({
               headBranch={snap.head.branch}
               changeCount={snap.changes.length}
               selected={selected}
-              focus={focus}
+              focus={bisectFocus ?? focus}
+              badges={badges}
               animate={animate}
               onSelect={(id) => (id || !composer ? show({ commit: id }) : undefined)}
               onPlus={() => show({ composer: true })}

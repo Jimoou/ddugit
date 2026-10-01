@@ -83,6 +83,8 @@ command!(git_edit_commit(path: String, id: String, edit: git::edit::CommitEdit) 
     => git::edit::edit_commit(&path, &id, &edit));
 command!(git_restore_file(path: String, source: String, file: String) -> OpResult
     => git::edit::restore_file(&path, &source, &file));
+command!(git_bisect(path: String, op: git::bisect::BisectOp) -> OpResult => git::bisect::bisect(&path, &op));
+command!(bisect_state(path: String) -> Option<git::bisect::BisectState> => git::bisect::state(&path));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
 command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
     => git::stash::stash_push(&path, &message, &paths));
@@ -160,6 +162,8 @@ pub fn run() {
             git_delete_branches,
             git_edit_commit,
             git_restore_file,
+            git_bisect,
+            bisect_state,
             git_discard,
             git_stash_push,
             git_stash,
