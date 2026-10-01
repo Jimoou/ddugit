@@ -109,16 +109,30 @@ export function buildScene(layout: Layout): Scene {
     }
     const samples = new Float32Array(pts);
     const cum = new Float32Array(samples.length / 2);
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
     for (let i = 0; i < cum.length; i++) {
-      const x = samples[i * 2], y = samples[i * 2 + 1];
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      const x = samples[i * 2],
+        y = samples[i * 2 + 1];
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
       if (i > 0) cum[i] = cum[i - 1] + Math.hypot(x - samples[i * 2 - 2], y - samples[i * 2 - 1]);
     }
     return {
-      edge: e, path, samples, cum, length: cum[cum.length - 1] || 1,
-      minX, maxX, minY, maxY, seed: hashStr(e.child + e.parent),
+      edge: e,
+      path,
+      samples,
+      cum,
+      length: cum[cum.length - 1] || 1,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      seed: hashStr(e.child + e.parent),
     };
   });
 
@@ -138,10 +152,12 @@ export function buildScene(layout: Layout): Scene {
 export function pointAt(e: EdgePath, t: number): Pt {
   const d = t * e.length;
   const cum = e.cum;
-  let lo = 0, hi = cum.length - 1;
+  let lo = 0,
+    hi = cum.length - 1;
   while (lo < hi - 1) {
     const mid = (lo + hi) >> 1;
-    if (cum[mid] <= d) lo = mid; else hi = mid;
+    if (cum[mid] <= d) lo = mid;
+    else hi = mid;
   }
   const span = cum[hi] - cum[lo] || 1;
   const f = Math.min(1, Math.max(0, (d - cum[lo]) / span));

@@ -1,20 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri } from "./api";
 import { Composer } from "./components/Composer";
+import { AuthDialog } from "./components/AuthDialog";
+import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
+import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
 import { Sidebar } from "./components/Sidebar";
+import { StashPanel } from "./components/StashPanel";
+import { SyncDialog } from "./components/SyncDialog";
+import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, computeLayout } from "./graph/layout";
 import { NEON } from "./graph/scene";
-import type { OpResult, RefInfo, RepoSnapshot } from "./types";
+import { stashTitle } from "./format";
+import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RemoteOp, RepoSnapshot } from "./types";
 import "./App.css";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
+type DiffSource = { kind: "commit"; id: string } | { kind: "worktree" };
+type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
 
 const LAST_REPO = "otgit.lastRepo";
 const ANIMATE = "otgit.animate";
+
+const REMOTE_DONE: Record<RemoteOp, string> = {
+  fetch: "원격 커밋을 가져왔어요",
+  pull: "최신 상태로 받았어요",
+  pullMerge: "병합해서 받았어요",
+  pullRebase: "리베이스해서 받았어요",
+  push: "원격에 올렸어요",
+};
+
+const CONFLICT_HINT: Record<string, string> = {
+  merge: "해결 후 ＋ 로 커밋하면 병합이 완료됩니다.",
+  rebase: "파일을 고친 뒤 '계속'을 누르면 리베이스를 이어갑니다.",
+};
+
+/** URL of the remote behind HEAD's upstream (else `origin`, else the first remote). */
+function upstreamUrl(snap: RepoSnapshot): string | null {
+  const name = snap.head.upstream?.split("/")[0];
+  const r =
+    snap.remotes.find((x) => x.name === name) ?? snap.remotes.find((x) => x.name === "origin") ?? snap.remotes[0];
+  return r?.url ?? null;
+}
 
 function store(key: string, value?: string): string | null {
   try {
@@ -31,10 +61,18 @@ export default function App() {
   const [snap, setSnap] = useState<RepoSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [remoteBusy, setRemoteBusy] = useState<RemoteOp | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedStash, setSelectedStash] = useState<number | null>(null);
+  const [panelFiles, setPanelFiles] = useState<FileDiff[] | null>(null);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [focusRef, setFocusRef] = useState<RefInfo | null>(null);
   const [composer, setComposer] = useState(false);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
+  const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
+  const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [diff, setDiff] = useState<DiffState | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
   const [animate, setAnimate] = useState(() => {
@@ -44,6 +82,7 @@ export default function App() {
   });
   const graph = useRef<GraphHandle>(null);
   const toastId = useRef(0);
+  const diffReq = useRef(0);
 
   const toast = useCallback((kind: Toast["kind"], text: string) => {
     const id = ++toastId.current;
@@ -69,7 +108,9 @@ export default function App() {
   useEffect(() => {
     setSnap(null);
     setSelected(null);
+    setSelectedStash(null);
     setFocusRef(null);
+    setDiff(null);
     void refresh();
   }, [refresh]);
 
@@ -80,17 +121,54 @@ export default function App() {
     return () => window.removeEventListener("focus", onFocus);
   }, [refresh]);
 
+  const stashSel = selectedStash !== null ? snap?.stashes[selectedStash] : undefined;
+  /** The right panel shows one thing: composer, a stash, or a commit. */
+  const show = (what: { commit?: string | null; stash?: number | null; composer?: boolean }) => {
+    setSelected(what.commit ?? null);
+    setSelectedStash(what.stash ?? null);
+    setComposer(what.composer ?? false);
+  };
+
+  // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
+  const panelId = stashSel?.id ?? selected;
+  useEffect(() => {
+    setPanelFiles(null);
+    if (!path || !panelId) return;
+    let live = true;
+    api
+      .commitDiff(path, panelId)
+      .then((f) => live && setPanelFiles(f))
+      .catch(() => live && setPanelFiles([]));
+    return () => {
+      live = false;
+    };
+  }, [path, panelId]);
+
+  const loadDiff = useCallback(
+    (source: DiffSource, title: string, file?: string) => {
+      if (!path) return;
+      const req = ++diffReq.current;
+      setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
+      const load = source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path);
+      load.then(
+        (files) => req === diffReq.current && setDiff((d) => d && { ...d, files }),
+        (e) => req === diffReq.current && setDiff((d) => d && { ...d, files: [], error: String(e) }),
+      );
+    },
+    [path],
+  );
+
+  // The working-tree diff follows the files on disk.
+  useEffect(() => {
+    if (diff?.source.kind === "worktree") loadDiff(diff.source, diff.title, diff.path);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snap]);
+
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
-  const focus = useMemo(
-    () => (snap && focusRef ? ancestors(snap.commits, focusRef.target) : null),
-    [snap, focusRef],
-  );
-  const colorOf = useCallback(
-    (id: string) => NEON[layout?.byId.get(id)?.color ?? 0],
-    [layout],
-  );
+  const focus = useMemo(() => (snap && focusRef ? ancestors(snap.commits, focusRef.target) : null), [snap, focusRef]);
+  const colorOf = useCallback((id: string) => NEON[layout?.byId.get(id)?.color ?? 0], [layout]);
 
   /** Local branch a merge can land on at commit `id`. */
   const branchAt = useCallback(
@@ -122,26 +200,51 @@ export default function App() {
     return (refs.find((r) => r.kind === "local") ?? refs[0])?.name ?? id;
   };
 
-  async function run(label: string, op: () => Promise<OpResult>, after?: () => void) {
-    if (!path) return;
+  /**
+   * Every git write goes through here: busy state, toasts, refresh.
+   * Statuses that need a follow-up dialog (diverged / rejected / auth) are left to the caller.
+   */
+  async function run(label: string, op: () => Promise<OpResult>, after?: () => void): Promise<OpResult> {
+    let r: OpResult = { status: "failed", output: "" };
     setBusy(true);
     try {
-      const r = await op();
-      if (r.ok) {
+      r = await op();
+      if (r.status === "ok") {
         toast("ok", label);
         after?.();
-      } else if (r.conflict) {
-        toast("err", "충돌이 났어요. 파일을 고친 뒤 + 로 커밋하거나 병합을 취소하세요.");
-      } else {
-        toast("err", r.output || `${label} 실패`);
-      }
+      } else if (r.status === "conflict") toast("err", "충돌이 났어요. 상단 안내에 따라 해결하거나 취소하세요.");
+      else if (r.status === "failed") toast("err", r.output || `${label} 실패`);
     } catch (e) {
       toast("err", String(e));
     } finally {
       setBusy(false);
       await refresh();
     }
+    return r;
   }
+
+  const remote = async (op: RemoteOp): Promise<OpStatus> => {
+    setRemoteBusy(op);
+    setProgress(null);
+    try {
+      const r = await run(REMOTE_DONE[op], () => api.remote(path!, op, setProgress));
+      if (r.status === "auth") setAuth({ op, output: r.output });
+      if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
+      // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
+      if (r.status === "rejected") await api.remote(path!, "fetch").then(refresh, () => {});
+      return r.status;
+    } finally {
+      setRemoteBusy(null);
+      setProgress(null);
+    }
+  };
+
+  /** Resolve a diverged pull or rejected push with merge/rebase (then push for the latter). */
+  const resolveSync = async (op: "pullMerge" | "pullRebase") => {
+    const wasRejected = sync === "rejected";
+    setSync(null);
+    if ((await remote(op)) === "ok" && wasRejected) await remote("push");
+  };
 
   const openRepo = async () => {
     const p = await api.pickFolder();
@@ -172,54 +275,46 @@ export default function App() {
 
   const selectedCommit = selected ? commitById.get(selected) : undefined;
   const conflicts = snap.changes.filter((c) => c.conflicted).length;
-  const mergeColors = mergeReq && {
-    s: colorOf(mergeReq.sourceId),
-    t: colorOf(mergeReq.targetId),
-  };
+  const headColor = colorOf(snap.head.target ?? "");
 
   return (
     <div className="app">
-      <header className="topbar">
-        <h1 className="wordmark small">
-          otgit<span>옷깃</span>
-        </h1>
-        <button className="repo" onClick={openRepo} title={snap.path}>
-          {snap.name} <span className="muted">▾</span>
-        </button>
-        <span className="branch-now" style={{ ["--c" as string]: colorOf(snap.head.target ?? "") }}>
-          ◉ {snap.head.branch ?? (snap.head.target ? `detached @ ${snap.head.target.slice(0, 7)}` : "빈 저장소")}
-        </span>
-        {!isTauri && <span className="demo-pill">데모 모드</span>}
-        <div className="spacer" />
-        <button className="ghost" onClick={() => setComposer(true)} disabled={busy}>
-          ＋ 커밋 {snap.changes.length > 0 && <span className="count">{snap.changes.length}</span>}
-        </button>
-        <button className="ghost" onClick={() => void refresh()} title="새로고침">
-          ⟳
-        </button>
-        <button
-          className={`ghost ${animate ? "on" : ""}`}
-          title="반짝임 효과"
-          onClick={() => {
-            setAnimate(!animate);
-            store(ANIMATE, animate ? "0" : "1");
-          }}
-        >
-          ✦
-        </button>
-      </header>
+      <TopBar
+        repoName={snap.name}
+        repoPath={snap.path}
+        head={snap.head}
+        headColor={headColor}
+        changeCount={snap.changes.length}
+        busy={busy}
+        remoteBusy={remoteBusy}
+        progress={progress}
+        animate={animate}
+        onOpenRepo={openRepo}
+        onCompose={() => show({ composer: true })}
+        onRefresh={() => void refresh()}
+        onRemote={(op) => void remote(op)}
+        onToggleAnimate={() => {
+          setAnimate(!animate);
+          store(ANIMATE, animate ? "0" : "1");
+        }}
+      />
 
       {snap.state !== "clean" && (
         <div className="banner">
           <span>
-            {snap.state === "merge" ? "병합 진행 중" : `${snap.state} 진행 중`}
-            {conflicts > 0 && ` — 충돌 파일 ${conflicts}개`}. 해결 후 ＋ 로 커밋하면 병합이 완료됩니다.
+            {snap.state === "merge" ? "병합" : snap.state === "rebase" ? "리베이스" : snap.state} 진행 중
+            {conflicts > 0 && ` — 충돌 파일 ${conflicts}개`}. {CONFLICT_HINT[snap.state] ?? ""}
           </span>
-          {snap.state === "merge" && (
-            <button disabled={busy} onClick={() => run("병합을 취소했어요", () => api.mergeAbort(path))}>
-              병합 취소
+          <span className="row">
+            {snap.state === "rebase" && (
+              <button disabled={busy} onClick={() => run("리베이스를 이어갔어요", () => api.continueRebase(path))}>
+                계속
+              </button>
+            )}
+            <button disabled={busy} onClick={() => run("취소했어요", () => api.abort(path))}>
+              취소
             </button>
-          )}
+          </span>
         </div>
       )}
 
@@ -234,61 +329,77 @@ export default function App() {
             if (r) graph.current?.centerOn(r.target);
           }}
           onCheckout={(name) => run(`${name}(으)로 이동했어요`, () => api.checkout(path, name))}
+          stashes={snap.stashes}
+          selectedStash={selectedStash}
+          onStash={(i) => {
+            show({ stash: i });
+            const base = snap.stashes[i]?.base;
+            if (base) graph.current?.centerOn(base);
+          }}
         />
 
         <section className="stage">
-          <GraphCanvas
-            ref={graph}
-            layout={layout}
-            refs={snap.refs}
-            summaries={summaries}
-            headId={snap.head.target}
-            headBranch={snap.head.branch}
-            changeCount={snap.changes.length}
-            selected={selected}
-            focus={focus}
-            animate={animate}
-            onSelect={(id) => {
-              setSelected(id);
-              if (id) setComposer(false);
-            }}
-            onPlus={() => {
-              setSelected(null);
-              setComposer(true);
-            }}
-            canMergeInto={canMergeInto}
-            onMerge={(sourceId, targetId) => {
-              const target = branchAt(targetId)!;
-              setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
-            }}
-            onZoomChange={setZoom}
-          />
+          <div className="stage-graph">
+            <GraphCanvas
+              ref={graph}
+              layout={layout}
+              refs={snap.refs}
+              summaries={summaries}
+              headId={snap.head.target}
+              headBranch={snap.head.branch}
+              changeCount={snap.changes.length}
+              selected={selected}
+              focus={focus}
+              animate={animate}
+              onSelect={(id) => (id || !composer ? show({ commit: id }) : undefined)}
+              onPlus={() => show({ composer: true })}
+              stashes={snap.stashes}
+              selectedStash={selectedStash}
+              onStash={(i) => show({ stash: i })}
+              canMergeInto={canMergeInto}
+              onMerge={(sourceId, targetId) => {
+                const target = branchAt(targetId)!;
+                setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
+              }}
+              onZoomChange={setZoom}
+            />
 
-          {snap.commits.length === 0 && (
-            <div className="empty-hint">
-              아직 체크포인트가 없어요. <b>＋</b> 를 눌러 첫 커밋을 만들어 보세요.
+            {snap.commits.length === 0 && (
+              <div className="empty-hint">
+                아직 체크포인트가 없어요. <b>＋</b> 를 눌러 첫 커밋을 만들어 보세요.
+              </div>
+            )}
+
+            <div className="hud">
+              <button onClick={() => graph.current?.zoomBy(0.8)} title="축소 (-)">
+                −
+              </button>
+              <span className="zoom">{Math.round(zoom * 100)}%</span>
+              <button onClick={() => graph.current?.zoomBy(1.25)} title="확대 (+)">
+                ＋
+              </button>
+              <button onClick={() => graph.current?.fit()} title="전체 보기 (0)">
+                ⤢
+              </button>
+              <button onClick={() => graph.current?.centerOnHead()} title="HEAD로 (H)">
+                ◉
+              </button>
             </div>
-          )}
+            <div className="hint">
+              드래그 이동 · ⌘/Ctrl+휠 확대 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
+              {snap.truncated && " · 최근 커밋만 표시 중"}
+            </div>
+          </div>
 
-          <div className="hud">
-            <button onClick={() => graph.current?.zoomBy(0.8)} title="축소 (-)">
-              −
-            </button>
-            <span className="zoom">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => graph.current?.zoomBy(1.25)} title="확대 (+)">
-              ＋
-            </button>
-            <button onClick={() => graph.current?.fit()} title="전체 보기 (0)">
-              ⤢
-            </button>
-            <button onClick={() => graph.current?.centerOnHead()} title="HEAD로 (H)">
-              ◉
-            </button>
-          </div>
-          <div className="hint">
-            드래그 이동 · ⌘/Ctrl+휠 확대 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
-            {snap.truncated && " · 최근 커밋만 표시 중"}
-          </div>
+          {diff && (
+            <DiffSheet
+              title={diff.title}
+              files={diff.files}
+              error={diff.error}
+              initialPath={diff.path}
+              onClose={() => setDiff(null)}
+            />
+          )}
         </section>
 
         {composer && (
@@ -298,20 +409,57 @@ export default function App() {
             merging={snap.state === "merge"}
             busy={busy}
             onClose={() => setComposer(false)}
-            onCommit={async (message, paths, newBranch) => {
-              if (newBranch) {
-                try {
-                  const r = await api.createBranch(path, newBranch, null, true);
-                  if (!r.ok) return toast("err", r.output);
-                } catch (e) {
-                  return toast("err", String(e));
-                }
-              }
-              await run("체크포인트를 추가했어요", () => api.commit(path, message, paths), () => {
-                setComposer(false);
-                setTimeout(() => graph.current?.centerOnHead(), 60);
-              });
-            }}
+            onOpenFile={(file) => loadDiff({ kind: "worktree" }, "작업 중인 변경", file)}
+            onStash={(message, paths) =>
+              run(
+                "스태시에 보관했어요",
+                () => api.stashPush(path, message, paths),
+                () => {
+                  setDiff((d) => (d?.source.kind === "worktree" ? null : d));
+                },
+              )
+            }
+            onDiscard={(paths) =>
+              setConfirm({
+                title: "변경 버리기",
+                danger: true,
+                confirmLabel: `${paths.length}개 파일 버리기`,
+                body: (
+                  <>
+                    <p>
+                      아래 파일의 변경을 마지막 커밋 상태로 되돌립니다. 새로 만든 파일은 <b>삭제</b>돼요.
+                      <b> 되돌릴 수 없습니다.</b> 확실하지 않으면 스태시로 치워두세요.
+                    </p>
+                    <ul>
+                      {paths.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </ul>
+                  </>
+                ),
+                onConfirm: () => {
+                  setConfirm(null);
+                  void run("변경을 버렸어요", () => api.discard(path, paths));
+                },
+              })
+            }
+            onCommit={(message, paths, newBranch) =>
+              run(
+                "체크포인트를 추가했어요",
+                async () => {
+                  if (newBranch) {
+                    const r = await api.createBranch(path, newBranch, null, true);
+                    if (r.status !== "ok") return r;
+                  }
+                  return api.commit(path, message, paths);
+                },
+                () => {
+                  setComposer(false);
+                  setDiff((d) => (d?.source.kind === "worktree" ? null : d));
+                  setTimeout(() => graph.current?.centerOnHead(), 60);
+                },
+              )
+            }
           />
         )}
 
@@ -319,6 +467,7 @@ export default function App() {
           <Inspector
             commit={selectedCommit}
             refs={snap.refs.filter((r) => r.target === selectedCommit.id)}
+            files={panelFiles}
             color={colorOf(selectedCommit.id)}
             isHead={selectedCommit.id === snap.head.target}
             busy={busy}
@@ -327,18 +476,62 @@ export default function App() {
               setSelected(id);
               graph.current?.centerOn(id);
             }}
+            onOpenFile={(file) =>
+              loadDiff({ kind: "commit", id: selectedCommit.id }, selectedCommit.summary || selectedCommit.id, file)
+            }
             onCheckout={(name) => run(`${name}(으)로 이동했어요`, () => api.checkout(path, name))}
-            onCreateBranch={(name, at) => run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true))}
+            onCreateBranch={(name, at) =>
+              run(`${name} 브랜치를 만들었어요`, () => api.createBranch(path, name, at, true))
+            }
+          />
+        )}
+        {stashSel && !composer && (
+          <StashPanel
+            stash={stashSel}
+            files={panelFiles}
+            busy={busy}
+            onClose={() => show({})}
+            onSelectBase={() => {
+              show({ commit: stashSel.base });
+              graph.current?.centerOn(stashSel.base);
+            }}
+            onOpenFile={(file) => loadDiff({ kind: "commit", id: stashSel.id }, stashTitle(stashSel.message), file)}
+            onPop={() =>
+              run(
+                "스태시를 꺼냈어요",
+                () => api.stash(path, "pop", stashSel.index),
+                () => show({}),
+              )
+            }
+            onApply={() => run("스태시를 적용했어요", () => api.stash(path, "apply", stashSel.index))}
+            onDrop={() =>
+              setConfirm({
+                title: "스태시 삭제",
+                danger: true,
+                confirmLabel: "삭제",
+                body: <p>“{stashTitle(stashSel.message)}” 스태시를 지웁니다. 되돌릴 수 없어요.</p>,
+                onConfirm: () => {
+                  setConfirm(null);
+                  void run(
+                    "스태시를 삭제했어요",
+                    () => api.stash(path, "drop", stashSel.index),
+                    () => show({}),
+                  );
+                },
+              })
+            }
           />
         )}
       </div>
 
-      {mergeReq && mergeColors && (
+      {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
+
+      {mergeReq && (
         <MergeDialog
           source={mergeReq.source.length === 40 ? mergeReq.source.slice(0, 7) : mergeReq.source}
           target={mergeReq.target}
-          sourceColor={mergeColors.s}
-          targetColor={mergeColors.t}
+          sourceColor={colorOf(mergeReq.sourceId)}
+          targetColor={colorOf(mergeReq.targetId)}
           switchesBranch={snap.head.branch !== mergeReq.target}
           dirty={snap.changes.length}
           busy={busy}
@@ -351,6 +544,36 @@ export default function App() {
               setTimeout(() => graph.current?.centerOnHead(), 60);
             })
           }
+        />
+      )}
+
+      {sync && snap.head.branch && snap.head.upstream && (
+        <SyncDialog
+          kind={sync}
+          branch={snap.head.branch}
+          upstream={snap.head.upstream}
+          ahead={snap.head.ahead}
+          behind={snap.head.behind}
+          color={headColor}
+          busy={busy}
+          onMerge={() => void resolveSync("pullMerge")}
+          onRebase={() => void resolveSync("pullRebase")}
+          onCancel={() => setSync(null)}
+        />
+      )}
+
+      {auth && (
+        <AuthDialog
+          url={upstreamUrl(snap)}
+          output={auth.output}
+          repoPath={snap.path}
+          busy={busy}
+          onClose={() => setAuth(null)}
+          onRetry={() => {
+            const op = auth.op;
+            setAuth(null);
+            void remote(op);
+          }}
         />
       )}
 

@@ -1,9 +1,13 @@
 import { useState } from "react";
-import type { CommitInfo, RefInfo } from "../types";
+import { fmtTime } from "../format";
+import type { CommitInfo, FileDiff, RefInfo } from "../types";
+import { ChangedFiles } from "./ChangedFiles";
 
 interface Props {
   commit: CommitInfo;
   refs: RefInfo[];
+  /** Changed files; `null` while loading. */
+  files: FileDiff[] | null;
   color: string;
   isHead: boolean;
   busy: boolean;
@@ -11,19 +15,11 @@ interface Props {
   onCheckout(branch: string): void;
   onCreateBranch(name: string, at: string): void;
   onSelect(id: string): void;
+  onOpenFile(path: string): void;
 }
 
-function fmt(t: number) {
-  return new Date(t * 1000).toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function Inspector({ commit, refs, color, isHead, busy, onClose, onCheckout, onCreateBranch, onSelect }: Props) {
+export function Inspector(props: Props) {
+  const { commit, refs, files, color, isHead, busy, onClose, onCheckout, onCreateBranch, onSelect, onOpenFile } = props;
   const [name, setName] = useState("");
   const body = commit.message.split("\n").slice(1).join("\n").trim();
   const locals = refs.filter((r) => r.kind === "local");
@@ -32,9 +28,7 @@ export function Inspector({ commit, refs, color, isHead, busy, onClose, onChecko
     <aside className="panel inspector" style={{ ["--accent" as string]: color }}>
       <header>
         <div>
-          <div className="eyebrow">
-            체크포인트 {isHead && <span className="head-pill">HEAD</span>}
-          </div>
+          <div className="eyebrow">체크포인트 {isHead && <span className="head-pill">HEAD</span>}</div>
           <h2>{commit.summary || "(메시지 없음)"}</h2>
         </div>
         <button className="icon" onClick={onClose} title="닫기 (Esc)">
@@ -61,7 +55,7 @@ export function Inspector({ commit, refs, color, isHead, busy, onClose, onChecko
           {commit.author} <span className="muted">&lt;{commit.email}&gt;</span>
         </dd>
         <dt>시간</dt>
-        <dd>{fmt(commit.time)}</dd>
+        <dd>{fmtTime(commit.time)}</dd>
         <dt>커밋</dt>
         <dd>
           <code className="sha" title="클릭해서 복사" onClick={() => navigator.clipboard?.writeText(commit.id)}>
@@ -81,6 +75,8 @@ export function Inspector({ commit, refs, color, isHead, busy, onClose, onChecko
           </>
         )}
       </dl>
+
+      <ChangedFiles files={files} onOpen={onOpenFile} />
 
       {locals.length > 0 && (
         <div className="actions">

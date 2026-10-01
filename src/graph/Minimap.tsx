@@ -95,7 +95,8 @@ export function Minimap({ scene, getView, getSize, onJump }: Props) {
       ctx.fillStyle = "rgba(34,232,255,0.08)";
       ctx.strokeStyle = "rgba(34,232,255,0.8)";
       ctx.lineWidth = 1;
-      const rx = Math.max(1, x0), ry = Math.max(1, y0);
+      const rx = Math.max(1, x0),
+        ry = Math.max(1, y0);
       const rw = Math.max(4, Math.min(c.clientWidth - 1, x1) - rx);
       const rh = Math.max(4, Math.min(H - 1, y1) - ry);
       ctx.fillRect(rx, ry, rw, rh);

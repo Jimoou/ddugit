@@ -83,13 +83,17 @@ export function branchColors(refs: RefInfo[]): Map<string, number> {
   return out;
 }
 
-export function trunkName(refs: RefInfo[], head: HeadInfo): string | null {
+export function trunkName(refs: RefInfo[], head: Pick<HeadInfo, "branch" | "target">): string | null {
   const locals = new Set(refs.filter((r) => r.kind === "local").map((r) => r.name));
   for (const n of ["main", "master", "develop", "trunk"]) if (locals.has(n)) return n;
   return head.branch;
 }
 
-export function computeLayout(commits: CommitInfo[], refs: RefInfo[], head: HeadInfo): Layout {
+export function computeLayout(
+  commits: CommitInfo[],
+  refs: RefInfo[],
+  head: Pick<HeadInfo, "branch" | "target">,
+): Layout {
   const index = new Map<string, number>();
   commits.forEach((c, i) => index.set(c.id, i));
 
@@ -105,8 +109,7 @@ export function computeLayout(commits: CommitInfo[], refs: RefInfo[], head: Head
   // First-parent chain of the trunk.
   const trunk = new Set<string>();
   const tn = trunkName(refs, head);
-  let cursor =
-    (tn && refs.find((r) => r.kind === "local" && r.name === tn)?.target) || head.target || null;
+  let cursor = (tn && refs.find((r) => r.kind === "local" && r.name === tn)?.target) || head.target || null;
   while (cursor && index.has(cursor) && !trunk.has(cursor)) {
     trunk.add(cursor);
     cursor = commits[index.get(cursor)!].parents[0] ?? null;

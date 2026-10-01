@@ -1,8 +1,9 @@
 // In-memory demo repository used when the UI runs outside Tauri
-// (`npm run dev` in a plain browser). Supports the same operations as the
-// real backend so the whole UX can be exercised without a repo on disk.
+// (`npm run dev` in a plain browser). Implements the same command table as the
+// Rust backend so the whole UX can be exercised without a repo on disk.
 
-import type { CommitInfo, FileChange, OpResult, RefInfo, RepoSnapshot } from "./types";
+import type { Args, Command, Ret } from "./api";
+import type { CommitInfo, FileChange, FileDiff, OpResult, OpStatus, RefInfo, RemoteOp, RepoSnapshot } from "./types";
 
 let seq = 0;
 const fakeId = () => {
@@ -28,22 +29,29 @@ class MockRepo {
   changes: FileChange[] = [];
   state = "clean";
   clock = Math.floor(Date.now() / 1000) - 86400 * 40;
+  fetched = false;
+  stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
 
-  add(branch: string, summary: string, extraParents: string[] = []): string {
+  commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
     const id = fakeId();
-    const tip = this.branches.get(branch);
-    const parents = [...(tip ? [tip] : []), ...extraParents];
     this.clock += 3600 * (2 + (seq % 7));
     this.commits.set(id, {
       id,
       parents,
       summary,
       message: summary + "\n",
-      author: AUTHORS[seq % AUTHORS.length],
-      email: `${AUTHORS[seq % AUTHORS.length].toLowerCase()}@otgit.dev`,
+      author,
+      email: `${author.toLowerCase()}@otgit.dev`,
       time: this.clock,
     });
     this.order.unshift(id);
+    return id;
+  }
+
+  /** Commit on top of `branch` and advance it. */
+  add(branch: string, summary: string, extraParents: string[] = []): string {
+    const tip = this.branches.get(branch);
+    const id = this.commit([...(tip ? [tip] : []), ...extraParents], summary);
     this.branches.set(branch, id);
     return id;
   }
@@ -53,8 +61,34 @@ class MockRepo {
   }
 
   merge(source: string, target: string, summary?: string) {
-    const src = this.branches.get(source) ?? source;
+    const src = this.branches.get(source) ?? this.remotes.get(source) ?? source;
     return this.add(target, summary ?? `Merge branch '${source}' into ${target}`, [src]);
+  }
+
+  ancestors(id: string): Set<string> {
+    const out = new Set<string>();
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (out.has(cur) || !this.commits.has(cur)) continue;
+      out.add(cur);
+      stack.push(...this.commits.get(cur)!.parents);
+    }
+    return out;
+  }
+
+  upstream(): string | null {
+    const name = `origin/${this.head}`;
+    return this.remotes.has(name) ? name : null;
+  }
+
+  aheadBehind(): [number, number] {
+    const up = this.upstream();
+    const local = this.branches.get(this.head);
+    if (!up || !local) return [0, 0];
+    const a = this.ancestors(local);
+    const b = this.ancestors(this.remotes.get(up)!);
+    return [[...a].filter((x) => !b.has(x)).length, [...b].filter((x) => !a.has(x)).length];
   }
 
   snapshot(): RepoSnapshot {
@@ -63,13 +97,25 @@ class MockRepo {
       ...[...this.remotes].map(([name, target]) => ({ name, kind: "remote" as const, target })),
       ...[...this.tags].map(([name, target]) => ({ name, kind: "tag" as const, target })),
     ];
+    const [ahead, behind] = this.aheadBehind();
+    // Like git, only list commits reachable from a ref (rebased-away ones vanish).
+    const reachable = new Set<string>();
+    for (const r of refs) for (const id of this.ancestors(r.target)) reachable.add(id);
     return {
       path: "/demo/otgit-demo",
       name: "otgit-demo",
-      head: { branch: this.head, target: this.branches.get(this.head) ?? null },
-      commits: this.order.map((id) => this.commits.get(id)!),
+      head: {
+        branch: this.head,
+        target: this.branches.get(this.head) ?? null,
+        upstream: this.upstream(),
+        ahead,
+        behind,
+      },
+      commits: this.order.filter((id) => reachable.has(id)).map((id) => this.commits.get(id)!),
       refs,
+      remotes: [{ name: "origin", url: "https://github.com/otgit/otgit-demo.git" }],
       changes: this.changes.map((c) => ({ ...c })),
+      stashes: this.stashes.map(({ message, id, base, time }, index) => ({ index, message, id, base, time })),
       state: this.state,
       truncated: false,
     };
@@ -106,7 +152,15 @@ function seed(): MockRepo {
   r.add("feature/graph-zoom", "Minimap");
   r.remotes.set("origin/main", r.branches.get("main")!);
   r.remotes.set("origin/feature/theme", r.branches.get("feature/theme")!);
+  r.remotes.set("origin/feature/graph-zoom", r.branches.get("feature/graph-zoom")!);
   r.add("feature/graph-zoom", "Zoom to cursor");
+  r.stashes.push({
+    message: "On main: try warmer glow palette",
+    id: fakeId(),
+    base: r.branches.get("main")!,
+    time: r.clock,
+    changes: [{ path: "src/App.css", staged: null, unstaged: "modified", conflicted: false }],
+  });
   r.head = "feature/graph-zoom";
   r.changes = [
     { path: "src/graph/renderer.ts", staged: null, unstaged: "modified", conflicted: false },
@@ -116,46 +170,238 @@ function seed(): MockRepo {
   return r;
 }
 
+// --- fake diffs ---------------------------------------------------------------
+
+const FILES = ["src/graph/renderer.ts", "src/graph/layout.ts", "src/App.tsx", "src/App.css", "README.md"];
+
+function fakeFile(path: string, seed: number, summary: string, status = "modified"): FileDiff {
+  const start = 10 + (seed % 40);
+  const ctx = (n: number, t: string) => ({ kind: " " as const, old: n, new: n + 1, text: t });
+  const lines =
+    status === "added" || status === "untracked"
+      ? [`// ${summary}`, "export function demo() {", "  return 42;", "}"].map((text, i) => ({
+          kind: "+" as const,
+          old: null,
+          new: i + 1,
+          text,
+        }))
+      : [
+          ctx(start, "  const view = state.view;"),
+          ctx(start + 1, ""),
+          { kind: "-" as const, old: start + 2, new: null, text: "  draw(ctx, view);" },
+          { kind: "+" as const, old: null, new: start + 3, text: `  // ${summary}` },
+          { kind: "+" as const, old: null, new: start + 4, text: "  draw(ctx, { ...view, glow: true });" },
+          ctx(start + 3, "  return frame;"),
+        ];
+  const additions = lines.filter((l) => l.kind === "+").length;
+  const deletions = lines.filter((l) => l.kind === "-").length;
+  const header =
+    status === "added" || status === "untracked"
+      ? `@@ -0,0 +1,${lines.length} @@`
+      : `@@ -${start},5 +${start},6 @@ function frame()`;
+  return {
+    path,
+    oldPath: null,
+    status,
+    additions,
+    deletions,
+    binary: false,
+    truncated: false,
+    hunks: [{ header, lines }],
+  };
+}
+
+function hash(s: string) {
+  let h = 0;
+  for (const ch of s) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0;
+  return h;
+}
+
+// --- command table ------------------------------------------------------------
+
 const repo = seed();
-const ok = (output = ""): OpResult => ({ ok: true, conflict: false, output });
-const delay = <T>(v: T) => new Promise<T>((res) => setTimeout(() => res(v), 120));
+const res = (status: OpStatus, output = ""): OpResult => ({ status, output });
+const delay = <T>(v: T, ms = 120) => new Promise<T>((r) => setTimeout(() => r(v), ms));
+const fail = (msg: string) => Promise.reject(msg);
 
-export const mock = {
-  snapshot: () => delay(repo.snapshot()),
+function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
+  const up = repo.upstream();
+  if (!up) return `'${repo.head}' has no upstream branch; push it first`;
+  const [ahead, behind] = repo.aheadBehind();
+  const remote = repo.remotes.get(up)!;
+  if (behind === 0) return res("ok", "Already up to date.");
+  if (ahead === 0) {
+    repo.branches.set(repo.head, remote);
+    return res("ok", "Fast-forward");
+  }
+  if (mode === "ff") return res("diverged", "fatal: Not possible to fast-forward, aborting.");
+  if (mode === "merge") {
+    repo.merge(up, repo.head, `Merge remote-tracking branch '${up}' into ${repo.head}`);
+    return res("ok", "Merge made by the 'ort' strategy.");
+  }
+  // Rebase: replay local-only first-parent commits on top of the upstream.
+  const theirs = repo.ancestors(remote);
+  const mine: CommitInfo[] = [];
+  for (let id = repo.branches.get(repo.head); id && !theirs.has(id);) {
+    const c = repo.commits.get(id)!;
+    mine.unshift(c);
+    id = c.parents[0];
+  }
+  let tip = remote;
+  for (const c of mine) tip = repo.commit([tip], c.summary, c.author);
+  repo.branches.set(repo.head, tip);
+  return res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`);
+}
 
-  commit(message: string, paths: string[]) {
-    if (!message.trim()) return Promise.reject("Commit message is empty");
+/** Dev/e2e switch: make the next remote call fail authentication. */
+export const demoControls = { failNextRemote: null as null | "https" | "ssh" };
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  (window as unknown as Record<string, unknown>).__otgitDemo = demoControls;
+}
+
+const AUTH_OUTPUT = {
+  https: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+  ssh: "git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.",
+};
+
+const PHASES = {
+  fetch: ["Receiving objects", "Resolving deltas"],
+  push: ["Compressing objects", "Writing objects"],
+};
+
+function remoteOp(op: RemoteOp): OpResult | string {
+  if (op === "fetch") {
+    // First fetch: a teammate pushed to origin/main and to our branch.
+    if (!repo.fetched) {
+      repo.fetched = true;
+      const main = repo.remotes.get("origin/main")!;
+      repo.remotes.set("origin/main", repo.commit([main], "Teammate: tighten lane spacing", "Minji"));
+      const up = repo.upstream();
+      if (up) repo.remotes.set(up, repo.commit([repo.remotes.get(up)!], "Teammate: fix minimap drag", "Hyunwoo"));
+    }
+    return res("ok", "Fetching origin");
+  }
+  if (op === "push") {
+    const local = repo.branches.get(repo.head)!;
+    const up = repo.upstream();
+    if (up && !repo.ancestors(local).has(repo.remotes.get(up)!)) return res("rejected", " ! [rejected]  (fetch first)");
+    repo.remotes.set(up ?? `origin/${repo.head}`, local);
+    return res("ok", up ? "" : `branch '${repo.head}' set up to track 'origin/${repo.head}'.`);
+  }
+  return pull(op === "pull" ? "ff" : op === "pullMerge" ? "merge" : "rebase");
+}
+
+type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
+
+export const mock: Table = {
+  initial_repo: () => delay(null, 0),
+  repo_snapshot: () => delay(repo.snapshot()),
+
+  git_commit({ message, paths }) {
+    if (!message.trim()) return fail("Commit message is empty");
     const set = new Set(paths.length ? paths : repo.changes.map((c) => c.path));
-    if (![...repo.changes].some((c) => set.has(c.path))) return Promise.reject("Nothing to commit");
+    if (!repo.changes.some((c) => set.has(c.path))) return fail("Nothing to commit");
     repo.add(repo.head, message.split("\n")[0]);
     repo.changes = repo.changes.filter((c) => !set.has(c.path));
-    return delay(ok(`[${repo.head}] ${message}`));
+    return delay(res("ok", `[${repo.head}] ${message}`));
   },
 
-  merge(source: string, target: string | null) {
+  git_merge({ source, target }) {
     const t = target ?? repo.head;
-    if (!repo.branches.has(t)) return Promise.reject(`Unknown branch '${t}'`);
+    if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
-    const label = repo.branches.has(source) ? source : source.slice(0, 7);
-    repo.merge(source, t, `Merge ${repo.branches.has(source) ? `branch '${label}'` : `commit ${label}`} into ${t}`);
-    return delay(ok("Merge made by the 'ort' strategy."));
+    const named = repo.branches.has(source) || repo.remotes.has(source);
+    repo.merge(source, t, `Merge ${named ? `branch '${source}'` : `commit ${source.slice(0, 7)}`} into ${t}`);
+    return delay(res("ok", "Merge made by the 'ort' strategy."));
   },
 
-  mergeAbort() {
+  git_abort() {
     repo.state = "clean";
-    return delay(ok());
+    return delay(res("ok"));
   },
 
-  checkout(target: string) {
-    if (!repo.branches.has(target)) return Promise.reject(`Unknown branch '${target}'`);
+  git_continue_rebase() {
+    repo.state = "clean";
+    return delay(res("ok"));
+  },
+
+  git_checkout({ target }) {
+    if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
     repo.head = target;
-    return delay(ok(`Switched to branch '${target}'`));
+    return delay(res("ok", `Switched to branch '${target}'`));
   },
 
-  createBranch(name: string, at: string | null, sw: boolean) {
-    if (repo.branches.has(name)) return Promise.reject(`Branch '${name}' already exists`);
+  git_create_branch({ name, at, switch: sw }) {
+    if (repo.branches.has(name)) return fail(`Branch '${name}' already exists`);
     repo.branches.set(name, at ?? repo.branches.get(repo.head)!);
     if (sw) repo.head = name;
-    return delay(ok());
+    return delay(res("ok"));
+  },
+
+  async git_remote({ op, onProgress }) {
+    const fake = demoControls.failNextRemote;
+    if (fake) {
+      demoControls.failNextRemote = null;
+      await delay(null, 300);
+      return res("auth", AUTH_OUTPUT[fake]);
+    }
+    for (const phase of PHASES[op === "push" ? "push" : "fetch"]) {
+      for (let pct = 0; pct <= 100; pct += 20) {
+        onProgress.onmessage({ phase, percent: pct });
+        await delay(null, 60);
+      }
+    }
+    const r = remoteOp(op);
+    return typeof r === "string" ? fail(r) : r;
+  },
+
+  git_discard({ paths }) {
+    const set = new Set(paths);
+    repo.changes = repo.changes.filter((c) => !set.has(c.path));
+    return delay(res("ok"));
+  },
+
+  git_stash_push({ message, paths }) {
+    const set = new Set(paths.length ? paths : repo.changes.map((c) => c.path));
+    const moved = repo.changes.filter((c) => set.has(c.path));
+    if (!moved.length) return fail("No local changes to save");
+    repo.changes = repo.changes.filter((c) => !set.has(c.path));
+    repo.stashes.unshift({
+      message: `On ${repo.head}: ${message || "otgit stash"}`,
+      id: fakeId(),
+      base: repo.branches.get(repo.head)!,
+      time: Math.floor(Date.now() / 1000),
+      changes: moved,
+    });
+    return delay(res("ok", "Saved working directory and index state"));
+  },
+
+  git_stash({ op, index }) {
+    const st = repo.stashes[index];
+    if (!st) return fail(`stash@{${index}} does not exist`);
+    if (op !== "drop") {
+      const have = new Set(repo.changes.map((c) => c.path));
+      repo.changes.push(...st.changes.filter((c) => !have.has(c.path)));
+    }
+    if (op !== "apply") repo.stashes.splice(index, 1);
+    return delay(res("ok"));
+  },
+
+  commit_diff({ id }) {
+    const st = repo.stashes.find((x) => x.id === id);
+    if (st)
+      return delay(st.changes.map((c) => fakeFile(c.path, hash(c.path), st.message, c.unstaged ?? c.staged ?? "")));
+    const c = repo.commits.get(id);
+    if (!c) return fail(`Unknown commit ${id}`);
+    const h = hash(id);
+    const n = 1 + (h % 3);
+    const files = Array.from({ length: n }, (_, i) => FILES[(h + i * 2) % FILES.length]);
+    const status = (i: number) => (c.parents.length === 0 || (i === n - 1 && h % 4 === 0) ? "added" : "modified");
+    return delay([...new Set(files)].map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
+  },
+
+  worktree_diff({ file }) {
+    const list = repo.changes.filter((c) => !file || c.path === file);
+    return delay(list.map((c) => fakeFile(c.path, hash(c.path), "work in progress", c.unstaged ?? c.staged ?? "")));
   },
 };

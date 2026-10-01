@@ -1,4 +1,5 @@
-import type { RefInfo } from "../types";
+import { stashTitle } from "../format";
+import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf } from "./scene";
 
 export interface View {
@@ -35,7 +36,40 @@ export interface DrawState {
   summaries: Map<string, string>;
   drag: Drag | null;
   births: Map<string, number>;
+  stashes: StashMark[];
+  stashHover: number | null;
+  stashSelected: number | null;
 }
+
+/** A stash drawn as a small diamond hanging off the commit it was taken on. */
+export interface StashMark {
+  index: number;
+  message: string;
+  base: Pt;
+  pos: Pt;
+}
+
+export function stashMarks(scene: Scene, stashes: StashInfo[]): StashMark[] {
+  const perBase = new Map<string, number>();
+  const n = scene.layout.rowCount;
+  return stashes.flatMap((st) => {
+    const node = scene.layout.byId.get(st.base);
+    if (!node) return []; // base outside the loaded history
+    const i = perBase.get(st.base) ?? 0;
+    perBase.set(st.base, i + 1);
+    const base = { x: xOf(node.row, n), y: yOf(node.lane) };
+    return [
+      {
+        index: st.index,
+        message: stashTitle(st.message),
+        base,
+        pos: { x: base.x + COL * (0.5 + i * 0.3), y: base.y + LANE * 0.45 },
+      },
+    ];
+  });
+}
+
+export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
 
 /** Zoom thresholds for semantic zoom. */
 export const ZOOM = { dots: 0.35, branches: 0.55, allRefs: 0.8, summaries: 1.25 };
@@ -80,10 +114,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): string {
   if (ctx.measureText(text).width <= max) return text;
-  let lo = 0, hi = text.length;
+  let lo = 0,
+    hi = text.length;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (ctx.measureText(text.slice(0, mid) + "…").width <= max) lo = mid; else hi = mid - 1;
+    if (ctx.measureText(text.slice(0, mid) + "…").width <= max) lo = mid;
+    else hi = mid - 1;
   }
   return text.slice(0, lo) + "…";
 }
@@ -112,8 +148,10 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   // Visible world rect (with margin).
   const m = 40 / k;
-  const vx0 = -view.tx / k - m, vx1 = (w - view.tx) / k + m;
-  const vy0 = -view.ty / k - m, vy1 = (h - view.ty) / k + m;
+  const vx0 = -view.tx / k - m,
+    vx1 = (w - view.tx) / k + m;
+  const vy0 = -view.ty / k - m,
+    vy1 = (h - view.ty) / k + m;
 
   const dim = (id: string) => s.focus !== null && !s.focus.has(id);
 
@@ -153,7 +191,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const count = Math.max(1, Math.round(e.length / (COL * 2.2)));
       const c = NEON[e.edge.color];
       for (let i = 0; i < count; i++) {
-        const t = (((time * speed) / e.length + i / count + e.seed) % 1 + 1) % 1;
+        const t = ((((time * speed) / e.length + i / count + e.seed) % 1) + 1) % 1;
         const p = toScreen(view, pointAt(e, t));
         if (p.x < -20 || p.x > w + 20 || p.y < -20 || p.y > h + 20) continue;
         const fade = Math.sin(t * Math.PI); // fade in/out at the ends
@@ -192,8 +230,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   // --- nodes ------------------------------------------------------------------
   const r = nodeRadius(k);
-  const firstCol = Math.max(0, Math.floor((n - 1) - vx1 / COL));
-  const lastCol = Math.min(n - 1, Math.ceil((n - 1) - vx0 / COL));
+  const firstCol = Math.max(0, Math.floor(n - 1 - vx1 / COL));
+  const lastCol = Math.min(n - 1, Math.ceil(n - 1 - vx0 / COL));
   const nodes = scene.layout.nodes;
   const labelQueue: { x: number; y: number; id: string; color: string; d: boolean }[] = [];
 
@@ -263,6 +301,50 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     labelQueue.push({ x: p.x, y: p.y, id: node.id, color: c, d });
   }
 
+  // --- stashes ----------------------------------------------------------------
+  for (const m of s.stashes) {
+    const b = toScreen(view, m.base);
+    const p = toScreen(view, m.pos);
+    if (p.x < -40 || p.x > w + 40 || p.y < -40 || p.y > h + 40) continue;
+    const c = NEON[3];
+    const on = m.index === s.stashHover || m.index === s.stashSelected;
+    const sr = stashRadius(k) * (on ? 1.2 : 1);
+    ctx.save();
+    ctx.setLineDash([2, 4]);
+    ctx.strokeStyle = alpha(c, 0.6);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.quadraticCurveTo(p.x, b.y, p.x, p.y);
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sr * 3);
+    g.addColorStop(0, alpha(c, on ? 0.6 : 0.35));
+    g.addColorStop(1, alpha(c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(p.x - sr * 3, p.y - sr * 3, sr * 6, sr * 6);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - sr);
+    ctx.lineTo(p.x + sr, p.y);
+    ctx.lineTo(p.x, p.y + sr);
+    ctx.lineTo(p.x - sr, p.y);
+    ctx.closePath();
+    ctx.fillStyle = on ? c : "#0a0814";
+    ctx.fill();
+    ctx.strokeStyle = c;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    if (on || k >= ZOOM.summaries) {
+      ctx.font = `600 11px ${SANS}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = c;
+      ctx.fillText(truncate(ctx, `stash · ${m.message}`, 220), p.x + sr + 6, p.y);
+    }
+  }
+
   // --- labels (semantic zoom) -------------------------------------------------
   if (k >= ZOOM.branches) {
     for (const L of labelQueue) {
@@ -275,8 +357,10 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
           const isHead = rf.kind === "local" && rf.name === s.headBranch && L.id === s.headId;
           const label = (isHead ? "◉ " : rf.kind === "remote" ? "☁ " : rf.kind === "tag" ? "◆ " : "") + rf.name;
           const tw = Math.min(ctx.measureText(label).width, 160);
-          const bw = tw + 14, bh = 18;
-          const bx = L.x - bw / 2, by = y - bh;
+          const bw = tw + 14,
+            bh = 18;
+          const bx = L.x - bw / 2,
+            by = y - bh;
           const col = rf.kind === "tag" ? NEON[3] : L.color;
           ctx.globalAlpha = L.d ? 0.3 : rf.kind === "remote" ? 0.75 : 1;
           roundRect(ctx, bx, by, bw, bh, 9);
@@ -314,7 +398,11 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const c = s.drag.valid ? "#ffffff" : NEON[src.color];
       const mx = (a.x + b.x) / 2;
       ctx.globalCompositeOperation = "lighter";
-      for (const [lw, al] of [[10, 0.12], [5, 0.3], [2, 1]] as const) {
+      for (const [lw, al] of [
+        [10, 0.12],
+        [5, 0.3],
+        [2, 1],
+      ] as const) {
         ctx.strokeStyle = alpha(s.drag.valid ? NEON[6] : NEON[src.color], al);
         ctx.lineWidth = lw;
         ctx.beginPath();
@@ -367,7 +455,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.font = `700 10px ${MONO}`;
       const label = String(s.changeCount);
       const bw = Math.max(16, ctx.measureText(label).width + 8);
-      const bx = plusS.x + pr * 0.6, by = plusS.y - pr - 6;
+      const bx = plusS.x + pr * 0.6,
+        by = plusS.y - pr - 6;
       roundRect(ctx, bx, by, bw, 15, 7.5);
       ctx.fillStyle = NEON[1];
       ctx.fill();

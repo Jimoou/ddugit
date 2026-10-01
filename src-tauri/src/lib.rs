@@ -1,6 +1,11 @@
 mod git;
 
-use git::{OpResult, RepoSnapshot};
+use git::diff::FileDiff;
+use git::read::RepoSnapshot;
+use git::remote::{Progress, RemoteOp};
+use git::stash::StashOp;
+use git::OpResult;
+use tauri::ipc::Channel;
 
 /// Run blocking git work off the main thread so the window never stalls.
 async fn blocking<T, F>(f: F) -> Result<T, String>
@@ -13,40 +18,37 @@ where
         .map_err(|e| e.to_string())?
 }
 
-#[tauri::command]
-async fn repo_snapshot(path: String, limit: Option<usize>) -> Result<RepoSnapshot, String> {
-    blocking(move || git::snapshot(&path, limit.unwrap_or(3000))).await
+/// Declares an async Tauri command whose body runs on the blocking pool.
+/// Commands only unpack arguments; logic lives in `git::*`.
+macro_rules! command {
+    ($name:ident($($arg:ident: $ty:ty),*) -> $ret:ty => $body:expr) => {
+        #[tauri::command]
+        async fn $name($($arg: $ty),*) -> Result<$ret, String> {
+            blocking(move || $body).await
+        }
+    };
 }
 
-#[tauri::command]
-async fn git_commit(path: String, message: String, paths: Vec<String>) -> Result<OpResult, String> {
-    blocking(move || git::commit(&path, &message, &paths)).await
-}
-
-#[tauri::command]
-async fn git_merge(path: String, source: String, target: Option<String>) -> Result<OpResult, String> {
-    blocking(move || git::merge(&path, &source, target.as_deref())).await
-}
-
-#[tauri::command]
-async fn git_merge_abort(path: String) -> Result<OpResult, String> {
-    blocking(move || git::merge_abort(&path)).await
-}
-
-#[tauri::command]
-async fn git_checkout(path: String, target: String) -> Result<OpResult, String> {
-    blocking(move || git::checkout(&path, &target)).await
-}
-
-#[tauri::command]
-async fn git_create_branch(
-    path: String,
-    name: String,
-    at: Option<String>,
-    switch: bool,
-) -> Result<OpResult, String> {
-    blocking(move || git::create_branch(&path, &name, at.as_deref(), switch)).await
-}
+command!(repo_snapshot(path: String, limit: Option<usize>) -> RepoSnapshot
+    => git::read::snapshot(&path, limit.unwrap_or(3000)));
+command!(git_commit(path: String, message: String, paths: Vec<String>) -> OpResult
+    => git::write::commit(&path, &message, &paths));
+command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
+    => git::write::merge(&path, &source, target.as_deref()));
+command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
+command!(git_continue_rebase(path: String) -> OpResult => git::write::continue_rebase(&path));
+command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
+command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
+    => git::write::create_branch(&path, &name, at.as_deref(), switch));
+command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
+command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
+command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
+    => git::stash::stash_push(&path, &message, &paths));
+command!(git_stash(path: String, op: StashOp, index: usize) -> OpResult => git::stash::stash(&path, op, index));
+command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
+command!(worktree_diff(path: String, file: Option<String>) -> Vec<FileDiff>
+    => git::diff::worktree_diff(&path, file.as_deref()));
 
 /// Repository passed on the command line (`otgit path/to/repo`), if any.
 #[tauri::command]
@@ -67,9 +69,16 @@ pub fn run() {
             repo_snapshot,
             git_commit,
             git_merge,
-            git_merge_abort,
+            git_abort,
+            git_continue_rebase,
             git_checkout,
             git_create_branch,
+            git_remote,
+            git_discard,
+            git_stash_push,
+            git_stash,
+            commit_diff,
+            worktree_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

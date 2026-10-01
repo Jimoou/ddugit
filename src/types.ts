@@ -22,6 +22,10 @@ export interface RefInfo {
 export interface HeadInfo {
   branch: string | null;
   target: string | null;
+  /** Tracking branch, e.g. `origin/main`. */
+  upstream: string | null;
+  ahead: number;
+  behind: number;
 }
 
 export interface FileChange {
@@ -31,19 +35,70 @@ export interface FileChange {
   conflicted: boolean;
 }
 
+export interface StashInfo {
+  /** Position in the stash list: `stash@{index}`. */
+  index: number;
+  message: string;
+  id: string;
+  /** Commit the stash was taken on. */
+  base: string;
+  time: number;
+}
+
+export type StashOp = "apply" | "pop" | "drop";
+
 export interface RepoSnapshot {
   path: string;
   name: string;
   head: HeadInfo;
   commits: CommitInfo[];
   refs: RefInfo[];
+  remotes: RemoteInfo[];
   changes: FileChange[];
+  stashes: StashInfo[];
   state: string;
   truncated: boolean;
 }
 
+export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected" | "auth";
+
 export interface OpResult {
-  ok: boolean;
-  conflict: boolean;
+  status: OpStatus;
   output: string;
+}
+
+export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push";
+
+/** Parsed from git's `--progress` output. */
+export interface Progress {
+  phase: string;
+  percent: number;
+}
+
+export interface RemoteInfo {
+  name: string;
+  url: string;
+}
+
+export interface DiffLine {
+  kind: "+" | "-" | " ";
+  old: number | null;
+  new: number | null;
+  text: string;
+}
+
+export interface DiffHunk {
+  header: string;
+  lines: DiffLine[];
+}
+
+export interface FileDiff {
+  path: string;
+  oldPath: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+  binary: boolean;
+  truncated: boolean;
+  hunks: DiffHunk[];
 }
