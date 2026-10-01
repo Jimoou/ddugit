@@ -22,7 +22,7 @@ otgit(옷깃): 그래프 중심의 크로스플랫폼(macOS / Windows) Git 클�
 ```bash
 npm run dev                  # 브라우저 데모 모드 (가상 저장소, localhost:1420)
 npm run tauri dev            # 데스크톱 앱 (뒤에 `-- -- <repo>`를 붙이면 그 저장소를 연다)
-npm run check                # typecheck + prettier --check + vitest
+npm run check                # typecheck + eslint + prettier --check + vitest
 npm run e2e                  # Playwright e2e on the demo (sandbox: PW_CHROMIUM=/opt/pw-browsers/chromium)
 npm run format               # prettier --write
 cd src-tauri && cargo fmt && cargo clippy --all-targets -- -D warnings && cargo test
