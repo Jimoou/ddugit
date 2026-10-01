@@ -5,6 +5,7 @@
 //! hooks, credentials, signing and LFS behave exactly as on the command line.
 
 pub mod diff;
+pub mod pick;
 pub mod read;
 pub mod remote;
 pub mod stash;
@@ -237,7 +238,7 @@ mod testutil {
     /// Write `file` and commit everything with `msg`.
     pub fn commit_file(p: &Path, file: &str, content: &str, msg: &str) {
         fs::write(p.join(file), content).unwrap();
-        let r = super::write::commit(s(p), msg, &[]).unwrap();
+        let r = super::write::commit(s(p), msg, &[], false).unwrap();
         assert_eq!(r.status, super::OpStatus::Ok, "{}", r.output);
     }
 }
