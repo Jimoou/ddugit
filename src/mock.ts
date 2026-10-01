@@ -119,6 +119,7 @@ class MockRepo {
       changes: this.changes.map((c) => ({ ...c })),
       stashes: this.stashes.map(({ message, id, base, time }, index) => ({ index, message, id, base, time })),
       state: this.state,
+      incoming: this.pending?.source ?? null,
       truncated: false,
     };
   }

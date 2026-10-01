@@ -70,6 +70,8 @@ export interface RepoSnapshot {
   changes: FileChange[];
   stashes: StashInfo[];
   state: string;
+  /** Commit a stopped merge / cherry-pick / revert is bringing in. */
+  incoming: string | null;
   truncated: boolean;
 }
 

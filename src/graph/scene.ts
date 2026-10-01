@@ -4,6 +4,9 @@ import type { Layout, LayoutEdge } from "./layout";
 export const COL = 84;
 export const LANE = 46;
 
+/** Conflict / pending-operation colour (matches the CSS `--red` token). */
+export const ALERT = "#ff4d6d";
+
 export const NEON = [
   "#22e8ff", // trunk
   "#ff3df2",
