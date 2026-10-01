@@ -39,9 +39,7 @@ export function TopBar(p: Props) {
 
   return (
     <header className="topbar">
-      <h1 className="wordmark small">
-        otgit<span>옷깃</span>
-      </h1>
+      <h1 className="wordmark small">otgit</h1>
       <button className="repo" onClick={p.onOpenRepo} title={p.repoPath}>
         {p.repoName} <span className="muted">▾</span>
       </button>

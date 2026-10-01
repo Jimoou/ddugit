@@ -1,7 +1,8 @@
 // Galaxy backdrop for the graph canvas: a deep gradient, a few soft nebulae
 // and three star layers that drift slower than the graph when panning
-// (parallax). Star layers are rendered once into tiles, so a frame costs a
-// handful of drawImage calls.
+// (parallax). The sky turns very slowly around the view's centre while
+// animation is on, like a night sky. Star layers are rendered once into
+// tiles, so a frame costs a handful of drawImage calls.
 
 import type { View } from "./renderer";
 
@@ -64,6 +65,20 @@ const TWINKLES = (() => {
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
 
+/** One full turn of the sky every 10 minutes: visible if you watch, never distracting. */
+const SPIN = (Math.PI * 2) / 600;
+
+/** Sky angle, advanced only while animating so pausing doesn't make it jump. */
+const sky = { angle: 0, last: null as number | null };
+
+/** Advance the sky's angle by the time since the last frame (seconds). */
+export function skyAngle(time: number, animate: boolean): number {
+  const dt = sky.last === null ? 0 : Math.min(time - sky.last, 0.25);
+  sky.last = time;
+  if (animate && dt > 0) sky.angle = (sky.angle + dt * SPIN) % (Math.PI * 2);
+  return sky.angle;
+}
+
 /** Paint the sky in CSS pixels (the caller has set the device-pixel transform). */
 export function drawSpace(
   ctx: CanvasRenderingContext2D,
@@ -79,6 +94,15 @@ export function drawSpace(
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, w, h);
 
+  // Everything after the base gradient turns with the sky. Drawing over the
+  // view's circumscribed square keeps the corners filled at any angle.
+  const angle = skyAngle(time, animate);
+  const pad = Math.ceil(Math.hypot(w, h) / 2 - Math.min(w, h) / 2);
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(angle);
+  ctx.translate(-w / 2, -h / 2);
+
   const side = Math.max(w, h);
   for (const [fx, fy, fr, color] of NEBULAE) {
     const x = fx * w + view.tx * 0.02;
@@ -87,13 +111,13 @@ export function drawSpace(
     g.addColorStop(0, color);
     g.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(-pad, -pad, w + 2 * pad, h + 2 * pad);
   }
 
   for (const { tile, parallax } of starLayers()) {
-    const ox = mod(view.tx * parallax, TILE) - TILE;
-    const oy = mod(view.ty * parallax, TILE) - TILE;
-    for (let x = ox; x < w; x += TILE) for (let y = oy; y < h; y += TILE) ctx.drawImage(tile, x, y);
+    const ox = mod(view.tx * parallax, TILE) - TILE - Math.ceil(pad / TILE) * TILE;
+    const oy = mod(view.ty * parallax, TILE) - TILE - Math.ceil(pad / TILE) * TILE;
+    for (let x = ox; x < w + pad; x += TILE) for (let y = oy; y < h + pad; y += TILE) ctx.drawImage(tile, x, y);
   }
 
   for (const s of TWINKLES) {
@@ -106,4 +130,5 @@ export function drawSpace(
     ctx.fillStyle = g;
     ctx.fillRect(x - 4, y - 4, 8, 8);
   }
+  ctx.restore();
 }

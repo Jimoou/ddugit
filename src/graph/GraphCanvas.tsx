@@ -20,6 +20,7 @@ import {
 import { type Step, stepFrom } from "./navigate";
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
+import { type Bounds, clampView } from "./camera";
 import { Minimap } from "./Minimap";
 import { t } from "../i18n";
 
@@ -159,6 +160,12 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     s.anchor = nodes.length ? { id: nodes[0].id, x: xOf(0, rowCount) } : null;
   }, [props.layout]);
 
+  /** World box of the graph: from the "load more" tail (if any) to the [+] node. */
+  const graphBounds = (): Bounds => {
+    const sc = sceneRef.current;
+    return { left: propsRef.current.truncated ? -COL * 2.4 : 0, right: sc.width + COL, top: 0, bottom: sc.height };
+  };
+
   const viewFor = (world: Pt, k: number): View => {
     const { w, h } = st.current.size;
     return { k, tx: w / 2 - world.x * k, ty: h / 2 - world.y * k };
@@ -200,9 +207,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     fit() {
       const sc = sceneRef.current;
       const { w, h } = st.current.size;
-      // World x span: from the "load more" tail (if any) to the [+] node.
-      const left = propsRef.current.truncated ? -COL * 2.4 : 0;
-      const right = sc.width + COL;
+      const { left, right } = graphBounds();
       const k = clampK(Math.min((w - 160) / Math.max(right - left, 1), (h - 160) / Math.max(sc.height + LANE, 1), 1.2));
       st.current.target = viewFor({ x: (left + right) / 2, y: sc.height / 2 }, k);
     },
@@ -291,6 +296,10 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           s.target = null;
         }
       }
+      // The graph is finite: never let it leave the screen.
+      const bounds = graphBounds();
+      s.view = clampView(s.view, bounds, s.size.w, s.size.h);
+      if (s.target) s.target = clampView(s.target, bounds, s.size.w, s.size.h);
       if (Math.abs(lastK.current - s.view.k) > 0.005) {
         lastK.current = s.view.k;
         p.onZoomChange?.(s.view.k);
