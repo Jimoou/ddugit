@@ -1,7 +1,8 @@
-//! Diffs via libgit2: a commit against its first parent, or the working tree against HEAD.
+//! Diffs via libgit2: a commit against its first parent, or local changes
+//! (all / unstaged / staged) against HEAD and the index.
 
 use git2::{Delta, Diff, DiffFindOptions, DiffOptions, Patch, Repository};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::{err, open, Result};
 
@@ -60,24 +61,50 @@ pub fn commit_diff(path: &str, id: &str) -> Result<Vec<FileDiff>> {
             Some(&mut options()),
         )
         .map_err(err)?;
+    find_renames(&mut diff)?;
     collect(&mut diff)
 }
 
-/// Working tree + index against HEAD, optionally limited to one path. Untracked files show as added.
-pub fn worktree_diff(path: &str, file: Option<&str>) -> Result<Vec<FileDiff>> {
+/// Which local changes a working-tree diff shows.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DiffScope {
+    /// HEAD → working tree (staged and unstaged together).
+    All,
+    /// Index → working tree: what `git add` would still pick up.
+    Unstaged,
+    /// HEAD → index: what the next commit contains.
+    Staged,
+}
+
+/// Local changes in `scope`, optionally limited to one path. Untracked files show as added.
+pub fn worktree_diff(path: &str, file: Option<&str>, scope: DiffScope) -> Result<Vec<FileDiff>> {
     let repo = open(path)?;
-    let head_tree = head_tree(&repo)?;
+    let mut diff = local_diff(&repo, file, scope)?;
+    collect(&mut diff)
+}
+
+/// Raw diff behind `worktree_diff`. Hunk indices are shared with it, so staging
+/// code can pick hunks the UI showed.
+pub(super) fn local_diff<'r>(repo: &'r Repository, file: Option<&str>, scope: DiffScope) -> Result<Diff<'r>> {
+    let head = head_tree(repo)?;
     let mut opts = options();
-    opts.include_untracked(true)
-        .recurse_untracked_dirs(true)
-        .show_untracked_content(true);
+    if scope != DiffScope::Staged {
+        opts.include_untracked(true)
+            .recurse_untracked_dirs(true)
+            .show_untracked_content(true);
+    }
     if let Some(f) = file {
         opts.pathspec(f).disable_pathspec_match(true);
     }
-    let mut diff = repo
-        .diff_tree_to_workdir_with_index(head_tree.as_ref(), Some(&mut opts))
-        .map_err(err)?;
-    collect(&mut diff)
+    let mut diff = match scope {
+        DiffScope::All => repo.diff_tree_to_workdir_with_index(head.as_ref(), Some(&mut opts)),
+        DiffScope::Unstaged => repo.diff_index_to_workdir(None, Some(&mut opts)),
+        DiffScope::Staged => repo.diff_tree_to_index(head.as_ref(), None, Some(&mut opts)),
+    }
+    .map_err(err)?;
+    find_renames(&mut diff)?;
+    Ok(diff)
 }
 
 fn head_tree(repo: &Repository) -> Result<Option<git2::Tree<'_>>> {
@@ -106,10 +133,12 @@ fn status_name(d: Delta) -> &'static str {
     }
 }
 
-fn collect(diff: &mut Diff) -> Result<Vec<FileDiff>> {
+fn find_renames(diff: &mut Diff) -> Result<()> {
     diff.find_similar(Some(DiffFindOptions::new().renames(true)))
-        .map_err(err)?;
+        .map_err(err)
+}
 
+fn collect(diff: &mut Diff) -> Result<Vec<FileDiff>> {
     let mut out = Vec::new();
     let mut budget = MAX_TOTAL_LINES;
     for idx in 0..diff.deltas().len() {
@@ -220,9 +249,9 @@ mod tests {
         fs::write(d.path().join("a.txt"), "a\nb\n").unwrap();
         fs::write(d.path().join("new.txt"), "hello\n").unwrap();
 
-        let all = worktree_diff(s(d.path()), None).unwrap();
+        let all = worktree_diff(s(d.path()), None, DiffScope::All).unwrap();
         assert_eq!(all.len(), 2);
-        let only = worktree_diff(s(d.path()), Some("new.txt")).unwrap();
+        let only = worktree_diff(s(d.path()), Some("new.txt"), DiffScope::All).unwrap();
         assert_eq!(only.len(), 1);
         assert_eq!(only[0].additions, 1);
         assert_eq!(only[0].hunks[0].lines[0].text, "hello");
@@ -232,7 +261,7 @@ mod tests {
     fn worktree_diff_on_unborn_branch() {
         let d = repo();
         fs::write(d.path().join("first.txt"), "x\n").unwrap();
-        let files = worktree_diff(s(d.path()), None).unwrap();
+        let files = worktree_diff(s(d.path()), None, DiffScope::All).unwrap();
         assert_eq!(files.len(), 1);
     }
 

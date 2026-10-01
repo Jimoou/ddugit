@@ -1,6 +1,6 @@
 mod git;
 
-use git::diff::FileDiff;
+use git::diff::{DiffScope, FileDiff};
 use git::pick::PickOp;
 use git::read::RepoSnapshot;
 use git::refs::RefOp;
@@ -33,8 +33,14 @@ macro_rules! command {
 
 command!(repo_snapshot(path: String, limit: Option<usize>) -> RepoSnapshot
     => git::read::snapshot(&path, limit.unwrap_or(3000)));
-command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool) -> OpResult
-    => git::write::commit(&path, &message, &paths, amend));
+command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool, staged_only: bool) -> OpResult
+=> if staged_only {
+    git::write::commit_index(&path, &message, amend)
+} else {
+    git::write::commit(&path, &message, &paths, amend)
+});
+command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, unstage: bool) -> OpResult
+    => git::stage::stage_hunks(&path, &file, &hunks, unstage));
 command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
     => git::write::merge(&path, &source, target.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
@@ -52,8 +58,8 @@ command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> Op
     => git::stash::stash_push(&path, &message, &paths));
 command!(git_stash(path: String, op: StashOp, index: usize) -> OpResult => git::stash::stash(&path, op, index));
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
-command!(worktree_diff(path: String, file: Option<String>) -> Vec<FileDiff>
-    => git::diff::worktree_diff(&path, file.as_deref()));
+command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
+    => git::diff::worktree_diff(&path, file.as_deref(), scope));
 
 /// Repository passed on the command line (`otgit path/to/repo`), if any.
 #[tauri::command]
@@ -73,6 +79,7 @@ pub fn run() {
             initial_repo,
             repo_snapshot,
             git_commit,
+            git_stage_hunks,
             git_merge,
             git_abort,
             git_continue,

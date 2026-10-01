@@ -36,6 +36,18 @@ pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Resul
     Ok(git(&dir, &commit)?.into())
 }
 
+/// Commit exactly what is staged in the index (after hunk staging).
+pub fn commit_index(path: &str, message: &str, amend: bool) -> Result<OpResult> {
+    if message.trim().is_empty() {
+        return Err("Commit message is empty".into());
+    }
+    let mut args = vec!["commit", "-m", message];
+    if amend {
+        args.push("--amend");
+    }
+    Ok(git(&repo_dir(path)?, &args)?.into())
+}
+
 /// Refuse to start while another operation is half-done, then check out
 /// `target` if it isn't already HEAD. Shared by merge and cherry-pick.
 pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {

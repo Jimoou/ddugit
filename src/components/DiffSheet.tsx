@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
 
 interface Props {
@@ -7,7 +7,16 @@ interface Props {
   files: FileDiff[] | null;
   error: string | null;
   initialPath?: string;
+  /** Present for working-tree diffs: switch scope and (un)stage single hunks. */
+  stage?: Staging;
   onClose(): void;
+}
+
+export interface Staging {
+  scope: "unstaged" | "staged";
+  busy: boolean;
+  onScope(scope: Staging["scope"]): void;
+  onHunk(file: string, hunk: number): void;
 }
 
 const STATUS: Record<string, string> = {
@@ -24,7 +33,7 @@ const STATUS: Record<string, string> = {
 const MIN_H = 160;
 
 /** Bottom sheet under the graph: file list on the left, unified diff on the right. */
-export function DiffSheet({ title, files, error, initialPath, onClose }: Props) {
+export function DiffSheet({ title, files, error, initialPath, stage, onClose }: Props) {
   const [path, setPath] = useState<string | undefined>(initialPath);
   const [height, setHeight] = useState(() => Math.round(window.innerHeight * 0.45));
   const drag = useRef<{ y: number; h: number } | null>(null);
@@ -81,6 +90,21 @@ export function DiffSheet({ title, files, error, initialPath, onClose }: Props) 
             </span>
           )}
         </div>
+        {stage && (
+          <div className="scope-tabs" role="tablist">
+            {(["unstaged", "staged"] as const).map((sc) => (
+              <button
+                key={sc}
+                role="tab"
+                aria-selected={stage.scope === sc}
+                className={stage.scope === sc ? "on" : ""}
+                onClick={() => stage.onScope(sc)}
+              >
+                {sc === "unstaged" ? "변경" : "스테이지됨"}
+              </button>
+            ))}
+          </div>
+        )}
         <span className="muted keys">[ ] 파일 이동 · Esc 닫기</span>
         <button className="icon" onClick={onClose} title="닫기 (Esc)">
           ✕
@@ -110,14 +134,14 @@ export function DiffSheet({ title, files, error, initialPath, onClose }: Props) 
 
         <div className="diff-body" ref={body}>
           {error && <p className="note warn">{error}</p>}
-          {current && <FileView file={current} />}
+          {current && <FileView file={current} stage={stage} />}
         </div>
       </div>
     </section>
   );
 }
 
-function FileView({ file }: { file: FileDiff }) {
+function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
   if (file.binary) return <p className="muted pad">바이너리 파일이라 내용을 표시하지 않아요.</p>;
   if (file.hunks.length === 0) return <p className="muted pad">내용 변경 없음 (권한·이름만 바뀜)</p>;
   return (
@@ -131,7 +155,18 @@ function FileView({ file }: { file: FileDiff }) {
           </tr>
         )}
         {file.hunks.map((h, i) => (
-          <HunkRows key={i} header={h.header} lines={h.lines} />
+          <HunkRows
+            key={i}
+            header={h.header}
+            lines={h.lines}
+            action={
+              stage && (
+                <button className="hunk-btn" disabled={stage.busy} onClick={() => stage.onHunk(file.path, i)}>
+                  {stage.scope === "unstaged" ? "＋ 이 부분 스테이지" : "− 스테이지에서 내리기"}
+                </button>
+              )
+            }
+          />
         ))}
         {file.truncated && (
           <tr className="hunk">
@@ -143,11 +178,22 @@ function FileView({ file }: { file: FileDiff }) {
   );
 }
 
-function HunkRows({ header, lines }: { header: string; lines: FileDiff["hunks"][number]["lines"] }) {
+function HunkRows({
+  header,
+  lines,
+  action,
+}: {
+  header: string;
+  lines: FileDiff["hunks"][number]["lines"];
+  action?: ReactNode;
+}) {
   return (
     <>
       <tr className="hunk">
-        <td colSpan={4}>{header}</td>
+        <td colSpan={4}>
+          <span>{header}</span>
+          {action}
+        </td>
       </tr>
       {lines.map((l, i) => (
         <tr key={i} className={l.kind === "+" ? "ins" : l.kind === "-" ? "rem" : ""}>

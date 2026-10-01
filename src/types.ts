@@ -49,6 +49,9 @@ export type StashOp = "apply" | "pop" | "drop";
 
 export type PickOp = "cherryPick" | "revert";
 
+/** Which local changes a working-tree diff shows (mirrors `DiffScope`). */
+export type DiffScope = "all" | "unstaged" | "staged";
+
 /** Mirrors `RefOp` in git/refs.rs (`kind` tag, camelCase fields). */
 export type RefOp =
   | { kind: "renameBranch"; from: string; to: string }

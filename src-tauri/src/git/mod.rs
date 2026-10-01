@@ -9,6 +9,7 @@ pub mod pick;
 pub mod read;
 pub mod refs;
 pub mod remote;
+pub mod stage;
 pub mod stash;
 pub mod write;
 
@@ -198,6 +199,29 @@ fn git_streaming(dir: &Path, args: &[&str], mut on_segment: impl FnMut(&str) -> 
         status.success(),
         &String::from_utf8_lossy(&stdout),
         &kept,
+    ))
+}
+
+/// Like `git`, but feeds `input` on stdin (e.g. a patch for `git apply`).
+fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
+    use std::io::Write;
+    let mut child = command(dir, args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("{SPAWN_ERR}: {e}"))?;
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(input.as_bytes())
+        .map_err(err)?; // stdin drops here, closing the pipe
+    let out = child.wait_with_output().map_err(err)?;
+    Ok(join_output(
+        out.status.success(),
+        &String::from_utf8_lossy(&out.stdout),
+        &String::from_utf8_lossy(&out.stderr),
     ))
 }
 

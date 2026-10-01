@@ -1188,3 +1188,42 @@ table.diff tr.rem .sign {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------ hunk staging */
+.scope-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.scope-tabs button {
+  border: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  background: none;
+}
+.scope-tabs button.on {
+  background: rgba(34, 232, 255, 0.14);
+  color: var(--cyan);
+}
+table.diff tr.hunk td {
+  position: relative;
+}
+.hunk-btn {
+  position: sticky;
+  float: right;
+  right: 8px;
+  padding: 1px 8px;
+  font: 11px var(--sans);
+  border-color: rgba(34, 232, 255, 0.4);
+  color: var(--cyan);
+}
+.hunk-btn:hover:not(:disabled) {
+  box-shadow: 0 0 10px rgba(34, 232, 255, 0.3);
+}
+.chip.staged {
+  margin-left: -4px;
+  color: #07060d;
+  background: var(--cyan);
+}
