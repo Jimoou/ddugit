@@ -49,6 +49,18 @@ export type StashOp = "apply" | "pop" | "drop";
 
 export type PickOp = "cherryPick" | "revert";
 
+/** Mirrors `BackportState` in git/backport.rs (`kind` tag). */
+export type BackportState =
+  { kind: "missing" } | { kind: "applied" } | { kind: "picked"; by: string } | { kind: "ignored" };
+
+export interface BackportItem {
+  id: string;
+  summary: string;
+  author: string;
+  time: number;
+  state: BackportState;
+}
+
 /** Which local changes a working-tree diff shows (mirrors `DiffScope`). */
 export type DiffScope = "all" | "unstaged" | "staged";
 

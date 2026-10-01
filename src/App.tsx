@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri } from "./api";
+import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
@@ -87,6 +88,7 @@ export default function App() {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [diff, setDiff] = useState<DiffState | null>(null);
   const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
+  const [backport, setBackport] = useState<{ source: string; target: string } | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
   const [limit, setLimit] = useState(HISTORY_PAGE);
@@ -128,6 +130,7 @@ export default function App() {
     setSelectedStash(null);
     setFocusRef(null);
     setDiff(null);
+    setBackport(null);
     setLimit(HISTORY_PAGE);
   }, [path]);
 
@@ -186,6 +189,7 @@ export default function App() {
     (source: DiffSource, title: string, file?: string) => {
       if (!path) return;
       const req = ++diffReq.current;
+      setBackport(null);
       setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
       const load =
         source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
@@ -422,6 +426,15 @@ export default function App() {
       onSelect: () =>
         setMergeReq({ sourceId: r.target, targetId: snap.head.target!, source: r.name, target: snap.head.branch! }),
     };
+    const compare: MenuItem = {
+      label: snap.head.branch ? `${snap.head.branch}에 없는 커밋 보기` : "현재 브랜치에 없는 커밋 보기",
+      hint: "백포트",
+      disabled: !snap.head.branch || isHead,
+      onSelect: () => {
+        setDiff(null);
+        setBackport({ source: r.name, target: snap.head.branch! });
+      },
+    };
     if (r.kind === "tag")
       return [
         { label: "태그 위치로 이동", onSelect: () => graph.current?.centerOn(r.target) },
@@ -450,12 +463,14 @@ export default function App() {
       return [
         { label: "로컬 브랜치로 체크아웃", hint: "추적", onSelect: () => void checkoutRef(r) },
         merge,
+        compare,
         "separator",
         { label: "여기서 새 브랜치…", onSelect: () => askBranchAt(r.target) },
       ];
     return [
       { label: "체크아웃", disabled: isHead, onSelect: () => void checkoutRef(r) },
       merge,
+      compare,
       "separator",
       {
         label: "이름 변경…",
@@ -716,7 +731,49 @@ export default function App() {
             />
           )}
 
-          {diff && !conflictSheet && (
+          {backport && !conflictSheet && (
+            <BackportSheet
+              path={path}
+              branches={snap.refs.filter((r) => r.kind !== "tag").map((r) => r.name)}
+              remoteCount={snap.remotes.length}
+              source={backport.source}
+              target={backport.target}
+              version={snap}
+              busy={busy}
+              onPair={(source, target) => setBackport({ source, target })}
+              onSelect={(id) => {
+                show({ commit: id });
+                graph.current?.centerOn(id);
+              }}
+              onApply={(ids) =>
+                setConfirm({
+                  title: "백포트",
+                  confirmLabel: `${ids.length}개 cherry-pick`,
+                  body: (
+                    <p>
+                      <b>{backport.source}</b>의 커밋 {ids.length}개를 오래된 것부터 <b>{backport.target}</b>에
+                      cherry-pick합니다. 원본 커밋은 메시지에 <code>-x</code>로 기록돼서 나중에 고쳐 반영해도 반영됨으로
+                      인식돼요.
+                      {snap.head.branch !== backport.target && ` 먼저 ${backport.target}(으)로 체크아웃합니다.`}
+                    </p>
+                  ),
+                  onConfirm: () => {
+                    setConfirm(null);
+                    void run(`${ids.length}개 커밋을 ${backport.target}에 가져왔어요`, () =>
+                      api.backportApply(path, ids, backport.target),
+                    );
+                  },
+                })
+              }
+              onExport={async (ids) => {
+                const dir = await api.pickFolder("패치를 저장할 폴더");
+                if (dir) void run(`패치 ${ids.length}개를 저장했어요`, () => api.backportExport(path, ids, dir));
+              }}
+              onClose={() => setBackport(null)}
+            />
+          )}
+
+          {diff && !conflictSheet && !backport && (
             <DiffSheet
               title={diff.title}
               files={diff.files}

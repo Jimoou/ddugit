@@ -7,23 +7,36 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #13(Playwright e2e, CI 잡)을 squash merge했다(`1de7c77`).
-  - e2e가 첫 CI 실행에서 실제 버그를 잡았다. 최신 Chromium은 `scrollTo`가 Promise를 반환해서 diff 시트가 깨졌다. effect 5곳을 블록 본문으로 바꿨다.
+- PR #14(ESLint)를 squash merge했다(`4b08f67`).
 
 ## 지금 하는 일
 
-M5 · ESLint → PR #14에서 CI 대기 (10분 뒤 확인 예약)
+M4 · 멀티 레포 백포트 트래커 → PR #15에서 CI 대기 (10분 뒤 확인 예약)
 
-- `eslint.config.js`
-  - typescript-eslint 권장 규칙, react-hooks `rules-of-hooks`·`exhaustive-deps`(error)
-  - `no-restricted-syntax`로 effect 식 본문을 금지한다
-- react-hooks v7의 React Compiler 규칙은 아직 켜지 않았다. 켜면 `set-state-in-effect`에 8곳이 걸려서 ROADMAP에 후속 항목으로 남겼다
-- `npm run lint`를 만들고 `npm run check`와 CI Web 잡에 넣었다
-- 이제 필요 없어진 `eslint-disable` 2줄을 지웠다
+이 작업은 사용자의 원래 질문(원본 레포 A ↔ 고객사 레포 B, 원격이 다를 때 공통 수정을 양쪽에 반영)을 앱으로 푼 것이다.
+
+- 설계: 고객사 레포 B에 원본 A를 원격(`upstream`)으로 추가하고, 같은 저장소 안에서 `upstream/main`(가져올 쪽)과 `main`(받는 쪽)을 비교한다
+- `git/backport.rs`
+  - `compare`: `git log --cherry-mark --right-only --no-merges target...source`로 목록을 만든다
+    - `=`는 같은 패치라서 반영됨
+    - 받는 쪽 커밋 메시지에 `(cherry picked from commit X)`가 있으면 반영됨(-x)이다. 충돌을 고치며 옮겨서 패치가 달라진 경우도 잡는다
+    - `otgit.backportIgnored`(로컬 config, 여러 값)에 있으면 제외
+    - 나머지는 미반영
+  - `apply`: 받는 쪽을 체크아웃하고 `cherry-pick -x a b c`를 실행한다(오래된 것부터). 충돌은 기존 충돌 흐름을 탄다
+  - `export`: `format-patch -1 --start-number n -o dir`로 번호가 붙은 `.patch` 파일을 만든다. 폐쇄망 고객사에 보낼 때 쓴다
+- `BackportSheet`
+  - 두 브랜치를 고른다
+  - 미반영/전체 탭과 상태 칩(미반영 / 반영됨 / 반영됨(-x) / 제외)을 보여 준다
+  - 체크해서 cherry-pick(확인 대화상자를 거친다)하거나 패치로 내보낸다
+  - 행을 누르면 그래프에서 그 커밋을 보여 준다
+  - 원격이 하나뿐이면 `git remote add upstream` 안내를 띄운다
+- 여는 곳: 브랜치(로컬/원격) 우클릭 → "{현재 브랜치}에 없는 커밋 보기"
+- 데모는 같은 요약 = 같은 패치로 근사한다. e2e 6번째 테스트(백포트 → 반영됨으로 바뀜 → 제외)가 이 흐름을 확인한다
+- 실제 앱(Tauri) 실행 확인은 아직 하지 않았다. git 동작은 Rust 테스트 3개(분류, 제외/적용, 내보내기)로 확인했다
 
 ## 다음 단계
 
-1. M4 · 멀티 레포 백포트 트래커 (원래 질문: 원본 ↔ 고객사 레포 공통 수정 반영). 설계부터 한다
+1. 앱 안에서 원격 추가 (백포트 시트의 터미널 안내를 대체)
 2. M4 · 드래그로 interactive rebase
 3. M5 · React Compiler 규칙 켜기 (setState-in-effect 8곳 정리)
 

@@ -1,6 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { mock } from "./mock";
 import type {
+  BackportItem,
   ConflictFile,
   DiffScope,
   FileDiff,
@@ -48,6 +49,10 @@ export interface Commands {
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
+  backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
+  backport_ignore: [{ path: string; id: string; ignore: boolean }, null];
+  backport_apply: [{ path: string; ids: string[]; target: string }, OpResult];
+  backport_export: [{ path: string; ids: string[]; outDir: string }, OpResult];
 }
 export type Command = keyof Commands;
 export type Args<C extends Command> = Commands[C][0];
@@ -103,6 +108,11 @@ export const api = {
     }
     return hit;
   },
+  backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),
+  backportIgnore: (path: string, id: string, ignore: boolean) => call("backport_ignore", { path, id, ignore }),
+  /** `ids` oldest first. */
+  backportApply: (path: string, ids: string[], target: string) => call("backport_apply", { path, ids, target }),
+  backportExport: (path: string, ids: string[], outDir: string) => call("backport_export", { path, ids, outDir }),
   /** Watch the repo on disk; `onChange` fires (debounced) on relevant edits. Returns an unsubscribe. */
   async watch(path: string, onChange: () => void): Promise<() => void> {
     if (!isTauri || path === DEMO_PATH) return () => {};
@@ -111,10 +121,10 @@ export const api = {
     await invoke("watch_repo", { path });
     return unlisten;
   },
-  async pickFolder(): Promise<string | null> {
+  async pickFolder(title = "Git 저장소 열기"): Promise<string | null> {
     if (!isTauri) return DEMO_PATH;
     const { open } = await import("@tauri-apps/plugin-dialog");
-    const r = await open({ directory: true, multiple: false, title: "Git 저장소 열기" });
+    const r = await open({ directory: true, multiple: false, title });
     return typeof r === "string" ? r : null;
   },
 };

@@ -1350,3 +1350,102 @@ table.diff tr.picked .no {
   padding: 8px 14px;
   border-top: 1px solid var(--line);
 }
+
+/* ---------------------------------------------------------- backport sheet */
+.backport-sheet select {
+  font: 600 12px var(--mono);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+  max-width: 220px;
+}
+.bp-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.bp-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.bp-list th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font: 600 10px var(--sans);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--panel);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.bp-list td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+.bp-list th:first-child,
+.bp-list td:first-child {
+  width: 1%;
+}
+.bp-list tr.bp-applied,
+.bp-list tr.bp-picked,
+.bp-list tr.bp-ignored {
+  opacity: 0.55;
+}
+.bp-commit {
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0; /* let the summary column take the remaining width */
+  width: 100%;
+}
+.bp-commit:hover .summary {
+  color: var(--cyan);
+}
+.bp-commit code {
+  color: var(--muted);
+}
+.bp-actions {
+  text-align: right;
+}
+.bp-actions button {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+.chip.bp-missing,
+.chip.bp-applied,
+.chip.bp-picked,
+.chip.bp-ignored {
+  width: auto;
+  padding: 0 7px;
+  font: 600 10px/17px var(--sans);
+  border-radius: 9px;
+}
+.chip.bp-missing {
+  color: var(--amber);
+  background: rgba(255, 184, 77, 0.14);
+}
+.chip.bp-applied,
+.chip.bp-picked {
+  color: var(--lime);
+  background: rgba(166, 255, 77, 0.12);
+}
+.chip.bp-ignored {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+.bp-hint {
+  margin: 12px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.bp-hint code {
+  color: var(--text);
+}
+b.bp-missing {
+  color: var(--amber);
+}

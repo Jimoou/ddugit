@@ -3,7 +3,17 @@
 // Rust backend so the whole UX can be exercised without a repo on disk.
 
 import type { Args, Command, Ret } from "./api";
-import type { CommitInfo, FileChange, FileDiff, OpResult, OpStatus, RefInfo, RemoteOp, RepoSnapshot } from "./types";
+import type {
+  BackportItem,
+  CommitInfo,
+  FileChange,
+  FileDiff,
+  OpResult,
+  OpStatus,
+  RefInfo,
+  RemoteOp,
+  RepoSnapshot,
+} from "./types";
 
 let seq = 0;
 const fakeId = () => {
@@ -33,6 +43,7 @@ class MockRepo {
   /** In-progress demo merge: source commit and the conflicted files' marked-up text. */
   pending: { source: string; label: string; files: Map<string, string> } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
+  backportIgnored = new Set<string>();
 
   commit(parents: string[], summary: string, author = AUTHORS[seq % AUTHORS.length]): string {
     const id = fakeId();
@@ -48,6 +59,24 @@ class MockRepo {
     });
     this.order.unshift(id);
     return id;
+  }
+
+  /** Branch, remote branch, tag or commit id → commit id. */
+  resolve(name: string): string | undefined {
+    return this.branches.get(name) ?? this.remotes.get(name) ?? this.tags.get(name) ?? this.commits.get(name)?.id;
+  }
+
+  /** Every commit reachable from `id`. */
+  reach(id: string | undefined): Set<string> {
+    const seen = new Set<string>();
+    const stack = id ? [id] : [];
+    while (stack.length) {
+      const c = stack.pop()!;
+      if (seen.has(c)) continue;
+      seen.add(c);
+      stack.push(...(this.commits.get(c)?.parents ?? []));
+    }
+    return seen;
   }
 
   /** Commit on top of `branch` and advance it. */
@@ -553,6 +582,49 @@ export const mock: Table = {
       unstage ? { staged: null, unstaged: kind } : { staged: kind === "untracked" ? "added" : kind, unstaged: null },
     );
     return delay(res("ok"));
+  },
+
+  // Patch equivalence is approximated by equal summaries.
+  backport_compare({ source, target }) {
+    const [src, tgt] = [repo.resolve(source), repo.resolve(target)];
+    if (!src) return fail(`Unknown branch or commit '${source}'`);
+    if (!tgt) return fail(`Unknown branch or commit '${target}'`);
+    const [inSrc, inTgt] = [repo.reach(src), repo.reach(tgt)];
+    const only = (a: Set<string>, b: Set<string>) =>
+      repo.order.map((id) => repo.commits.get(id)!).filter((c) => a.has(c.id) && !b.has(c.id) && c.parents.length < 2);
+    const ported = new Set(only(inTgt, inSrc).map((c) => c.summary));
+    return delay(
+      only(inSrc, inTgt).map((c): BackportItem => ({
+        id: c.id,
+        summary: c.summary,
+        author: c.author,
+        time: c.time,
+        state: ported.has(c.summary)
+          ? { kind: "applied" }
+          : repo.backportIgnored.has(c.id)
+            ? { kind: "ignored" }
+            : { kind: "missing" },
+      })),
+    );
+  },
+
+  backport_ignore({ id, ignore }) {
+    if (ignore) repo.backportIgnored.add(id);
+    else repo.backportIgnored.delete(id);
+    return delay(null);
+  },
+
+  backport_apply({ ids, target }) {
+    if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
+    repo.head = target;
+    for (const id of ids) repo.add(target, repo.commits.get(id)?.summary ?? id);
+    return delay(res("ok"));
+  },
+
+  backport_export({ ids, outDir }) {
+    const name = (id: string, i: number) =>
+      `${outDir}/${String(i + 1).padStart(4, "0")}-${(repo.commits.get(id)?.summary ?? id).replace(/\W+/g, "-")}.patch`;
+    return delay(res("ok", ids.map(name).join("\n")));
   },
 
   worktree_diff({ file, scope }) {
