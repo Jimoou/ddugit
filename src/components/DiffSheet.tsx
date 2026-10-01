@@ -40,7 +40,9 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
   const drag = useRef<{ y: number; h: number } | null>(null);
   const body = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setPath(initialPath), [initialPath]);
+  useEffect(() => {
+    setPath(initialPath);
+  }, [initialPath]);
 
   const current = useMemo(() => files?.find((f) => f.path === path) ?? files?.[0], [files, path]);
   const totals = useMemo(
@@ -48,7 +50,11 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
     [files],
   );
 
-  useEffect(() => body.current?.scrollTo(0, 0), [current]);
+  // Block body: an effect must return nothing or a cleanup, and newer
+  // Chromium (WebView2 included) returns a Promise from scrollTo.
+  useEffect(() => {
+    body.current?.scrollTo(0, 0);
+  }, [current]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -152,7 +158,9 @@ interface LinePick {
 
 function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
   const [pick, setPick] = useState<LinePick | null>(null);
-  useEffect(() => setPick(null), [file]);
+  useEffect(() => {
+    setPick(null);
+  }, [file]);
 
   if (file.binary) return <p className="muted pad">바이너리 파일이라 내용을 표시하지 않아요.</p>;
   if (file.hunks.length === 0) return <p className="muted pad">내용 변경 없음 (권한·이름만 바뀜)</p>;

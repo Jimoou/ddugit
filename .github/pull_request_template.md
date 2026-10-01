@@ -6,5 +6,6 @@
 
 - [ ] `npm run check` (typecheck · format · vitest)
 - [ ] `cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`
+- [ ] UI 흐름을 바꿨으면 `npm run e2e` (Playwright, 데모 모드) · 새 흐름이면 `e2e/`에 테스트 추가
 - [ ] UI 변경이면 스크린샷 첨부 (데모 모드 `npm run dev` 가능)
 - [ ] ROADMAP.md 체크 / NEXT.md 갱신

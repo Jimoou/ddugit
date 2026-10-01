@@ -248,7 +248,9 @@ export default function App() {
   );
 
   const ancestorCache = useRef(new Map<string, Set<string>>());
-  useEffect(() => ancestorCache.current.clear(), [snap]);
+  useEffect(() => {
+    ancestorCache.current.clear();
+  }, [snap]);
   const isAncestor = (anc: string, of: string | null) => {
     if (!snap || !of) return false;
     let set = ancestorCache.current.get(of);
