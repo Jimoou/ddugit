@@ -12,19 +12,16 @@ _마지막 갱신: 2026-10-01_
 
 ## 지금 하는 일
 
-v0.1.0 초안 Release
+1. PR #29를 merge했다(`080b09d`). main에서 `release: true`로 실행 중이다. 초안 v0.1.0에 dmg/exe가 붙었는지 확인한다
+2. M6 "우주 다듬기" PR: `graph/camera.ts`(`clampView`: 그래프가 화면에 최소 160px 남도록 렌더 루프에서 view·target 제한), `space.ts`(`skyAngle`: 10분에 한 바퀴, 반짝임 효과가 켜져 있을 때만 각도 누적, 회전해도 모서리가 비지 않게 대각선만큼 더 그림), 브랜드 "옷깃" 삭제
 
-- 이 세션에서는 태그 push가 막힌다(git 프록시가 세션 브랜치만 받는다)
-- 그래서 `release.yml` 수동 실행에 `release` 옵션을 추가했다. 켜면 `tauri-action`이 `v__VERSION__`(= v0.1.0) 초안 Release를 만들고 dmg/exe를 올린다
-- 사용자가 초안을 공개하면 GitHub가 그 커밋에 `v0.1.0` 태그를 만든다
-- merge 후 main에서 `release: true`로 실행하고, 초안에 파일 두 개가 붙었는지 확인한다
+## 다음 단계 (M6 순서, ROADMAP 참고)
 
-## 다음 단계 (남은 ROADMAP)
-
-1. M4: GitHub / GitLab PR 연동(그래프에 PR 상태 표시). 토큰 저장 방식을 정해야 한다
-2. M4: 병합이 섞인 구간 rebase(`--rebase-merges`)
-3. M3(보류): 레이아웃 Web Worker / WebGL, diff 가상 스크롤. 측정상 지금은 필요 없다
-4. M5(나중에): 서명·공증, 자동 업데이트. 계정과 인증서가 필요하다
+1. 저장소 연결 방법: clone(URL·진행률), 최근 목록·즐겨찾기, init, 폴더 끌어다 놓기
+2. 멀티탭
+3. 고급 git 작업: 실수 되돌리기 → 브랜치 정리 → 과거 커밋 손보기 → bisect·blame
+4. 게임 같은 우주 연출: 원격(궤적·유성) → 그래프 작업(중력장·혜성·별자리) → 충돌·되돌리기·탭 전환. 각 기능 PR에 그 기능의 연출을 함께 넣고, 기존 기능 연출은 별도 PR
+5. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
 
 ## 막힌 것 / 결정 필요
 

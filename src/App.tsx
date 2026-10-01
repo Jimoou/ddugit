@@ -695,9 +695,7 @@ export default function App() {
   if (!path || (!snap && loadError)) {
     return (
       <div className="welcome">
-        <h1 className="wordmark">
-          otgit<span>옷깃</span>
-        </h1>
+        <h1 className="wordmark">otgit</h1>
         <p>{t("app.tagline")}</p>
         {loadError && <p className="note warn">{loadError}</p>}
         <div className="row">
