@@ -27,6 +27,9 @@ type MergeReq = { sourceId: string; targetId: string; source: string; target: st
 type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
 type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
 
+/** Commits loaded per page; `?page=N` overrides it for demos and e2e. */
+const HISTORY_PAGE = Number(new URLSearchParams(window.location.search).get("page")) || 3000;
+
 const LAST_REPO = "otgit.lastRepo";
 const ANIMATE = "otgit.animate";
 
@@ -86,6 +89,7 @@ export default function App() {
   const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
+  const [limit, setLimit] = useState(HISTORY_PAGE);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const [animate, setAnimate] = useState(() => {
     const saved = store(ANIMATE);
@@ -109,20 +113,25 @@ export default function App() {
   const refresh = useCallback(async () => {
     if (!path) return;
     try {
-      const s = await api.snapshot(path);
+      const s = await api.snapshot(path, limit);
       setSnap(s);
       setLoadError(null);
     } catch (e) {
       setLoadError(String(e));
     }
-  }, [path]);
+  }, [path, limit]);
 
+  // New repository: start from a clean slate.
   useEffect(() => {
     setSnap(null);
     setSelected(null);
     setSelectedStash(null);
     setFocusRef(null);
     setDiff(null);
+    setLimit(HISTORY_PAGE);
+  }, [path]);
+
+  useEffect(() => {
     void refresh();
   }, [refresh]);
 
@@ -634,6 +643,8 @@ export default function App() {
                 confirmPick(sourceId, target);
               }}
               incoming={snap.incoming}
+              truncated={snap.truncated}
+              onLoadMore={() => setLimit((l) => l + HISTORY_PAGE)}
               onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
               onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}
@@ -662,7 +673,7 @@ export default function App() {
             </div>
             <div className="hint">
               드래그 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
-              {snap.truncated && " · 최근 커밋만 표시 중"}
+              {snap.truncated && ` · 최근 ${snap.commits.length}개 표시 중`}
             </div>
           </div>
 
