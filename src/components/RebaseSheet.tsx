@@ -8,6 +8,8 @@ interface Props {
   base: CommitInfo;
   /** Commits after `base`, oldest first. */
   commits: CommitInfo[];
+  /** Starting plan (e.g. from dragging a commit in the graph); defaults to all picked in order. */
+  initial?: RebaseStep[] | null;
   /** How many of the newest commits are not on the upstream yet (null: no upstream). */
   unpushed: number | null;
   busy: boolean;
@@ -19,9 +21,9 @@ interface Props {
  * Interactive rebase as a list: drag rows (or use ↑↓) to reorder, pick an
  * action per commit, apply. Top is oldest, the order git replays them in.
  */
-export function RebaseSheet({ branch, base, commits, unpushed, busy, onApply, onClose }: Props) {
+export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, onApply, onClose }: Props) {
   const byId = new Map(commits.map((c) => [c.id, c]));
-  const [steps, setSteps] = useState<RebaseStep[]>(() => commits.map((c) => ({ id: c.id, action: "pick" })));
+  const [steps, setSteps] = useState<RebaseStep[]>(() => initial ?? commits.map((c) => ({ id: c.id, action: "pick" })));
   const [dragging, setDragging] = useState<number | null>(null);
   const problem = planProblem(steps);
   const changed = steps.some((s, i) => s.action !== "pick" || s.id !== commits[i].id);

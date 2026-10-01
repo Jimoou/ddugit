@@ -45,3 +45,30 @@ export const ACTIONS: { value: RebaseAction; label: string }[] = [
   { value: "fixup", label: "위와 합치기 (메시지 버림)" },
   { value: "drop", label: "버리기" },
 ];
+
+/**
+ * Plan for dragging `source` onto `target` on the current branch: the
+ * commits from the older of the two up to HEAD, with `source` moved to just
+ * after `target`. Null when either isn't on HEAD's straight history (no merge
+ * in between, not the root) or the move changes nothing.
+ */
+export function planMove(
+  byId: Map<string, CommitInfo>,
+  head: string,
+  source: string,
+  target: string,
+): { base: string; steps: RebaseStep[] } | null {
+  const tail: CommitInfo[] = []; // newest first, up to the first merge
+  for (let c = byId.get(head); c && c.parents.length === 1; c = byId.get(c.parents[0])) tail.push(c);
+  const [s, t] = [tail.findIndex((c) => c.id === source), tail.findIndex((c) => c.id === target)];
+  if (s < 0 || t < 0 || s === t) return null;
+  const oldest = tail[Math.max(s, t)];
+  const ids = tail
+    .slice(0, Math.max(s, t) + 1)
+    .reverse()
+    .map((c) => c.id);
+  const moved = ids.filter((id) => id !== source);
+  moved.splice(moved.indexOf(target) + 1, 0, source);
+  if (moved.every((id, i) => id === ids[i])) return null;
+  return { base: oldest.parents[0], steps: moved.map((id) => ({ id, action: "pick" as const })) };
+}

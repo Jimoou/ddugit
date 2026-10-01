@@ -16,8 +16,8 @@ export interface Drag {
   to: Pt;
   target: string | null;
   valid: boolean;
-  /** Plain drag merges; with ⌥/Alt held it cherry-picks. */
-  mode: "merge" | "pick";
+  /** Plain drag merges; with ⌥/Alt held it cherry-picks; with Shift it reorders (rebase). */
+  mode: "merge" | "pick" | "move";
 }
 
 export interface DrawState {
@@ -538,7 +538,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const a = toScreen(view, { x: xOf(src.row, n), y: yOf(src.lane) });
       const b = s.drag.to;
       const c = s.drag.valid ? "#ffffff" : NEON[src.color];
-      const cable = s.drag.mode === "pick" ? NEON[3] : s.drag.valid ? NEON[6] : NEON[src.color];
+      const cable =
+        s.drag.mode === "pick" ? NEON[3] : s.drag.mode === "move" ? NEON[4] : s.drag.valid ? NEON[6] : NEON[src.color];
       const mx = (a.x + b.x) / 2;
       ctx.globalCompositeOperation = "lighter";
       for (const [lw, al] of [

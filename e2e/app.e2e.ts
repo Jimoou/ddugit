@@ -243,3 +243,35 @@ test("moves through commits with the keyboard and announces them", async ({ demo
   await expect(page.locator(".context-menu")).toBeVisible();
   await expect(page.locator(".context-menu")).toContainText("여기서 새 브랜치");
 });
+
+test("shift-dragging a commit onto another opens the rebase plan with it moved", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutate((d) => d.grow(3));
+  const before = await demo.snapshot();
+  const byId = new Map(before.commits.map((c) => [c.id, c]));
+  const head = before.head.target!;
+  const step2 = byId.get(head)!.parents[0];
+  const step1 = byId.get(step2)!.parents[0];
+  await expect.poll(async () => (await demo.screenOf(head)) !== null).toBe(true);
+
+  const a = (await demo.screenOf(head))!;
+  const z = (await demo.screenOf(step1))!;
+  await page.keyboard.down("Shift");
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x - 30, a.y + 20, { steps: 6 });
+  await page.mouse.move(z.x, z.y, { steps: 10 });
+  await expect(page.locator(".drag-hint")).toContainText("순서 정리 화면");
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+
+  const rows = page.locator(".rb-list li");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("Step 1 of 3");
+  await expect(rows.nth(1)).toContainText("Step 3 of 3");
+  await page.click(".rebase-sheet button.primary");
+  await demo.toast("커밋을 정리했어요");
+  const snap = await demo.snapshot();
+  const now = new Map(snap.commits.map((c) => [c.id, c]));
+  expect(now.get(snap.head.target!)!.summary).toBe("Step 2 of 3");
+});

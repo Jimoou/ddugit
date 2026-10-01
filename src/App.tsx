@@ -22,9 +22,20 @@ import { ancestors, computeLayout } from "./graph/layout";
 import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
-import { rebaseRange } from "./rebasePlan";
+import { planMove, rebaseRange } from "./rebasePlan";
 import { defaults, parseSettings, type Settings } from "./settings";
-import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RefOp, RemoteOp, RepoSnapshot } from "./types";
+import type { Drag } from "./graph/renderer";
+import type {
+  FileDiff,
+  OpResult,
+  OpStatus,
+  Progress,
+  RebaseStep,
+  RefInfo,
+  RefOp,
+  RemoteOp,
+  RepoSnapshot,
+} from "./types";
 import "./App.css";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string };
@@ -105,6 +116,8 @@ export default function App() {
   const [backport, setBackport] = useState<{ source: string; target: string } | null>(null);
   /** Base commit of an interactive rebase being planned. */
   const [rebaseFrom, setRebaseFrom] = useState<string | null>(null);
+  /** Starting plan for the sheet (from a Shift-drag); null starts with every commit picked in order. */
+  const [rebaseInit, setRebaseInit] = useState<RebaseStep[] | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
   const [limit, setLimit] = useState(() => PAGE_OVERRIDE ?? loadSettings().historyPage);
@@ -328,12 +341,14 @@ export default function App() {
     return set.has(anc);
   };
   const canDropOn = useCallback(
-    (target: string, source: string) => {
-      if (!snap || snap.state !== "clean" || !branchAt(target)) return false;
+    (target: string, source: string, mode: Drag["mode"]) => {
+      if (!snap || snap.state !== "clean") return false;
+      if (mode === "move") return !!snap.head.target && !!planMove(commitById, snap.head.target, source, target);
+      if (!branchAt(target)) return false;
       return !isAncestor(source, target); // already contained otherwise
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [snap, branchAt],
+    [snap, branchAt, commitById],
   );
 
   const sourceName = (id: string, target: string): string => {
@@ -496,7 +511,8 @@ export default function App() {
   const refMenu = (r: RefInfo): MenuItem[] => {
     if (!snap || !path) return [];
     const isHead = r.kind === "local" && r.name === snap.head.branch;
-    const canMerge = !!snap.head.branch && !isHead && r.kind !== "tag" && canDropOn(snap.head.target ?? "", r.target);
+    const canMerge =
+      !!snap.head.branch && !isHead && r.kind !== "tag" && canDropOn(snap.head.target ?? "", r.target, "merge");
     const merge: MenuItem = {
       label: snap.head.branch ? `${snap.head.branch}에 병합` : "HEAD에 병합",
       disabled: !canMerge,
@@ -648,6 +664,7 @@ export default function App() {
         onSelect: () => {
           setDiff(null);
           setBackport(null);
+          setRebaseInit(null);
           setRebaseFrom(id);
         },
       },
@@ -782,6 +799,15 @@ export default function App() {
               onStash={(i) => show({ stash: i })}
               canDropOn={canDropOn}
               onDrop={(sourceId, targetId, mode) => {
+                if (mode === "move") {
+                  const plan = planMove(commitById, snap.head.target!, sourceId, targetId);
+                  if (!plan) return;
+                  setDiff(null);
+                  setBackport(null);
+                  setRebaseInit(plan.steps);
+                  setRebaseFrom(plan.base);
+                  return;
+                }
                 const target = branchAt(targetId)!;
                 if (mode === "merge")
                   return setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
@@ -817,7 +843,8 @@ export default function App() {
               </button>
             </div>
             <div className="hint">
-              드래그 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 끌어 다른 브랜치 끝에 놓으면 병합
+              드래그 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 끌어 다른 브랜치 끝에 놓으면 병합 · Shift+끌기 순서
+              옮기기
               {snap.truncated && ` · 최근 ${snap.commits.length}개 표시 중`}
             </div>
             {/* Inside the graph area so bottom sheets never cover them. */}
@@ -845,10 +872,11 @@ export default function App() {
           {rebase && !conflictSheet && (
             <RebaseSheet
               // Fresh plan whenever the history under it changes.
-              key={`${rebaseFrom}:${snap.head.target}`}
+              key={`${rebaseFrom}:${snap.head.target}:${rebaseInit?.map((x) => x.id).join() ?? ""}`}
               branch={snap.head.branch ?? "HEAD"}
               base={commitById.get(rebaseFrom!)!}
               commits={rebase}
+              initial={rebaseInit}
               unpushed={snap.head.upstream ? snap.head.ahead : null}
               busy={busy}
               onApply={(steps) =>
