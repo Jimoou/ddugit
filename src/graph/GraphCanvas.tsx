@@ -4,6 +4,7 @@ import type { Layout } from "./layout";
 import {
   draw,
   type Drag,
+  type DrawState,
   type LabelHit,
   nodeRadius,
   plusPosition,
@@ -44,6 +45,8 @@ interface Props {
   canDropOn(target: string, source: string): boolean;
   onNodeMenu(id: string, x: number, y: number): void;
   incoming: string | null;
+  truncated: boolean;
+  onLoadMore(): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
   onZoomChange?(k: number): void;
 }
@@ -90,11 +93,13 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     plusHover: false,
     stashHover: null as number | null,
     labelHits: [] as LabelHit[],
+    moreHit: { rect: null } as DrawState["moreHit"],
     drag: null as Drag | null,
     pan: null as { x: number; y: number; tx: number; ty: number; moved: boolean } | null,
     press: null as { id: string; x: number; y: number } | null,
     births: new Map<string, number>(),
     known: null as Set<string> | null,
+    anchor: null as { id: string; x: number } | null,
     initialized: false,
   });
   const propsRef = useRef(props);
@@ -107,14 +112,24 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
 
   const now = () => performance.now() / 1000;
 
-  // Sparkle burst for commits that appear after a refresh (new commit / merge).
+  // On every new layout: keep the previously newest commit where it was on
+  // screen (older history appended on the left shifts world x), and sparkle
+  // commits that are newer than it (new commit / merge), not loaded history.
   useEffect(() => {
     const s = st.current;
-    const ids = new Set(props.layout.nodes.map((n) => n.id));
+    const { nodes, rowCount, byId } = props.layout;
+    const ids = new Set(nodes.map((n) => n.id));
+    const anchor = s.anchor && byId.get(s.anchor.id);
+    if (s.anchor && anchor) {
+      const dx = xOf(anchor.row, rowCount) - s.anchor.x;
+      s.view = { ...s.view, tx: s.view.tx - dx * s.view.k };
+      if (s.target) s.target = { ...s.target, tx: s.target.tx - dx * s.target.k };
+    }
     if (s.known) {
-      for (const id of ids) if (!s.known.has(id)) s.births.set(id, now());
+      for (const n of nodes) if (!s.known.has(n.id) && (!anchor || n.row < anchor.row)) s.births.set(n.id, now());
     }
     s.known = ids;
+    s.anchor = nodes.length ? { id: nodes[0].id, x: xOf(0, rowCount) } : null;
   }, [props.layout]);
 
   const viewFor = (world: Pt, k: number): View => {
@@ -145,10 +160,11 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     fit() {
       const sc = sceneRef.current;
       const { w, h } = st.current.size;
-      const k = clampK(
-        Math.min((w - 160) / Math.max(sc.width + COL, 1), (h - 160) / Math.max(sc.height + LANE, 1), 1.2),
-      );
-      st.current.target = viewFor({ x: (sc.width + COL) / 2, y: sc.height / 2 }, k);
+      // World x span: from the "load more" tail (if any) to the [+] node.
+      const left = propsRef.current.truncated ? -COL * 2.4 : 0;
+      const right = sc.width + COL;
+      const k = clampK(Math.min((w - 160) / Math.max(right - left, 1), (h - 160) / Math.max(sc.height + LANE, 1), 1.2));
+      st.current.target = viewFor({ x: (left + right) / 2, y: sc.height / 2 }, k);
     },
     zoomBy(f) {
       const { w, h } = st.current.size;
@@ -266,6 +282,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         stashSelected: p.selectedStash,
         labelHits: s.labelHits,
         incoming: p.incoming,
+        truncated: p.truncated,
+        moreHit: s.moreHit,
       });
       const hint = !s.drag ? null : (`${s.drag.mode}:${s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle"}` as const);
       setDragHint((h) => (h === hint ? h : hint));
@@ -320,6 +338,11 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     s.target = null;
     if (onPlus(p)) {
       propsRef.current.onPlus();
+      return;
+    }
+    const more = s.moreHit.rect;
+    if (more && p.x >= more.x && p.x <= more.x + more.w && p.y >= more.y && p.y <= more.y + more.h) {
+      propsRef.current.onLoadMore();
       return;
     }
     const stash = stashAt(p);

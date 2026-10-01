@@ -43,8 +43,19 @@ export interface DrawState {
   stashSelected: number | null;
   /** Commit being merged / picked in while the operation waits on conflicts. */
   incoming: string | null;
+  /** History was cut: draw a "load more" tail before the oldest commit. */
+  truncated: boolean;
+  /** Output: screen rect of that tail's button (null when not drawn). */
+  moreHit: { rect: Rect | null };
   /** Output: screen rects of the ref badges drawn this frame, for hit testing. */
   labelHits: LabelHit[];
+}
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface LabelHit {
@@ -222,6 +233,42 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       }
     }
     ctx.globalCompositeOperation = "source-over";
+  }
+
+  // --- "load more" tail before the oldest loaded commit -------------------------
+  s.moreHit.rect = null;
+  if (s.truncated && n > 0) {
+    const oldest = scene.layout.nodes[n - 1];
+    const a = toScreen(view, { x: xOf(oldest.row, n), y: yOf(oldest.lane) });
+    const b = toScreen(view, { x: xOf(oldest.row, n) - COL * 1.6, y: yOf(oldest.lane) });
+    const g = ctx.createLinearGradient(a.x, 0, b.x, 0);
+    g.addColorStop(0, alpha(NEON[oldest.color], 0.9));
+    g.addColorStop(1, alpha(NEON[oldest.color], 0));
+    ctx.save();
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.restore();
+    ctx.font = `600 11px ${SANS}`;
+    const label = "⋯ 이전 이력 더 불러오기";
+    const bw = ctx.measureText(label).width + 18,
+      bh = 22;
+    const rect = { x: b.x - bw / 2, y: b.y - bh / 2, w: bw, h: bh };
+    roundRect(ctx, rect.x, rect.y, bw, bh, 11);
+    ctx.fillStyle = "rgba(10,8,20,0.9)";
+    ctx.fill();
+    ctx.strokeStyle = alpha(NEON[oldest.color], 0.8);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = NEON[oldest.color];
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, b.x, b.y + 0.5);
+    s.moreHit.rect = rect;
   }
 
   // --- link HEAD → [+] --------------------------------------------------------

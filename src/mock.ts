@@ -93,7 +93,7 @@ class MockRepo {
     return [[...a].filter((x) => !b.has(x)).length, [...b].filter((x) => !a.has(x)).length];
   }
 
-  snapshot(): RepoSnapshot {
+  snapshot(limit = Infinity): RepoSnapshot {
     const refs: RefInfo[] = [
       ...[...this.branches].map(([name, target]) => ({ name, kind: "local" as const, target })),
       ...[...this.remotes].map(([name, target]) => ({ name, kind: "remote" as const, target })),
@@ -103,6 +103,7 @@ class MockRepo {
     // Like git, only list commits reachable from a ref (rebased-away ones vanish).
     const reachable = new Set<string>();
     for (const r of refs) for (const id of this.ancestors(r.target)) reachable.add(id);
+    const all = this.order.filter((id) => reachable.has(id));
     return {
       path: "/demo/otgit-demo",
       name: "otgit-demo",
@@ -113,14 +114,14 @@ class MockRepo {
         ahead,
         behind,
       },
-      commits: this.order.filter((id) => reachable.has(id)).map((id) => this.commits.get(id)!),
+      commits: all.slice(0, limit).map((id) => this.commits.get(id)!),
       refs,
       remotes: [{ name: "origin", url: "https://github.com/otgit/otgit-demo.git" }],
       changes: this.changes.map((c) => ({ ...c })),
       stashes: this.stashes.map(({ message, id, base, time }, index) => ({ index, message, id, base, time })),
       state: this.state,
       incoming: this.pending?.source ?? null,
-      truncated: false,
+      truncated: all.length > limit,
     };
   }
 }
@@ -334,7 +335,7 @@ type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
 
 export const mock: Table = {
   initial_repo: () => delay(null, 0),
-  repo_snapshot: () => delay(repo.snapshot()),
+  repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
 
   git_commit({ message, paths, amend, stagedOnly }) {
     if (!message.trim()) return fail("Commit message is empty");
