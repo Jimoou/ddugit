@@ -12,6 +12,7 @@ import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
 import { SearchBar } from "./components/SearchBar";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { Sidebar } from "./components/Sidebar";
 import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
@@ -22,6 +23,7 @@ import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { rebaseRange } from "./rebasePlan";
+import { defaults, parseSettings, type Settings } from "./settings";
 import type { FileDiff, OpResult, OpStatus, Progress, RefInfo, RefOp, RemoteOp, RepoSnapshot } from "./types";
 import "./App.css";
 
@@ -30,11 +32,20 @@ type MergeReq = { sourceId: string; targetId: string; source: string; target: st
 type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
 type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
 
-/** Commits loaded per page; `?page=N` overrides it for demos and e2e. */
-const HISTORY_PAGE = Number(new URLSearchParams(window.location.search).get("page")) || 3000;
+/** `?page=N` overrides the history page size for demos and e2e. */
+const PAGE_OVERRIDE = Number(new URLSearchParams(window.location.search).get("page")) || null;
 
 const LAST_REPO = "otgit.lastRepo";
-const ANIMATE = "otgit.animate";
+const SETTINGS = "otgit.settings";
+/** Before the settings screen, only this one flag was stored. */
+const LEGACY_ANIMATE = "otgit.animate";
+
+function loadSettings(): Settings {
+  const base = defaults(!!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  const legacy = store(LEGACY_ANIMATE);
+  if (legacy !== null) base.animate = legacy === "1";
+  return parseSettings(store(SETTINGS), base);
+}
 
 const REMOTE_DONE: Record<RemoteOp, string> = {
   fetch: "원격 커밋을 가져왔어요",
@@ -96,13 +107,18 @@ export default function App() {
   const [rebaseFrom, setRebaseFrom] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [zoom, setZoom] = useState(1);
-  const [limit, setLimit] = useState(HISTORY_PAGE);
+  const [limit, setLimit] = useState(() => PAGE_OVERRIDE ?? loadSettings().historyPage);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
-  const [animate, setAnimate] = useState(() => {
-    const saved = store(ANIMATE);
-    if (saved !== null) return saved === "1";
-    return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  });
+  const [settings, setSettings] = useState(loadSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const animate = settings.animate;
+  const page = PAGE_OVERRIDE ?? settings.historyPage;
+  const updateSettings = (patch: Partial<Settings>) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    store(SETTINGS, JSON.stringify(next));
+    if (patch.historyPage) setLimit(PAGE_OVERRIDE ?? patch.historyPage);
+  };
   const graph = useRef<GraphHandle>(null);
   const toastId = useRef(0);
   const diffReq = useRef(0);
@@ -116,6 +132,13 @@ export default function App() {
   useEffect(() => {
     void api.initialRepo().then((p) => p && setPath(p));
   }, []);
+
+  // A git executable chosen in settings applies from startup.
+  const startGitPath = useRef(settings.gitPath);
+  useEffect(() => {
+    if (startGitPath.current && isTauri)
+      api.setGitPath(startGitPath.current).catch((e) => toast("err", `설정한 git을 쓸 수 없어요: ${e}`));
+  }, [toast]);
 
   const applySnapshot = useCallback((s: RepoSnapshot) => {
     setSnap(s);
@@ -138,7 +161,7 @@ export default function App() {
     setDiff(null);
     setBackport(null);
     setRebaseFrom(null);
-    setLimit(HISTORY_PAGE);
+    setLimit(page);
   }
 
   // First load for a repo / history size. A response for a repo we have since
@@ -273,6 +296,8 @@ export default function App() {
         e.preventDefault();
         setSearch((s) => s ?? { query: "", index: 0 });
       }
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (e.key === "?" && tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") setSettingsOpen(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -678,10 +703,8 @@ export default function App() {
         onCompose={() => show({ composer: true })}
         onRefresh={() => void refresh()}
         onRemote={(op) => void remote(op)}
-        onToggleAnimate={() => {
-          setAnimate(!animate);
-          store(ANIMATE, animate ? "0" : "1");
-        }}
+        onToggleAnimate={() => updateSettings({ animate: !animate })}
+        onSettings={() => setSettingsOpen(true)}
       />
 
       {snap.state !== "clean" && (
@@ -766,7 +789,7 @@ export default function App() {
               }}
               incoming={snap.incoming}
               truncated={snap.truncated}
-              onLoadMore={() => setLimit((l) => l + HISTORY_PAGE)}
+              onLoadMore={() => setLimit((l) => l + page)}
               onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
               onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}
@@ -1109,6 +1132,9 @@ export default function App() {
             void remote(op);
           }}
         />
+      )}
+      {settingsOpen && (
+        <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );

@@ -64,7 +64,8 @@
 
 - [ ] macOS 서명 + 공증, Windows 코드 서명
 - [ ] 자동 업데이트 (tauri-plugin-updater)
-- [ ] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
+- [x] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표 — 반짝임, 한 번에 불러올 커밋 수, git 실행 파일(`--version`으로 확인 후 적용), 단축키 표, `?`/⚙로 열기
+  - [ ] 테마 (지금은 네온 다크 하나)
 - [ ] i18n (영어), 접근성 (키보드로 노드 이동, 스크린리더 라벨)
 - [x] ESLint, Playwright e2e를 CI에 추가
   - [x] Playwright e2e: 데모 모드 대상 5개 흐름(커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기), CI `E2E` 잡
@@ -101,3 +102,4 @@
 | 2026-10-01 | PR #17 squash merge(`5a95888`). 강제 push(`RemoteOp::ForcePush` = `push --force-with-lease`, 거부 화면 세 번째 선택, 그사이 남이 올린 커밋은 lease가 막는 것을 bare 저장소로 테스트)(테스트 55, e2e 9)                                                                  |
 | 2026-10-01 | PR #18 squash merge(`d6bf590`). M5: react-hooks 권장 규칙 전부 켬. effect 안 setState 9곳 → 렌더 중 조정(경로·초기 파일·부분 스테이지), 데이터를 키와 함께 저장(패널 파일·충돌 파일·줄 선택), diff 다시 불러오기를 fetch만 하도록 분리, 첫 로드에 늦게 온 응답 무시     |
 | 2026-10-01 | PR #19 squash merge(`74f7924`). 백포트: 제외를 받는 쪽별 config(`otgit.<target>.backportIgnored`, 예전 저장소 전체 키도 읽음), `backport_summary` + "대상별" 탭(테스트 56, e2e 10)                                                                                      |
+| 2026-10-01 | PR #20 squash merge(`1d0ac4e`). M5: 설정 화면(`settings.ts` 파싱 + vitest 3, `SettingsDialog`, `git::set_program` 전역 git 경로를 검증 후 적용, 예전 `otgit.animate` 키 이어받음)(테스트 57, e2e 11)                                                                    |

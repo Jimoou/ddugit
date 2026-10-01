@@ -7,26 +7,29 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #19(React Compiler 린트 규칙, effect 안 setState 정리)를 squash merge했다(`74f7924`).
+- PR #20(백포트 받는 쪽별 제외 + 대상별 표)을 squash merge했다(`1d0ac4e`).
 
 ## 지금 하는 일
 
-백포트 · 여러 대상 한눈에 보기 → PR #20에서 CI 대기 (10분 뒤 확인 예약)
+M5 · 설정 화면과 단축키 표 → PR #21에서 CI 대기 (10분 뒤 확인 예약)
 
-- 설계 문제를 고쳤다. 제외 표시가 저장소 전체에 하나라서, 한 저장소에 고객사 브랜치가 여럿이면 한 곳에서 제외한 커밋이 다른 곳에서도 제외됐다
-  - 이제 `otgit.<target>.backportIgnored`에 저장한다. git은 키를 첫 점과 마지막 점에서 자르므로 `/`나 `.`가 든 브랜치 이름도 subsection이 된다
-  - 예전 키 `otgit.backportIgnored`도 계속 읽어서 모든 대상에 적용한다. 제외를 풀면 두 키에서 모두 지운다
-- `backport_summary(path, source, targets)`: 대상마다 `compare`를 돌려 미반영/반영됨/제외 개수를 센다. 가져올 쪽 자신은 뺀다
-- `BackportSheet`
-  - 탭을 미반영 / 전체 / **대상별** 세 개로 늘렸다. 대상별 표는 로컬 브랜치를 미반영이 많은 순으로 보여 준다
-  - 행을 누르면 그 브랜치가 받는 쪽이 되고 미반영 탭으로 돌아간다
-- 데모 mock도 받는 쪽별로 제외를 기록한다. e2e 10번째 테스트가 확인한다
+- `src/settings.ts`
+  - `Settings { animate, historyPage, gitPath }`
+  - `parseSettings`: 깨지거나 예전 형식인 값은 기본값으로 되돌린다(vitest 3)
+  - `SHORTCUTS` 표
+- `SettingsDialog`
+  - 반짝임 효과, 한 번에 불러올 커밋 수(1천/3천/1만), git 실행 파일 경로(확인하고 적용), 단축키 표
+  - `?` 키와 TopBar의 ⚙로 연다. Esc는 window에서 듣는다
+- 백엔드 `git::set_program`
+  - 전역 `GIT_PATH`에 저장한다. `--version`이 `git version`으로 시작해야 받아들이고, 아니면 기존 값을 그대로 둔다
+  - 빈 값이면 PATH의 git으로 돌아간다. 앱을 시작할 때 저장된 경로를 다시 적용한다
+- 예전 `otgit.animate` 키는 처음 불러올 때 이어받는다. `?page=N`은 여전히 설정보다 우선한다
 
 ## 다음 단계
 
-1. M5 · 설정 화면 (테마, 애니메이션, git 경로), 단축키 표
-2. M5 · 키보드로 노드 이동(접근성)
-3. M3 · 그래프 위에서 노드를 끌어 바로 rebase 순서 바꾸기
+1. M5 · 키보드로 노드 이동(접근성: ←→ 이전/다음 커밋, ↑↓ 레인, Enter 선택), 스크린리더 라벨
+2. M3 · 그래프 위에서 노드를 끌어 바로 rebase 순서 바꾸기
+3. M5 · i18n(영어)
 
 ## 막힌 것 / 결정 필요
 

@@ -56,6 +56,7 @@ command!(backport_export(path: String, ids: Vec<String>, out_dir: String) -> OpR
     => git::backport::export(&path, &ids, &out_dir));
 command!(git_rebase(path: String, base: String, steps: Vec<RebaseStep>) -> OpResult
     => git::rebase::rebase(&path, &base, &steps));
+command!(set_git_path(git_path: Option<String>) -> String => git::set_program(git_path.as_deref()));
 command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
     => git::write::merge(&path, &source, target.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
@@ -115,6 +116,7 @@ pub fn run() {
             repo_snapshot,
             git_commit,
             git_stage_hunks,
+            set_git_path,
             git_rebase,
             backport_compare,
             backport_ignore,

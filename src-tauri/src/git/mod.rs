@@ -108,8 +108,45 @@ struct Output {
     text: String,
 }
 
+/// The git executable writes run with; `None` means `git` on PATH. Set from
+/// the settings screen, e.g. when the app's PATH lacks the user's git (macOS
+/// apps launched from Finder don't see a shell's PATH).
+static GIT_PATH: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+fn git_program() -> String {
+    GIT_PATH
+        .read()
+        .ok()
+        .and_then(|p| p.clone())
+        .unwrap_or_else(|| "git".into())
+}
+
+/// `git --version` of `program` (`None`: the current one), or why it can't run.
+pub fn version(program: Option<&str>) -> Result<String> {
+    let program = program.map_or_else(git_program, str::to_string);
+    let out = Command::new(&program)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("Can't run '{program}': {e}"))?;
+    let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if !out.status.success() || !text.starts_with("git version") {
+        return Err(format!("'{program}' is not a git executable"));
+    }
+    Ok(text)
+}
+
+/// Use `program` for git (blank or `None`: back to PATH). Refused, keeping
+/// the current one, unless it answers `--version` like git.
+pub fn set_program(program: Option<&str>) -> Result<String> {
+    let program = program.map(str::trim).filter(|p| !p.is_empty());
+    let v = version(Some(program.unwrap_or("git")))?;
+    *GIT_PATH.write().map_err(err)? = program.map(str::to_string);
+    Ok(v)
+}
+
 fn command(dir: &Path, args: &[&str]) -> Command {
-    let mut cmd = Command::new("git");
+    let mut cmd = Command::new(git_program());
     cmd.args(args)
         .current_dir(dir)
         // Never block on a hidden prompt: no terminal credential prompt, no
@@ -235,6 +272,22 @@ fn git_ok(dir: &Path, args: &[&str]) -> Result<String> {
         Ok(o.text)
     } else {
         Err(o.text)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn git_program_is_validated_before_use() {
+        assert!(version(None).unwrap().starts_with("git version"));
+        // Something that runs but isn't git, and something that doesn't exist.
+        assert!(set_program(Some("/no/such/git")).is_err());
+        assert!(version(Some(if cfg!(windows) { "where" } else { "true" })).is_err());
+        // Blank means PATH again; the global never held the bad value.
+        assert!(set_program(Some("  ")).unwrap().starts_with("git version"));
+        assert_eq!(git_program(), "git");
     }
 }
 
