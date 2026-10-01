@@ -1,5 +1,6 @@
 import { stashTitle } from "../format";
 import { placeBadges } from "./labels";
+import { drawSpace } from "./space";
 import type { Run } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
@@ -121,8 +122,6 @@ export function foldedRun(s: Pick<DrawState, "view" | "focus" | "runOf" | "selec
 /** Bar half-height for folded runs. */
 export const runRadius = (k: number) => nodeRadius(k) + 2;
 
-const BG_TOP = "#0b0916";
-const BG_BOTTOM = "#05040a";
 const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace';
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", sans-serif';
 
@@ -177,22 +176,9 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const n = scene.layout.rowCount;
   s.labelHits.length = 0;
 
-  // --- background -----------------------------------------------------------
+  // --- background: galaxy ---------------------------------------------------
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const bg = ctx.createLinearGradient(0, 0, 0, h);
-  bg.addColorStop(0, BG_TOP);
-  bg.addColorStop(1, BG_BOTTOM);
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, w, h);
-
-  // Dot grid that scales with zoom (fades out when too dense).
-  const step = COL * k;
-  if (step > 14) {
-    ctx.fillStyle = `rgba(140,120,255,${Math.min(0.12, (step - 14) / 300)})`;
-    const ox = ((view.tx % step) + step) % step;
-    const oy = (((view.ty - (LANE * k) / 2) % (LANE * k)) + LANE * k) % (LANE * k);
-    for (let x = ox; x < w; x += step) for (let y = oy; y < h; y += LANE * k) ctx.fillRect(x, y, 1, 1);
-  }
+  drawSpace(ctx, w, h, view, time, s.animate);
 
   // Visible world rect (with margin).
   const m = 40 / k;
