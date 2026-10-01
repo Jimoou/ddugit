@@ -17,6 +17,7 @@ import {
   type View,
   ZOOM,
 } from "./renderer";
+import { type Step, stepFrom } from "./navigate";
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
 import { Minimap } from "./Minimap";
@@ -64,6 +65,8 @@ const HINTS = {
   "pick:bad": "브랜치 끝(체크포인트)에만 놓을 수 있어요",
 } as const;
 
+const ARROWS: Record<string, Step> = { ArrowLeft: "older", ArrowRight: "newer", ArrowUp: "up", ArrowDown: "down" };
+
 const MIN_K = 0.08;
 const MAX_K = 3;
 const clampK = (k: number) => Math.min(MAX_K, Math.max(MIN_K, k));
@@ -98,6 +101,20 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   const runOf = useMemo(() => runIndex(runs), [runs]);
   const runsRef = useRef({ runs, runOf });
   runsRef.current = { runs, runOf };
+
+  const announced = props.selected
+    ? [
+        `커밋 ${props.selected.slice(0, 7)}`,
+        props.summaries.get(props.selected),
+        refsByCommit
+          .get(props.selected)
+          ?.map((r) => r.name)
+          .join(", "),
+        props.selected === props.headId ? "HEAD" : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
   // Mutable interaction state lives in a ref so pointer moves never re-render React.
   const st = useRef({
@@ -159,6 +176,19 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const node = propsRef.current.headId ? sc.layout.byId.get(propsRef.current.headId) : undefined;
     if (!node) return plusPosition(sc, null);
     return { x: xOf(node.row, sc.layout.rowCount) + COL * 0.5 - (st.current.size.w * 0.18) / k, y: sc.height / 2 };
+  };
+
+  /** A commit's position on the canvas, or null if it isn't loaded. */
+  const screenOf = (id: string): Pt | null => {
+    const sc = sceneRef.current;
+    const node = sc.layout.byId.get(id);
+    return node ? toScreen(st.current.view, { x: xOf(node.row, sc.layout.rowCount), y: yOf(node.lane) }) : null;
+  };
+  /** Pan (keeping the zoom) when a keyboard-selected commit is off screen. */
+  const reveal = (id: string) => {
+    const p = screenOf(id);
+    const { w, h } = st.current.size;
+    if (p && (p.x < 60 || p.x > w - 60 || p.y < 40 || p.y > h - 40)) api.centerOn(id, st.current.view.k);
   };
 
   const api: GraphHandle = {
@@ -490,6 +520,24 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       else if (e.key === "Escape") {
         st.current.drag = null;
         propsRef.current.onSelect(null);
+      } else if (ARROWS[e.key] || e.key === "Enter" || e.key === "ContextMenu") {
+        // Only when nothing else has focus: arrows must still scroll lists and sheets.
+        if (e.target !== document.body && e.target !== canvasRef.current) return;
+        const { selected, headId } = propsRef.current;
+        if (ARROWS[e.key]) {
+          e.preventDefault();
+          // The first arrow picks HEAD; later ones move from the selection.
+          const next = selected ? stepFrom(sceneRef.current.layout, selected, ARROWS[e.key]) : headId;
+          if (next) {
+            propsRef.current.onSelect(next);
+            reveal(next);
+          }
+        } else if (selected) {
+          e.preventDefault();
+          const at = screenOf(selected);
+          const r = canvasRef.current!.getBoundingClientRect();
+          if (at) propsRef.current.onNodeMenu(selected, r.left + at.x + 12, r.top + at.y + 12);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -502,6 +550,9 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         <canvas
           ref={canvasRef}
           style={{ cursor }}
+          tabIndex={0}
+          role="application"
+          aria-label="커밋 그래프. 화살표로 커밋 이동, Enter로 메뉴, + - 0 H로 확대·전체·HEAD"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -521,6 +572,10 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
             st.current.plusHover = false;
           }}
         />
+      </div>
+      {/* Read out what keyboard (or mouse) selection lands on. */}
+      <div className="sr-only" aria-live="polite">
+        {announced}
       </div>
       {dragHint && (
         <div className={`drag-hint ${dragHint.split(":")[1]} ${dragHint.split(":")[0]}`}>{HINTS[dragHint]}</div>

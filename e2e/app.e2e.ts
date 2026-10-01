@@ -222,3 +222,24 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
+
+test("moves through commits with the keyboard and announces them", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  const head = byId.get(snap.head.target!)!;
+  const parent = byId.get(head.parents[0])!;
+  const live = page.locator(".graph .sr-only");
+
+  await page.keyboard.press("ArrowLeft"); // first arrow selects HEAD
+  await expect(live).toContainText(head.summary);
+  await expect(live).toContainText("HEAD");
+  await page.keyboard.press("ArrowLeft");
+  await expect(live).toContainText(parent.summary);
+  await page.keyboard.press("ArrowRight");
+  await expect(live).toContainText(head.summary);
+
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".context-menu")).toBeVisible();
+  await expect(page.locator(".context-menu")).toContainText("여기서 새 브랜치");
+});

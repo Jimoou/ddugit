@@ -7,29 +7,28 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #20(백포트 받는 쪽별 제외 + 대상별 표)을 squash merge했다(`1d0ac4e`).
+- PR #21(설정 화면, git 경로, 단축키 표)을 squash merge했다(`62759c0`).
 
 ## 지금 하는 일
 
-M5 · 설정 화면과 단축키 표 → PR #21에서 CI 대기 (10분 뒤 확인 예약)
+M5 · 접근성: 키보드로 커밋 이동 → PR #22에서 CI 대기 (10분 뒤 확인 예약)
 
-- `src/settings.ts`
-  - `Settings { animate, historyPage, gitPath }`
-  - `parseSettings`: 깨지거나 예전 형식인 값은 기본값으로 되돌린다(vitest 3)
-  - `SHORTCUTS` 표
-- `SettingsDialog`
-  - 반짝임 효과, 한 번에 불러올 커밋 수(1천/3천/1만), git 실행 파일 경로(확인하고 적용), 단축키 표
-  - `?` 키와 TopBar의 ⚙로 연다. Esc는 window에서 듣는다
-- 백엔드 `git::set_program`
-  - 전역 `GIT_PATH`에 저장한다. `--version`이 `git version`으로 시작해야 받아들이고, 아니면 기존 값을 그대로 둔다
-  - 빈 값이면 PATH의 git으로 돌아간다. 앱을 시작할 때 저장된 경로를 다시 적용한다
-- 예전 `otgit.animate` 키는 처음 불러올 때 이어받는다. `?page=N`은 여전히 설정보다 우선한다
+- `graph/navigate.ts` `stepFrom(layout, id, step)`
+  - older: 첫 부모
+  - newer: 같은 레인의 자식을 우선한다
+  - up / down: 가장 가까운 레인에서 행 거리가 가장 짧은 커밋
+- `GraphCanvas`
+  - 처음 누른 화살표는 HEAD를 고르고, 그다음부터 이동한다. Enter(또는 메뉴 키)는 그 커밋의 메뉴를 노드 옆에 연다
+  - 고른 커밋이 화면 밖이면 배율을 유지한 채 그쪽으로 옮긴다
+  - 포커스가 body나 캔버스에 있을 때만 동작한다. 그래야 시트나 목록의 화살표 스크롤을 가로채지 않는다
+  - 캔버스에 `tabIndex=0`, `role="application"`, 사용법 `aria-label`을 붙였다. 선택한 커밋(짧은 SHA, 요약, ref, HEAD)은 `aria-live`로 읽어 준다
+- 단축키 표(`SHORTCUTS`)에 화살표와 Enter를 추가했다
 
 ## 다음 단계
 
-1. M5 · 키보드로 노드 이동(접근성: ←→ 이전/다음 커밋, ↑↓ 레인, Enter 선택), 스크린리더 라벨
-2. M3 · 그래프 위에서 노드를 끌어 바로 rebase 순서 바꾸기
-3. M5 · i18n(영어)
+1. M3 · 그래프 위에서 노드를 끌어 바로 rebase 순서 바꾸기
+2. M5 · i18n(영어). 문자열을 추출해야 해서 규모가 크다
+3. M5 · 테마(밝은 테마)
 
 ## 막힌 것 / 결정 필요
 
