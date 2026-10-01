@@ -4,6 +4,7 @@ import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
+import { FxLayer, useFx } from "./components/Fx";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -159,23 +160,17 @@ export function RepoView({
     rewrites: number;
     pushed: boolean;
   } | null>(null);
-  /** Where an edited commit was, for a brief nova (bumped id replays it). */
-  const [nova, setNova] = useState<{ n: number; at: { x: number; y: number } | null; red?: boolean }>({
-    n: 0,
-    at: null,
-  });
   /** Bisect: the ends picked before starting, and git's state once it runs (keyed by snapshot). */
   const [bisectDraft, setBisectDraft] = useState<{ bad?: string; good?: string } | null>(null);
   const [bisectLoaded, setBisectLoaded] = useState<{ snap: RepoSnapshot; state: BisectState | null } | null>(null);
   const lastBisect = useRef<{ current: string | null; culprit: string | null }>({ current: null, culprit: null });
-  /** Where deleted branch tips were, to scatter them as stardust (bumped id replays it). */
-  const [dust, setDust] = useState<{ n: number; at: { x: number; y: number }[] }>({ n: 0, at: [] });
-  /** Bumped after a reset to replay the rewind effect. */
-  const [rewind, setRewind] = useState(0);
+  /** The snapshot last applied, for comparing before / after an operation outside render. */
+  const latest = useRef<RepoSnapshot | null>(null);
   const [zoom, setZoom] = useState(1);
   const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
+  const { playing: fx, play } = useFx(animate);
   // A new page size from the settings applies to every open repository.
   const [shownPage, setShownPage] = useState(page);
   if (shownPage !== page) {
@@ -186,6 +181,7 @@ export function RepoView({
   const diffReq = useRef(0);
 
   const applySnapshot = useCallback((s: RepoSnapshot) => {
+    latest.current = s;
     setSnap(s);
     setLoadError(null);
   }, []);
@@ -324,7 +320,10 @@ export function RepoView({
           const id = state.culprit;
           setTimeout(() => {
             graph.current?.centerOn(id);
-            setTimeout(() => setNova((v) => ({ n: v.n + 1, at: graph.current?.screenOf(id) ?? null, red: true })), 450);
+            setTimeout(() => {
+              const at = graph.current?.screenOf(id);
+              if (at) play({ kind: "nova", at, red: true });
+            }, 450);
           }, 60);
         } else if (state?.current && state.current !== prev.current) {
           const id = state.current;
@@ -337,7 +336,7 @@ export function RepoView({
     return () => {
       live = false;
     };
-  }, [path, snap]);
+  }, [path, snap, play]);
   const bisect = bisectLoaded && bisectLoaded.snap === snap ? bisectLoaded.state : null;
   const badges = useMemo(() => {
     const m = new Map<string, NodeBadge>();
@@ -454,8 +453,24 @@ export function RepoView({
   const remote = async (op: RemoteOp): Promise<OpStatus> => {
     setRemoteBusy(op);
     setProgress(null);
+    const pushing = op === "push" || op === "forcePush";
+    const known = new Set(latest.current?.commits.map((c) => c.id));
     try {
       const r = await run(t(REMOTE_DONE[op]), () => api.remote(path, op, setProgress));
+      if (r.status === "ok") {
+        const head = latest.current?.head.target;
+        // Wait a frame or two so the new layout is drawn before reading positions.
+        const fresh = pushing ? [] : (latest.current?.commits ?? []).filter((c) => !known.has(c.id));
+        setTimeout(() => {
+          if (pushing) {
+            const from = head && graph.current?.screenOf(head);
+            if (from) play({ kind: "launch", from });
+          } else {
+            const to = fresh.flatMap((c) => graph.current?.screenOf(c.id) ?? []);
+            if (to.length) play({ kind: "meteors", to });
+          }
+        }, 80);
+      }
       if (r.status === "auth") setAuth({ op, output: r.output });
       if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
       // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
@@ -610,7 +625,7 @@ export function RepoView({
       () => api.editCommit(path, id, edit),
       () => {
         setEditReq(null);
-        setNova((v) => ({ n: v.n + 1, at }));
+        if (at) play({ kind: "nova", at });
       },
     );
   };
@@ -665,7 +680,7 @@ export function RepoView({
     return run(
       t("clean.done", { n: names.length }),
       () => api.deleteBranches(path, names, force),
-      () => setDust((d) => ({ n: d.n + 1, at })),
+      () => play({ kind: "dust", at }),
     );
   };
 
@@ -676,7 +691,7 @@ export function RepoView({
       () => api.reset(path, target, mode),
       () => {
         setResetReq(null);
-        setRewind((n) => n + 1);
+        play({ kind: "rewind" });
         setTimeout(() => graph.current?.centerOnHead(), 60);
       },
     );
@@ -1122,33 +1137,7 @@ export function RepoView({
                 onClose={() => setSearch(null)}
               />
             )}
-            {animate && nova.n > 0 && nova.at && (
-              <div className="fx-clip" aria-hidden key={`nova-${nova.n}`}>
-                <div className={`nova ${nova.red ? "red" : ""}`} style={{ left: nova.at.x, top: nova.at.y }} />
-              </div>
-            )}
-            {animate && dust.n > 0 && (
-              <div className="fx-clip" aria-hidden key={`dust-${dust.n}`}>
-                {dust.at.map((p, i) => (
-                  <div key={i} className="stardust" style={{ left: p.x, top: p.y }}>
-                    {Array.from({ length: 16 }, (_, j) => (
-                      <i
-                        key={j}
-                        style={{
-                          ["--a" as string]: `${j * 22.5}deg`,
-                          ["--d" as string]: `${44 + ((j * 7) % 5) * 13}px`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-            {animate && rewind > 0 && (
-              <div className="fx-clip" aria-hidden>
-                <div key={rewind} className="rewind" />
-              </div>
-            )}
+            <FxLayer playing={fx} />
             <GraphCanvas
               ref={graph}
               layout={layout}

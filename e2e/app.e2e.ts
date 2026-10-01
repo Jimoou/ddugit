@@ -543,3 +543,30 @@ test("traces a file through history and shows who changed each line", async ({ d
   await banner.getByRole("button", { name: "닫기" }).click();
   await expect(banner).toHaveCount(0);
 });
+
+test("a push rides a comet into orbit and fetched commits arrive as meteors, unless sparkles are off", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  const launch = page.locator(".fx-clip .launch");
+  const meteors = page.locator(".fx-clip .meteor");
+
+  await page.getByRole("button", { name: /Push/ }).click();
+  await demo.toast("원격에 올렸어요");
+  await expect(launch).toHaveCount(1);
+  await expect(launch).toHaveCount(0, { timeout: 5000 });
+
+  // The demo's first fetch brings one commit to origin/main and one to the upstream.
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+  await expect(meteors).toHaveCount(2);
+
+  // Sparkles off: the same moments play nothing.
+  await page.locator(".topbar button[title='반짝임 효과']").click();
+  await expect(meteors).toHaveCount(0, { timeout: 5000 });
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+  await page.getByRole("button", { name: /Push/ }).click();
+  await page.waitForTimeout(300);
+  await expect(launch).toHaveCount(0);
+});

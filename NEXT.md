@@ -7,28 +7,28 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #36(bisect)을 squash merge했다(`d995819`). CI가 `playwright install --with-deps`(apt)에서 30분 넘게 멈춰 있어서 취소하고 다시 돌렸다. 그래서 e2e 단계에 `timeout-minutes`(설치 8분, 테스트 15분)를 붙였다.
+- PR #37(파일 이력·blame)을 squash merge했다(`aff5c4d`).
+- CI에서 bisect e2e가 또 빗나갔다. 이제 `demo.commitMenu(id)`가 메뉴 제목이 그 커밋 요약일 때까지 우클릭을 다시 시도한다. 커밋 우클릭이 필요한 새 테스트도 이것을 쓴다.
 
 ## 지금 하는 일
 
-M6 고급 git 마지막 "파일 이력·blame" → PR CI 대기
+게임 같은 연출 1단계 "원격" → PR CI 대기
 
-- Rust `git/history.rs`
-  - `file_log(rev, file)`: `git log --follow --name-only`로 커밋마다 그때의 경로를 얻는다. libgit2에는 follow가 없어서 CLI로 읽는다
-  - `blame(rev, file)`: libgit2 `blame_file(newest_commit)`로 hunk마다 커밋·작성자·시각·요약을 낸다. 내용은 그 커밋의 blob에서 읽는다
-- 화면
-  - Inspector의 변경 파일을 우클릭하면 "이 파일이 지나온 커밋 보기"와 "blame"이 나온다. 이력은 그 커밋이 HEAD에 닿으면 HEAD부터 읽는다
-  - 그래프 `trail`(renderer `drawTrail`): 금빛 점선 별자리, 각 커밋에 반짝이는 십자, 옛것→최근으로 흐르는 혜성. 다른 커밋은 focus로 흐리게 한다
-  - 배너: 더 최근 / 더 예전 / 줄마다 보기 / 닫기
-  - `components/History.tsx`의 `BlameSheet`: 줄 묶음마다 별 색(`ageColor`: 붉을수록 오래됨, 푸를수록 최근). 왼쪽을 누르면 그 커밋으로 간다. Esc로 닫는다
-- 데모: `filesOf(id)`(commit_diff와 공유)로 파일을 바꾼 커밋을 고르고, blame은 커밋마다 줄 묶음 하나씩 만든다
+- `components/Fx.tsx`
+  - `useFx(animate)`: `play(effect)`로 효과를 큐에 넣고 2.2초 뒤에 뺀다. 반짝임이 꺼져 있으면 아무것도 넣지 않는다
+  - `FxLayer`가 그래프 위 `.fx-clip` 안에 그린다
+  - 기존 노바·별가루·되감기 state 세 개를 여기로 합쳤다
+- push 성공: HEAD에서 궤적(svg path가 그려짐)을 따라 혜성이 날아간다(`offset-path`). 점화 섬광이 함께 뜬다
+- fetch·pull 성공: 작업 전 커밋 id와 `latest`(마지막으로 적용한 스냅샷 ref)를 비교한다. 새 커밋마다 유성이 떨어지고 충돌 섬광이 뜬다(최대 6개, 130ms 간격)
+- 화면 좌표는 새 레이아웃이 그려지도록 80ms 뒤에 읽는다
 
 ## 다음 단계
 
-1. 기존 기능의 게임 같은 연출: 원격(push 궤적, pull·fetch 유성) → 그래프 작업(merge 중력장·섬광, cherry-pick 혜성, rebase 별자리) → 충돌(붉은 성운)
-2. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
-3. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다
-4. 사용자가 v0.1.0 초안 Release를 Publish해야 태그가 생긴다
+1. 연출 2단계 그래프 작업: merge(끌면 대상 끝에 중력장, 놓으면 섬광), cherry-pick(혜성이 원본에서 새 커밋으로), rebase(별자리 재배열)
+2. 연출 3단계 충돌: 붉은 성운, 해결하면 걷힘
+3. 그다음 M4 PR 연동(토큰 방식 결정 필요: `gh auth token` 재사용 vs 키체인)
+4. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다
+5. 사용자가 v0.1.0 초안 Release를 Publish해야 태그가 생긴다
 
 ## 막힌 것 / 결정 필요
 
