@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fmtTime } from "../format";
 import type { CommitInfo, FileDiff, RefInfo } from "../types";
 import { ChangedFiles } from "./ChangedFiles";
+import { t } from "../i18n";
 
 interface Props {
   commit: CommitInfo;
@@ -28,10 +29,12 @@ export function Inspector(props: Props) {
     <aside className="panel inspector" style={{ ["--accent" as string]: color }}>
       <header>
         <div>
-          <div className="eyebrow">체크포인트 {isHead && <span className="head-pill">HEAD</span>}</div>
-          <h2>{commit.summary || "(메시지 없음)"}</h2>
+          <div className="eyebrow">
+            {t("inspector.eyebrow")} {isHead && <span className="head-pill">HEAD</span>}
+          </div>
+          <h2>{commit.summary || t("common.noMessage")}</h2>
         </div>
-        <button className="icon" onClick={onClose} title="닫기 (Esc)">
+        <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
           ✕
         </button>
       </header>
@@ -50,21 +53,21 @@ export function Inspector(props: Props) {
       {body && <pre className="body">{body}</pre>}
 
       <dl className="meta">
-        <dt>작성자</dt>
+        <dt>{t("inspector.author")}</dt>
         <dd>
           {commit.author} <span className="muted">&lt;{commit.email}&gt;</span>
         </dd>
-        <dt>시간</dt>
+        <dt>{t("inspector.time")}</dt>
         <dd>{fmtTime(commit.time)}</dd>
-        <dt>커밋</dt>
+        <dt>{t("inspector.commit")}</dt>
         <dd>
-          <code className="sha" title="클릭해서 복사" onClick={() => navigator.clipboard?.writeText(commit.id)}>
+          <code className="sha" title={t("inspector.copy")} onClick={() => navigator.clipboard?.writeText(commit.id)}>
             {commit.id.slice(0, 12)}
           </code>
         </dd>
         {commit.parents.length > 0 && (
           <>
-            <dt>{commit.parents.length > 1 ? "병합한 부모" : "부모"}</dt>
+            <dt>{commit.parents.length > 1 ? t("inspector.parents") : t("inspector.parent")}</dt>
             <dd className="parents">
               {commit.parents.map((p) => (
                 <code key={p} className="sha link" onClick={() => onSelect(p)}>
@@ -82,7 +85,7 @@ export function Inspector(props: Props) {
         <div className="actions">
           {locals.map((r) => (
             <button key={r.name} disabled={busy} onClick={() => onCheckout(r.name)}>
-              ⇢ {r.name} 체크아웃
+              ⇢ {t("menu.checkoutName", { name: r.name })}
             </button>
           ))}
         </div>
@@ -98,16 +101,16 @@ export function Inspector(props: Props) {
       >
         <input
           className="text"
-          placeholder="여기서 새 브랜치…"
+          placeholder={t("menu.branchHere")}
           value={name}
           onChange={(e) => setName(e.target.value.replace(/\s+/g, "-"))}
         />
         <button type="submit" disabled={busy || !name.trim()}>
-          만들고 이동
+          {t("branch.new.go")}
         </button>
       </form>
 
-      <p className="tip">팁: 이 점을 끌어서 다른 브랜치 끝에 놓으면 병합돼요.</p>
+      <p className="tip">{t("inspector.tip")}</p>
     </aside>
   );
 }

@@ -1,6 +1,7 @@
 import { fmtTime, stashTitle } from "../format";
 import type { FileDiff, StashInfo } from "../types";
 import { ChangedFiles } from "./ChangedFiles";
+import { t } from "../i18n";
 
 interface Props {
   stash: StashInfo;
@@ -20,18 +21,20 @@ export function StashPanel({ stash, files, busy, onClose, onSelectBase, onOpenFi
     <aside className="panel stash-panel" style={{ ["--accent" as string]: "var(--amber)" }}>
       <header>
         <div>
-          <div className="eyebrow">스태시 · stash@{`{${stash.index}}`}</div>
+          <div className="eyebrow">
+            {t("stashPanel.eyebrow")} · stash@{`{${stash.index}}`}
+          </div>
           <h2>{stashTitle(stash.message)}</h2>
         </div>
-        <button className="icon" onClick={onClose} title="닫기 (Esc)">
+        <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
           ✕
         </button>
       </header>
 
       <dl className="meta">
-        <dt>보관한 시간</dt>
+        <dt>{t("stashPanel.time")}</dt>
         <dd>{fmtTime(stash.time, false)}</dd>
-        <dt>기준 커밋</dt>
+        <dt>{t("stashPanel.base")}</dt>
         <dd>
           <code className="sha link" onClick={onSelectBase}>
             {stash.base.slice(0, 7)}
@@ -40,17 +43,17 @@ export function StashPanel({ stash, files, busy, onClose, onSelectBase, onOpenFi
       </dl>
 
       <ChangedFiles files={files} onOpen={onOpenFile} />
-      <p className="tip">추적하지 않던 새 파일은 목록에 나오지 않지만 함께 보관돼 있어요.</p>
+      <p className="tip">{t("stashPanel.tip")}</p>
 
       <div className="actions">
         <button className="primary" disabled={busy} onClick={onPop}>
-          꺼내기 (pop)
+          {t("stashPanel.pop")}
         </button>
         <button disabled={busy} onClick={onApply}>
-          적용만 하기 (apply · 보관 유지)
+          {t("stashPanel.apply")}
         </button>
         <button className="danger ghost" disabled={busy} onClick={onDrop}>
-          삭제 (drop)
+          {t("stashPanel.drop")}
         </button>
       </div>
     </aside>

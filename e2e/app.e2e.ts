@@ -285,6 +285,9 @@ test("settings: switching to English relabels the app and is remembered", async 
   await page.keyboard.press("Escape");
   await expect(page.locator(".topbar")).toContainText("Commit");
   await expect(page.locator(".hint")).toContainText("Drag to pan");
+  await page.locator(".topbar").getByText("Commit").click();
+  await expect(page.locator(".composer")).toContainText("Add checkpoint");
+  await page.keyboard.press("Escape");
 
   await page.reload();
   await expect(page.locator(".topbar")).toContainText("Demo mode");

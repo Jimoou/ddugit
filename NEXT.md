@@ -7,25 +7,21 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #25(dmg / exe 배포, 아이콘)를 squash merge했다(`d2a5ccf`). main에서 Release 워크플로를 수동 실행했다. artifact(dmg, exe)가 만들어지는지 확인한다.
+- PR #26(i18n 기반, 언어 설정)을 squash merge했다(`f7363d7`). e2e `screenOf`는 이제 카메라가 멈춘 뒤 좌표를 읽는다(CI에서 드래그 병합 테스트가 한 번 빗나갔다).
+- main에서 Release 워크플로를 수동 실행했다(run 36838768528). dmg/exe artifact가 나오는지 확인한다.
 
 ## 지금 하는 일
 
-영어 번역 PR A(기반) → CI 대기
+영어 번역 PR B → CI 대기
 
-- `src/i18n/`
-  - `ko.ts`: 원본 사전, `Key` 타입
-  - `en.ts`: `Record<Key, string>`, 그래서 빠진 키는 타입 오류
-  - `index.ts`: `t()`, `setLocale`, `resolveLocale`, `localeTag`, `isKey`
-  - `Rich.tsx`: `<b>`/`<code>` 표시를 요소로 바꾼다
-- 언어는 설정 `language`(system/ko/en)에 저장한다. App이 불러올 때와 바꿀 때 `setLocale`을 부르고, 다시 렌더하면서 모든 화면이 바뀐다. 캔버스는 매 프레임 그리므로 따로 할 일이 없다
-- Playwright는 `locale: "ko-KR"`로 고정했다. 그래서 기존 한국어 e2e가 그대로 돈다
+- App의 알림·메뉴·확인 문구를 사전으로 옮겼다(`remote.done.*`, `state.*`, `menu.*`, `branch.*`, `tag.*`, `remote.*`, `stash.*` …). 굵게 표시가 있는 확인 문구는 `<Rich>`
+- 진행 중 배너는 `stateText(state)`가 `state.<name>`과 `.hint`를 찾는다
+- Inspector, Composer, StashPanel 번역. 영어 e2e에서 Composer 버튼도 확인한다
 
 ## 다음 단계
 
-1. i18n PR B: `App.tsx`(알림·확인 문구 136줄), Inspector, Composer, StashPanel
-2. i18n PR C: BackportSheet, AuthDialog, ConflictSheet, DiffSheet, RebaseSheet, SyncDialog, `rebasePlan.ts`
-3. (나중에) 서명, 자동 업데이트
+1. i18n PR C: BackportSheet, AuthDialog, ConflictSheet, DiffSheet, RebaseSheet, SyncDialog, `rebasePlan.ts`
+2. (나중에) 서명, 자동 업데이트
 
 ## 막힌 것 / 결정 필요
 
