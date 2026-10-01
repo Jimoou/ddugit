@@ -1,5 +1,6 @@
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
+import { t } from "../i18n";
 
 interface Props {
   title: string;
@@ -77,7 +78,7 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
     <section className="diff-sheet" style={{ height }}>
       <div
         className="grip"
-        title="끌어서 높이 조절"
+        title={t("diff.resize")}
         onPointerDown={(e) => {
           drag.current = { y: e.clientY, h: height };
           (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -91,11 +92,11 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
       />
       <header>
         <div className="title">
-          <span className="eyebrow">변경 내용</span>
+          <span className="eyebrow">{t("diff.title")}</span>
           <b>{title}</b>
           {files && (
             <span className="muted">
-              파일 {files.length}개 · <span className="add">+{totals.add}</span>{" "}
+              {t("diff.files", { n: files.length })} · <span className="add">+{totals.add}</span>{" "}
               <span className="del">−{totals.del}</span>
             </span>
           )}
@@ -110,21 +111,21 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
                 className={stage.scope === sc ? "on" : ""}
                 onClick={() => stage.onScope(sc)}
               >
-                {sc === "unstaged" ? "변경" : "스테이지됨"}
+                {sc === "unstaged" ? t("diff.tab.unstaged") : t("diff.tab.staged")}
               </button>
             ))}
           </div>
         )}
-        <span className="muted keys">[ ] 파일 이동 · Esc 닫기</span>
-        <button className="icon" onClick={onClose} title="닫기 (Esc)">
+        <span className="muted keys">{t("diff.keys")}</span>
+        <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
           ✕
         </button>
       </header>
 
       <div className="split">
         <ul className="file-list">
-          {!files && !error && <li className="muted pad">불러오는 중…</li>}
-          {files?.length === 0 && <li className="muted pad">변경 없음</li>}
+          {!files && !error && <li className="muted pad">{t("diff.loading")}</li>}
+          {files?.length === 0 && <li className="muted pad">{t("diff.none")}</li>}
           {files?.map((f) => (
             <li
               key={f.path}
@@ -166,8 +167,8 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
   const setPick = (next: (p: LinePick | null) => LinePick | null) =>
     setPicked((cur) => ({ file, pick: next(cur.file === file ? cur.pick : null) }));
 
-  if (file.binary) return <p className="muted pad">바이너리 파일이라 내용을 표시하지 않아요.</p>;
-  if (file.hunks.length === 0) return <p className="muted pad">내용 변경 없음 (권한·이름만 바뀜)</p>;
+  if (file.binary) return <p className="muted pad">{t("diff.binary")}</p>;
+  if (file.hunks.length === 0) return <p className="muted pad">{t("diff.modeOnly")}</p>;
 
   const toggle = (hunk: number, line: number, range: boolean) =>
     setPick((p) => {
@@ -194,7 +195,7 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
         )}
         {file.hunks.map((h, i) => {
           const picked = pick?.hunk === i ? pick.lines : [];
-          const verb = stage?.scope === "unstaged" ? "스테이지" : "스테이지에서 내리기";
+          const staging = stage?.scope === "unstaged";
           return (
             <HunkRows
               key={i}
@@ -212,7 +213,9 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
                     }
                   >
                     {stage.scope === "unstaged" ? "＋ " : "− "}
-                    {picked.length ? `선택한 ${picked.length}줄 ${verb}` : `이 부분 ${verb}`}
+                    {picked.length
+                      ? t(staging ? "diff.stageLines" : "diff.unstageLines", { n: picked.length })
+                      : t(staging ? "diff.stageHunk" : "diff.unstageHunk")}
                   </button>
                 )
               }
@@ -221,7 +224,7 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
         })}
         {file.truncated && (
           <tr className="hunk">
-            <td colSpan={4}>… 너무 길어서 일부만 표시했어요</td>
+            <td colSpan={4}>{t("diff.truncated")}</td>
           </tr>
         )}
       </tbody>
@@ -257,7 +260,7 @@ function HunkRows({
           onPick && change
             ? {
                 onClick: (e: MouseEvent) => onPick(i, e.shiftKey),
-                title: "클릭해서 이 줄만 고르기 (Shift: 범위)",
+                title: t("diff.pickLine"),
               }
             : {};
         return (

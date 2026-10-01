@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
 import type { BackportItem, BackportState, BackportTally } from "../types";
+import { type Key, t } from "../i18n";
+import { Rich } from "../i18n/Rich";
 
 interface Props {
   path: string;
@@ -25,11 +27,11 @@ interface Props {
   onClose(): void;
 }
 
-const STATE: Record<BackportState["kind"], string> = {
-  missing: "미반영",
-  applied: "반영됨",
-  picked: "반영됨 (-x)",
-  ignored: "제외",
+const STATE: Record<BackportState["kind"], Key> = {
+  missing: "bp.state.missing",
+  applied: "bp.state.applied",
+  picked: "bp.state.picked",
+  ignored: "bp.state.ignored",
 };
 
 /**
@@ -119,22 +121,22 @@ export function BackportSheet(p: Props) {
     <section className="diff-sheet backport-sheet" style={{ height: "50vh" }}>
       <header>
         <div className="title">
-          <span className="eyebrow">백포트</span>
-          {select("가져올 쪽", source, (s) => p.onPair(s, target))}
+          <span className="eyebrow">{t("bp.title")}</span>
+          {select(t("bp.source"), source, (s) => p.onPair(s, target))}
           <span className="muted">→</span>
-          {select("받는 쪽", target, (t) => p.onPair(source, t))}
+          {select(t("bp.target"), target, (tg) => p.onPair(source, tg))}
           {items && (
             <span className="muted">
-              미반영 <b className="bp-missing">{count.missing}</b> · 반영됨 {count.applied} · 제외 {count.ignored}
+              <Rich k="bp.counts" vars={count} bold="bp-missing" />
             </span>
           )}
         </div>
         <div className="scope-tabs" role="tablist">
           {(
             [
-              ["missing", "미반영"],
-              ["all", "전체"],
-              ["targets", "대상별"],
+              ["missing", "bp.state.missing"],
+              ["all", "bp.tab.all"],
+              ["targets", "bp.tab.targets"],
             ] as const
           ).map(([v, label]) => (
             <button
@@ -144,11 +146,11 @@ export function BackportSheet(p: Props) {
               className={view === v ? "on" : ""}
               onClick={() => setView(v)}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
-        <button className="icon" onClick={p.onClose} title="닫기">
+        <button className="icon" onClick={p.onClose} title={t("common.close")}>
           ✕
         </button>
       </header>
@@ -160,18 +162,18 @@ export function BackportSheet(p: Props) {
             source={source}
             current={target}
             rows={rows}
-            onOpen={(t) => {
-              p.onPair(source, t);
+            onOpen={(tg) => {
+              p.onPair(source, tg);
               setView("missing");
             }}
           />
         ) : (
           <>
-            {!items && !error && <p className="muted pad">비교하는 중…</p>}
+            {!items && !error && <p className="muted pad">{t("bp.comparing")}</p>}
             {items && !error && shown.length === 0 && (
               <p className="muted pad">
-                {target}에 {source}의 커밋이 모두 반영돼 있어요.
-                {items.length > 0 && " (전체 탭에서 반영된 커밋을 볼 수 있어요)"}
+                {t("bp.upToDate", { target, source })}
+                {items.length > 0 && t("bp.upToDate.all")}
               </p>
             )}
             {shown.length > 0 && (
@@ -181,14 +183,14 @@ export function BackportSheet(p: Props) {
                     <th>
                       <input
                         type="checkbox"
-                        aria-label="미반영 모두 선택"
+                        aria-label={t("bp.selectAll")}
                         disabled={missing.length === 0}
                         checked={missing.length > 0 && missing.every((i) => picked.has(i.id))}
                         onChange={(e) => setPicked(new Set(e.target.checked ? missing.map((i) => i.id) : []))}
                       />
                     </th>
-                    <th>상태</th>
-                    <th>커밋</th>
+                    <th>{t("bp.col.state")}</th>
+                    <th>{t("bp.col.commit")}</th>
                     <th />
                   </tr>
                 </thead>
@@ -198,7 +200,7 @@ export function BackportSheet(p: Props) {
                       <td>
                         <input
                           type="checkbox"
-                          aria-label={`${i.summary} 선택`}
+                          aria-label={t("bp.select", { summary: i.summary })}
                           disabled={i.state.kind !== "missing"}
                           checked={picked.has(i.id)}
                           onChange={() => toggle(i.id)}
@@ -207,12 +209,14 @@ export function BackportSheet(p: Props) {
                       <td>
                         <span
                           className={`chip bp-${i.state.kind}`}
-                          title={i.state.kind === "picked" ? `${i.state.by.slice(0, 7)}에서 -x로 가져옴` : undefined}
+                          title={
+                            i.state.kind === "picked" ? t("bp.pickedFrom", { sha: i.state.by.slice(0, 7) }) : undefined
+                          }
                         >
-                          {STATE[i.state.kind]}
+                          {t(STATE[i.state.kind])}
                         </span>
                       </td>
-                      <td className="bp-commit" onClick={() => p.onSelect(i.id)} title="그래프에서 보기">
+                      <td className="bp-commit" onClick={() => p.onSelect(i.id)} title={t("bp.showInGraph")}>
                         <code>{i.id.slice(0, 7)}</code> <span className="summary">{i.summary}</span>
                         <span className="muted">
                           {" "}
@@ -220,9 +224,11 @@ export function BackportSheet(p: Props) {
                         </span>
                       </td>
                       <td className="bp-actions">
-                        {i.state.kind === "missing" && <button onClick={() => void ignore(i.id, true)}>제외</button>}
+                        {i.state.kind === "missing" && (
+                          <button onClick={() => void ignore(i.id, true)}>{t("bp.ignore")}</button>
+                        )}
                         {i.state.kind === "ignored" && (
-                          <button onClick={() => void ignore(i.id, false)}>제외 취소</button>
+                          <button onClick={() => void ignore(i.id, false)}>{t("bp.unignore")}</button>
                         )}
                       </td>
                     </tr>
@@ -234,9 +240,7 @@ export function BackportSheet(p: Props) {
         )}
         {p.remoteCount < 2 && (
           <p className="note bp-hint">
-            다른 저장소(예: 원본 프로젝트 ↔ 고객사 저장소)와 비교하려면 그 저장소를 원격으로 추가하세요. 가져온 뒤
-            가져올 쪽에서 <code>upstream/main</code> 같은 브랜치를 고르면 됩니다.{" "}
-            <button onClick={p.onAddRemote}>원격 추가…</button>
+            <Rich k="bp.remoteHint" /> <button onClick={p.onAddRemote}>{t("bp.addRemote")}</button>
           </p>
         )}
       </div>
@@ -244,15 +248,13 @@ export function BackportSheet(p: Props) {
       {view !== "targets" && (
         <footer className="conflict-foot">
           <span className="muted">
-            {picked.size
-              ? `${picked.size}개 선택 · 오래된 것부터 적용`
-              : `제외: ${target}에 필요 없는 커밋 (받는 쪽마다 따로, 이 저장소에만 기록)`}
+            {picked.size ? t("bp.picked", { n: picked.size }) : t("bp.ignoreHint", { target })}
           </span>
           <button disabled={p.busy || picked.size === 0} onClick={() => p.onExport(chosen())}>
-            패치로 내보내기…
+            {t("bp.export")}
           </button>
           <button className="primary" disabled={p.busy || picked.size === 0} onClick={() => p.onApply(chosen())}>
-            {target}에 cherry-pick
+            {t("bp.apply", { target })}
           </button>
         </footer>
       )}
@@ -268,17 +270,17 @@ function Overview(props: {
   onOpen(target: string): void;
 }) {
   const { rows } = props;
-  if (!rows) return <p className="muted pad">브랜치마다 비교하는 중…</p>;
-  if (rows.length === 0) return <p className="muted pad">비교할 다른 로컬 브랜치가 없어요.</p>;
+  if (!rows) return <p className="muted pad">{t("bp.overview.loading")}</p>;
+  if (rows.length === 0) return <p className="muted pad">{t("bp.overview.none")}</p>;
   const sorted = [...rows].sort((a, b) => b.missing - a.missing || a.target.localeCompare(b.target));
   return (
     <table className="bp-list bp-overview">
       <thead>
         <tr>
-          <th>받는 쪽 ({props.source}에서)</th>
-          <th>미반영</th>
-          <th>반영됨</th>
-          <th>제외</th>
+          <th>{t("bp.overview.target", { source: props.source })}</th>
+          <th>{t("bp.state.missing")}</th>
+          <th>{t("bp.state.applied")}</th>
+          <th>{t("bp.state.ignored")}</th>
         </tr>
       </thead>
       <tbody>
@@ -287,7 +289,7 @@ function Overview(props: {
             key={r.target}
             className={r.target === props.current ? "on" : ""}
             onClick={() => props.onOpen(r.target)}
-            title="이 브랜치의 미반영 목록 보기"
+            title={t("bp.overview.open")}
           >
             <td className="bp-commit">{r.target}</td>
             <td>{r.missing > 0 ? <b className="bp-missing">{r.missing}</b> : <span className="muted">0</span>}</td>

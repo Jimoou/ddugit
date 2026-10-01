@@ -7,21 +7,22 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #26(i18n 기반, 언어 설정)을 squash merge했다(`f7363d7`). e2e `screenOf`는 이제 카메라가 멈춘 뒤 좌표를 읽는다(CI에서 드래그 병합 테스트가 한 번 빗나갔다).
-- main에서 Release 워크플로를 수동 실행했다(run 36838768528). dmg/exe artifact가 나오는지 확인한다.
+- PR #27(i18n B: App 알림·메뉴, 커밋·스태시 패널)을 squash merge했다(`c46fd83`).
+- main에서 Release 워크플로를 수동 실행했다(run 36838768528). macOS dmg artifact(6.6MB)는 나왔다. Windows exe는 확인 중이다.
 
 ## 지금 하는 일
 
-영어 번역 PR B → CI 대기
+영어 번역 PR C(마지막) → CI 대기
 
-- App의 알림·메뉴·확인 문구를 사전으로 옮겼다(`remote.done.*`, `state.*`, `menu.*`, `branch.*`, `tag.*`, `remote.*`, `stash.*` …). 굵게 표시가 있는 확인 문구는 `<Rich>`
-- 진행 중 배너는 `stateText(state)`가 `state.<name>`과 `.hint`를 찾는다
-- Inspector, Composer, StashPanel 번역. 영어 e2e에서 Composer 버튼도 확인한다
+- Backport·Conflict·Diff·Rebase 시트, Auth·Sync 다이얼로그, `rebasePlan`의 사유와 동작 이름
+- `<Rich bold="bp-missing">`: e2e와 CSS가 쓰는 `<b>` 클래스를 지킨다
+- 이제 `src/` 안의 한국어는 사전(`src/i18n/ko.ts`)과 언어 이름 "한국어", 브랜드 "옷깃"뿐이다
 
 ## 다음 단계
 
-1. i18n PR C: BackportSheet, AuthDialog, ConflictSheet, DiffSheet, RebaseSheet, SyncDialog, `rebasePlan.ts`
+1. Release 결과 확인: Windows exe artifact
 2. (나중에) 서명, 자동 업데이트
+3. ROADMAP의 남은 항목에서 다음 작업을 고른다
 
 ## 막힌 것 / 결정 필요
 

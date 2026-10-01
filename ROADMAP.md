@@ -68,12 +68,12 @@
 - [x] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표 — 반짝임, 한 번에 불러올 커밋 수, git 실행 파일(`--version`으로 확인 후 적용), 단축키 표, `?`/⚙로 열기
   - [ ] 테마 (지금은 네온 다크 하나) — 2026-10-01 결정: 밝은 테마는 만들지 않는다
   - [x] 은하계 스타일: 그래프 배경에 성운과 별 세 겹(시차), 조작 요소는 네온 대신 유리 표면 + 차분한 보라 강조(가독성), 탑바·사이드바는 검정. 그래프 네온과 브랜드는 그대로
-- [ ] i18n (영어), 접근성 (키보드로 노드 이동, 스크린리더 라벨)
+- [x] i18n (영어), 접근성 (키보드로 노드 이동, 스크린리더 라벨)
   - [x] 접근성: ←→ 부모/자식, ↑↓ 옆 레인, Enter 메뉴, 선택한 커밋을 aria-live로 읽어 줌, 캔버스 포커스 가능
-  - [ ] i18n (영어)
+  - [x] i18n (영어): 모든 화면. 설정에서 시스템/한국어/English
     - [x] 기반: `src/i18n`(사전, `t()`, `<Rich>`), 언어 설정(시스템/한국어/English), 탑바·사이드바·검색·다이얼로그·설정·그래프 위 글자
     - [x] App 알림·메뉴·확인 문구, Inspector·Composer·StashPanel
-    - [ ] 시트(Backport, Conflict, Diff, Rebase), Auth·Sync 다이얼로그, `rebasePlan`
+    - [x] 시트(Backport, Conflict, Diff, Rebase), Auth·Sync 다이얼로그, `rebasePlan`
 - [x] ESLint, Playwright e2e를 CI에 추가
   - [x] Playwright e2e: 데모 모드 대상 5개 흐름(커밋, 드래그 병합, 충돌 직접 편집, 줄 스테이징, 직선 구간 접기), CI `E2E` 잡
   - [x] ESLint: typescript-eslint 권장 + react-hooks(`rules-of-hooks`, `exhaustive-deps`) + effect 식 본문 금지. CI Web 잡에서 실행
@@ -115,4 +115,5 @@
 | 2026-10-01 | PR #24 squash merge(`d284a40`). 사용자 결정: 밝은 테마 없음, 은하계 스타일, 영어 번역 필요, 서명·자동 업데이트는 나중에, 배포는 dmg/exe. 은하계 스타일(`graph/space.ts`, UI 토큰 `--glass*`/`--ui*`, 조작 요소의 네온·발광 제거, CONVENTIONS에 규칙)                          |
 | 2026-10-01 | PR #25 squash merge(`d2a5ccf`). 배포: `bundle.targets = [dmg, nsis]`(macOS 11+, universal / Windows 사용자 설치, 한·영 설치 화면), `release.yml`(태그 → 초안 Release, 수동 실행 → artifact), 옷깃 아이콘(은하계 + 네온 브랜치 그래프, `tauri icon`으로 전 크기 생성)          |
 | 2026-10-01 | PR #26 squash merge(`f7363d7`). i18n 기반: `src/i18n`(`ko.ts` 원본, `en.ts`, `t()`, `<Rich>`), 설정에 언어(시스템/한국어/English, `<html lang>`), 탑바·사이드바·검색·다이얼로그·설정·단축키 표·그래프 글자 번역, Playwright는 `ko-KR` 고정 + 영어 전환 e2e(vitest 42, e2e 14) |
-| 2026-10-01 | i18n B: App의 알림·메뉴·확인 문구, 진행 중 배너(`stateText`), Inspector·Composer·StashPanel 번역(e2e 14)                                                                                                                                                                      |
+| 2026-10-01 | PR #27 squash merge(`c46fd83`). i18n B: App의 알림·메뉴·확인 문구, 진행 중 배너(`stateText`), Inspector·Composer·StashPanel 번역(e2e 14)                                                                                                                                      |
+| 2026-10-01 | i18n C: Backport·Conflict·Diff·Rebase 시트, Auth·Sync 다이얼로그, `rebasePlan` 사유·동작 이름 번역. `<Rich bold>`로 `<b>`에 클래스. 이제 `src/` 화면 문구는 모두 사전에 있다(e2e 14)                                                                                          |

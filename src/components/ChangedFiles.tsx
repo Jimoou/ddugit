@@ -1,7 +1,7 @@
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
 
-/** "변경 파일" list used by the commit and stash panels; clicking a file opens its diff. */
+/** "Changed files" list used by the commit and stash panels; clicking a file opens its diff. */
 export function ChangedFiles({ files, onOpen }: { files: FileDiff[] | null; onOpen(path: string): void }) {
   return (
     <section className="changed">
