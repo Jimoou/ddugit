@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import { conflictCount, parseConflicts, type Pick, resolveText } from "../conflict";
+import { blockText, conflictCount, parseConflicts, type Pick, resolveText } from "../conflict";
 import type { ConflictFile, Resolution } from "../types";
 
 interface Props {
@@ -116,7 +116,12 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
                 );
               const n = ++blockNo;
               const pick = picks[n];
+              const editing = typeof pick === "object";
               const choose = (p: Pick) => setPicks((ps) => Object.assign([...ps], { [n]: p }));
+              // Start editing from the current choice, or from both sides.
+              const edit = () => choose({ text: blockText(s, pick ?? "both").replace(/\r\n/g, "\n") });
+              const keeps = (side: "ours" | "theirs") =>
+                pick === side || pick === "both" ? "keep" : pick ? "drop" : "";
               return (
                 <div key={i} className={`block ${pick ? "picked" : ""}`}>
                   <div className="block-head">
@@ -129,22 +134,34 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
                           {p === "ours" ? ours : p === "theirs" ? theirs : "둘 다"}
                         </button>
                       ))}
+                      <button className={editing ? "on" : ""} onClick={edit} title="이 블록의 결과를 직접 고칩니다">
+                        직접 편집
+                      </button>
                     </span>
                   </div>
-                  <div className="sides">
-                    <pre className={`side ours ${pick === "ours" || pick === "both" ? "keep" : pick ? "drop" : ""}`}>
-                      <em>{ours}</em>
-                      {s.ours || "(비어 있음)"}
-                    </pre>
-                    <pre
-                      className={`side theirs ${pick === "theirs" || pick === "both" ? "keep" : pick ? "drop" : ""}`}
-                    >
-                      <em>
-                        {theirs} {s.theirsLabel && `· ${s.theirsLabel}`}
-                      </em>
-                      {s.theirs || "(비어 있음)"}
-                    </pre>
-                  </div>
+                  {editing ? (
+                    <textarea
+                      className="block-edit"
+                      spellCheck={false}
+                      autoFocus
+                      value={pick.text}
+                      rows={Math.max(3, pick.text.split("\n").length + 1)}
+                      onChange={(e) => choose({ text: e.target.value })}
+                    />
+                  ) : (
+                    <div className="sides">
+                      <pre className={`side ours ${keeps("ours")}`}>
+                        <em>{ours}</em>
+                        {s.ours || "(비어 있음)"}
+                      </pre>
+                      <pre className={`side theirs ${keeps("theirs")}`}>
+                        <em>
+                          {theirs} {s.theirsLabel && `· ${s.theirsLabel}`}
+                        </em>
+                        {s.theirs || "(비어 있음)"}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -537,7 +537,7 @@ export const mock: Table = {
   },
 
   git_stage_hunks({ file, unstage }) {
-    // Demo files have one hunk, so staging a hunk moves the whole file.
+    // Demo files have one hunk, so staging a hunk (or some of its lines) moves the whole file.
     const c = repo.changes.find((x) => x.path === file);
     if (!c) return fail(`No changes to '${file}'`);
     const kind = c.unstaged ?? c.staged ?? "modified";

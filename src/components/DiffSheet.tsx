@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
 
 interface Props {
@@ -16,7 +16,8 @@ export interface Staging {
   scope: "unstaged" | "staged";
   busy: boolean;
   onScope(scope: Staging["scope"]): void;
-  onHunk(file: string, hunk: number): void;
+  /** With `lines`, only those lines (indices into the hunk's lines) move. */
+  onHunk(file: string, hunk: number, lines?: number[]): void;
 }
 
 const STATUS: Record<string, string> = {
@@ -141,11 +142,36 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
   );
 }
 
+/** Lines picked for line-level staging; one hunk at a time, as the backend applies them. */
+interface LinePick {
+  hunk: number;
+  lines: number[];
+  /** Last clicked line, for Shift+click ranges. */
+  anchor: number;
+}
+
 function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
+  const [pick, setPick] = useState<LinePick | null>(null);
+  useEffect(() => setPick(null), [file]);
+
   if (file.binary) return <p className="muted pad">바이너리 파일이라 내용을 표시하지 않아요.</p>;
   if (file.hunks.length === 0) return <p className="muted pad">내용 변경 없음 (권한·이름만 바뀜)</p>;
+
+  const toggle = (hunk: number, line: number, range: boolean) =>
+    setPick((p) => {
+      const lines = file.hunks[hunk].lines;
+      if (p?.hunk === hunk && range) {
+        const [a, b] = [Math.min(p.anchor, line), Math.max(p.anchor, line)];
+        const span = Array.from({ length: b - a + 1 }, (_, i) => a + i).filter((i) => lines[i].kind !== " ");
+        return { ...p, lines: [...new Set([...p.lines, ...span])], anchor: line };
+      }
+      const prev = p?.hunk === hunk ? p.lines : [];
+      const next = prev.includes(line) ? prev.filter((i) => i !== line) : [...prev, line];
+      return next.length ? { hunk, lines: next, anchor: line } : null;
+    });
+
   return (
-    <table className="diff">
+    <table className={`diff ${stage ? "pickable" : ""}`}>
       <tbody>
         {file.oldPath && (
           <tr className="hunk">
@@ -154,20 +180,33 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
             </td>
           </tr>
         )}
-        {file.hunks.map((h, i) => (
-          <HunkRows
-            key={i}
-            header={h.header}
-            lines={h.lines}
-            action={
-              stage && (
-                <button className="hunk-btn" disabled={stage.busy} onClick={() => stage.onHunk(file.path, i)}>
-                  {stage.scope === "unstaged" ? "＋ 이 부분 스테이지" : "− 스테이지에서 내리기"}
-                </button>
-              )
-            }
-          />
-        ))}
+        {file.hunks.map((h, i) => {
+          const picked = pick?.hunk === i ? pick.lines : [];
+          const verb = stage?.scope === "unstaged" ? "스테이지" : "스테이지에서 내리기";
+          return (
+            <HunkRows
+              key={i}
+              header={h.header}
+              lines={h.lines}
+              picked={picked}
+              onPick={stage && ((line, range) => toggle(i, line, range))}
+              action={
+                stage && (
+                  <button
+                    className="hunk-btn"
+                    disabled={stage.busy}
+                    onClick={() =>
+                      stage.onHunk(file.path, i, picked.length ? [...picked].sort((a, b) => a - b) : undefined)
+                    }
+                  >
+                    {stage.scope === "unstaged" ? "＋ " : "− "}
+                    {picked.length ? `선택한 ${picked.length}줄 ${verb}` : `이 부분 ${verb}`}
+                  </button>
+                )
+              }
+            />
+          );
+        })}
         {file.truncated && (
           <tr className="hunk">
             <td colSpan={4}>… 너무 길어서 일부만 표시했어요</td>
@@ -182,10 +221,15 @@ function HunkRows({
   header,
   lines,
   action,
+  picked = [],
+  onPick,
 }: {
   header: string;
   lines: FileDiff["hunks"][number]["lines"];
   action?: ReactNode;
+  picked?: number[];
+  /** Click a changed line's gutter to pick it (Shift: range). */
+  onPick?(line: number, range: boolean): void;
 }) {
   return (
     <>
@@ -195,14 +239,33 @@ function HunkRows({
           {action}
         </td>
       </tr>
-      {lines.map((l, i) => (
-        <tr key={i} className={l.kind === "+" ? "ins" : l.kind === "-" ? "rem" : ""}>
-          <td className="no">{l.old ?? ""}</td>
-          <td className="no">{l.new ?? ""}</td>
-          <td className="sign">{l.kind === " " ? "" : l.kind === "-" ? "−" : "+"}</td>
-          <td className="code">{l.text}</td>
-        </tr>
-      ))}
+      {lines.map((l, i) => {
+        const change = l.kind !== " ";
+        const pick =
+          onPick && change
+            ? {
+                onClick: (e: MouseEvent) => onPick(i, e.shiftKey),
+                title: "클릭해서 이 줄만 고르기 (Shift: 범위)",
+              }
+            : {};
+        return (
+          <tr
+            key={i}
+            className={`${l.kind === "+" ? "ins" : l.kind === "-" ? "rem" : ""} ${picked.includes(i) ? "picked" : ""}`}
+          >
+            <td className="no" {...pick}>
+              {l.old ?? ""}
+            </td>
+            <td className="no" {...pick}>
+              {l.new ?? ""}
+            </td>
+            <td className="sign" {...pick}>
+              {l.kind === " " ? "" : l.kind === "-" ? "−" : "+"}
+            </td>
+            <td className="code">{l.text}</td>
+          </tr>
+        );
+      })}
     </>
   );
 }

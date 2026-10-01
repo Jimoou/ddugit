@@ -40,8 +40,8 @@ command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bo
 } else {
     git::write::commit(&path, &message, &paths, amend)
 });
-command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, unstage: bool) -> OpResult
-    => git::stage::stage_hunks(&path, &file, &hunks, unstage));
+command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, lines: Option<Vec<usize>>, unstage: bool) -> OpResult
+    => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
 command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
     => git::write::merge(&path, &source, target.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
