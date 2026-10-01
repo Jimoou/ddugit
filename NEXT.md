@@ -24,7 +24,8 @@ _마지막 갱신: 2026-10-01_
 - CSS
   - 새 토큰: `--space` `--glass` `--glass-strong` `--text-2` `--ui` `--ui-hover` `--ui-soft` `--ui-text` `--focus` `--ok` `--danger`
   - 조작 요소에서 네온 그라디언트와 발광을 걷어냈다. primary 버튼은 보라 단색에 흰 글자, 켜짐 상태는 채운 배경으로 보여 준다
-  - eyebrow 글자는 `--text-2`, 토스트는 왼쪽 색 막대로 구분한다. topbar, sidebar, panel은 유리 표면(blur)으로 바꿨다
+  - eyebrow 글자는 `--text-2`, 토스트는 왼쪽 색 막대로 구분한다. panel, dialog, menu, sheet는 유리 표면(blur)으로 바꿨다
+  - topbar와 sidebar는 사용자 요청으로 검정 단색(`--chrome: #000`)이다
 - CONVENTIONS §5에 "네온은 그래프와 데이터 전용" 규칙을 적었다
 
 ## 다음 단계
