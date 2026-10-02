@@ -15,6 +15,9 @@ const LISTED = 8;
 export function SyncConfirm(p: {
   plan: SyncPlan;
   branch: string | null;
+  /** For a push: the remote it goes to, and another one to push to instead. */
+  target?: { remote: string; url: string; fetchOnly: boolean; alt: string | null } | null;
+  onPushTo(remote: string): void;
   busy: boolean;
   onGo(): void;
   onNeverAsk(): void;
@@ -63,13 +66,42 @@ export function SyncConfirm(p: {
           </ul>
         )}
         {plan.op === "pull" && plan.dirty && <p className="note warn">{t("sync.ask.dirty")}</p>}
+        {p.target && (
+          <p className="sync-target muted small">
+            <Rich k="sync.ask.to" vars={{ remote: p.target.remote, url: p.target.url }} />
+          </p>
+        )}
+        {p.target?.fetchOnly && (
+          <p className="note warn">
+            <Rich k="sync.ask.fetchOnly" vars={{ remote: p.target.remote }} />
+          </p>
+        )}
+        {p.target && !p.target.fetchOnly && p.target.alt && p.target.remote !== "origin" && (
+          <p className="note warn">
+            <Rich k="sync.ask.notOrigin" vars={{ remote: p.target.remote, alt: p.target.alt }} />
+          </p>
+        )}
         <label className="check">
           <input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} />
           {t("sync.ask.never")}
         </label>
         <div className="dialog-actions">
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
-          <button className="primary" autoFocus disabled={p.busy} onClick={go}>
+          {p.target?.alt && (p.target.fetchOnly || p.target.remote !== "origin") && (
+            <button
+              className={p.target.fetchOnly ? "primary" : ""}
+              disabled={p.busy}
+              onClick={() => p.onPushTo(p.target!.alt!)}
+            >
+              {t("sync.ask.pushTo", { remote: p.target.alt })}
+            </button>
+          )}
+          <button
+            className={p.target?.fetchOnly ? "" : "primary"}
+            autoFocus={!p.target?.fetchOnly}
+            disabled={p.busy || !!p.target?.fetchOnly}
+            onClick={go}
+          >
             {t(`sync.ask.go.${plan.op}`, { n })}
           </button>
         </div>

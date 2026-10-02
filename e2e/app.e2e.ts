@@ -984,8 +984,10 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   await page.getByRole("button", { name: /Fetch/ }).click();
   await demo.toast("원격 커밋을 가져왔어요");
   await page
-    .locator(".app:not([hidden]) .sidebar li")
-    .filter({ hasText: /^origin\/main$/ })
+    .locator(".app:not([hidden]) .sidebar section.sub")
+    .filter({ hasText: "origin" })
+    .locator("li")
+    .filter({ hasText: /^main$/ })
     .dblclick();
   const name = page.locator(".dialog input.text");
   await expect(name).toHaveValue("origin-main");
@@ -1103,4 +1105,88 @@ test("groups show in the repository menu, and grouped tabs carry the group's col
   await expect(page.locator(".tabbar .tab")).toHaveCount(3);
   await expect(page.locator(".tabbar .tab.grouped")).toHaveCount(2);
   await expect(page.locator(".tabbar .tab.grouped").first()).toHaveAttribute("title", /^결제 플랫폼 · /);
+});
+
+test("a backported commit that is already there stops as empty and is skipped, not sent to the conflict sheet", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await demo.mutateQuietly((d) => ((d as unknown as { emptyNext: boolean }).emptyNext = true));
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  for (const i of [0, 1]) await sheet.locator("tbody tr").nth(i).locator("input[type=checkbox]").check();
+  await sheet.getByRole("button", { name: /cherry-pick$/ }).click();
+  await page.click(".dialog button.primary");
+
+  const dialog = page.locator(".dialog").filter({ hasText: "이미 들어 있는 변경" });
+  await expect(dialog).toContainText("충돌한 파일도 없어요");
+  await expect(page.locator(".conflict-sheet")).toHaveCount(0);
+  await expect(page.locator(".banner")).toContainText("충돌한 파일은 없어요");
+  await dialog.getByRole("button", { name: "이 커밋 건너뛰기" }).click();
+  await demo.toast("이 커밋을 건너뛰고 이어서 진행했어요");
+  expect((await demo.snapshot()).state).toBe("clean");
+});
+
+test("the original project added as a remote is fetch-only: a push offers origin instead", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".sidebar").getByTitle("원격 저장소 추가").click();
+  await page.fill(".dialog input >> nth=0", "upstream");
+  await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
+  await page.click(".dialog button.primary");
+  await demo.toast("upstream은(는) 가져오기 전용으로 추가했어요. 그쪽으로는 보내지 않아요");
+  const upstream = page.locator(".sidebar section.sub").filter({ hasText: "upstream" });
+  await expect(upstream.locator(".fetch-only")).toBeVisible();
+
+  // A branch that follows upstream/main.
+  await upstream
+    .locator("li")
+    .filter({ hasText: /^main$/ })
+    .dblclick();
+  await page.locator(".dialog").getByRole("button", { name: "만들고 이동" }).click();
+  await demo.toast(/upstream\/main을\(를\) 로컬로/);
+  expect((await demo.snapshot()).head.upstream).toBe("upstream/main");
+
+  await page.locator(".topbar").getByRole("button", { name: /Push/ }).click();
+  const ask = page.locator(".dialog.sync-confirm");
+  await expect(ask).toContainText("가져오기 전용 원격이라 보내지 않아요");
+  await expect(ask.getByRole("button", { name: /^Push/ })).toBeDisabled();
+  await ask.getByRole("button", { name: "origin(으)로 보내기" }).click();
+  await demo.toast(/origin으로 보냈어요/);
+  expect((await demo.snapshot()).head.upstream).toBe("origin/upstream-main");
+});
+
+test("a remote can be disconnected from its menu, even the only one", async ({ demo }) => {
+  const { page } = demo;
+  const origin = page.locator(".sidebar section.sub").filter({ hasText: "origin" });
+  await origin.getByRole("button", { name: "origin 메뉴" }).click();
+  await page.getByRole("menuitem", { name: "origin 연결 끊기 (원격 삭제)…" }).click();
+  await page.locator(".dialog").getByRole("button", { name: "삭제" }).click();
+  await demo.toast("origin 연결을 끊었어요");
+  await expect(page.locator(".sidebar section.sub")).toHaveCount(0);
+  expect((await demo.snapshot()).remotes).toEqual([]);
+});
+
+test("several branches can be picked in the sidebar, lighting their histories together", async ({ demo }) => {
+  const { page } = demo;
+  const side = page.locator(".app:not([hidden]) .sidebar");
+  const branch = (name: string) =>
+    side
+      .locator("li")
+      .filter({ hasText: new RegExp(`^${name}`) })
+      .first();
+  await branch("feature/login").click();
+  await expect(side.locator("li.focused")).toHaveCount(1);
+  await branch("hotfix/crash").click({ modifiers: ["Control"] });
+  await branch("feature/theme").click({ modifiers: ["Shift"] });
+  await expect(side.locator("li.focused")).toHaveCount(3);
+  await expect(side.locator(".side-picked")).toContainText("브랜치 3개 선택");
+  // ⌘/Ctrl+click again takes one out; a plain click keeps only that one.
+  await branch("hotfix/crash").click({ modifiers: ["Control"] });
+  await expect(side.locator("li.focused")).toHaveCount(2);
+  await branch("main").click();
+  await expect(side.locator("li.focused")).toHaveCount(1);
+  await branch("feature/login").click({ modifiers: ["Control"] });
+  await side.getByRole("button", { name: "선택 해제" }).click();
+  await expect(side.locator("li.focused")).toHaveCount(0);
 });

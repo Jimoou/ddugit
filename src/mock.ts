@@ -64,6 +64,12 @@ class MockRepo {
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();
   remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);
+  /** Remotes nothing is pushed to (the original project of a fork). */
+  fetchOnly = new Set<string>();
+  /** Branches following something other than `origin/<same name>`. */
+  tracking = new Map<string, string>();
+  /** Commits a stopped (empty) backport still has to apply after a skip. */
+  skipRest: string[] = [];
   /** Demo bisect (HEAD isn't moved; the probe is reported in the state instead). */
   bisect: { bad: string; good: string[]; skipped: string[] } | null = null;
   /** Submodules: one in place, one not checked out yet (like a clone without --recursive). */
@@ -163,7 +169,7 @@ class MockRepo {
   }
 
   upstream(): string | null {
-    const name = `origin/${this.head}`;
+    const name = this.tracking.get(this.head) ?? `origin/${this.head}`;
     return this.remotes.has(name) ? name : null;
   }
 
@@ -199,7 +205,7 @@ class MockRepo {
       },
       commits: all.slice(0, limit).map((id) => this.commits.get(id)!),
       refs,
-      remotes: [...this.remoteUrls].map(([name, url]) => ({ name, url })),
+      remotes: [...this.remoteUrls].map(([name, url]) => ({ name, url, push: !this.fetchOnly.has(name) })),
       changes: this.changes.map((c) => ({ ...c })),
       stashes: this.stashes.map(({ message, id, base, time }, index) => ({ index, message, id, base, time })),
       state: this.state,
@@ -398,6 +404,8 @@ export const demoControls = {
   nextFolder: null as string | null,
   /** Make the next merge stop on a conflict in two files. */
   conflictNext: false,
+  /** Make the next backport stop on a commit whose change is already there (nothing to commit). */
+  emptyNext: false,
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
   /** Current demo state, read synchronously (e2e assertions). */
@@ -441,6 +449,9 @@ function remoteOp(op: RemoteOp): OpResult | string {
   if (op === "push") {
     const local = repo.branches.get(repo.head)!;
     const up = repo.upstream();
+    const upRemote = up?.split("/")[0];
+    if (upRemote && repo.fetchOnly.has(upRemote))
+      return res("failed", `'${repo.head}' follows ${up}, and ${upRemote} is fetch-only: nothing is pushed there.`);
     if (up && !repo.ancestors(local).has(repo.remotes.get(up)!)) return res("rejected", " ! [rejected]  (fetch first)");
     repo.remotes.set(up ?? `origin/${repo.head}`, local);
     return res("ok", up ? "" : `branch '${repo.head}' set up to track 'origin/${repo.head}'.`);
@@ -625,6 +636,12 @@ const mockTable: Table = {
       case "addRemote": {
         if (repo.remoteUrls.has(op.name)) return fail(`error: remote ${op.name} already exists.`);
         repo.remoteUrls.set(op.name, op.url);
+        if (op.fetchOnly) repo.fetchOnly.add(op.name);
+        return delay(res("ok"));
+      }
+      case "setPushable": {
+        if (op.pushable) repo.fetchOnly.delete(op.name);
+        else repo.fetchOnly.add(op.name);
         return delay(res("ok"));
       }
       case "removeRemote":
@@ -634,7 +651,10 @@ const mockTable: Table = {
       case "checkoutRemote": {
         const local = op.name ?? op.remoteRef.replace(/^[^/]+\//, "");
         if (op.name && repo.branches.has(op.name)) return fail(`Branch '${op.name}' already exists`);
-        if (!repo.branches.has(local)) repo.branches.set(local, repo.remotes.get(op.remoteRef)!);
+        if (!repo.branches.has(local)) {
+          repo.branches.set(local, repo.remotes.get(op.remoteRef)!);
+          repo.tracking.set(local, op.remoteRef);
+        }
         repo.head = local;
         return delay(res("ok"));
       }
@@ -649,6 +669,25 @@ const mockTable: Table = {
     repo.head = t;
     repo.add(t, op === "revert" ? `Revert "${c.summary}"` : c.summary);
     return delay(res("ok"));
+  },
+
+  git_skip() {
+    if (repo.state === "clean") return fail("Nothing to skip (clean)");
+    for (const summary of repo.skipRest) repo.add(repo.head, summary);
+    repo.skipRest = [];
+    repo.state = "clean";
+    return delay(res("ok"));
+  },
+
+  async git_push_to({ remote: name, onProgress }) {
+    if (repo.fetchOnly.has(name)) return fail(`${name} is fetch-only`);
+    for (let pct = 0; pct <= 100; pct += 25) {
+      onProgress.onmessage({ phase: "Writing objects", percent: pct });
+      await delay(null, 40);
+    }
+    repo.remotes.set(`${name}/${repo.head}`, repo.branches.get(repo.head)!);
+    repo.tracking.set(repo.head, `${name}/${repo.head}`);
+    return res("ok", `branch '${repo.head}' set up to track '${name}/${repo.head}'.`);
   },
 
   git_continue() {
@@ -899,6 +938,13 @@ const mockTable: Table = {
   backport_apply({ ids, target }) {
     if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
     repo.head = target;
+    if (demoControls.emptyNext) {
+      // The first commit's change is already on the target: git stops with nothing to commit.
+      demoControls.emptyNext = false;
+      repo.state = "cherry-pick";
+      repo.skipRest = ids.slice(1).map((id) => repo.commits.get(id)?.summary ?? id);
+      return delay(res("empty", "The previous cherry-pick is now empty, possibly due to conflict resolution."));
+    }
     for (const id of ids) repo.add(target, repo.commits.get(id)?.summary ?? id);
     return delay(res("ok"));
   },

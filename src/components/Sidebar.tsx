@@ -17,8 +17,11 @@ interface Props {
   refs: RefInfo[];
   headBranch: string | null;
   colorOf(target: string): string;
-  focused: string | null;
-  onFocus(ref: RefInfo | null): void;
+  /** Picked refs, as `kind:name`. */
+  focused: string[];
+  /** Click on a ref; `add` (⌘/Ctrl/Shift held) adds it to or takes it out of the picked set. */
+  onFocus(ref: RefInfo, add: boolean): void;
+  onClearFocus(): void;
   onCheckout(ref: RefInfo): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
   stashes: StashInfo[];
@@ -102,10 +105,11 @@ export function Sidebar(props: Props) {
     return (
       <li
         key={key}
-        className={`${focused === key ? "focused" : ""} ${isHead ? "head" : ""}`}
+        className={`${focused.includes(key) ? "focused" : ""} ${isHead ? "head" : ""}`}
+        aria-selected={focused.includes(key)}
         style={{ ["--c" as string]: colorOf(r.target) }}
         title={`${r.name}\n${r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}`}
-        onClick={() => onFocus(focused === key ? null : r)}
+        onClick={(e) => onFocus(r, e.metaKey || e.ctrlKey || e.shiftKey)}
         onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -190,6 +194,14 @@ export function Sidebar(props: Props) {
   return (
     <Sections.Provider value={{ closed: searching ? [] : closed, toggle }}>
       <nav className="sidebar">
+        {focused.length > 1 && (
+          <div className="side-picked" role="status">
+            <span>{t("side.picked", { n: focused.length })}</span>
+            <button className="ghost" onClick={props.onClearFocus}>
+              {t("side.unpick")}
+            </button>
+          </div>
+        )}
         <div className="side-top">
           <input
             className="text search"
@@ -257,7 +269,7 @@ export function Sidebar(props: Props) {
               }
             >
               {g.kind === "local" && !items.length && <p className="side-note muted">{t("branch.local.none")}</p>}
-              {g.kind === "remote" && remotes.length > 1 ? (
+              {g.kind === "remote" && remotes.length > 0 ? (
                 // Several remotes: a fold per remote, branches listed without its prefix.
                 remotes.map((rm) => {
                   const mine = items.filter((r) => r.name.startsWith(`${rm.name}/`));
@@ -267,7 +279,12 @@ export function Sidebar(props: Props) {
                       key={rm.name}
                       id={`remote:${rm.name}`}
                       className="sub"
-                      title={<span title={rm.url}>{rm.name}</span>}
+                      title={
+                        <span title={rm.url}>
+                          {rm.name}
+                          {!rm.push && <span className="fetch-only">{t("side.fetchOnly")}</span>}
+                        </span>
+                      }
                       count={mine.length}
                       actions={
                         <button

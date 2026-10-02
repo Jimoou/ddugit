@@ -80,10 +80,17 @@ pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult>
 
 /// Failed and left mid-operation → `Conflict`, otherwise the plain result.
 pub(super) fn conflict_aware(path: &str, o: Output) -> OpResult {
-    if !o.ok && in_progress(path) {
-        OpResult::with(OpStatus::Conflict, o)
+    if o.ok || !in_progress(path) {
+        return o.into();
+    }
+    // Stopped with nothing in conflict: the commit's change is already here.
+    let conflicted = open(path)
+        .and_then(|r| r.index().map_err(super::err))
+        .is_ok_and(|i| i.has_conflicts());
+    if !conflicted && o.text.contains("now empty") {
+        OpResult::with(OpStatus::Empty, o)
     } else {
-        o.into()
+        OpResult::with(OpStatus::Conflict, o)
     }
 }
 
@@ -113,6 +120,17 @@ pub fn continue_op(path: &str) -> Result<OpResult> {
     let dir = workdir(&repo)?;
     git_ok(&dir, &["add", "-A"])?;
     let o = git(&dir, &[state, "--continue"])?;
+    Ok(conflict_aware(path, o))
+}
+
+/// Drop the step a cherry-pick / revert / rebase stopped on and go on with the rest.
+pub fn skip(path: &str) -> Result<OpResult> {
+    let repo = open(path)?;
+    let state = state_name(repo.state());
+    if !matches!(state, "rebase" | "cherry-pick" | "revert") {
+        return Err(format!("Nothing to skip ({state})"));
+    }
+    let o = git(&workdir(&repo)?, &[state, "--skip"])?;
     Ok(conflict_aware(path, o))
 }
 

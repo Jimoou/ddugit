@@ -36,9 +36,17 @@ pub enum RefOp {
         name: Option<String>,
     },
     /// Another repository to fetch from, e.g. the original project in a customer fork.
+    /// `fetch_only`: never push there (its push URL is disabled).
     AddRemote {
         name: String,
         url: String,
+        #[serde(default)]
+        fetch_only: bool,
+    },
+    /// Allow or stop pushing to a remote (fetching is unaffected).
+    SetPushable {
+        name: String,
+        pushable: bool,
     },
     /// Forget a remote and its remote-tracking branches.
     RemoveRemote {
@@ -56,7 +64,8 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
         RefOp::CheckoutRemote { remote_ref, name } => {
             [Some(remote_ref), name.as_ref()].into_iter().flatten().collect()
         }
-        RefOp::AddRemote { name, url } => vec![name, url],
+        RefOp::AddRemote { name, url, .. } => vec![name, url],
+        RefOp::SetPushable { name, .. } => vec![name],
     };
     for n in names {
         super::operand(n.trim())?;
@@ -112,13 +121,46 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
                 vec!["checkout".into(), "--track".into(), remote_ref.clone()]
             }
         }
-        RefOp::AddRemote { name, url } => {
+        RefOp::AddRemote { name, url, .. } => {
             vec!["remote".into(), "add".into(), name.clone(), url.trim().into()]
+        }
+        RefOp::SetPushable {
+            name,
+            pushable: false,
+        } => vec![
+            "remote".into(),
+            "set-url".into(),
+            "--push".into(),
+            name.clone(),
+            super::NO_PUSH.into(),
+        ],
+        RefOp::SetPushable { name, pushable: true } => {
+            vec![
+                "config".into(),
+                "--unset-all".into(),
+                format!("remote.{name}.pushurl"),
+            ]
         }
         RefOp::RemoveRemote { name } => vec!["remote".into(), "remove".into(), name.clone()],
     };
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     let o = git(&dir, &argv)?;
+    if let RefOp::AddRemote {
+        name,
+        fetch_only: true,
+        ..
+    } = op
+    {
+        if o.ok {
+            return apply(
+                path,
+                &RefOp::SetPushable {
+                    name: name.clone(),
+                    pushable: false,
+                },
+            );
+        }
+    }
     if !o.ok && o.text.contains("not fully merged") {
         return Ok(OpResult::with(OpStatus::Unmerged, o));
     }
@@ -280,6 +322,7 @@ mod tests {
         let add = RefOp::AddRemote {
             name: "upstream".into(),
             url: format!(" {} ", s(upstream.path())),
+            fetch_only: false,
         };
         assert_eq!(apply(p, &add).unwrap().status, OpStatus::Ok);
         assert_eq!(apply(p, &add).unwrap().status, OpStatus::Failed, "duplicate name");

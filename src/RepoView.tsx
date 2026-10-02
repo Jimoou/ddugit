@@ -163,7 +163,8 @@ export function RepoView({
   const [selectedStash, setSelectedStash] = useState<number | null>(null);
   const [panel, setPanel] = useState<{ id: string; files: FileDiff[] } | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
-  const [focusRef, setFocusRef] = useState<RefInfo | null>(null);
+  /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
+  const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
   const [composer, setComposer] = useState<false | { amend: boolean }>(false);
   const [menu, setMenu] = useState<{ x: number; y: number; title?: string; items: MenuItem[] } | null>(null);
   const [nameReq, setNameReq] = useState<NameRequest | null>(null);
@@ -486,8 +487,11 @@ export function RepoView({
   const trailFocus = useMemo(() => (trailIds ? new Set(trailIds) : null), [trailIds]);
   const focus = useMemo(() => {
     if (search?.query.trim()) return new Set(matches);
-    return snap && focusRef ? ancestors(snap.commits, focusRef.target) : null;
-  }, [snap, focusRef, search?.query, matches]);
+    if (!snap || !focusRefs.length) return null;
+    const lit = new Set<string>();
+    for (const r of focusRefs) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
+    return lit;
+  }, [snap, focusRefs, search?.query, matches]);
 
   /** Select match `i` (wrapping) and fly the camera to it. */
   const goToMatch = (i: number, list = matches) => {
@@ -558,7 +562,8 @@ export function RepoView({
       } else if (r.status === "conflict") {
         toast("err", t("app.conflict"));
         setConflictSheet({});
-      } else if (r.status === "failed") toast("err", r.output || t("app.failed", { label }));
+      } else if (r.status === "empty") askSkip();
+      else if (r.status === "failed") toast("err", r.output || t("app.failed", { label }));
     } catch (e) {
       toast("err", String(e));
     } finally {
@@ -567,6 +572,39 @@ export function RepoView({
     }
     return r;
   }
+
+  /** A pick stopped with nothing to commit: its change is already here. Offer to skip it. */
+  const askSkip = () =>
+    setConfirm({
+      title: t("empty.title"),
+      confirmLabel: t("empty.skip"),
+      body: (
+        <>
+          <p>
+            <Rich k="empty.body" vars={{ branch: latest.current?.head.branch ?? "HEAD" }} />
+          </p>
+          <p className="muted small">{t("empty.later")}</p>
+        </>
+      ),
+      onConfirm: () => {
+        setConfirm(null);
+        void run(t("empty.skipped"), () => api.skip(path));
+      },
+    });
+
+  /** Push to `name` (e.g. origin) instead of a fetch-only upstream, and follow it there from now on. */
+  const pushTo = async (name: string) => {
+    setRemoteBusy("push");
+    setProgress(null);
+    try {
+      const r = await run(t("remote.pushedTo", { name }), () => api.pushTo(path, name, setProgress));
+      if (r.status === "auth") setAuth({ op: "push", output: r.output });
+      if (r.status === "rejected") setSync("rejected");
+    } finally {
+      setRemoteBusy(null);
+      setProgress(null);
+    }
+  };
 
   const remote = async (op: RemoteOp): Promise<OpStatus> => {
     setRemoteBusy(op);
@@ -688,6 +726,21 @@ export function RepoView({
   };
 
   const localNames = new Set(snap?.refs.filter((r) => r.kind === "local").map((r) => r.name));
+
+  /**
+   * Where a push goes: the upstream's remote (or the default one for a first push),
+   * whether that remote is fetch-only, and the alternative to offer instead.
+   */
+  const pushTarget = (() => {
+    if (!snap) return null;
+    const name = snap.head.upstream
+      ? splitRemote(snap.head.upstream).remote
+      : (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
+    const info = snap.remotes.find((r) => r.name === name);
+    if (!info) return null;
+    const alt = (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
+    return { remote: info.name, url: info.url, fetchOnly: !info.push, alt: alt && alt !== info.name ? alt : null };
+  })();
 
   /** A new branch where HEAD is (also the first branch of an empty repository). */
   const askNewBranch = () => {
@@ -877,6 +930,20 @@ export function RepoView({
       label: t("remote.copyUrl"),
       onSelect: () => void navigator.clipboard?.writeText(snap?.remotes.find((x) => x.name === name)?.url ?? ""),
     },
+    {
+      label:
+        snap?.remotes.find((x) => x.name === name)?.push === false
+          ? t("remote.allowPush", { name })
+          : t("remote.blockPush", { name }),
+      onSelect: () => {
+        const push = snap?.remotes.find((x) => x.name === name)?.push !== false;
+        void refRun(t(push ? "remote.pushBlocked" : "remote.pushAllowed", { name }), {
+          kind: "setPushable",
+          name,
+          pushable: !push,
+        });
+      },
+    },
     "separator",
     removeRemoteItem(name),
   ];
@@ -892,12 +959,15 @@ export function RepoView({
       onSubmit: async (name, url) => {
         setNameReq(null);
         // Added quietly; what the user waits for is the fetch, shown on the progress card.
-        const r = await api.ref(path, { kind: "addRemote", name, url }).catch((e) => ({
+        // Anything but `origin` is someone else's project (the original of a fork): fetch only.
+        const fetchOnly = name !== "origin";
+        const r = await api.ref(path, { kind: "addRemote", name, url, fetchOnly }).catch((e) => ({
           status: "failed" as const,
           output: String(e),
         }));
         if (r.status !== "ok") return toast("err", r.output);
         await refresh();
+        if (fetchOnly) toast("ok", t("remote.addedFetchOnly", { name }));
         await fetchOne(name);
       },
     });
@@ -1380,7 +1450,7 @@ export function RepoView({
           }}
           onRemote={(op) =>
             op === "fetch" || op === "pull" || op === "push"
-              ? settings.confirmRemote[op]
+              ? settings.confirmRemote[op] || (op === "push" && pushTarget?.fetchOnly)
                 ? setSyncAsk(op)
                 : void remote(op)
               : void remote(op)
@@ -1496,13 +1566,23 @@ export function RepoView({
         <div className="banner">
           <span>
             {t("state.banner", { name: stateText(snap.state).name })}
-            {conflicts > 0 && t("state.conflicts", { n: conflicts })}. {stateText(snap.state).hint}
+            {conflicts > 0 && t("state.conflicts", { n: conflicts })}.{" "}
+            {conflicts === 0 && IN_PROGRESS[snap.state]?.canContinue ? t("state.nothing") : stateText(snap.state).hint}
           </span>
           <span className="row">
             {conflicts > 0 && <button onClick={() => setConflictSheet({})}>{t("state.resolve")}</button>}
             {IN_PROGRESS[snap.state]?.canContinue && (
               <button disabled={busy} onClick={() => run(t("state.continued"), () => api.continueOp(path))}>
                 {t("state.continue")}
+              </button>
+            )}
+            {IN_PROGRESS[snap.state]?.canContinue && (
+              <button
+                disabled={busy}
+                title={t("state.skip.hint")}
+                onClick={() => run(t("empty.skipped"), () => api.skip(path))}
+              >
+                {t("state.skip")}
               </button>
             )}
             <button disabled={busy} onClick={() => run(t("state.aborted"), () => api.abort(path))}>
@@ -1521,11 +1601,22 @@ export function RepoView({
           refs={snap.refs}
           headBranch={snap.head.branch}
           colorOf={colorOf}
-          focused={focusRef ? `${focusRef.kind}:${focusRef.name}` : null}
-          onFocus={(r) => {
-            setFocusRef(r);
-            if (r) graph.current?.centerOn(r.target);
+          focused={focusRefs.map((r) => `${r.kind}:${r.name}`)}
+          onFocus={(r, add) => {
+            const key = (x: RefInfo) => `${x.kind}:${x.name}`;
+            const on = focusRefs.some((x) => key(x) === key(r));
+            // A plain click picks just this one (or clears it); with ⌘/Ctrl/Shift it joins or leaves the set.
+            const next = add
+              ? on
+                ? focusRefs.filter((x) => key(x) !== key(r))
+                : [...focusRefs, r]
+              : on && focusRefs.length === 1
+                ? []
+                : [r];
+            setFocusRefs(next);
+            if (next.some((x) => key(x) === key(r))) graph.current?.centerOn(r.target);
           }}
+          onClearFocus={() => setFocusRefs([])}
           onCheckout={checkoutRef}
           onAddRemote={askRemote}
           remotes={snap.remotes}
@@ -2163,6 +2254,11 @@ export function RepoView({
         <SyncConfirm
           plan={syncPlan(snap, syncAsk)}
           branch={snap.head.branch}
+          target={syncAsk === "push" ? pushTarget : null}
+          onPushTo={(name) => {
+            setSyncAsk(null);
+            void pushTo(name);
+          }}
           busy={busy}
           onGo={() => {
             setSyncAsk(null);
