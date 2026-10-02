@@ -1,6 +1,7 @@
 // Undoing mistakes: move the branch back to a commit (choosing what happens
 // to the changes in between) and the reflog, where "lost" commits live on.
 
+import { Icon } from "./Icon";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
@@ -123,7 +124,7 @@ export function ReflogSheet(p: {
           <span className="muted">{t("undo.log.hint")}</span>
         </div>
         <button className="icon" onClick={p.onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
       {error && <p className="note warn pad">{error}</p>}

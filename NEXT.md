@@ -7,34 +7,24 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #43(PR CI·리뷰 상태 표시)을 squash merge했다(`d38c81e`).
-- 사용자 결정(2026-10-02, ROADMAP M7): 커밋 내용 기획 중 1(대각선 요약)과 3(미리보기 카드)은 하고, 2(종류 기호·변경량)는 하지 않는다. 4는 세로 목록 대신 **브랜치 맵 90° 단위 회전**으로 한다. 아이콘은 자체 SVG로 바꾼다(외부 아이콘 라이브러리는 없고, 지금은 유니코드·이모지 글자다)
+- PR #44(첫 실행 튜토리얼 "항해 일지")를 squash merge했다(`6103882`).
 
 ## 지금 하는 일
 
-M7 튜토리얼 → PR CI 대기
+M7 자체 SVG 아이콘 → PR CI 대기
 
-- `missions.ts`: `MISSIONS`, `Voyage {done, dismissed}`, `parseVoyage`, `complete`, `current`
-- `components/Missions.tsx`
-  - `useVoyage(enabled)`: localStorage `ddugit.voyage`에 저장한다. 데모 경로에서만 켜진다. `mission(id)`
-  - `MissionPanel`: 그래프 왼쪽 아래 패널. 접기·닫기, 끝나면 "내 저장소 열기"(`onRepoMenu`)
-- RepoView 호출 지점
-  - `show({commit})` → inspect
-  - 커밋 성공 → commit
-  - 병합 `.then` → merge
-  - `doReset` → undo
-  - 범인을 찾으면 → bisect
-  - push 성공 → push
-- 닫았으면 탑바 "데모 모드 · ✦" 버튼으로 다시 연다
-- e2e fixture는 `addInitScript`로 튜토리얼을 기본으로 닫아 둔다(그래프를 가리지 않게). 튜토리얼 테스트만 연다
+- 외부 아이콘 라이브러리는 없었다. 아이콘이 모두 유니코드·이모지 글자라서 OS 글꼴마다 모양이 달랐다
+- `icons.ts`: 24×24 stroke path 표(`ICONS`), 채우는 아이콘 목록(`FILLED`), 캔버스용 `iconPath`(Path2D 캐시)
+- `components/Icon.tsx`: `<Icon name size filled className>`
+- 캔버스: 라벨 앞 아이콘(HEAD·원격·태그·PR)과 PR 리뷰 표시(✓/✎ → check/edit)를 `drawIcon`으로 그린다. 리뷰 상태는 이름 문자열 대신 `RefInfo.review`로 넘긴다
+- 문장 속 화살표(→)나 그래프의 ＋ 노드를 가리키는 글자는 그대로 둔다
 
 ## 다음 단계 (M7 순서)
 
-1. 릴리스 초안 ddugit v0.2.0: 버전 세 곳을 올리고, "CI · Rust"를 `all_os`로 실행한 뒤 Release를 수동 실행한다. 예전 v0.1.0(otgit) 초안은 사용자에게 지워 달라고 한다
-2. 자체 SVG 아이콘(`components/Icon.tsx`)과 캔버스 Path2D 아이콘
-3. 대각선 요약 라벨
-4. 미리보기 카드
-5. 90° 회전(카메라·히트 테스트·미니맵·라벨이 바로 서게, 설정에 저장)
+1. 릴리스 초안 ddugit v0.2.0(튜토리얼과 아이콘 포함): 버전 세 곳을 올리고, "CI · Rust"를 `all_os`로 실행한 뒤 Release를 수동 실행한다. 예전 v0.1.0(otgit) 초안은 사용자에게 지워 달라고 한다
+2. 대각선 요약 라벨
+3. 미리보기 카드
+4. 90° 회전
 
 ## 막힌 것 / 결정 필요
 

@@ -1,3 +1,5 @@
+import { Icon } from "./Icon";
+import type { IconName } from "../icons";
 import type { ReactNode } from "react";
 import { isTauri } from "../api";
 import { isKey, type Key, t } from "../i18n";
@@ -35,10 +37,10 @@ const phase = (name: string) => {
   return isKey(key) ? t(key) : name;
 };
 
-const REMOTE: { op: RemoteOp; icon: string; label: string; title: Key }[] = [
-  { op: "fetch", icon: "⟳", label: "Fetch", title: "top.fetch.title" },
-  { op: "pull", icon: "↓", label: "Pull", title: "top.pull.title" },
-  { op: "push", icon: "↑", label: "Push", title: "top.push.title" },
+const REMOTE: { op: RemoteOp; icon: IconName; label: string; title: Key }[] = [
+  { op: "fetch", icon: "fetch", label: "Fetch", title: "top.fetch.title" },
+  { op: "pull", icon: "arrowDown", label: "Pull", title: "top.pull.title" },
+  { op: "push", icon: "arrowUp", label: "Push", title: "top.push.title" },
 ];
 
 export function TopBar(p: Props) {
@@ -50,17 +52,22 @@ export function TopBar(p: Props) {
       <h1 className="wordmark small">ddugit</h1>
       <span className="repo-anchor">
         <button className="repo" onClick={p.onOpenRepo} title={p.repoPath} aria-expanded={!!p.repoMenu}>
-          {p.repoName} <span className="muted">▾</span>
+          {p.repoName} <Icon name="chevronDown" size={12} className="muted" />
         </button>
         {p.repoMenu}
       </span>
       <span className="branch-now" style={{ ["--c" as string]: p.headColor }}>
-        ◉ {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
+        <Icon name="head" size={12} />{" "}
+        {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
       </span>
-      {head.upstream && <span className="upstream muted">⇄ {head.upstream}</span>}
+      {head.upstream && (
+        <span className="upstream muted">
+          <Icon name="pull" size={12} /> {head.upstream}
+        </span>
+      )}
       {onVoyage ? (
         <button className="demo-pill" onClick={onVoyage} title={t("voyage.reopen")}>
-          {t("top.demo")} · ✦
+          {t("top.demo")} <Icon name="sparkle" size={11} />
         </button>
       ) : (
         !isTauri && <span className="demo-pill">{t("top.demo")}</span>
@@ -79,7 +86,7 @@ export function TopBar(p: Props) {
               title={op === "push" && !head.upstream ? t("top.push.first") : t(title)}
               onClick={() => p.onRemote(op)}
             >
-              <span className="ico">{icon}</span>{" "}
+              <Icon name={icon} className="ico" />{" "}
               {running && p.progress ? `${phase(p.progress.phase)} ${p.progress.percent}%` : label}
               {n > 0 && !running && <span className={`count ${op}`}>{n}</span>}
               {running && p.progress && (
@@ -93,19 +100,24 @@ export function TopBar(p: Props) {
       </div>
 
       <button className="ghost" onClick={p.onCompose} disabled={p.busy}>
-        {t("top.commit")} {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
+        <Icon name="plus" /> {t("top.commit")} {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
       </button>
       <button className="ghost" onClick={p.onUndoHistory} title={t("undo.log.open")} aria-label={t("undo.log.open")}>
-        ⏱
+        <Icon name="history" />
       </button>
-      <button className="ghost" onClick={p.onRefresh} title={t("top.refresh")}>
-        ⟲
+      <button className="ghost" onClick={p.onRefresh} title={t("top.refresh")} aria-label={t("top.refresh")}>
+        <Icon name="refresh" />
       </button>
-      <button className={`ghost ${p.animate ? "on" : ""}`} title={t("top.sparkle")} onClick={p.onToggleAnimate}>
-        ✦
+      <button
+        className={`ghost ${p.animate ? "on" : ""}`}
+        title={t("top.sparkle")}
+        aria-label={t("top.sparkle")}
+        onClick={p.onToggleAnimate}
+      >
+        <Icon name="sparkle" />
       </button>
       <button className="ghost" title={t("top.settings")} aria-label={t("top.settings.label")} onClick={p.onSettings}>
-        ⚙
+        <Icon name="settings" />
       </button>
     </header>
   );

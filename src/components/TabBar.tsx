@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { t } from "../i18n";
 import { repoName } from "../recent";
 import type { Tabs } from "../tabs";
@@ -29,13 +30,13 @@ export function TabBar(p: { tabs: Tabs; onSelect(id: number): void; onClose(id: 
                 p.onClose(tab.id);
               }}
             >
-              ✕
+              <Icon name="close" />
             </button>
           </div>
         );
       })}
       <button className="tab-new" aria-label={t("tabs.newTab")} title={t("tabs.newTab")} onClick={p.onNew}>
-        ＋
+        <Icon name="plus" />
       </button>
     </nav>
   );

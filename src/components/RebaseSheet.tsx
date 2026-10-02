@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useState } from "react";
 import { fmtTime } from "../format";
 import { ACTIONS, move, planProblem, resultCount } from "../rebasePlan";
@@ -51,7 +52,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
         </div>
         <span className="muted keys">{t("rb.keys")}</span>
         <button className="icon" onClick={onClose} title={t("common.close")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 
@@ -86,7 +87,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
                   disabled={i === 0}
                   onClick={() => shift(i, -1)}
                 >
-                  ↑
+                  <Icon name="arrowUp" size={12} />
                 </button>
                 <button
                   title={t("rb.down")}
@@ -94,7 +95,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
                   disabled={i === steps.length - 1}
                   onClick={() => shift(i, 1)}
                 >
-                  ↓
+                  <Icon name="arrowDown" size={12} />
                 </button>
               </span>
               <select

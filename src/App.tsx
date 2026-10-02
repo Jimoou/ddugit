@@ -1,3 +1,4 @@
+import { Icon } from "./components/Icon";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri } from "./api";
 import { AuthDialog } from "./components/AuthDialog";
@@ -255,7 +256,7 @@ export default function App() {
                 <RecentList recent={recent} onOpen={openPath} />
               </section>
               <button className="ghost" onClick={() => openPath(DEMO_PATH)}>
-                {t("app.demo")}
+                <Icon name="sparkle" /> {t("app.demo")}
               </button>
             </div>
           )

@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { blockText, conflictCount, parseConflicts, type Pick, resolveText } from "../conflict";
@@ -76,7 +77,7 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
           </div>
         )}
         <button className="icon" onClick={onClose} title={t("common.close")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 

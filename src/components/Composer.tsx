@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FileChange } from "../types";
 import { t } from "../i18n";
@@ -102,7 +103,7 @@ export function Composer(props: Props) {
           </h2>
         </div>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 
@@ -237,7 +238,9 @@ export function Composer(props: Props) {
 
       <button className="primary" disabled={!canCommit} onClick={submit}>
         {busy ? t("composer.committing") : amend ? t("composer.amendGo") : t("composer.commitGo")}
-        <kbd>⌘/Ctrl ⏎</kbd>
+        <kbd>
+          ⌘/Ctrl <Icon name="enter" size={11} />
+        </kbd>
       </button>
     </aside>
   );

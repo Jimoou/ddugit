@@ -39,20 +39,20 @@ describe("pull request labels", () => {
   it("labels only commits in the loaded history and maps a label back to its PR", () => {
     const report: PrReport = { forges: [forge()], prs: [pr(1, "in"), pr(2, "out")] };
     const refs = prRefs(report, (id) => id === "in");
-    expect(refs).toEqual([{ name: "#1", kind: "pr", target: "in", checks: null }]);
+    expect(refs).toEqual([{ name: "#1", kind: "pr", target: "in", checks: null, review: null }]);
     expect(prOf(report, refs[0])?.number).toBe(1);
     expect(prRefs(null, () => true)).toEqual([]);
   });
 });
 
 describe("pull request status on labels", () => {
-  it("carries CI for the label color and marks the review in the name", () => {
+  it("carries CI for the label color and the review for its mark", () => {
     const approved = { ...pr(4, "a"), checks: "failure" as const, review: "approved" as const };
     const report: PrReport = { forges: [forge()], prs: [approved, { ...pr(5, "b"), review: "changes" }] };
     const refs = prRefs(report, () => true);
-    expect(refs.map((r) => [r.name, r.checks])).toEqual([
-      ["#4 ✓", "failure"],
-      ["#5 ✎", null],
+    expect(refs.map((r) => [r.name, r.checks, r.review])).toEqual([
+      ["#4", "failure", "approved"],
+      ["#5", null, "changes"],
     ]);
     expect(prOf(report, refs[0])?.number).toBe(4);
   });

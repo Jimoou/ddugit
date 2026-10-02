@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
@@ -118,7 +119,7 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
         )}
         <span className="muted keys">{t("diff.keys")}</span>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 
@@ -212,7 +213,7 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
                       stage.onHunk(file.path, i, picked.length ? [...picked].sort((a, b) => a - b) : undefined)
                     }
                   >
-                    {stage.scope === "unstaged" ? "＋ " : "− "}
+                    <Icon name={stage.scope === "unstaged" ? "plus" : "minus"} size={12} />{" "}
                     {picked.length
                       ? t(staging ? "diff.stageLines" : "diff.unstageLines", { n: picked.length })
                       : t(staging ? "diff.stageHunk" : "diff.unstageHunk")}

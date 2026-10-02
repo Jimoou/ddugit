@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useState } from "react";
 import { fmtTime } from "../format";
 import type { CommitInfo, FileDiff, RefInfo } from "../types";
@@ -37,7 +38,7 @@ export function Inspector(props: Props) {
           <h2>{commit.summary || t("common.noMessage")}</h2>
         </div>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 
@@ -45,8 +46,8 @@ export function Inspector(props: Props) {
         <div className="refs">
           {refs.map((r) => (
             <span key={r.kind + r.name} className={`ref ref-${r.kind}`}>
-              {r.kind === "remote" ? "☁ " : r.kind === "tag" ? "◆ " : ""}
-              {r.name}
+              {r.kind === "remote" && <Icon name="cloud" size={12} />}
+              {r.kind === "tag" && <Icon name="tag" size={11} />} {r.name}
             </span>
           ))}
         </div>

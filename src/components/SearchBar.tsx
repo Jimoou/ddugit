@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { t } from "../i18n";
 
 interface Props {
@@ -14,7 +15,7 @@ interface Props {
 export function SearchBar({ query, count, index, onQuery, onStep, onClose }: Props) {
   return (
     <div className="search-bar" role="search">
-      <span className="ico">⌕</span>
+      <Icon name="search" className="ico" />
       <input
         autoFocus
         placeholder={t("search.placeholder")}
@@ -27,13 +28,13 @@ export function SearchBar({ query, count, index, onQuery, onStep, onClose }: Pro
       />
       <span className="count">{query.trim() ? (count ? `${index + 1} / ${count}` : t("common.none")) : ""}</span>
       <button className="icon" disabled={!count} onClick={() => onStep(-1)} title={t("search.prev")}>
-        ↑
+        <Icon name="arrowUp" />
       </button>
       <button className="icon" disabled={!count} onClick={() => onStep(1)} title={t("search.next")}>
-        ↓
+        <Icon name="arrowDown" />
       </button>
       <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
-        ✕
+        <Icon name="close" />
       </button>
     </div>
   );

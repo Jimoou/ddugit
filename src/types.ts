@@ -20,6 +20,8 @@ export interface RefInfo {
   target: string;
   /** `pr` refs only: CI on the pull request's head, which colors its label. */
   checks?: Checks | null;
+  /** `pr` refs only: drawn as a mark after the name (approved / changes requested). */
+  review?: Review | null;
 }
 
 export interface HeadInfo {
