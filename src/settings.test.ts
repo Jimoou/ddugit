@@ -22,6 +22,12 @@ describe("parseSettings", () => {
       sidebarCollapsed: false,
       closedSections: [],
       trustedForgeHosts: [],
+      confirmRemote: { fetch: false, pull: true, push: true },
+    });
+    expect(parseSettings(JSON.stringify({ confirmRemote: { push: false, pull: "x" } }), base).confirmRemote).toEqual({
+      fetch: false,
+      pull: true,
+      push: false,
     });
     expect(parseSettings(JSON.stringify({ closedSections: ["tag", "stash"] }), base).closedSections).toEqual([
       "tag",

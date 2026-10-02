@@ -76,6 +76,19 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
             />
             {t("settings.sparkle")}
           </label>
+          <div className="field confirm-remote">
+            {t("settings.confirmRemote")}
+            {(["fetch", "pull", "push"] as const).map((op) => (
+              <label key={op} className="check inline">
+                <input
+                  type="checkbox"
+                  checked={settings.confirmRemote[op]}
+                  onChange={(e) => onChange({ confirmRemote: { ...settings.confirmRemote, [op]: e.target.checked } })}
+                />
+                {op[0].toUpperCase() + op.slice(1)}
+              </label>
+            ))}
+          </div>
           <label className="field">
             {t("settings.page")}
             <select value={settings.historyPage} onChange={(e) => onChange({ historyPage: Number(e.target.value) })}>

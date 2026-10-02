@@ -24,6 +24,8 @@ import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
 import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
+import { SyncConfirm } from "./components/SyncConfirm";
+import { type SyncOp, syncPlan } from "./sync";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, ancestorsOf, computeLayout } from "./graph/layout";
@@ -143,6 +145,8 @@ export function RepoView({
   const [nameReq, setNameReq] = useState<NameRequest | null>(null);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
   const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
+  /** Remote work waiting for the user's go-ahead (see `SyncConfirm`). */
+  const [syncAsk, setSyncAsk] = useState<SyncOp | null>(null);
   const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [diff, setDiff] = useState<DiffState | null>(null);
@@ -1104,7 +1108,13 @@ export function RepoView({
             setCleanupOpen(false);
             setReflogOpen((o) => !o);
           }}
-          onRemote={(op) => void remote(op)}
+          onRemote={(op) =>
+            op === "fetch" || op === "pull" || op === "push"
+              ? settings.confirmRemote[op]
+                ? setSyncAsk(op)
+                : void remote(op)
+              : void remote(op)
+          }
         />
       )}
 
@@ -1818,6 +1828,20 @@ export function RepoView({
             setTokenFor(null);
           }}
           onCancel={() => setTokenFor(null)}
+        />
+      )}
+
+      {syncAsk && (
+        <SyncConfirm
+          plan={syncPlan(snap, syncAsk)}
+          branch={snap.head.branch}
+          busy={busy}
+          onGo={() => {
+            setSyncAsk(null);
+            void remote(syncAsk);
+          }}
+          onNeverAsk={() => onChangeSettings({ confirmRemote: { ...settings.confirmRemote, [syncAsk]: false } })}
+          onCancel={() => setSyncAsk(null)}
         />
       )}
 

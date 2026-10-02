@@ -171,6 +171,7 @@ test("overwrites the upstream after rewriting a pushed commit", async ({ demo })
   const { page } = demo;
   const push = page.locator(".topbar button", { hasText: "Push" });
   await push.click();
+  await demo.confirmSync();
   await demo.toast("원격에 올렸어요");
 
   // Reword the (now pushed) HEAD commit.
@@ -183,6 +184,7 @@ test("overwrites the upstream after rewriting a pushed commit", async ({ demo })
   await expect.poll(async () => (await demo.snapshot()).head.target).not.toBe(head);
 
   await push.click();
+  await demo.confirmSync();
   const dialog = page.locator(".dialog", { hasText: "Push 거부됨" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: /덮어쓰기/ }).click();
@@ -190,6 +192,33 @@ test("overwrites the upstream after rewriting a pushed commit", async ({ demo })
   const snap = await demo.snapshot();
   const upstream = snap.refs.find((r) => r.kind === "remote" && r.name === snap.head.upstream)!;
   expect(upstream.target).toBe(snap.head.target);
+});
+
+test("asks before pull and push, lists what moves, and can stop asking", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const ahead = before.head.ahead;
+  await page.locator(".topbar button", { hasText: "Push" }).click();
+  const ask = page.getByRole("dialog", { name: "Push" });
+  await expect(ask).toContainText(before.head.upstream!);
+  await expect(ask.locator(".sync-commits li")).toHaveCount(ahead);
+  // Cancel: nothing left.
+  await ask.getByRole("button", { name: "취소" }).click();
+  expect((await demo.snapshot()).head.ahead).toBe(ahead);
+
+  // Fetch only reads: it runs without asking.
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+
+  // Pull lists what comes in; "don't ask again" sticks.
+  await page.locator(".topbar button", { hasText: "Pull" }).click();
+  const pull = page.getByRole("dialog", { name: "Pull" });
+  await expect(pull.locator(".sync-commits li")).not.toHaveCount(0);
+  await pull.getByLabel(/다시 묻지 않기/).check();
+  await pull.locator("button.primary").click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).confirmRemote.pull)).toBe(
+    false,
+  );
 });
 
 test("ignores are per target and the overview counts each branch", async ({ demo }) => {
@@ -222,7 +251,7 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
   await expect(dialog).toBeVisible();
   await expect(dialog.locator("kbd", { hasText: "⌘/Ctrl + F" })).toBeVisible();
 
-  await dialog.getByRole("checkbox").uncheck();
+  await dialog.getByLabel(/반짝임 효과/).uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).animate)).toBe(false);
 
   const git = dialog.getByPlaceholder("비워 두면 PATH의 git");
@@ -647,6 +676,7 @@ test("a push rides a comet into orbit and fetched commits arrive as meteors, unl
   const meteors = page.locator(".fx-clip .meteor");
 
   await page.getByRole("button", { name: /Push/ }).click();
+  await demo.confirmSync();
   await demo.toast("원격에 올렸어요");
   await expect(launch).toHaveCount(1);
   await expect(launch).toHaveCount(0, { timeout: 5000 });
@@ -658,12 +688,16 @@ test("a push rides a comet into orbit and fetched commits arrive as meteors, unl
 
   // Sparkles off (in settings): the same moments play nothing.
   await page.keyboard.press("?");
-  await page.getByRole("dialog", { name: "설정" }).getByRole("checkbox").uncheck();
+  await page
+    .getByRole("dialog", { name: "설정" })
+    .getByLabel(/반짝임 효과/)
+    .uncheck();
   await page.keyboard.press("Escape");
   await expect(meteors).toHaveCount(0, { timeout: 5000 });
   await page.getByRole("button", { name: /Fetch/ }).click();
   await demo.toast("원격 커밋을 가져왔어요");
   await page.getByRole("button", { name: /Push/ }).click();
+  await demo.confirmSync();
   await page.waitForTimeout(300);
   await expect(launch).toHaveCount(0);
 });
@@ -732,6 +766,7 @@ test("the tutorial voyage ticks off missions as they are done, and can be closed
 
   // Mission 6 out of order: push.
   await page.getByRole("button", { name: /Push/ }).click();
+  await demo.confirmSync();
   await demo.toast("원격에 올렸어요");
   await expect(log).toContainText("2 / 6");
   await expect(log.locator("li.done")).toHaveCount(2);
