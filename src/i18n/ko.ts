@@ -149,7 +149,7 @@ export const ko = {
   "app.failed": "{label} 실패",
   "app.tagline": "그래프로 보고, 그래프로 다루는 Git.",
   "app.open": "저장소 열기",
-  "app.demo": "데모 둘러보기",
+  "app.demo": "✦ 튜토리얼로 둘러보기 (데모 저장소)",
   "app.loading": "불러오는 중…",
   "app.empty": "아직 체크포인트가 없어요. <b>＋</b> 를 눌러 첫 커밋을 만들어 보세요.",
   "hud.zoomOut": "축소 (-)",
@@ -607,6 +607,29 @@ export const ko = {
   "pr.checks.none": "CI 없음",
   "pr.review.approved": "승인",
   "pr.review.changes": "수정 요청",
+  "voyage.title": "항해 일지",
+  "voyage.fold": "접기",
+  "voyage.unfold": "펼치기",
+  "voyage.close": "튜토리얼 닫기 (탑바의 데모 표시를 누르면 다시 열려요)",
+  "voyage.reopen": "튜토리얼 다시 열기",
+  "voyage.inspect": "별 하나 살펴보기",
+  "voyage.inspect.how": "그래프의 점(커밋)을 <b>클릭</b>하면 오른쪽에 내용이 열려요.",
+  "voyage.commit": "새 별 띄우기",
+  "voyage.commit.how": "HEAD 옆 <b>＋</b>를 눌러 메시지를 쓰고 커밋하세요.",
+  "voyage.merge": "두 별 합치기",
+  "voyage.merge.how":
+    "<b>feature/theme</b> 브랜치 끝을 <b>끌어서</b> HEAD 위에 놓으세요. 중력장이 보일 때 놓으면 병합돼요.",
+  "voyage.undo": "시간 되감기",
+  "voyage.undo.how":
+    "커밋을 <b>우클릭</b>해서 <b>마지막 커밋 취소</b>나 <b>이 커밋으로 되돌리기</b>를 고르세요. 지나온 자리는 탑바 <b>⏱</b>에 남아요.",
+  "voyage.bisect": "범인 별 찾기",
+  "voyage.bisect.how":
+    "최근 커밋을 <b>우클릭</b>해서 <b>버그가 있는 커밋</b>으로, 오래된 커밋을 <b>버그가 없는 커밋</b>으로 표시한 뒤 배너의 질문에 답하세요.",
+  "voyage.push": "궤도에 올리기",
+  "voyage.push.how": "탑바의 <b>↑ Push</b>를 누르세요.",
+  "voyage.end": "항해 완료! 이제 내 저장소로 떠나 볼까요?",
+  "voyage.openRepo": "내 저장소 열기",
+  "voyage.again": "처음부터 다시",
 } as const;
 
 export type Key = keyof typeof ko;

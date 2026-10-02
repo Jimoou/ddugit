@@ -4,6 +4,8 @@ import { isKey, type Key, t } from "../i18n";
 import type { HeadInfo, Progress, RemoteOp } from "../types";
 
 interface Props {
+  /** Demo with the tutorial closed: the demo badge reopens it. */
+  onVoyage?(): void;
   repoName: string;
   repoPath: string;
   head: HeadInfo;
@@ -40,7 +42,7 @@ const REMOTE: { op: RemoteOp; icon: string; label: string; title: Key }[] = [
 ];
 
 export function TopBar(p: Props) {
-  const { head } = p;
+  const { head, onVoyage } = p;
   const badge = (op: RemoteOp) => (op === "pull" ? head.behind : op === "push" ? head.ahead : 0);
 
   return (
@@ -56,7 +58,13 @@ export function TopBar(p: Props) {
         ◉ {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
       </span>
       {head.upstream && <span className="upstream muted">⇄ {head.upstream}</span>}
-      {!isTauri && <span className="demo-pill">{t("top.demo")}</span>}
+      {onVoyage ? (
+        <button className="demo-pill" onClick={onVoyage} title={t("voyage.reopen")}>
+          {t("top.demo")} · ✦
+        </button>
+      ) : (
+        !isTauri && <span className="demo-pill">{t("top.demo")}</span>
+      )}
       <div className="spacer" />
 
       <div className="remote-group">

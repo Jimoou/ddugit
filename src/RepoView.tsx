@@ -1,11 +1,12 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { api, DEMO_PATH } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
 import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
 import { FORGE_NAME, PullSection, TokenDialog, prOf, prRefs } from "./components/Pulls";
+import { MissionPanel, useVoyage } from "./components/Missions";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -185,6 +186,9 @@ export function RepoView({
   const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
+  // First-run tutorial, played on the demo repository only.
+  const tour = useVoyage(path === DEMO_PATH);
+  const foundCulprit = useCallback(() => tour.mission("bisect"), [tour.mission]); // eslint-disable-line react-hooks/exhaustive-deps
   const { playing: fx, play } = useFx(animate);
   /**
    * Play an effect once the new snapshot is drawn and the camera has come to rest
@@ -277,6 +281,7 @@ export function RepoView({
   /** The right panel shows one thing: composer, a stash, or a commit. */
   const show = (what: { commit?: string | null; stash?: number | null; composer?: boolean; amend?: boolean }) => {
     setSelected(what.commit ?? null);
+    if (what.commit) tour.mission("inspect");
     setSelectedStash(what.stash ?? null);
     setComposer(what.composer ? { amend: what.amend ?? false } : false);
   };
@@ -376,6 +381,7 @@ export function RepoView({
         const prev = lastBisect.current;
         if (state?.culprit && state.culprit !== prev.culprit) {
           const id = state.culprit;
+          foundCulprit();
           setTimeout(() => {
             graph.current?.centerOn(id);
             setTimeout(() => {
@@ -394,7 +400,7 @@ export function RepoView({
     return () => {
       live = false;
     };
-  }, [path, snap, play]);
+  }, [path, snap, play, foundCulprit]);
   const bisect = bisectLoaded && bisectLoaded.snap === snap ? bisectLoaded.state : null;
   const badges = useMemo(() => {
     const m = new Map<string, NodeBadge>();
@@ -517,6 +523,7 @@ export function RepoView({
       const r = await run(t(REMOTE_DONE[op]), () => api.remote(path, op, setProgress));
       if (r.status === "ok") {
         setPrTick((n) => n + 1);
+        if (pushing) tour.mission("push");
         const head = latest.current?.head.target;
         const fresh = pushing ? [] : (latest.current?.commits ?? []).filter((c) => !known.has(c.id));
         playAfterDraw((at) => {
@@ -757,6 +764,7 @@ export function RepoView({
       () => {
         setResetReq(null);
         play({ kind: "rewind" });
+        tour.mission("undo");
         setTimeout(() => graph.current?.centerOnHead(), 60);
       },
     );
@@ -1054,6 +1062,7 @@ export function RepoView({
       {/* Only the visible tab has a top bar, so window-level lookups find one. */}
       {active && (
         <TopBar
+          onVoyage={path === DEMO_PATH && !tour.shown ? tour.reopen : undefined}
           repoName={snap.name}
           repoPath={snap.path}
           head={snap.head}
@@ -1255,6 +1264,15 @@ export function RepoView({
             )}
             <FxLayer playing={fx} />
             <Nebula on={conflicts > 0} still={!animate} />
+            {tour.shown && (
+              <MissionPanel
+                voyage={tour.voyage}
+                just={tour.just}
+                onDismiss={tour.dismiss}
+                onRestart={tour.restart}
+                onOpenRepo={onRepoMenu}
+              />
+            )}
             <GraphCanvas
               ref={graph}
               layout={layout}
@@ -1599,6 +1617,7 @@ export function RepoView({
                 },
                 () => {
                   setComposer(false);
+                  if (!amend) tour.mission("commit");
                   setDiff((d) => (d?.source.kind === "worktree" ? null : d));
                   setTimeout(() => graph.current?.centerOnHead(), 60);
                 },
@@ -1721,6 +1740,7 @@ export function RepoView({
               setMergeReq(null);
               setTimeout(() => graph.current?.centerOnHead(), 60);
               if (r.status !== "ok") return;
+              tour.mission("merge");
               const merged = latest.current?.head.target;
               playAfterDraw((at) => {
                 const p = at(merged);

@@ -2651,3 +2651,99 @@ kbd {
 .pulls .chip.review.changes {
   color: var(--amber);
 }
+
+/* ------------------------------------------------- tutorial: the voyage log */
+.voyage {
+  position: absolute;
+  left: 14px;
+  bottom: 56px;
+  z-index: 6;
+  width: min(320px, calc(100% - 28px));
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 212, 121, 0.35);
+  border-radius: 14px;
+  background: var(--glass-strong);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  font-size: 12.5px;
+}
+.voyage header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.voyage header .eyebrow {
+  color: #ffd479;
+}
+.voyage header .spacer {
+  flex: 1;
+}
+.voyage ol {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.voyage li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 2px;
+  color: var(--muted);
+}
+.voyage li .mark {
+  flex: none;
+  width: 14px;
+  text-align: center;
+}
+.voyage li.done {
+  color: var(--text-2);
+}
+.voyage li.done .mark {
+  color: #ffd479;
+  text-shadow: 0 0 8px rgba(255, 212, 121, 0.8);
+}
+.voyage li.now {
+  color: var(--text);
+}
+.voyage li.now .mark {
+  color: #ffd479;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.voyage li .how {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.voyage li.just .mark {
+  animation: star-won 0.9s ease-out;
+}
+@keyframes star-won {
+  0% {
+    transform: scale(0.4) rotate(0deg);
+  }
+  50% {
+    transform: scale(2) rotate(144deg);
+    text-shadow: 0 0 16px #ffd479;
+  }
+  100% {
+    transform: scale(1) rotate(216deg);
+  }
+}
+.voyage-end {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.voyage-end p {
+  margin: 0 0 8px;
+  color: #fff1d0;
+}
+button.demo-pill {
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voyage li.now .mark,
+  .voyage li.just .mark {
+    animation: none;
+  }
+}

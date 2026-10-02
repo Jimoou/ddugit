@@ -17,6 +17,11 @@ export const test = base.extend<{ demo: Demo }>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+    // The tutorial panel would sit over the graph in every test; its own test opens it.
+    await page.addInitScript(() => {
+      if (localStorage.getItem("ddugit.voyage") === null)
+        localStorage.setItem("ddugit.voyage", JSON.stringify({ done: [], dismissed: true }));
+    });
     await page.goto("/");
     await expect(page.locator(".topbar")).toContainText("ddugit-demo");
     await use(new Demo(page));
