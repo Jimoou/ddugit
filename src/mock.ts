@@ -11,6 +11,7 @@ import type {
   FileDiff,
   OpResult,
   OpStatus,
+  PullRequest,
   RefInfo,
   RemoteOp,
   ReflogEntry,
@@ -351,6 +352,8 @@ export const demoControls = {
   nextFolder: null as string | null,
   /** Make the next merge stop on a conflict in two files. */
   conflictNext: false,
+  /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
+  forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
   /** Current demo state, read synchronously (e2e assertions). */
   snapshot: () => repo.snapshot(),
   /** Append `n` commits to the current branch (long straight runs for the graph). */
@@ -831,6 +834,46 @@ const mockTable: Table = {
   },
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
+  pull_requests() {
+    const token = demoControls.forgeToken;
+    const ok = token === "cli" || token === "keychain";
+    const tip = (b: string) => repo.branches.get(b)!;
+    const prs: PullRequest[] = ok
+      ? [
+          { number: 12, branch: "feature/theme", title: "Warmer theme glow", draft: false, author: "seoyeon" },
+          { number: 15, branch: "hotfix/crash", title: "Fix crash on empty repo", draft: true, author: "hyunwoo" },
+        ]
+          .filter((p) => repo.branches.has(p.branch))
+          .map((p) => ({
+            ...p,
+            remote: "origin",
+            sha: tip(p.branch),
+            url: `https://github.com/ddugit/ddugit-demo/pull/${p.number}`,
+          }))
+      : [];
+    return delay({
+      forges: [
+        {
+          remote: "origin",
+          kind: "github" as const,
+          host: "github.com",
+          slug: "ddugit/ddugit-demo",
+          token: token === "unauthorized" ? ("keychain" as const) : token,
+          unauthorized: token === "unauthorized",
+          error: null,
+        },
+      ],
+      prs,
+    });
+  },
+  set_forge_token({ token }) {
+    demoControls.forgeToken = token ? "keychain" : "none";
+    return delay(null);
+  },
+  open_url({ url }) {
+    window.open(url, "_blank", "noopener");
+    return delay(null);
+  },
   file_log({ rev, file }) {
     const tip = (rev === "HEAD" ? repo.branches.get(repo.head) : repo.branches.get(rev)) ?? rev;
     if (!repo.commits.has(tip)) return fail(`Unknown revision ${rev}`);

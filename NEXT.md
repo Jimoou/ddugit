@@ -7,27 +7,30 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #40(충돌 붉은 성운)을 squash merge했다(`5c118dc`). M6가 끝났다.
-- 사용자 결정(2026-10-02)
-  - PR 연동 토큰은 gh/glab 먼저, 없으면 키체인. M4 PR 연동부터 한다
-  - **이름을 otgit에서 ddugit으로 바꾼다**(저장소도 `Jimoou/ddugit`). 저장소는 public으로 바꿨다
-  - CI 절감 1·2·3을 적용한다
+- PR #41(이름 변경 otgit → ddugit, CI 절감)을 squash merge했다(`0bc7ca2`). CI는 PR에서만, 바뀐 쪽만 돌고 Rust는 ubuntu만 돈다.
+- 저장소가 `Jimoou/ddugit`(public)이 됐다. git remote도 바꿨다. 세션에 `jimoou/ddugit`을 추가해야 push된다(이미 했다).
 
 ## 지금 하는 일
 
-이름 변경 + CI 절감 → PR CI 대기
+M4 PR 연동 → PR CI 대기
 
-- 이름: 화면, 크레이트(`ddugit`, `ddugit_lib`), 패키지, `tauri.conf`(productName, identifier `com.ddugit.app`), 창 전역(`__ddugit`, `__ddugitDemo`), localStorage 키(`ddugit.*`), 데모(`ddugit-demo`), 문서
-  - identifier가 바뀌어 앱 데이터 폴더가 달라진다. 0.1.0 빌드의 설정·최근 목록은 넘어오지 않는다(배포 전이라 이전하지 않았다)
-  - 백포트 제외 config는 사용자 저장소에 남는 데이터다. 그래서 `ddugit.<target>.backportIgnored`에 쓰고, 예전 `otgit.<target>.backportIgnored`와 `otgit.backportIgnored`도 계속 읽고 지운다(테스트 추가)
-  - git remote를 `https://github.com/Jimoou/ddugit`으로 바꿨다
-- CI: `ci.yml`을 `ci-web.yml`과 `ci-rust.yml`로 나눴다. PR에서만 돌고, 경로 필터를 건다. Rust는 ubuntu만 돌고 macOS·Windows는 수동 `all_os`로 돌린다. 작업 단위마다 timeout을 둔다
+- Rust `forge.rs`
+  - `parse_remote`: https, scp, ssh 형식에서 GitHub·GitLab과 slug를 읽는다
+  - 토큰: `gh auth token` / `glab config get token`이 먼저, 없으면 keyring(서비스 `ddugit`, 사용자 = host)
+  - ureq로 열린 PR·MR을 받는다. 401·403이면 `unauthorized`
+  - 테스트 4개
+- 명령: `pull_requests`, `set_forge_token`, `open_url`(https만)
+- 프론트
+  - `components/Pulls.tsx`: `prRefs`(그래프 라벨), `PullSection`(사이드바), `TokenDialog`
+  - `RepoView`: 탭이 보일 때 읽고 5분마다 다시 읽는다. 원격 작업이 성공해도 다시 읽는다
+  - ⚿(토큰 관리)는 키체인 토큰을 쓸 때만 보인다
+- 데모: `demoControls.forgeToken`
 
 ## 다음 단계
 
-1. M4 PR 연동: 코드는 `m4-pr` 로컬 브랜치(`acc1f8e`, origin 세션 브랜치에도 한때 push했다)에 있다. 이름 변경 뒤에 cherry-pick하고 `otgit` 문자열(키체인 서비스, User-Agent, 토큰 설명, 데모 URL, 테스트)을 ddugit으로 바꿔 PR을 연다
+1. PR 연동 2단계(선택): PR의 CI·리뷰 상태(체크 성공·실패·대기, 승인·변경 요청)를 라벨 색으로 보여 준다
 2. 제안 중: 첫 실행 튜토리얼(미션)
-3. 사용자가 v0.1.0 초안 Release를 Publish해야 태그가 생긴다(이름이 바뀌었으니 다음 릴리스는 ddugit 이름으로 나간다)
+3. 릴리스: 이름이 바뀌었으니 v0.1.0 초안은 지우고 ddugit 이름으로 새 초안을 만드는 것을 제안한다. 릴리스 전에 "CI · Rust"를 `all_os`로 수동 실행한다
 
 ## 막힌 것 / 결정 필요
 

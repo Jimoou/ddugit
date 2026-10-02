@@ -5,6 +5,7 @@ interface DemoWindow {
   __ddugit: { screenOf(id: string): { x: number; y: number } | null };
   __ddugitDemo: {
     conflictNext: boolean;
+    forgeToken: "cli" | "keychain" | "none" | "unauthorized";
     snapshot(): RepoSnapshot;
     grow(n: number): void;
   };

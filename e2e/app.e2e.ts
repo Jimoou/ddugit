@@ -599,3 +599,34 @@ test("cherry-picks a commit from its menu and a comet carries the copy over", as
   expect(snap.commits.find((c) => c.id === snap.head.target)!.parents).toEqual([before.head.target]);
   await expect(page.locator(".fx-clip .pick-comet")).toHaveCount(1);
 });
+
+test("lists open pull requests, checks one out, and connects or forgets a forge token", async ({ demo }) => {
+  const { page } = demo;
+  const section = page.locator(".sidebar .pulls");
+  // `gh` is logged in (demo): open PRs show without asking, and there is no token to manage.
+  await expect(section.locator("li")).toHaveCount(2);
+  await expect(section.locator("li").nth(0)).toContainText("#12");
+  await expect(section.locator("li").nth(1)).toContainText("초안");
+  await expect(section.getByRole("button", { name: "토큰 관리" })).toHaveCount(0);
+
+  await section.locator("li").nth(0).click({ button: "right" });
+  await page.click(".context-menu >> text=feature/theme 브랜치 체크아웃");
+  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
+
+  // Without a login the section offers to connect; a pasted token is saved and can be forgotten.
+  await demo.mutate((d) => (d.forgeToken = "none"));
+  await page.getByRole("button", { name: /Fetch/ }).click(); // remote work re-reads pull requests
+  await expect(section).toContainText("GitHub에 연결하면");
+  await expect(section.locator("li")).toHaveCount(0);
+  await section.getByRole("button", { name: "GitHub 연결" }).click();
+  const dialog = page.getByRole("dialog", { name: "GitHub 연결" });
+  await dialog.getByLabel("토큰").fill("ghp_demo");
+  await dialog.getByLabel("토큰").press("Enter");
+  await demo.toast("GitHub에 연결했어요");
+  await expect(section.locator("li")).toHaveCount(2);
+
+  await section.getByRole("button", { name: "토큰 관리" }).click();
+  await dialog.getByRole("button", { name: "저장된 토큰 지우기" }).click();
+  await demo.toast("저장된 토큰을 지웠어요");
+  await expect(section.getByRole("button", { name: "GitHub 연결" })).toBeVisible();
+});

@@ -466,11 +466,13 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.font = `600 11px ${SANS}`;
     const groups = labelQueue.map((L) => {
       const shown = (s.refs.get(L.id) ?? []).filter(
-        (rf) => k >= ZOOM.allRefs || rf.kind === "local" || rf.name === s.headBranch,
+        (rf) => k >= ZOOM.allRefs || rf.kind === "local" || rf.kind === "pr" || rf.name === s.headBranch,
       );
       const labels = shown.map((rf) => {
         const isHead = rf.kind === "local" && rf.name === s.headBranch && L.id === s.headId;
-        const text = (isHead ? "◉ " : rf.kind === "remote" ? "☁ " : rf.kind === "tag" ? "◆ " : "") + rf.name;
+        const text =
+          (isHead ? "◉ " : rf.kind === "remote" ? "☁ " : rf.kind === "tag" ? "◆ " : rf.kind === "pr" ? "⇄ " : "") +
+          rf.name;
         return { rf, isHead, text, w: Math.min(ctx.measureText(text).width, 160) + 14 };
       });
       return { L, labels };
@@ -497,7 +499,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       }
       for (const b of pg.badges) {
         const item = b.index >= 0 ? labels[b.index] : null;
-        const col = item?.rf.kind === "tag" ? NEON[3] : L.color;
+        const col = item?.rf.kind === "tag" ? NEON[3] : item?.rf.kind === "pr" ? PR_COLOR : L.color;
         ctx.globalAlpha = L.d ? 0.3 : item?.rf.kind === "remote" || !item ? 0.75 : 1;
         roundRect(ctx, b.x, b.y, b.w, BADGE_H, 9);
         ctx.fillStyle = item?.isHead ? col : "rgba(10,8,20,0.85)";
@@ -669,6 +671,8 @@ function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: 
 }
 
 const TRAIL = "#ffd479";
+/** Pull request labels: a pale violet, apart from every lane color. */
+const PR_COLOR = "#c9b8ff";
 
 /**
  * A star chart through the commits that touched a file, oldest to newest,

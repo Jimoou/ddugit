@@ -1,3 +1,4 @@
+mod forge;
 mod git;
 
 use git::backport::{BackportItem, BackportTally};
@@ -85,6 +86,15 @@ command!(git_restore_file(path: String, source: String, file: String) -> OpResul
     => git::edit::restore_file(&path, &source, &file));
 command!(git_bisect(path: String, op: git::bisect::BisectOp) -> OpResult => git::bisect::bisect(&path, &op));
 command!(bisect_state(path: String) -> Option<git::bisect::BisectState> => git::bisect::state(&path));
+command!(pull_requests(path: String) -> forge::PrReport => forge::report(&path));
+command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
+// Open a pull request page in the browser (web links only).
+command!(open_url(url: String) -> () => {
+    if !url.starts_with("https://") {
+        return Err("Only https links can be opened".into());
+    }
+    tauri_plugin_opener::open_url(&url, None::<&str>).map_err(|e| e.to_string())
+});
 command!(file_log(path: String, rev: String, file: String) -> Vec<git::history::FileTouch>
     => git::history::file_log(&path, &rev, &file));
 command!(git_blame(path: String, rev: String, file: String) -> git::history::Blame
@@ -169,6 +179,9 @@ pub fn run() {
             git_bisect,
             bisect_state,
             file_log,
+            pull_requests,
+            set_forge_token,
+            open_url,
             git_blame,
             git_discard,
             git_stash_push,

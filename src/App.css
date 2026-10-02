@@ -2588,3 +2588,39 @@ kbd {
     transform: scale(1.08) rotate(4deg) translateX(2%);
   }
 }
+
+/* ---------------------------------------------------------- pull requests */
+.pulls .pr-num {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #c9b8ff;
+}
+.pulls .chip {
+  width: auto;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+.pr-connect {
+  padding: 2px 14px 8px;
+  font-size: 12px;
+}
+.pr-connect p {
+  margin: 0 0 6px;
+}
+.pr-empty,
+.pr-error {
+  margin: 0;
+  padding: 2px 14px 6px;
+  font-size: 12px;
+}
+.token-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.token-dialog p {
+  margin: 0;
+  font-size: 13px;
+}
+.token-dialog .token-page {
+  align-self: flex-start;
+}

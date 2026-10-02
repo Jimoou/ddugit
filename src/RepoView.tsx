@@ -5,6 +5,7 @@ import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
 import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
+import { FORGE_NAME, PullSection, TokenDialog, prOf, prRefs } from "./components/Pulls";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -38,6 +39,9 @@ import type {
   CommitInfo,
   FileDiff,
   FileTouch,
+  ForgeStatus,
+  PrReport,
+  PullRequest,
   OpResult,
   OpStatus,
   Progress,
@@ -53,6 +57,9 @@ import type {
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
 type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
 type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
+
+/** Open pull requests are re-read this often while the tab is visible (and after remote work). */
+const PR_REFRESH_MS = 5 * 60_000;
 
 /** Longest wait for the camera to settle before an effect plays anyway. */
 const SETTLE_MAX_MS = 1500;
@@ -151,6 +158,10 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  /** Open pull requests on the forge remotes; `prTick` re-reads them. */
+  const [pulls, setPulls] = useState<PrReport | null>(null);
+  const [prTick, setPrTick] = useState(0);
+  const [tokenFor, setTokenFor] = useState<ForgeStatus | null>(null);
   /** File history: the commits that touched one file, drawn as a constellation. */
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
   const [blameReq, setBlameReq] = useState<{ rev: string; file: string } | null>(null);
@@ -321,6 +332,24 @@ export function RepoView({
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
+  // Pull requests: read when the tab shows, then every few minutes (forges rate-limit, so not per snapshot).
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    api.pullRequests(path).then(
+      (r) => live && setPulls(r),
+      () => {}, // offline or no forge: the graph just has no PR labels
+    );
+    const timer = setInterval(() => setPrTick((n) => n + 1), PR_REFRESH_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [path, active, prTick]);
+  const graphRefs = useMemo(
+    () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
+    [snap, pulls, commitById],
+  );
   const backportTargets = useMemo(
     () => (snap?.refs ?? []).filter((r) => r.kind === "local").map((r) => r.name),
     [snap],
@@ -487,6 +516,7 @@ export function RepoView({
     try {
       const r = await run(t(REMOTE_DONE[op]), () => api.remote(path, op, setProgress));
       if (r.status === "ok") {
+        setPrTick((n) => n + 1);
         const head = latest.current?.head.target;
         const fresh = pushing ? [] : (latest.current?.commits ?? []).filter((c) => !known.has(c.id));
         playAfterDraw((at) => {
@@ -764,8 +794,41 @@ export function RepoView({
   };
 
   /** Right-click menu for a ref badge (graph) or a sidebar row. */
+  const showPr = (pr: PullRequest) => {
+    if (!commitById.has(pr.sha)) return;
+    show({ commit: pr.sha });
+    graph.current?.centerOn(pr.sha);
+  };
+  const prMenu = (pr: PullRequest): MenuItem[] => {
+    const local = snap?.refs.find((x) => x.kind === "local" && x.name === pr.branch);
+    const remote = snap?.refs.find((x) => x.kind === "remote" && x.name === `${pr.remote}/${pr.branch}`);
+    const target = local ?? remote;
+    return [
+      { label: t("pr.open"), onSelect: () => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e))) },
+      { label: t("pr.show"), disabled: !commitById.has(pr.sha), onSelect: () => showPr(pr) },
+      {
+        label: target ? t("pr.checkout", { branch: pr.branch }) : t("pr.checkout.missing", { branch: pr.branch }),
+        disabled: !target || (local && local.name === snap?.head.branch),
+        onSelect: () => target && void checkoutRef(target),
+      },
+    ];
+  };
+  const saveToken = (forge: ForgeStatus, token: string | null) =>
+    api.setForgeToken(path, forge.host, token).then(
+      () => {
+        setTokenFor(null);
+        toast("ok", token ? t("pr.token.saved", { forge: FORGE_NAME[forge.kind] }) : t("pr.token.forgotten"));
+        setPrTick((n) => n + 1);
+      },
+      (e) => toast("err", String(e)),
+    );
+
   const refMenu = (r: RefInfo): MenuItem[] => {
     if (!snap) return [];
+    if (r.kind === "pr") {
+      const pr = prOf(pulls, r);
+      return pr ? prMenu(pr) : [];
+    }
     const isHead = r.kind === "local" && r.name === snap.head.branch;
     const canMerge =
       !!snap.head.branch && !isHead && r.kind !== "tag" && canDropOn(snap.head.target ?? "", r.target, "merge");
@@ -1164,6 +1227,15 @@ export function RepoView({
             const base = snap.stashes[i]?.base;
             if (base) graph.current?.centerOn(base);
           }}
+          pulls={
+            <PullSection
+              report={pulls}
+              onShow={showPr}
+              onOpen={(pr) => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e)))}
+              onMenu={(pr, x, y) => setMenu({ x, y, title: pr.title, items: prMenu(pr) })}
+              onConnect={setTokenFor}
+            />
+          }
         />
 
         <section className="stage">
@@ -1186,7 +1258,7 @@ export function RepoView({
             <GraphCanvas
               ref={graph}
               layout={layout}
-              refs={snap.refs}
+              refs={graphRefs}
               summaries={summaries}
               headId={snap.head.target}
               headBranch={snap.head.branch}
@@ -1656,6 +1728,16 @@ export function RepoView({
               });
             })
           }
+        />
+      )}
+
+      {tokenFor && (
+        <TokenDialog
+          forge={tokenFor}
+          busy={busy}
+          onSave={(token) => void saveToken(tokenFor, token)}
+          onOpenPage={(url) => void api.openUrl(path, url).catch((e) => toast("err", String(e)))}
+          onCancel={() => setTokenFor(null)}
         />
       )}
 

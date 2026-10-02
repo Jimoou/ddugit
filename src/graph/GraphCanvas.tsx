@@ -86,7 +86,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
 
   const refsByCommit = useMemo(() => {
     const m = new Map<string, RefInfo[]>();
-    const order = { local: 0, remote: 1, tag: 2 } as const;
+    const order = { local: 0, pr: 1, remote: 2, tag: 3 } as const;
     for (const r of props.refs) {
       const list = m.get(r.target) ?? [];
       list.push(r);

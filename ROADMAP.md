@@ -58,7 +58,9 @@
   - [x] 그래프 위에서 노드를 끌어 바로 순서 바꾸기 (Shift+끌기 → 옮긴 계획으로 정리 화면이 열림)
   - [ ] 병합이 섞인 구간(`--rebase-merges`)
   - [x] 정리한 뒤 강제 push: Push 거부 화면에 "덮어쓰기"(`--force-with-lease`)
-- [ ] GitHub / GitLab PR 연동 (그래프에 PR 상태 표시)
+- [x] GitHub / GitLab PR 연동 (그래프에 PR 상태 표시) — 2026-10-02 결정: 토큰은 `gh`/`glab` 로그인 먼저, 없으면 앱에서 받아 OS 키체인
+  - [x] 열린 PR·MR을 head 커밋 라벨(⇄ #12 / !3)과 사이드바 PR 목록으로, 우클릭: 브라우저·그래프에서 보기·브랜치 체크아웃, 토큰 없음·거절 시 연결 안내와 토큰 만들기 링크
+  - [ ] CI 상태·리뷰 상태 표시, 닫힌·병합된 PR
 
 ## M5 · 배포 품질
 
@@ -150,3 +152,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-01 | PR #38 squash merge(`aedb7fc`). 연출 2단계 그래프 작업: renderer `drawGravityWell`, `Fx` fusion·comet·constellation, `playAfterDraw`(rAF로 카메라가 멈출 때까지 기다림, `run()`이 끝난 뒤 새 스냅샷 기준), CI Linux deps 단계 timeout(e2e 24)                                                                                                                                   |
 | 2026-10-01 | PR #39 squash merge(`10ce8c6`). 연출 3단계 충돌: `Nebula`(충돌 파일 수 > 0이면 `.on`, 해결되면 transition으로 흩어짐, 반짝임을 끄면 움직임 없이 색만), 충돌 e2e에 성운이 끼고 걷히는 것 확인. 게임 같은 연출 완료(e2e 24)                                                                                                                                                       |
 | 2026-10-02 | PR #40 squash merge(`5c118dc`). 이름 변경 otgit → ddugit(저장소 `Jimoou/ddugit`, 앱 identifier `com.ddugit.app`, 크레이트·패키지·화면·문서). 백포트 제외 config는 예전 `otgit.*` 키도 계속 읽는다. CI 절감: PR에서만, 바뀐 쪽만(`ci-web.yml`/`ci-rust.yml` 경로 필터), Rust는 ubuntu만(macOS·Windows는 수동 `all_os`), main push 검사 없음. 사용자가 저장소를 public으로 바꿨다 |
+| 2026-10-02 | PR #41 squash merge(`0bc7ca2`). M4 PR 연동: `forge.rs`(원격 URL → GitHub/GitLab, 토큰 gh/glab → keyring, ureq로 열린 PR·MR, 테스트 4: URL·API 주소·로컬 서버로 응답·401), `components/Pulls.tsx`(`prRefs` 가짜 `pr` ref로 그래프 라벨, 사이드바 섹션, 토큰 창), `open_url`(https만), 5분마다·원격 작업 후 다시 읽기(e2e 25)                                                     |
