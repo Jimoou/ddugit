@@ -1,7 +1,8 @@
+import { Icon } from "./Icon";
 import { useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo, Review } from "../types";
+import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../types";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
 
@@ -18,21 +19,17 @@ export function prRefs(report: PrReport | null, has: (id: string) => boolean): R
   return report.prs
     .filter((p) => has(p.sha))
     .map((p) => ({
-      name: prLabel(p, report) + REVIEW_MARK[p.review ?? "none"],
+      name: prLabel(p, report),
       kind: "pr",
       target: p.sha,
       checks: p.checks,
+      review: p.review,
     }));
 }
 
-/** Appended to a label so the review state reads at a glance. */
-const REVIEW_MARK: Record<Review | "none", string> = { approved: " ✓", changes: " ✎", required: "", none: "" };
-
 /** The pull request a `pr` label stands for. */
 export function prOf(report: PrReport | null, ref: RefInfo): PullRequest | undefined {
-  return report?.prs.find(
-    (p) => p.sha === ref.target && prLabel(p, report) + REVIEW_MARK[p.review ?? "none"] === ref.name,
-  );
+  return report?.prs.find((p) => p.sha === ref.target && prLabel(p, report) === ref.name);
 }
 
 /** A forge we can't read yet: no token, or the token was refused. */
@@ -72,7 +69,7 @@ export function PullSection(p: {
             aria-label={t("pr.token.manage")}
             onClick={() => p.onConnect(saved)}
           >
-            ⚿
+            <Icon name="key" />
           </button>
         )}
       </h3>
@@ -140,7 +137,7 @@ export function TokenDialog(p: {
         </p>
         <p className="muted">{t("pr.token.paste", { host: p.forge.host })}</p>
         <button className="token-page" onClick={() => p.onOpenPage(page)}>
-          {t("pr.token.make")} ↗
+          {t("pr.token.make")} <Icon name="external" size={12} />
         </button>
         <input
           className="text"

@@ -2747,3 +2747,10 @@ button.demo-pill {
     animation: none;
   }
 }
+
+/* ddugit's own icons (components/Icon.tsx) sit on the text baseline. */
+.icon-svg {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -0.15em;
+}

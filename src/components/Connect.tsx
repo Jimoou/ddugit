@@ -1,6 +1,7 @@
 // Ways into a repository: recent ones (with stars), open a folder, clone a
 // URL, or start a new one. Used by the welcome screen and the top bar menu.
 
+import { Icon } from "./Icon";
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -59,13 +60,13 @@ export function ConnectActions(p: { onOpen(): void; onClone(): void; onInit(): v
   return (
     <div className="connect-actions">
       <button className={p.primary ? "primary" : ""} onClick={p.onOpen}>
-        <span className="ico">⌂</span> {t("connect.open")}
+        <Icon name="folder" className="ico" /> {t("connect.open")}
       </button>
       <button onClick={p.onClone}>
-        <span className="ico">⇣</span> {t("connect.clone")}
+        <Icon name="clone" className="ico" /> {t("connect.clone")}
       </button>
       <button onClick={p.onInit}>
-        <span className="ico">✦</span> {t("connect.init")}
+        <Icon name="sparkle" className="ico" /> {t("connect.init")}
       </button>
     </div>
   );
@@ -89,7 +90,7 @@ export function RecentList(p: { recent: Recent; current?: string | null; onOpen(
             title={r.starred ? t("connect.unstar") : t("connect.star")}
             onClick={() => star(r.path)}
           >
-            {r.starred ? "★" : "☆"}
+            <Icon name="star" filled={r.starred} />
           </button>
           <button
             className="icon"
@@ -97,7 +98,7 @@ export function RecentList(p: { recent: Recent; current?: string | null; onOpen(
             title={t("connect.forget")}
             onClick={() => forget(r.path)}
           >
-            ✕
+            <Icon name="close" />
           </button>
         </li>
       ))}

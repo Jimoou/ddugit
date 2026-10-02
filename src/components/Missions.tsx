@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useCallback, useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
@@ -67,7 +68,9 @@ export function MissionPanel(p: {
   return (
     <aside className={`voyage ${folded ? "folded" : ""}`} aria-label={t("voyage.title")}>
       <header>
-        <span className="eyebrow">✦ {t("voyage.title")}</span>
+        <span className="eyebrow">
+          <Icon name="sparkle" size={12} /> {t("voyage.title")}
+        </span>
         <span className="muted">
           {p.voyage.done.length} / {MISSIONS.length}
         </span>
@@ -78,10 +81,10 @@ export function MissionPanel(p: {
           aria-label={folded ? t("voyage.unfold") : t("voyage.fold")}
           title={folded ? t("voyage.unfold") : t("voyage.fold")}
         >
-          {folded ? "▴" : "▾"}
+          <Icon name={folded ? "chevronUp" : "chevronDown"} />
         </button>
         <button className="icon" onClick={p.onDismiss} aria-label={t("common.close")} title={t("voyage.close")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
       {!folded && (
@@ -94,7 +97,9 @@ export function MissionPanel(p: {
                   key={m}
                   className={`${done ? "done" : ""} ${m === next ? "now" : ""} ${m === p.just ? "just" : ""}`}
                 >
-                  <span className="mark">{done ? "★" : "☆"}</span>
+                  <span className="mark">
+                    <Icon name="star" size={13} filled={done} />
+                  </span>
                   <span className="what">
                     {t(`voyage.${m}`)}
                     {m === next && (

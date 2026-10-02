@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { type ReactNode, useMemo, useState } from "react";
 import { stashTitle } from "../format";
 import type { RefInfo, StashInfo } from "../types";
@@ -49,8 +50,13 @@ export function Sidebar(props: Props) {
             <h3>
               {t(g.title)} <span className="muted">{items.length}</span>
               {g.kind === "remote" && (
-                <button className="h3-add" title={t("side.addRemote")} onClick={props.onAddRemote}>
-                  ＋
+                <button
+                  className="h3-add"
+                  title={t("side.addRemote")}
+                  aria-label={t("side.addRemote")}
+                  onClick={props.onAddRemote}
+                >
+                  <Icon name="plus" size={12} />
                 </button>
               )}
               {g.kind === "local" && (
@@ -60,7 +66,7 @@ export function Sidebar(props: Props) {
                   aria-label={t("clean.open")}
                   onClick={props.onCleanup}
                 >
-                  ✧
+                  <Icon name="sparkles" size={12} />
                 </button>
               )}
             </h3>

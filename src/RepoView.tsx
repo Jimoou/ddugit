@@ -1,3 +1,4 @@
+import { Icon } from "./components/Icon";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
@@ -1092,7 +1093,9 @@ export function RepoView({
       {(bisect || bisectDraft) && (
         <div className="banner bisect-banner">
           <span>
-            <b className="bisect-eye">🔭 bisect</b>{" "}
+            <b className="bisect-eye">
+              <Icon name="telescope" /> bisect
+            </b>{" "}
             {!bisect && bisectDraft && (
               <>
                 {t("bisect.draft")} <span className={bisectDraft.bad ? "ok" : "muted"}>{t("bisect.draft.bad")}</span>
@@ -1164,15 +1167,17 @@ export function RepoView({
       {trail && (
         <div className="banner trail-banner">
           <span>
-            <b className="trail-eye">✦ {t("history.trail.eyebrow")}</b>{" "}
+            <b className="trail-eye">
+              <Icon name="sparkle" /> {t("history.trail.eyebrow")}
+            </b>{" "}
             <Rich k="history.trail.count" vars={{ file: trail.file, n: trail.touches.length }} />
           </span>
           <span className="row">
             <button onClick={() => stepTrail(-1)} title={t("history.trail.newer")}>
-              ◀ {t("history.trail.newer")}
+              <Icon name="arrowLeft" /> {t("history.trail.newer")}
             </button>
             <button onClick={() => stepTrail(1)} title={t("history.trail.older")}>
-              {t("history.trail.older")} ▶
+              {t("history.trail.older")} <Icon name="arrowRight" />
             </button>
             <button
               onClick={() =>
@@ -1322,18 +1327,18 @@ export function RepoView({
             )}
 
             <div className="hud">
-              <button onClick={() => graph.current?.zoomBy(0.8)} title={t("hud.zoomOut")}>
-                −
+              <button onClick={() => graph.current?.zoomBy(0.8)} title={t("hud.zoomOut")} aria-label={t("hud.zoomOut")}>
+                <Icon name="minus" />
               </button>
               <span className="zoom">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => graph.current?.zoomBy(1.25)} title={t("hud.zoomIn")}>
-                ＋
+              <button onClick={() => graph.current?.zoomBy(1.25)} title={t("hud.zoomIn")} aria-label={t("hud.zoomIn")}>
+                <Icon name="plus" />
               </button>
-              <button onClick={() => graph.current?.fit()} title={t("hud.fit")}>
-                ⤢
+              <button onClick={() => graph.current?.fit()} title={t("hud.fit")} aria-label={t("hud.fit")}>
+                <Icon name="fit" />
               </button>
-              <button onClick={() => graph.current?.centerOnHead()} title={t("hud.head")}>
-                ◉
+              <button onClick={() => graph.current?.centerOnHead()} title={t("hud.head")} aria-label={t("hud.head")}>
+                <Icon name="head" />
               </button>
             </div>
             <div className="hint">

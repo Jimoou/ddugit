@@ -5,6 +5,31 @@ import type { Run } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 import { t } from "../i18n";
+import { FILLED, iconPath, type IconName } from "../icons";
+
+/** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
+const REF_ICON: Partial<Record<RefInfo["kind"], IconName>> = { remote: "cloud", tag: "tag", pr: "pull" };
+const ICON_W = 13;
+/** A pull request's review state, after its number. */
+const REVIEW_ICON: Partial<Record<NonNullable<RefInfo["review"]>, IconName>> = { approved: "check", changes: "edit" };
+
+/** One of ddugit's icons on the canvas, `size` px square at (x, y). */
+function drawIcon(ctx: CanvasRenderingContext2D, name: IconName, x: number, y: number, size: number, color: string) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 24, size / 24);
+  if (FILLED.has(name)) {
+    ctx.fillStyle = color;
+    ctx.fill(iconPath(name));
+  } else {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke(iconPath(name));
+  }
+  ctx.restore();
+}
 
 export interface View {
   k: number;
@@ -470,10 +495,11 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       );
       const labels = shown.map((rf) => {
         const isHead = rf.kind === "local" && rf.name === s.headBranch && L.id === s.headId;
-        const text =
-          (isHead ? "◉ " : rf.kind === "remote" ? "☁ " : rf.kind === "tag" ? "◆ " : rf.kind === "pr" ? "⇄ " : "") +
-          rf.name;
-        return { rf, isHead, text, w: Math.min(ctx.measureText(text).width, 160) + 14 };
+        const icon: IconName | null = isHead ? "head" : (REF_ICON[rf.kind] ?? null);
+        const text = rf.name;
+        const mark = rf.review ? REVIEW_ICON[rf.review] : undefined;
+        const w = Math.min(ctx.measureText(text).width, 160) + 14 + (icon ? ICON_W : 0) + (mark ? ICON_W : 0);
+        return { rf, isHead, icon, mark, text, w };
       });
       return { L, labels };
     });
@@ -512,7 +538,16 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
         ctx.font = `600 11px ${SANS}`;
-        ctx.fillText(item ? truncate(ctx, item.text, 160) : `+${pg.hidden}`, b.x + b.w / 2, b.y + BADGE_H / 2 + 0.5);
+        const iw = item?.icon ? ICON_W : 0;
+        const mw = item?.mark ? ICON_W : 0;
+        const iy = b.y + (BADGE_H - 10) / 2;
+        if (item?.icon) drawIcon(ctx, item.icon, b.x + 6, iy, 10, ctx.fillStyle as string);
+        if (item?.mark) drawIcon(ctx, item.mark, b.x + b.w - 6 - 10, iy, 10, ctx.fillStyle as string);
+        ctx.fillText(
+          item ? truncate(ctx, item.text, 160) : `+${pg.hidden}`,
+          b.x + iw + (b.w - iw - mw) / 2,
+          b.y + BADGE_H / 2 + 0.5,
+        );
         ctx.globalAlpha = 1;
         if (item) s.labelHits.push({ x: b.x, y: b.y, w: b.w, h: BADGE_H, ref: item.rf });
       }

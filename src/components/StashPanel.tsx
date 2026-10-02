@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { fmtTime, stashTitle } from "../format";
 import type { FileDiff, StashInfo } from "../types";
 import { ChangedFiles } from "./ChangedFiles";
@@ -27,7 +28,7 @@ export function StashPanel({ stash, files, busy, onClose, onSelectBase, onOpenFi
           <h2>{stashTitle(stash.message)}</h2>
         </div>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
 

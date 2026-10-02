@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
@@ -70,7 +71,7 @@ export function BlameSheet(p: {
           </span>
         </div>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
       {cur?.error && <p className="note warn pad">{cur.error}</p>}

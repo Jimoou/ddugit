@@ -1,6 +1,7 @@
 // Branch housekeeping: merged branches, ones whose remote branch was deleted,
 // and ones nobody has touched in months, deleted together.
 
+import { Icon } from "./Icon";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
@@ -78,7 +79,7 @@ export function CleanupSheet(p: {
           {report?.base && <span className="muted">{t("clean.base", { base: report.base })}</span>}
         </div>
         <button className="icon" onClick={p.onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>
-          ✕
+          <Icon name="close" />
         </button>
       </header>
       <div className="bp-body">

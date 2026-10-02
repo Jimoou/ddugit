@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 
 test("adds a checkpoint from the + composer", async ({ demo }) => {
   const { page } = demo;
-  await page.click("text=＋ 커밋");
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
   await page.fill("textarea.message", "Wire up minimap jump");
   await page.keyboard.press("Control+Enter");
   await demo.toast("체크포인트를 추가했어요");
@@ -60,13 +60,13 @@ test("resolves a conflict block by editing it by hand", async ({ demo }) => {
 
 test("stages single lines picked in the diff", async ({ demo }) => {
   const { page } = demo;
-  await page.click("text=＋ 커밋");
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
   await page.locator(".composer .path").first().click();
   const signs = page.locator("table.diff tr.ins td.sign, table.diff tr.rem td.sign");
   await signs.nth(0).click();
   await signs.nth(2).click({ modifiers: ["Shift"] });
   await expect(page.locator("tr.picked")).toHaveCount(3);
-  await expect(page.locator(".hunk-btn").first()).toHaveText("＋ 선택한 3줄 스테이지");
+  await expect(page.locator(".hunk-btn").first()).toHaveText(/^\s*선택한 3줄 스테이지$/);
   // Read the file before staging: the list refreshes (and may drop it) afterwards.
   const file = (await page.locator(".diff-sheet .file-list li.on .path").textContent())!;
   await page.locator(".hunk-btn").first().click();
@@ -330,7 +330,6 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   const row = page.locator(".repo-menu .recent-list li").filter({ hasText: "/work/rocket" });
   await expect(row).toHaveClass(/on/);
   await row.getByRole("button", { name: "즐겨찾기", exact: true }).click();
-  await expect(row.locator(".star")).toHaveText("★");
   await expect(row.locator(".star")).toHaveAttribute("aria-pressed", "true");
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.recent")!));
   expect(stored[0]).toMatchObject({ path: "/work/rocket", starred: true });

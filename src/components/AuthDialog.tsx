@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useState } from "react";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
@@ -120,7 +121,7 @@ export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onC
                       setCopied(i);
                     }}
                   >
-                    {copied === i ? "✓" : "⧉"}
+                    <Icon name={copied === i ? "check" : "copy"} />
                   </button>
                 </div>
               )}

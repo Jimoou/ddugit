@@ -67,7 +67,7 @@
 
 - [x] 첫 실행 튜토리얼 "항해 일지": 데모 저장소에서 미션 6개(살펴보기·커밋·병합·되감기·bisect·push), 실제 작업이 일어나면 체크, 진행 저장, 닫아도 데모 표시로 다시 열기
 - [ ] 릴리스 초안 ddugit v0.2.0 (M6 마일스톤, 이름 변경 반영). 그 전에 "CI · Rust"를 `all_os`로 수동 실행한다
-- [ ] 자체 SVG 아이콘: 화면의 글자·이모지 아이콘(OS 글꼴마다 모양이 다름)을 한 세트로 바꾼다. 그래프 캔버스의 ◉·☁·◆·⇄는 Path2D로
+- [x] 자체 SVG 아이콘: 화면의 글자·이모지 아이콘(OS 글꼴마다 모양이 다름)을 한 세트(`icons.ts`, `components/Icon.tsx`)로 바꿨다. 그래프 라벨의 HEAD·원격·태그·PR·리뷰 표시는 같은 path를 Path2D로 그린다
 - [ ] 커밋 내용이 첫눈에: 대각선 요약 라벨(약 40°, 100%에서도 30~40자, 줌 단계별 정보량)
 - [ ] 커밋 미리보기 카드(마우스를 올려 두면 요약·본문 앞부분·바뀐 파일·+/−·PR)
 - [ ] 브랜치 맵 90° 단위 회전(0/90/180/270, 사용자가 고정). 글자는 늘 바로 서게. 세로 목록 보기 대신 이것으로 한다
@@ -166,3 +166,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-02 | PR #41 squash merge(`0bc7ca2`). M4 PR 연동: `forge.rs`(원격 URL → GitHub/GitLab, 토큰 gh/glab → keyring, ureq로 열린 PR·MR, 테스트 4: URL·API 주소·로컬 서버로 응답·401), `components/Pulls.tsx`(`prRefs` 가짜 `pr` ref로 그래프 라벨, 사이드바 섹션, 토큰 창), `open_url`(https만), 5분마다·원격 작업 후 다시 읽기(e2e 25)                                                     |
 | 2026-10-02 | PR #42 squash merge(`95b6fff`). PR 상태: `forge.rs`를 GraphQL로 바꿈(GitHub `statusCheckRollup`·`reviewDecision`, GitLab `headPipeline`·`approved`, GraphQL 오류도 실패로), `Checks`/`Review`, 라벨 색·표시, 사이드바 점·칩(cargo test forge 5, vitest 61)                                                                                                                      |
 | 2026-10-02 | PR #43 squash merge(`d38c81e`). M7 계획(사용자 결정: 튜토리얼, ddugit 릴리스, SVG 아이콘, 대각선 요약, 미리보기 카드, 90° 회전). 튜토리얼: `missions.ts`(순수, vitest 2), `components/Missions.tsx`(`useVoyage`, `MissionPanel`), RepoView 작업 지점마다 `tour.mission`, 탑바 데모 표시로 다시 열기, e2e는 기본으로 닫아 둠(e2e 26)                                             |
+| 2026-10-02 | PR #44 squash merge(`6103882`). 자체 SVG 아이콘: `icons.ts`(24×24 stroke path 표, `iconPath` Path2D 캐시), `Icon` 컴포넌트, 탑바·사이드바·시트 닫기·HUD·연결·검색·튜토리얼, 캔버스 라벨 아이콘(`drawIcon`), PR 리뷰 표시는 `RefInfo.review`로 옮김(e2e 26)                                                                                                                      |
