@@ -82,6 +82,7 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
       { keys: "H", what: "keys.head.what" },
       { keys: "R", what: "keys.rotate.what" },
       { keys: "⌘/Ctrl + B", what: "keys.sidebar.what" },
+      { keys: "⌘/Ctrl + R", what: "keys.refresh.what" },
       { keys: "keys.dragMerge", what: "keys.dragMerge.what" },
       { keys: "keys.altDrag", what: "cherry-pick" },
       { keys: "keys.shiftDrag", what: "keys.shiftDrag.what" },

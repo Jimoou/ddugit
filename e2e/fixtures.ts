@@ -23,7 +23,8 @@ export const test = base.extend<{ demo: Demo }>({
         localStorage.setItem("ddugit.voyage", JSON.stringify({ done: [], dismissed: true }));
     });
     await page.goto("/");
-    await expect(page.locator(".topbar")).toContainText("ddugit-demo");
+    await expect(page.locator(".tab.on")).toContainText("ddugit-demo");
+    await expect(page.locator(".topbar")).toBeVisible();
     await use(new Demo(page));
     expect(errors).toEqual([]);
   },
@@ -35,6 +36,11 @@ export class Demo {
 
   snapshot(): Promise<RepoSnapshot> {
     return this.page.evaluate(() => (window as unknown as DemoWindow).__ddugitDemo.snapshot());
+  }
+
+  /** Change demo state outside the UI without telling the app (no refresh). */
+  async mutateQuietly(fn: (demo: DemoWindow["__ddugitDemo"]) => void) {
+    await this.page.evaluate(`(${fn.toString()})(window.__ddugitDemo)`);
   }
 
   /** Change demo state outside the UI, then refresh like returning to the window. */
