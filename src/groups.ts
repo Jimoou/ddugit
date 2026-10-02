@@ -3,7 +3,7 @@
 // and folded state. Pure list operations, so they are unit-tested; the
 // storage lives with the recent list (`components/Connect.tsx`).
 
-import type { RecentRepo } from "./recent";
+import { parentDir, type RecentRepo, repoName } from "./recent";
 
 export interface RepoGroup {
   id: string;
@@ -107,4 +107,55 @@ export function bands(groups: RepoGroup[], list: RecentRepo[]): Band[] {
     ...groups.map((group) => ({ group, repos: list.filter((r) => r.group === group.id) })),
     { group: null, repos: list.filter((r) => !r.group || !known.has(r.group)) },
   ];
+}
+
+/** Who owns a remote: `https://github.com/acme/x.git`, `git@github.com:acme/x.git` → github.com/acme. Local paths → null. */
+export function ownerOf(url: string | null): { host: string; owner: string } | null {
+  if (!url) return null;
+  const m = /^(?:[a-z+]+:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/|[^@/]+@([^:/]+):)([^/]+)\/[^/]/i.exec(url.trim());
+  if (!m) return null;
+  return { host: (m[1] ?? m[2]).toLowerCase(), owner: m[3] };
+}
+
+export interface Suggestion {
+  /** Stable id, to remember a "no thanks". */
+  key: string;
+  name: string;
+  paths: string[];
+}
+
+/**
+ * One grouping to offer for ungrouped repositories: those of the same forge
+ * owner (an organisation), else those in the same folder. Only sets of two or
+ * more that aren't simply every ungrouped repository; the biggest wins, an
+ * owner before a folder; dismissed ones are skipped.
+ */
+export function suggestGroup(
+  list: RecentRepo[],
+  origins: Map<string, string | null>,
+  groups: RepoGroup[],
+  dismissed: string[],
+): Suggestion | null {
+  const known = new Set(groups.map((g) => g.id));
+  const loose = list.filter((r) => !r.group || !known.has(r.group)).map((r) => r.path);
+  const by = (prefix: string, keyOf: (p: string) => { key: string; name: string } | null) => {
+    const sets = new Map<string, Suggestion>();
+    for (const p of loose) {
+      const k = keyOf(p);
+      if (!k) continue;
+      const s = sets.get(k.key) ?? { key: `${prefix}:${k.key}`, name: k.name, paths: [] };
+      s.paths.push(p);
+      sets.set(k.key, s);
+    }
+    return [...sets.values()];
+  };
+  const candidates = [
+    ...by("owner", (p) => {
+      const o = ownerOf(origins.get(p) ?? null);
+      return o && { key: `${o.host}/${o.owner}`.toLowerCase(), name: o.owner };
+    }),
+    ...by("dir", (p) => ({ key: parentDir(p), name: repoName(parentDir(p)) })),
+  ].filter((s) => s.paths.length >= 2 && s.paths.length < loose.length && !dismissed.includes(s.key));
+  // Stable sort keeps owners ahead of folders of the same size.
+  return candidates.sort((a, b) => b.paths.length - a.paths.length)[0] ?? null;
 }

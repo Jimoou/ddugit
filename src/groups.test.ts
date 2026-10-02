@@ -6,6 +6,8 @@ import {
   GROUP_HUES,
   moveGroup,
   nextHue,
+  ownerOf,
+  suggestGroup,
   parseGroups,
   removeGroup,
   updateGroup,
@@ -64,5 +66,35 @@ describe("repository groups", () => {
     list = touchRecent(list, "/kept", 100);
     expect(list.find((r) => r.path === "/kept")).toEqual({ path: "/kept", starred: false, at: 100, group: "a" });
     expect(parseRecent(JSON.stringify(list)).find((r) => r.path === "/kept")?.group).toBe("a");
+  });
+});
+
+describe("grouping suggestions", () => {
+  it("reads the owner from forge URLs", () => {
+    expect(ownerOf("https://github.com/Acme/api.git")).toEqual({ host: "github.com", owner: "Acme" });
+    expect(ownerOf("git@gitlab.example.com:team/sub/x.git")).toEqual({ host: "gitlab.example.com", owner: "team" });
+    expect(ownerOf("ssh://git@host:2222/org/x")).toEqual({ host: "host", owner: "org" });
+    expect(ownerOf("/srv/repos/x.git")).toBeNull();
+    expect(ownerOf(null)).toBeNull();
+  });
+
+  it("offers the biggest same-owner or same-folder set of ungrouped repositories", () => {
+    const list = ["/w/a", "/w/b", "/w/c", "/x/d", "/y/e"].map((p) => repo(p));
+    const origins = new Map<string, string | null>([
+      ["/w/a", "https://github.com/acme/a.git"],
+      ["/x/d", "git@github.com:acme/d.git"],
+      ["/w/b", "https://github.com/me/b.git"],
+    ]);
+    // The /w folder (3) beats acme (2).
+    expect(suggestGroup(list, origins, [], [])).toEqual({ key: "dir:/w", name: "w", paths: ["/w/a", "/w/b", "/w/c"] });
+    expect(suggestGroup(list, origins, [], ["dir:/w"])).toEqual({
+      key: "owner:github.com/acme",
+      name: "acme",
+      paths: ["/w/a", "/x/d"],
+    });
+    // Already grouped ones aren't offered; a set of every loose repository isn't either.
+    const groups = addGroup([], "g", "G");
+    expect(suggestGroup(assignGroup(list, ["/w/a", "/w/b", "/w/c"], "g"), origins, groups, [])).toBeNull();
+    expect(suggestGroup([repo("/w/a"), repo("/w/b")], origins, [], [])).toBeNull();
   });
 });

@@ -380,6 +380,38 @@ textarea:focus {
 .band:not(.ungrouped) .world {
   border-left: 2px solid hsl(var(--h) 80% 60% / 0.8);
 }
+/* A card picked for grouping, and a band a card is dragged over. */
+.world.picked {
+  border-color: rgba(var(--signal), 0.9);
+  background: rgba(var(--signal), 0.06);
+}
+.band.drop {
+  outline: 1px dashed rgba(var(--signal), 0.8);
+  outline-offset: 4px;
+}
+.group-hint,
+.pick-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.group-hint {
+  color: var(--text-2);
+  border-color: rgba(var(--signal), 0.35);
+}
+.group-hint > span {
+  flex: 1;
+}
+.group-hint button,
+.pick-bar button {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
 .band-empty {
   margin: 0 0 0 22px;
 }

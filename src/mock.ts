@@ -462,7 +462,15 @@ function demoGlance(path: string): RepoGlance {
   const pick = (shift: number, n: number) => (h >>> shift) % n;
   const empty = { branch: null, upstream: null, ahead: 0, behind: 0, changes: 0, conflicts: 0, stashes: 0 };
   if (/gone/.test(path))
-    return { path, error: `could not find repository at '${path}'`, ...empty, state: "clean", remotes: 0, last: null };
+    return {
+      path,
+      error: `could not find repository at '${path}'`,
+      ...empty,
+      state: "clean",
+      remotes: 0,
+      origin: null,
+      last: null,
+    };
   const branch = GLANCE_BRANCHES[pick(0, 4)];
   const stopped = pick(20, 7) === 0;
   return {
@@ -477,6 +485,8 @@ function demoGlance(path: string): RepoGlance {
     state: stopped ? "merge" : "clean",
     stashes: pick(14, 3) === 0 ? 1 : 0,
     remotes: 1,
+    // Owner from the folder name's first word (`acme-main` → acme), so the demo has something to suggest.
+    origin: `https://github.com/${(path.split("/").pop() ?? "").split("-")[0]}/${path.split("/").pop()}.git`,
     last: {
       summary: GLANCE_SUMMARIES[pick(16, 4)],
       author: AUTHORS[pick(18, 4)],
