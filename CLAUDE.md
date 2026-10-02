@@ -61,7 +61,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.
-- `src/recent.ts`: 최근 저장소·즐겨찾기 목록(순수 함수). `components/Connect.tsx`가 저장(`useRecent`)과 화면(저장소 메뉴, 첫 화면 목록, clone 창)을 맡는다
+- `src/recent.ts`: 최근 저장소·즐겨찾기 목록(순수 함수). 저장소 그룹은 `src/groups.ts`(폴더형: 저장소마다 그룹 하나, 대시보드 띠 `bands`). `components/Connect.tsx`가 저장(`useRecent`)과 화면(저장소 메뉴, 첫 화면 목록, clone 창)을 맡는다
 - `src/settings.ts`: 사용자 설정(localStorage, 파싱은 순수 함수)과 단축키 표. 단축키를 바꾸면 `SHORTCUTS`도 고친다.
 - `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`. 화면 회전은 `View.r`(90° 단위) 하나로, 월드 ↔ 화면 변환은 늘 `toScreen`/`toWorld`/`viewAt`을 거친다(좌표를 직접 `* k + tx`로 계산하지 않는다)
 - `src/components/`: 패널과 다이얼로그. `Pulls.tsx`는 PR을 그래프 라벨용 가짜 ref(`kind: "pr"`)로 바꾸고 사이드바 섹션·토큰 창을 맡는다. `Fx.tsx`는 결과 순간의 우주 연출(효과 큐, 충돌 성운)

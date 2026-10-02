@@ -11,7 +11,7 @@ _마지막 갱신: 2026-10-02_
 
 ## 지금 하는 일
 
-M11: 원격 다듬기 PR(추가 후 받아오기 진행 카드, 원격별 접기) → 그룹 1·2·3 → v0.5.0.
+M11: 원격 다듬기 #69 merge. 그룹 1 PR → 그룹 2(여러 장 선택·끌어다 놓기·자동 제안) → 그룹 3(저장소 메뉴·탭 색 줄) → v0.5.0.
 
 ## 다음 단계
 
@@ -39,7 +39,7 @@ M11: 원격 다듬기 PR(추가 후 받아오기 진행 카드, 원격별 접기
   - 인증 실패 재현: `window.__ddugitDemo.failNextRemote = "https" | "ssh"`
   - 긴 직선 이력 만들기: `window.__ddugitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
   - 회전한 채로 열기: `localStorage["ddugit.settings"] = '{"rotation":3}'`
-  - 은하 대시보드: `localStorage["ddugit.recent"]`에 경로를 넣고 새로고침 → 새 탭. 데모의 각 경로는 경로 해시로 만든 상태, `gone`이 든 경로는 찾을 수 없음
+  - 은하 대시보드: `localStorage["ddugit.recent"]`에 경로를 넣고(그룹은 항목의 `group` + `localStorage["ddugit.groups"]`) 새로고침 → 새 탭. 데모의 각 경로는 경로 해시로 만든 상태, `gone`이 든 경로는 찾을 수 없음
   - 데모에는 원격에만 있는 브랜치 `origin/feature/orbit-sync`가 있다
   - 데모에는 서브모듈 둘(하나는 초기화 안 됨)과 LFS(패턴 둘, 받지 않은 파일 셋)가 있다. worktree는 `api.worktree("demo", …)`로 추가
 - mock.ts를 고친 뒤에는 vite를 다시 띄운다. 그러지 않으면 `import("/src/mock.ts")`가 앱과 다른 모듈 인스턴스를 가져온다(HMR `?t=`)

@@ -278,7 +278,13 @@ export default function App() {
               <p>{t("app.tagline")}</p>
               <ConnectActions primary {...connect} />
               {recent.list.some((r) => r.path !== DEMO_PATH) ? (
-                <Galaxy recent={recent} confirmFetch={settings.confirmRemote.fetch} onOpen={openPath} toast={toast} />
+                <Galaxy
+                  recent={recent}
+                  confirmFetch={settings.confirmRemote.fetch}
+                  onOpen={openPath}
+                  onOpenMany={(paths) => setTabs((tb) => paths.reduce(openIn, tb))}
+                  toast={toast}
+                />
               ) : (
                 <section className="welcome-recent">
                   <div className="eyebrow">{t("connect.recent")}</div>

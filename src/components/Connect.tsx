@@ -20,8 +20,10 @@ import {
   touchRecent,
 } from "../recent";
 import type { OpResult, Progress } from "../types";
+import { addGroup, assignGroup, moveGroup, parseGroups, removeGroup, type RepoGroup, updateGroup } from "../groups";
 
 const RECENT = "ddugit.recent";
+const GROUPS = "ddugit.groups";
 const CLONE_PARENT = "ddugit.cloneParent";
 
 function read(key: string): string | null {
@@ -39,9 +41,10 @@ function write(key: string, value: string) {
   }
 }
 
-/** Recent repositories, persisted; the callbacks are stable. */
+/** Recent repositories and their groups, persisted; the callbacks are stable. */
 export function useRecent() {
   const [list, setList] = useState(() => sortRecent(parseRecent(read(RECENT))));
+  const [groups, setGroups] = useState(() => parseGroups(read(GROUPS)));
   const update = useCallback((f: (l: RecentRepo[]) => RecentRepo[]) => {
     setList((l) => {
       const next = sortRecent(f(l));
@@ -49,8 +52,40 @@ export function useRecent() {
       return next;
     });
   }, []);
+  const updateGroups = useCallback((f: (g: RepoGroup[]) => RepoGroup[]) => {
+    setGroups((g) => {
+      const next = f(g);
+      write(GROUPS, JSON.stringify(next));
+      return next;
+    });
+  }, []);
   return {
     list,
+    groups,
+    /** A new group (optionally with `paths` in it); returns its id. */
+    addGroup: useCallback(
+      (name: string, paths: string[] = []) => {
+        const id = `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        updateGroups((g) => addGroup(g, id, name));
+        if (paths.length) update((l) => assignGroup(l, paths, id));
+        return id;
+      },
+      [update, updateGroups],
+    ),
+    editGroup: useCallback(
+      (id: string, patch: Partial<Omit<RepoGroup, "id">>) => updateGroups((g) => updateGroup(g, id, patch)),
+      [updateGroups],
+    ),
+    moveGroup: useCallback((id: string, delta: number) => updateGroups((g) => moveGroup(g, id, delta)), [updateGroups]),
+    removeGroup: useCallback(
+      (id: string) => {
+        updateGroups((g) => g.filter((x) => x.id !== id));
+        update((l) => removeGroup([], l, id).list);
+      },
+      [update, updateGroups],
+    ),
+    /** Put `paths` in group `id` (`null`: ungroup them). */
+    setGroup: useCallback((paths: string[], id: string | null) => update((l) => assignGroup(l, paths, id)), [update]),
     touch: useCallback((path: string) => update((l) => touchRecent(l, path, Date.now())), [update]),
     star: useCallback((path: string) => update((l) => toggleStar(l, path)), [update]),
     forget: useCallback((path: string) => update((l) => forgetRecent(l, path)), [update]),

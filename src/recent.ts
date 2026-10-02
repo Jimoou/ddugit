@@ -7,9 +7,11 @@ export interface RecentRepo {
   starred: boolean;
   /** Last opened, ms since epoch. */
   at: number;
+  /** The group it belongs to (see `groups.ts`); none means ungrouped. Grouped ones are never dropped for being old. */
+  group?: string;
 }
 
-/** Unstarred entries kept; starred ones are always kept. */
+/** Entries kept besides starred and grouped ones (those are always kept). */
 export const RECENT_MAX = 12;
 
 /** Folder name shown for a path (either separator, trailing ones ignored). */
@@ -31,7 +33,14 @@ export function parseRecent(raw: string | null): RecentRepo[] {
   return v.flatMap((o: unknown) => {
     const r = o as Partial<RecentRepo> | null;
     return r && typeof r.path === "string" && r.path
-      ? [{ path: r.path, starred: r.starred === true, at: typeof r.at === "number" ? r.at : 0 }]
+      ? [
+          {
+            path: r.path,
+            starred: r.starred === true,
+            at: typeof r.at === "number" ? r.at : 0,
+            ...(typeof r.group === "string" && r.group ? { group: r.group } : {}),
+          },
+        ]
       : [];
   });
 }
@@ -43,9 +52,12 @@ export const sortRecent = (list: RecentRepo[]) =>
 /** Record that `path` was opened at `now`, keeping its star, and trim old unstarred ones. */
 export function touchRecent(list: RecentRepo[], path: string, now: number): RecentRepo[] {
   const old = list.find((r) => r.path === path);
-  const next = sortRecent([{ path, starred: old?.starred ?? false, at: now }, ...list.filter((r) => r !== old)]);
-  let unstarred = 0;
-  return next.filter((r) => r.starred || ++unstarred <= RECENT_MAX);
+  const next = sortRecent([
+    { path, starred: old?.starred ?? false, at: now, ...(old?.group ? { group: old.group } : {}) },
+    ...list.filter((r) => r !== old),
+  ]);
+  let kept = 0;
+  return next.filter((r) => r.starred || r.group || ++kept <= RECENT_MAX);
 }
 
 export const toggleStar = (list: RecentRepo[], path: string) =>
