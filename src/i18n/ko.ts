@@ -31,6 +31,8 @@ export const ko = {
 
   // sidebar
   "side.search": "브랜치 찾기",
+  "side.fold": "사이드바 접기 (⌘/Ctrl+B)",
+  "side.unfold": "사이드바 펼치기 (⌘/Ctrl+B)",
   "side.local": "브랜치",
   "side.remote": "원격",
   "side.tag": "태그",
@@ -105,6 +107,7 @@ export const ko = {
   "keys.fit.what": "전체 보기",
   "keys.head.what": "HEAD로",
   "keys.rotate.what": "그래프를 90°씩 돌리기",
+  "keys.sidebar.what": "사이드바 접기·펼치기",
   "keys.dragMerge": "점 끌어 브랜치 끝에 놓기",
   "keys.dragMerge.what": "병합",
   "keys.altDrag": "⌥/Alt + 끌기",

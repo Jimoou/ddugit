@@ -1,4 +1,5 @@
 import { Icon } from "./Icon";
+import { SideSection } from "./Sidebar";
 import { useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
@@ -58,11 +59,15 @@ export function PullSection(p: {
   const failed = report.forges.find((f) => f.error);
   const saved = report.forges.find((f) => f.token === "keychain");
   return (
-    <section className="pulls">
-      <h3>
-        {t("pr.section")} <span className="muted">{report.prs.length}</span>
-        {/* A saved token can be replaced or forgotten; a CLI login is managed by `gh` / `glab` itself. */}
-        {saved && !blocked && (
+    <SideSection
+      id="pulls"
+      className="pulls"
+      title={t("pr.section")}
+      count={report.prs.length}
+      actions={
+        // A saved token can be replaced or forgotten; a CLI login is managed by `gh` / `glab` itself.
+        saved &&
+        !blocked && (
           <button
             className="h3-add"
             title={t("pr.token.manage")}
@@ -71,8 +76,9 @@ export function PullSection(p: {
           >
             <Icon name="key" />
           </button>
-        )}
-      </h3>
+        )
+      }
+    >
       {blocked && (
         <div className="pr-connect">
           <p className="muted">
@@ -107,7 +113,7 @@ export function PullSection(p: {
           </li>
         ))}
       </ul>
-    </section>
+    </SideSection>
   );
 }
 

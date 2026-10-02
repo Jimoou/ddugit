@@ -457,6 +457,29 @@ test("undoes the last commit, goes back hard, then rescues the lost commit from 
   await expect(page.locator(".reflog-list li.lost").filter({ hasText: head.slice(0, 7) })).toHaveCount(0);
 });
 
+test("folds sidebar sections and the whole sidebar, and keeps the layout", async ({ demo }) => {
+  const { page } = demo;
+  const side = page.locator(".sidebar");
+  const tags = side.locator("section", { has: page.locator("h3", { hasText: "태그" }) });
+  await expect(tags.locator("li")).toHaveCount(2);
+  await tags.locator("h3 .fold").click();
+  await expect(tags.locator("li")).toHaveCount(0);
+  await expect(tags.locator("h3 .fold")).toHaveAttribute("aria-expanded", "false");
+
+  // Folded to a rail; a section's icon unfolds the sidebar with that section open.
+  await side.getByLabel("사이드바 접기 (⌘/Ctrl+B)").click();
+  await expect(page.locator(".sidebar.rail")).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".sidebar.rail")).toBeVisible();
+  await page.locator(".sidebar.rail").getByLabel("태그").click();
+  await expect(page.locator(".sidebar.rail")).toHaveCount(0);
+  await expect(tags.locator("li")).toHaveCount(2);
+
+  // ⌘/Ctrl+B folds it again.
+  await page.keyboard.press("Control+b");
+  await expect(page.locator(".sidebar.rail")).toBeVisible();
+});
+
 test("cleans up merged and gone branches from the sidebar", async ({ demo }) => {
   const { page } = demo;
   await demo.mutate((d) => {
