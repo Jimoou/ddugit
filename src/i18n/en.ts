@@ -42,7 +42,7 @@ export const en: Record<Key, string> = {
   "side.stash": "Stashes",
   "side.addRemote": "Add remote",
   "side.hint.tag": "Click: focus · Right-click: menu",
-  "side.hint.branch": "Click: focus (⌘/Ctrl or Shift+click: several) · Double-click: checkout · Right-click: menu",
+  "side.hint.branch": "Click: focus (each click adds or removes one) · Double-click: checkout · Right-click: menu",
 
   // search
   "search.placeholder": "Message · author · SHA · branch",
@@ -176,7 +176,8 @@ export const en: Record<Key, string> = {
   "remote.pushBlocked": "{name} is fetch-only now",
   "remote.pushAllowed": "Pushing to {name} is allowed",
   "remote.pushedTo": "Pushed to {name}; this branch follows {name} from now on",
-  "side.fetchOnly": "fetch-only",
+  "side.fetchOnly": "fetch only",
+  "side.fetchOnly.hint": "Fetch-only: commits come from this remote, nothing is pushed to it",
   "sync.ask.to": "Pushing to <b>{remote}</b> <code>{url}</code>",
   "sync.ask.fetchOnly":
     "<b>{remote}</b> is a fetch-only remote: nothing is pushed there. Push to your own remote instead.",
@@ -211,6 +212,8 @@ export const en: Record<Key, string> = {
   "checkout.done": "Switched to {name}",
   "branch.newFromHead": "New branch (from {from})",
   "branch.newFirst": "Create the first branch",
+  "branch.newFirst.hint": "No commits yet: the branch appears with the first commit.",
+  "branch.newFirst.done": "Switched to {name}; it shows up after the first commit",
   "branch.newMenu": "New branch…",
   "branch.local.none": "No local branches. Create one with +, or double-click a remote branch to bring it here.",
   "branch.fromRemote": "{remote} as a local branch",
@@ -704,10 +707,13 @@ export const en: Record<Key, string> = {
 
   // tabs
   "tabs.label": "Open repositories",
+  "tabs.home": "Galaxy",
+  "tabs.homeHint": "My galaxy: every repository at a glance (⌘/Ctrl+0)",
   "tabs.new": "New tab",
   "tabs.newTab": "New tab (⌘/Ctrl+T)",
   "tabs.menu": "Open, clone or recent repositories",
   "tabs.close": "Close {name}",
+  "keys.home.what": "Go to my galaxy (home)",
   "keys.tabs": "Tabs",
   "keys.tabNew.what": "New tab (open, clone or create)",
   "keys.tabClose.what": "Close tab",

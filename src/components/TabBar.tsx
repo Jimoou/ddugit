@@ -6,12 +6,15 @@ import type { Tabs } from "../tabs";
 import { PlanetDot } from "./Planet";
 
 /**
- * The window's top row: the wordmark, a tab per open repository (the open
+ * The window's top row: the wordmark, the home tab (the galaxy dashboard), a tab per open repository (the open
  * tab's ▾ opens the repository menu: recent, open, clone, new), "+" for a new
  * tab, and settings at the far end.
  */
 export function TabBar(p: {
   tabs: Tabs;
+  /** The galaxy dashboard is showing instead of the active tab. */
+  home: boolean;
+  onHome(): void;
   /** Repository names as the snapshots report them, by path (the folder name until loaded). */
   names: Record<string, string>;
   /** Group of each grouped repository, by path: its colour runs along the tab's top. */
@@ -29,8 +32,18 @@ export function TabBar(p: {
     <header className="tabrow">
       <h1 className="wordmark small">ddugit</h1>
       <nav className="tabbar" role="tablist" aria-label={t("tabs.label")}>
+        <div
+          role="tab"
+          aria-selected={p.home}
+          className={`tab tab-home ${p.home ? "on" : ""}`}
+          title={t("tabs.homeHint")}
+          onClick={p.onHome}
+        >
+          <Icon name="orbit" />
+          <span className="tab-name">{t("tabs.home")}</span>
+        </div>
         {p.tabs.list.map((tab) => {
-          const on = tab.id === p.tabs.active;
+          const on = !p.home && tab.id === p.tabs.active;
           const name = tab.path ? (p.names[tab.path] ?? repoName(tab.path)) : t("tabs.new");
           const group = tab.path ? p.groupOf[tab.path] : undefined;
           return (

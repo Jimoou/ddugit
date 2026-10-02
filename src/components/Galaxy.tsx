@@ -246,7 +246,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
         )}
         <span className="world-tools">
           <button
-            className="icon"
+            className="icon more"
             aria-label={t("group.cardMenu")}
             title={t("group.cardMenu")}
             onClick={(e) => setMenu({ x: e.clientX, y: e.clientY, title: repoName(path), items: moveMenu(path) })}

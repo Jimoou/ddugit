@@ -129,6 +129,7 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
   {
     group: "keys.tabs",
     items: [
+      { keys: "⌘/Ctrl + 0", what: "keys.home.what" },
       { keys: "⌘/Ctrl + T", what: "keys.tabNew.what" },
       { keys: "⌘/Ctrl + W", what: "keys.tabClose.what" },
       { keys: "Ctrl + Tab / Ctrl + Shift + Tab", what: "keys.tabCycle.what" },

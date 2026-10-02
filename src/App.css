@@ -497,13 +497,35 @@ textarea:focus {
   display: flex;
   gap: 2px;
 }
-/* Tools show on hover; a star stays lit. */
-.world-tools button:not(.on) {
+/* The menu always shows (dimmed until hover); the star shows on hover and stays lit. */
+.world-tools button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.world-tools .icon-svg,
+.band-head button.icon .icon-svg {
+  stroke-width: 3.4;
+}
+.world-tools .more {
+  color: var(--text);
+  border-color: var(--line);
+  opacity: 0.85;
+}
+.world-tools .star:not(.on) {
   opacity: 0;
 }
 .world:hover .world-tools button,
 .world:focus-within .world-tools button {
   opacity: 1;
+}
+.world-tools button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line-strong);
 }
 .world-tools .star.on {
   color: var(--amber);
@@ -841,9 +863,10 @@ textarea:focus {
 }
 /* Fold per remote inside the remote section. */
 .sidebar .fetch-only {
-  margin-left: 6px;
-  padding: 0 4px;
-  font: 600 9.5px var(--sans);
+  flex-shrink: 0;
+  padding: 0 5px;
+  font: 600 10px/16px var(--sans);
+  white-space: nowrap;
   color: var(--amber);
   border: 1px solid rgba(255, 184, 77, 0.45);
 }
@@ -851,18 +874,54 @@ textarea:focus {
   font: 11px var(--mono);
   word-break: break-all;
 }
-.sidebar section.sub h3 {
-  margin: 6px 0 2px;
-  padding-left: 10px;
-  text-transform: none;
-  letter-spacing: 0.02em;
-  font: 600 11px var(--mono);
+/* A remote's own fold: a row of its own (cloud, name, badge, count, ⋯), its branches on a guide line. */
+.sidebar section.sub {
+  margin: 2px 0 4px 8px;
 }
-.sidebar section.sub li {
-  padding-left: 22px;
+.sidebar section.sub h3 {
+  margin: 0;
+  padding: 3px 0 3px 4px;
+  font: 600 12.5px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.035);
+}
+.sidebar section.sub h3 .fold {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.sidebar section.sub h3 .fold:hover {
+  color: var(--text);
+}
+.sidebar section.sub .remote-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+/* The name comes first; only a very long one is cut. */
+.sidebar section.sub .remote-name .nm {
+  flex-shrink: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar section.sub .remote-name svg {
+  flex-shrink: 0;
+  color: var(--cyan);
+}
+.sidebar section.sub ul,
+.sidebar section.sub .side-note {
+  margin-left: 11px;
+  border-left: 1px solid var(--line-strong);
 }
 .sidebar section.sub .side-note {
-  margin-left: 22px;
+  padding-left: 10px;
+}
+.sidebar section.sub li {
+  padding-left: 12px;
 }
 /* Make a local branch from a remote-only one: shown on hover. */
 .sidebar li .to-local {
@@ -3837,4 +3896,14 @@ button.demo-pill {
   font: 11px var(--mono);
   resize: vertical;
   margin-bottom: 6px;
+}
+
+/* The home tab: always first, set apart from the repository tabs. */
+.tab.tab-home {
+  padding-right: 12px;
+  margin-right: 4px;
+  color: var(--text-2);
+}
+.tab.tab-home .icon-svg {
+  color: var(--cyan);
 }

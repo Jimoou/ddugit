@@ -59,6 +59,8 @@ export default function App() {
   const [settings, setSettings] = useState(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tabs, setTabsState] = useState(loadTabs);
+  /** The galaxy dashboard is showing (the home tab), over whichever tab is active. */
+  const [home, setHome] = useState(false);
   const recent = useRecent();
   /** The repository menu is open under the active tab, at this x (window px). */
   const [repoMenu, setRepoMenu] = useState<number | null>(null);
@@ -73,8 +75,11 @@ export default function App() {
   const toastId = useRef(0);
   const page = PAGE_OVERRIDE ?? settings.historyPage;
   const current = activeTab(tabs);
+  const welcome = home || !current.path;
 
-  const setTabs = useCallback((f: (t: Tabs) => Tabs) => {
+  /** Change the tabs; showing a tab leaves home unless `stay` (closing a tab from home). */
+  const setTabs = useCallback((f: (t: Tabs) => Tabs, stay = false) => {
+    if (!stay) setHome(false);
     setTabsState((old) => {
       const next = f(old);
       if (isTauri) store(TABS, serializeTabs(next));
@@ -133,7 +138,11 @@ export default function App() {
       const mod = e.metaKey || e.ctrlKey;
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-      if (mod && e.key.toLowerCase() === "t") {
+      if (mod && e.key === "0") {
+        e.preventDefault();
+        setHome(true);
+        setRepoMenu(null);
+      } else if (mod && e.key.toLowerCase() === "t") {
         e.preventDefault();
         setTabs(addEmpty);
       } else if (mod && e.key.toLowerCase() === "w") {
@@ -232,10 +241,15 @@ export default function App() {
     <div className="shell">
       <TabBar
         tabs={tabs}
+        home={home}
+        onHome={() => {
+          setHome(true);
+          setRepoMenu(null);
+        }}
         names={names}
         groupOf={groupOf}
         onSelect={(id) => setTabs((tb) => ({ ...tb, active: id }))}
-        onClose={(id) => setTabs((tb) => closeTab(tb, id))}
+        onClose={(id) => setTabs((tb) => closeTab(tb, id), home)}
         onNew={() => setTabs(addEmpty)}
         onRepoMenu={(x) => setRepoMenu((o) => (o === null ? x : null))}
         onSettings={() => setSettingsOpen(true)}
@@ -262,7 +276,7 @@ export default function App() {
           <RepoView
             key={tab.id}
             path={tab.path}
-            active={tab.id === tabs.active}
+            active={!home && tab.id === tabs.active}
             settings={settings}
             page={page}
             toast={toast}
@@ -271,33 +285,32 @@ export default function App() {
             onOpenPath={openPath}
             onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
           />
-        ) : (
-          tab.id === tabs.active && (
-            <div key={tab.id} className="welcome">
-              <SpaceBackdrop animate={settings.animate} />
-              <h1 className="wordmark">ddugit</h1>
-              <p>{t("app.tagline")}</p>
-              <ConnectActions primary {...connect} />
-              {recent.list.some((r) => r.path !== DEMO_PATH) ? (
-                <Galaxy
-                  recent={recent}
-                  confirmFetch={settings.confirmRemote.fetch}
-                  onOpen={openPath}
-                  onOpenMany={openMany}
-                  toast={toast}
-                />
-              ) : (
-                <section className="welcome-recent">
-                  <div className="eyebrow">{t("connect.recent")}</div>
-                  <RecentList recent={recent} onOpen={openPath} />
-                </section>
-              )}
-              <button className="ghost" onClick={() => openPath(DEMO_PATH)}>
-                <Icon name="sparkle" /> {t("app.demo")}
-              </button>
-            </div>
-          )
-        ),
+        ) : null,
+      )}
+      {welcome && (
+        <div className="welcome">
+          <SpaceBackdrop animate={settings.animate} />
+          <h1 className="wordmark">ddugit</h1>
+          <p>{t("app.tagline")}</p>
+          <ConnectActions primary {...connect} />
+          {recent.list.some((r) => r.path !== DEMO_PATH) ? (
+            <Galaxy
+              recent={recent}
+              confirmFetch={settings.confirmRemote.fetch}
+              onOpen={openPath}
+              onOpenMany={openMany}
+              toast={toast}
+            />
+          ) : (
+            <section className="welcome-recent">
+              <div className="eyebrow">{t("connect.recent")}</div>
+              <RecentList recent={recent} onOpen={openPath} />
+            </section>
+          )}
+          <button className="ghost" onClick={() => openPath(DEMO_PATH)}>
+            <Icon name="sparkle" /> {t("app.demo")}
+          </button>
+        </div>
       )}
 
       {clone && (
@@ -338,7 +351,7 @@ export default function App() {
       {settingsOpen && (
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
-      <div className={`toasts floating ${current.path ? "" : "welcome-toasts"}`}>
+      <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
         {toasts.map((item) => (
           <div key={item.id} className={`toast ${item.kind}`}>
             {item.text}

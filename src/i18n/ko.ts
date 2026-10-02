@@ -41,7 +41,7 @@ export const ko = {
   "side.stash": "스태시",
   "side.addRemote": "원격 저장소 추가",
   "side.hint.tag": "클릭: 집중해서 보기 · 우클릭: 메뉴",
-  "side.hint.branch": "클릭: 집중해서 보기 (⌘/Ctrl·Shift+클릭: 여러 개) · 더블클릭: 체크아웃 · 우클릭: 메뉴",
+  "side.hint.branch": "클릭: 집중해서 보기 (누를 때마다 더하고 빼요) · 더블클릭: 체크아웃 · 우클릭: 메뉴",
 
   // search
   "search.placeholder": "메시지 · 작성자 · SHA · 브랜치",
@@ -174,7 +174,8 @@ export const ko = {
   "remote.pushBlocked": "{name}은(는) 이제 가져오기 전용이에요",
   "remote.pushAllowed": "{name}으로 보낼 수 있어요",
   "remote.pushedTo": "{name}으로 보냈어요. 이제 이 브랜치는 {name}을(를) 따라가요",
-  "side.fetchOnly": "가져오기 전용",
+  "side.fetchOnly": "받기만",
+  "side.fetchOnly.hint": "가져오기 전용: 이 원격에서 받기만 하고 보내지는 않아요",
   "sync.ask.to": "보낼 곳: <b>{remote}</b> <code>{url}</code>",
   "sync.ask.fetchOnly": "<b>{remote}</b>은(는) 가져오기 전용 원격이라 보내지 않아요. 내 원격으로 보내세요.",
   "sync.ask.notOrigin":
@@ -208,6 +209,8 @@ export const ko = {
   "checkout.done": "{name}(으)로 이동했어요",
   "branch.newFromHead": "새 브랜치 ({from}에서)",
   "branch.newFirst": "첫 브랜치 만들기",
+  "branch.newFirst.hint": "아직 커밋이 없어서 첫 커밋을 하면 이 브랜치가 생겨요.",
+  "branch.newFirst.done": "{name} 브랜치로 옮겼어요. 첫 커밋을 하면 목록에 나타나요",
   "branch.newMenu": "새 브랜치…",
   "branch.local.none": "로컬 브랜치가 없어요. + 로 만들거나 원격 브랜치를 더블클릭해 로컬로 가져오세요.",
   "branch.fromRemote": "{remote}을(를) 로컬 브랜치로",
@@ -698,10 +701,13 @@ export const ko = {
 
   // tabs
   "tabs.label": "열린 저장소",
+  "tabs.home": "내 은하",
+  "tabs.homeHint": "내 은하: 저장소를 한눈에 보는 첫 화면 (⌘/Ctrl+0)",
   "tabs.new": "새 탭",
   "tabs.newTab": "새 탭 (⌘/Ctrl+T)",
   "tabs.menu": "저장소 열기·가져오기·최근 목록",
   "tabs.close": "{name} 닫기",
+  "keys.home.what": "내 은하(첫 화면)로 가기",
   "keys.tabs": "탭",
   "keys.tabNew.what": "새 탭 (저장소 열기·clone·만들기)",
   "keys.tabClose.what": "탭 닫기",

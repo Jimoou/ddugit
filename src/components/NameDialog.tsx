@@ -3,6 +3,8 @@ import { t } from "../i18n";
 
 export interface NameRequest {
   title: string;
+  /** A note under the title. */
+  hint?: string;
   placeholder: string;
   confirmLabel: string;
   /** Prefilled name (rename): submitting needs a different one. */
@@ -33,6 +35,7 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
         }}
       >
         <div className="eyebrow">{title}</div>
+        {req.hint && <p className="muted">{req.hint}</p>}
         <input
           className="text"
           autoFocus
