@@ -267,6 +267,7 @@ export default function App() {
             toast={toast}
             onLoaded={onLoaded}
             onChangeSettings={updateSettings}
+            onOpenPath={openPath}
             onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
           />
         ) : (

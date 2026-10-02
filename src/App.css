@@ -681,6 +681,37 @@ textarea:focus {
   border: 1px solid var(--amber);
   color: var(--amber);
 }
+/* A branch checked out in another worktree. */
+.sidebar .elsewhere {
+  margin-left: auto;
+  color: var(--muted);
+  display: inline-flex;
+}
+.sidebar .worktrees li {
+  gap: 6px;
+  color: var(--text-2);
+}
+.sidebar .worktrees li.missing {
+  opacity: 0.55;
+}
+.worktree-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.worktree-dialog select {
+  font: 13px var(--mono);
+  border: 1px solid var(--line);
+  padding: 7px 8px;
+}
+.worktree-dialog .row {
+  display: flex;
+  gap: 6px;
+}
+.worktree-dialog .grow {
+  flex: 1;
+  min-width: 0;
+}
 .head-pill {
   display: inline-flex;
   align-items: center;

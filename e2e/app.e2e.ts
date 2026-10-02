@@ -898,3 +898,34 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
   await expect(page.locator(".app:not([hidden]) .topbar")).toBeVisible();
   await expect(page.locator(".tabbar .tab")).toHaveCount(2);
 });
+
+test("adds a worktree for a new branch, opens it in a tab, and removes it", async ({ demo }) => {
+  const { page } = demo;
+  const section = page.locator(".app:not([hidden]) .sidebar .worktrees");
+  await expect(section.locator("li")).toHaveCount(1);
+  await section.getByRole("button", { name: "worktree 추가" }).click();
+  const dialog = page.locator(".worktree-dialog");
+  await dialog.getByRole("radio", { name: "새 브랜치" }).click();
+  await dialog.getByLabel("새 브랜치").fill("hotfix");
+  await expect(dialog.getByLabel("worktree 폴더")).toHaveValue("/demo/ddugit-demo-hotfix");
+  await dialog.getByRole("button", { name: "추가하고 탭으로 열기" }).click();
+  await demo.toast("hotfix을(를) 새 worktree에 꺼냈어요");
+  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+
+  // Back in the first tab: the branch is out elsewhere, so checking it out opens that tab.
+  await page.locator(".tabbar .tab").nth(0).click();
+  await expect(section.locator("li")).toHaveCount(2);
+  const branch = page.locator(".app:not([hidden]) .sidebar li").filter({ hasText: /^hotfix$/ });
+  await expect(branch.locator(".elsewhere")).toBeVisible();
+  await branch.dblclick();
+  await demo.toast(/다른 worktree에 꺼내져 있어서/);
+  await expect(page.locator(".tab.on")).toHaveCount(1);
+  await expect(page.locator(".tabbar .tab").nth(1)).toHaveClass(/on/);
+
+  await page.locator(".tabbar .tab").nth(0).click();
+  await section.locator("li").filter({ hasText: "ddugit-demo-hotfix" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "worktree 제거…" }).click();
+  await page.locator(".dialog").getByRole("button", { name: "제거" }).click();
+  await demo.toast("worktree를 제거했어요");
+  await expect(section.locator("li")).toHaveCount(1);
+});

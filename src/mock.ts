@@ -23,6 +23,9 @@ import type {
 const demoLicense = { current: null as import("./types").LicenseInfo | null };
 const demoSsh = { keys: [] as { name: string; public: string }[], trusted: [] as string[] };
 
+/** Where the demo repository "is" on disk. */
+const DEMO_ROOT = "/demo/ddugit-demo";
+
 let seq = 0;
 const fakeId = () => {
   seq += 1;
@@ -56,6 +59,8 @@ class MockRepo {
   remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);
   /** Demo bisect (HEAD isn't moved; the probe is reported in the state instead). */
   bisect: { bad: string; good: string[]; skipped: string[] } | null = null;
+  /** Linked worktrees (the demo's own folder is the main one). */
+  worktrees: { path: string; branch: string }[] = [];
   /** Where HEAD has been, newest first (like `git reflog`); `lost` is computed on read. */
   reflog: Omit<ReflogEntry, "lost">[] = [];
 
@@ -157,7 +162,7 @@ class MockRepo {
     for (const r of refs) for (const id of this.ancestors(r.target)) reachable.add(id);
     const all = this.order.filter((id) => reachable.has(id));
     return {
-      path: "/demo/ddugit-demo",
+      path: DEMO_ROOT,
       name: "ddugit-demo",
       head: {
         branch: this.head,
@@ -174,6 +179,10 @@ class MockRepo {
       state: this.state,
       incoming: this.pending?.source ?? null,
       truncated: all.length > limit,
+      worktrees: [
+        { path: DEMO_ROOT, branch: this.head, main: true, current: true },
+        ...this.worktrees.map((w) => ({ ...w, main: false, current: false })),
+      ].map((w) => ({ ...w, head: this.branches.get(w.branch) ?? null, locked: false, missing: false })),
     };
   }
 }
@@ -611,8 +620,33 @@ const mockTable: Table = {
 
   git_checkout({ target }) {
     if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
+    const elsewhere = repo.worktrees.find((w) => w.branch === target);
+    if (elsewhere) return fail(`fatal: '${target}' is already used by worktree at '${elsewhere.path}'`);
     repo.head = target;
     return delay(res("ok", `Switched to branch '${target}'`));
+  },
+
+  git_worktree({ op }) {
+    if (op.kind === "prune") return delay(res("ok"));
+    if (op.kind === "remove") {
+      if (/dirty/.test(op.dir) && !op.force)
+        return delay(
+          res("unmerged", `fatal: '${op.dir}' contains modified or untracked files, use --force to delete it`),
+        );
+      repo.worktrees = repo.worktrees.filter((w) => w.path !== op.dir);
+      return delay(res("ok"));
+    }
+    const branch = op.newBranch ?? op.branch;
+    if (!branch) return fail("Choose a branch for the new worktree");
+    if (op.newBranch) {
+      if (repo.branches.has(op.newBranch))
+        return delay(res("failed", `fatal: a branch named '${branch}' already exists`));
+      repo.branches.set(op.newBranch, repo.branches.get(op.at ?? repo.head) ?? op.at ?? repo.branches.get(repo.head)!);
+    }
+    const used = branch === repo.head ? DEMO_ROOT : repo.worktrees.find((w) => w.branch === branch)?.path;
+    if (used) return delay(res("failed", `fatal: '${branch}' is already used by worktree at '${used}'`));
+    repo.worktrees.push({ path: op.dir, branch });
+    return delay(res("ok", `Preparing worktree (checking out '${branch}')`));
   },
 
   git_create_branch({ name, at, switch: sw }) {

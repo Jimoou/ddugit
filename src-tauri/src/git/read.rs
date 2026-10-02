@@ -86,6 +86,8 @@ pub struct RepoSnapshot {
     pub incoming: Option<String>,
     /// True when history was cut at `limit`.
     pub truncated: bool,
+    /// Every working tree of the repository, the main one first.
+    pub worktrees: Vec<super::worktree::WorktreeInfo>,
 }
 
 pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
@@ -112,6 +114,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
         state: state_name(repo.state()).to_string(),
         incoming: incoming(&repo),
         truncated,
+        worktrees: super::worktree::list(&repo),
     })
 }
 

@@ -69,3 +69,6 @@ export function joinPath(parent: string, name: string): string {
   const sep = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
   return parent.replace(/[\\/]+$/, "") + sep + name;
 }
+
+/** The folder `path` is in (either separator, trailing ones ignored). */
+export const parentDir = (path: string) => path.replace(/[\\/]+$/, "").replace(/[\\/][^\\/]*$/, "") || path;
