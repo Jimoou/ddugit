@@ -30,6 +30,7 @@ import type {
   SshTest,
   LicenseStatus,
   RepoGlance,
+  WorktreeOp,
 } from "./types";
 import { t } from "./i18n";
 
@@ -63,6 +64,7 @@ export interface Commands {
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
   git_ref: [{ path: string; op: RefOp }, OpResult];
+  git_worktree: [{ path: string; op: WorktreeOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
@@ -147,6 +149,8 @@ export const api = {
   createBranch: (path: string, name: string, at: string | null, switchTo: boolean) =>
     call("git_create_branch", { path, name, at, switch: switchTo }),
   ref: (path: string, op: RefOp) => call("git_ref", { path, op }),
+  /** Add, remove or prune worktrees; removing one with changes needs `force` (`unmerged`). */
+  worktree: (path: string, op: WorktreeOp) => call("git_worktree", { path, op }),
   remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
     return call("git_remote", { path, op, onProgress: progressSink(onProgress, path) });
   },

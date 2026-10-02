@@ -70,6 +70,8 @@ command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) 
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
+command!(git_worktree(path: String, op: git::worktree::WorktreeOp) -> OpResult
+    => git::worktree::apply(&path, &op));
 command!(git_ref(path: String, op: RefOp) -> OpResult => git::refs::apply(&path, &op));
 command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
@@ -202,6 +204,7 @@ pub fn run() {
             git_checkout,
             git_create_branch,
             git_ref,
+            git_worktree,
             git_remote,
             git_reset,
             git_reflog,

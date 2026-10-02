@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   forgetRecent,
   joinPath,
+  parentDir,
   nameFromUrl,
   parseRecent,
   RECENT_MAX,
@@ -44,5 +45,7 @@ describe("recent repositories", () => {
     expect(nameFromUrl("")).toBe("");
     expect(joinPath("/home/me/", "ddugit")).toBe("/home/me/ddugit");
     expect(joinPath("C:\\work", "ddugit")).toBe("C:\\work\\ddugit");
+    expect(parentDir("/home/me/ddugit/")).toBe("/home/me");
+    expect(parentDir("C:\\work\\ddugit")).toBe("C:\\work");
   });
 });

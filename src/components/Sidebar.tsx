@@ -29,8 +29,10 @@ interface Props {
   onCleanup(): void;
   /** Open the backport sheet (commits another branch has that this one doesn't). */
   onBackport(): void;
-  /** Open pull requests (or how to connect the forge), shown after the refs. */
-  pulls?: ReactNode;
+  /** Local branches checked out in another worktree → that worktree's folder. */
+  elsewhere: Record<string, string>;
+  /** More sections after the refs (pull requests, worktrees). */
+  extra?: ReactNode;
 }
 
 const GROUPS: { kind: RefInfo["kind"]; title: Key; icon: IconName }[] = [
@@ -206,6 +208,11 @@ export function Sidebar(props: Props) {
                       <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
                       <span className="name">{r.name}</span>
                       {isHead && <span className="head-pill">HEAD</span>}
+                      {r.kind === "local" && props.elsewhere[r.name] && (
+                        <span className="elsewhere" title={t("wt.elsewhere", { path: props.elsewhere[r.name] })}>
+                          <Icon name="folder" size={11} />
+                        </span>
+                      )}
                     </li>
                   );
                 })}
@@ -213,7 +220,7 @@ export function Sidebar(props: Props) {
             </SideSection>
           );
         })}
-        {props.pulls}
+        {props.extra}
         {stashes.length > 0 && (
           <SideSection id="stash" title={t("side.stash")} count={stashes.length}>
             <ul>

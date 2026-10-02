@@ -22,6 +22,7 @@ import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
 import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
+import { WorktreeDialog, WorktreeSection } from "./components/Worktrees";
 import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
 import { SyncConfirm } from "./components/SyncConfirm";
@@ -57,6 +58,8 @@ import type {
   RefOp,
   RemoteOp,
   RepoSnapshot,
+  WorktreeInfo,
+  WorktreeOp,
 } from "./types";
 
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
@@ -118,6 +121,8 @@ export interface RepoViewProps {
   onChangeSettings(patch: Partial<Settings>): void;
   /** Open the repository menu (recent, open, clone, new) under the tab. */
   onRepoMenu(): void;
+  /** Open another repository folder (a worktree) in a tab. */
+  onOpenPath(path: string): void;
 }
 
 /** One open repository: its graph, panels, sheets and every git action on it. */
@@ -130,6 +135,7 @@ export function RepoView({
   onLoaded,
   onChangeSettings,
   onRepoMenu,
+  onOpenPath,
 }: RepoViewProps) {
   const [snap, setSnap] = useState<RepoSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -165,6 +171,8 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  /** Adding a worktree, maybe for a branch picked from its menu. */
+  const [worktreeReq, setWorktreeReq] = useState<{ branch?: string } | null>(null);
   /** Preview card: the commit the pointer has rested on, where its star was then. */
   const [peek, setPeek] = useState<{ id: string; at: Pt; width: number } | null>(null);
   const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -611,10 +619,80 @@ export function RepoView({
 
   const refRun = (label: string, op: RefOp) => run(label, () => api.ref(path, op));
 
+  /** Local branches checked out in another worktree → that folder. */
+  const elsewhere = useMemo(
+    () =>
+      Object.fromEntries(
+        (snap?.worktrees ?? []).flatMap((w) => (!w.current && w.branch && !w.missing ? [[w.branch, w.path]] : [])),
+      ) as Record<string, string>,
+    [snap],
+  );
+
   const checkoutRef = (r: RefInfo) =>
-    r.kind === "remote"
-      ? refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name })
-      : run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name));
+    // git can't check out a branch another worktree has; open that worktree instead.
+    r.kind === "local" && elsewhere[r.name]
+      ? (onOpenPath(elsewhere[r.name]), toast("ok", t("wt.checkedOut", { branch: r.name })))
+      : r.kind === "remote"
+        ? refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name })
+        : run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name));
+
+  const addWorktree = async (op: Extract<WorktreeOp, { kind: "add" }>) => {
+    const branch = op.newBranch ?? op.branch ?? "";
+    const r = await run(t("wt.added", { branch }), () => api.worktree(path, op));
+    if (r.status === "ok") {
+      setWorktreeReq(null);
+      onOpenPath(op.dir);
+    }
+  };
+
+  const removeWorktree = (w: WorktreeInfo, force = false) => {
+    setConfirm(null);
+    void run(t("wt.remove.done"), () => api.worktree(path, { kind: "remove", dir: w.path, force })).then((r) => {
+      if (r.status !== "unmerged") return;
+      setConfirm({
+        title: t("wt.dirty.title"),
+        danger: true,
+        confirmLabel: t("wt.dirty.go"),
+        body: (
+          <p>
+            <Rich k="wt.dirty.body" vars={{ path: w.path }} />
+          </p>
+        ),
+        onConfirm: () => removeWorktree(w, true),
+      });
+    });
+  };
+
+  const worktreeMenu = (w: WorktreeInfo): MenuItem[] => [
+    { label: t("wt.menu.open"), disabled: w.current || w.missing, onSelect: () => onOpenPath(w.path) },
+    { label: t("wt.menu.copy"), onSelect: () => void navigator.clipboard?.writeText(w.path) },
+    "separator",
+    ...(w.missing
+      ? [
+          {
+            label: t("wt.menu.prune"),
+            onSelect: () => void run(t("wt.pruned"), () => api.worktree(path, { kind: "prune" })),
+          },
+        ]
+      : []),
+    {
+      label: t("wt.menu.remove"),
+      danger: true,
+      disabled: w.main || w.current || w.missing,
+      onSelect: () =>
+        setConfirm({
+          title: t("wt.remove.title"),
+          danger: true,
+          confirmLabel: t("wt.remove.go"),
+          body: (
+            <p>
+              <Rich k="wt.remove.body" vars={{ path: w.path, branch: w.branch ?? "HEAD" }} />
+            </p>
+          ),
+          onConfirm: () => removeWorktree(w),
+        }),
+    },
+  ];
 
   const askBranchAt = (at: string) =>
     setNameReq({
@@ -935,6 +1013,11 @@ export function RepoView({
     }
     return [
       { label: t("menu.checkout"), disabled: isHead, onSelect: () => void checkoutRef(r) },
+      {
+        label: t("menu.worktree"),
+        disabled: isHead || !!elsewhere[r.name],
+        onSelect: () => setWorktreeReq({ branch: r.name }),
+      },
       merge,
       compare,
       "separator",
@@ -1292,14 +1375,23 @@ export function RepoView({
             const base = snap.stashes[i]?.base;
             if (base) graph.current?.centerOn(base);
           }}
-          pulls={
-            <PullSection
-              report={pulls}
-              onShow={showPr}
-              onOpen={(pr) => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e)))}
-              onMenu={(pr, x, y) => setMenu({ x, y, title: pr.title, items: prMenu(pr) })}
-              onConnect={setTokenFor}
-            />
+          elsewhere={elsewhere}
+          extra={
+            <>
+              <PullSection
+                report={pulls}
+                onShow={showPr}
+                onOpen={(pr) => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e)))}
+                onMenu={(pr, x, y) => setMenu({ x, y, title: pr.title, items: prMenu(pr) })}
+                onConnect={setTokenFor}
+              />
+              <WorktreeSection
+                worktrees={snap.worktrees}
+                onOpen={(w) => onOpenPath(w.path)}
+                onAdd={() => setWorktreeReq({})}
+                onMenu={(w, x, y) => setMenu({ x, y, title: w.path, items: worktreeMenu(w) })}
+              />
+            </>
           }
         />
 
@@ -1777,6 +1869,19 @@ export function RepoView({
         <ContextMenu x={menu.x} y={menu.y} title={menu.title} items={menu.items} onClose={() => setMenu(null)} />
       )}
 
+      {worktreeReq && (
+        <WorktreeDialog
+          worktrees={snap.worktrees}
+          free={snap.refs
+            .filter((r) => r.kind === "local" && r.name !== snap.head.branch && !elsewhere[r.name])
+            .map((r) => r.name)
+            .sort()}
+          branch={worktreeReq.branch}
+          busy={busy}
+          onCancel={() => setWorktreeReq(null)}
+          onAdd={(op) => void addWorktree(op)}
+        />
+      )}
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
 
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}

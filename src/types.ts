@@ -221,7 +221,30 @@ export interface RepoSnapshot {
   /** Commit a stopped merge / cherry-pick / revert is bringing in. */
   incoming: string | null;
   truncated: boolean;
+  /** Every working tree of the repository, the main one first. */
+  worktrees: WorktreeInfo[];
 }
+
+/** One working tree (see `git/worktree.rs`). */
+export interface WorktreeInfo {
+  path: string;
+  /** Checked out there; null when detached. */
+  branch: string | null;
+  head: string | null;
+  /** The repository's original working tree (can't be removed). */
+  main: boolean;
+  /** The one this tab shows. */
+  current: boolean;
+  locked: boolean;
+  /** Its folder is gone; prune forgets it. */
+  missing: boolean;
+}
+
+/** Mirrors `WorktreeOp` in git/worktree.rs. */
+export type WorktreeOp =
+  | { kind: "add"; dir: string; branch: string | null; newBranch: string | null; at: string | null }
+  | { kind: "remove"; dir: string; force: boolean }
+  | { kind: "prune" };
 
 export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected" | "auth" | "unmerged";
 
