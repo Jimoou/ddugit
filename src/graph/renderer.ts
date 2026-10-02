@@ -6,7 +6,7 @@ import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
-import { captionLength, laneReach, SLANT } from "./captions";
+import { type Box, CAPTION_H, laneReach, placeCaptions } from "./captions";
 import type { Layout } from "./layout";
 
 /** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
@@ -579,21 +579,25 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
           })),
         );
 
-    // Summaries go under the badges, so a caption crossing a lane never hides a branch name.
-    for (const L of labelQueue) {
-      const text = s.summaries.get(L.id) ?? "";
-      if (!text) continue;
-      if (upright(view.r)) {
-        if (k >= ZOOM.captions || L.id === s.selected || L.id === s.hovered)
+    // Summaries go under the badges, so a caption never hides a branch name.
+    if (upright(view.r)) {
+      for (const L of labelQueue) {
+        const text = s.summaries.get(L.id) ?? "";
+        if (text && (k >= ZOOM.captions || L.id === s.selected || L.id === s.hovered))
           drawUprightCaption(ctx, s, L, text, rowText.get(L.id) ?? 0, side);
-      } else if (L.id === s.selected || L.id === s.hovered) {
-        // The commit in hand reads straight, in full.
-        ctx.font = `12px ${SANS}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillStyle = L.d ? "rgba(220,215,255,0.25)" : "rgba(230,225,255,0.85)";
-        ctx.fillText(truncate(ctx, text, 260), L.x, L.y + r + 9);
-      } else if (k >= ZOOM.captions) drawCaption(ctx, s, L, text, r);
+      }
+    } else {
+      const badges: Box[] = placed.flatMap((g) => g.badges.map((b) => ({ x: b.x, y: b.y, w: b.w, h: BADGE_H })));
+      const plusR = Math.max(9, Math.min(15, 12 * k)) + 4;
+      badges.push({ x: plusS.x - plusR, y: plusS.y - plusR, w: plusR * 2, h: plusR * 2 });
+      for (const m of s.stashes) {
+        const p = toScreen(view, m.pos);
+        const sr = stashRadius(k) + 3;
+        // Zoomed in, the stash's own label runs to its right.
+        badges.push({ x: p.x - sr, y: p.y - sr, w: sr * 2 + (k >= ZOOM.summaries ? 230 : 0), h: sr * 2 });
+      }
+      const badged = new Set(groups.filter((g) => g.labels.length).map((g) => g.L.id));
+      drawMapCaptions(ctx, s, labelQueue, badges, badged, r);
     }
 
     groups.forEach(({ L, labels }, gi) => {
@@ -774,51 +778,65 @@ function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: 
   ctx.restore();
 }
 
-/** Longest caption on screen, px. */
+/** Longest caption on screen, px; the commit in hand may run longer. */
 const CAPTION_MAX = 230;
+const CAPTION_FULL = 360;
 
 /**
- * A commit's summary on a slant below its star (see `captions.ts`), with a dark
- * halo so it stays readable where it crosses a lane.
+ * Commit summaries as map labels (see `captions.ts`): straight, under or over
+ * each star, placed by importance (the commit in hand, HEAD, labelled
+ * commits, merges, then newest first) so they never cover a star, a badge or
+ * each other. A label set further out hangs from a thin leader line.
  */
-function drawCaption(
+function drawMapCaptions(
   ctx: CanvasRenderingContext2D,
   s: DrawState,
-  L: { x: number; y: number; id: string; d: boolean },
-  text: string,
+  queue: { x: number; y: number; id: string; color: string; d: boolean }[],
+  obstacles: Box[],
+  badged: Set<string>,
   r: number,
 ) {
-  const node = s.scene.layout.byId.get(L.id);
-  if (!node) return;
-  const k = s.view.k;
+  const { byId } = s.scene.layout;
+  const inHand = (id: string) => id === s.selected || id === s.hovered;
+  const rank = (id: string) =>
+    inHand(id) ? 0 : id === s.headId ? 1 : badged.has(id) ? 2 : byId.get(id)?.isMerge ? 3 : 4;
+  const all = s.view.k >= ZOOM.captions;
+  const list = queue
+    .filter((L) => s.summaries.get(L.id) && (all || inHand(L.id)))
+    .sort((a, b) => rank(a.id) - rank(b.id) || (byId.get(a.id)?.row ?? 0) - (byId.get(b.id)?.row ?? 0));
   ctx.font = `11.5px ${SANS}`;
-  const want = Math.min(ctx.measureText(text).width, CAPTION_MAX);
-  const flip = s.view.r === 2;
-  const room = (dir: 1 | -1) =>
-    captionLength(s.scene.grid, node.row, node.lane, s.scene.layout.laneCount, CAPTION_MAX / k, 14 / k, dir, flip) * k -
-    r -
-    6;
-  let dir: 1 | -1 = 1;
-  let space = room(1);
-  // Under the lanes first; a commit without labels may use the open sky above when that fits more.
-  if (space < want && !s.refs.get(L.id)?.length) {
-    const up = room(-1);
-    if (up > space) [dir, space] = [-1, up];
-  }
-  if (space < 24) return;
-  ctx.save();
-  ctx.translate(L.x + (r + 5) * Math.cos(SLANT), L.y + dir * (r + 5) * Math.sin(SLANT));
-  ctx.rotate(dir * SLANT);
+  const items = list.map((L) => ({
+    id: L.id,
+    x: L.x,
+    y: L.y,
+    w: Math.min(ctx.measureText(s.summaries.get(L.id)!).width + 2, inHand(L.id) ? CAPTION_FULL : CAPTION_MAX),
+    up: !badged.has(L.id),
+  }));
+  const stars = queue.map((L) => ({ x: L.x - r - 3, y: L.y - r - 3, w: 2 * r + 6, h: 2 * r + 6 }));
+  const byQueue = new Map(list.map((L) => [L.id, L]));
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  const line = truncate(ctx, text, space);
   ctx.lineJoin = "round";
-  ctx.lineWidth = 3.5;
-  ctx.strokeStyle = "rgba(5,4,14,0.85)";
-  ctx.strokeText(line, 0, 0);
-  ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : "rgba(230,225,255,0.8)";
-  ctx.fillText(line, 0, 0);
-  ctx.restore();
+  for (const c of placeCaptions(items, [...stars, ...obstacles], r)) {
+    const L = byQueue.get(c.id)!;
+    const on = inHand(c.id);
+    if (c.level) {
+      ctx.strokeStyle = alpha(L.color, L.d ? 0.15 : 0.4);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(L.x, c.above ? L.y - r - 3 : L.y + r + 3);
+      ctx.lineTo(L.x, c.above ? c.y + CAPTION_H : c.y);
+      ctx.stroke();
+    }
+    ctx.font = `${on ? 600 : 400} 11.5px ${SANS}`;
+    const line = truncate(ctx, s.summaries.get(c.id)!, c.w);
+    const y = c.y + CAPTION_H / 2;
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = "rgba(5,4,14,0.85)";
+    ctx.strokeText(line, c.x, y);
+    ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : on ? "#ffffff" : "rgba(230,225,255,0.82)";
+    ctx.fillText(line, c.x, y);
+  }
 }
 
 /** Longest upright caption on screen, px. */

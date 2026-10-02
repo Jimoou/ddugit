@@ -1,45 +1,62 @@
 import { describe, expect, it } from "vitest";
-import { captionLength, SLANT } from "./captions";
-import { COL, LANE } from "./scene";
+import { CAPTION_H, laneReach, placeCaptions } from "./captions";
+import type { Layout } from "./layout";
 
-const grid = (...cells: [number, number][]) => new Map(cells.map(([row, lane]) => [`${row}:${lane}`, "x"]));
-const sin = Math.sin(SLANT),
-  cos = Math.cos(SLANT);
+const star = (x: number, y: number, r = 6) => ({ x: x - r - 2, y: y - r - 2, w: 2 * r + 4, h: 2 * r + 4 });
+const item = (id: string, x: number, y: number, w = 150, up = true) => ({ id, x, y, w, up });
 
-describe("slanted commit captions", () => {
-  it("run their full length over empty lanes or the bottom of the graph", () => {
-    expect(captionLength(grid(), 10, 0, 4, 200)).toBe(200);
-    expect(captionLength(grid([10, 0]), 10, 0, 1, 200)).toBe(200);
+describe("map-style commit captions", () => {
+  it("hang right under their star, starting at it and reading to the right", () => {
+    const [c] = placeCaptions([item("a", 100, 100)], [star(100, 100)], 6);
+    expect(c).toMatchObject({ id: "a", x: 94, y: 111, w: 150, level: 0, above: false });
+    // A short summary is placed whole.
+    expect(placeCaptions([item("b", 100, 100, 40)], [], 6)[0].w).toBe(40);
   });
 
-  it("stop before a commit they would cross", () => {
-    // At this slant the caption passes right over the commit three lanes down, two columns on.
-    const dx = 2 * COL,
-      dy = 3 * LANE;
-    expect(Math.abs(dx * sin - dy * cos)).toBeLessThan(15);
-    expect(captionLength(grid([8, 3]), 10, 0, 5, 400)).toBeLessThan(dx * cos + dy * sin);
+  it("take the next free slot when a neighbour's label is in the way, the most important placed first", () => {
+    // Two stars 84 px apart on one lane: the second can't hang under itself (the first label runs there).
+    const placed = placeCaptions([item("head", 100, 100), item("next", 184, 100)], [star(100, 100), star(184, 100)], 6);
+    expect(placed[0]).toMatchObject({ id: "head", level: 0, above: false });
+    expect(placed[1]).toMatchObject({ id: "next", level: 0, above: true });
   });
 
-  it("stop before running alongside a caption starting on the lane below", () => {
-    // Zoomed out, a line is tall in world units: the next-column commit one lane down starts a parallel caption too close.
-    const gap = 25;
-    const dx = COL,
-      dy = LANE;
-    expect(Math.abs(dx * sin - dy * cos)).toBeLessThan(gap);
-    expect(captionLength(grid([9, 1]), 10, 0, 3, 400, gap)).toBeCloseTo(dx * cos + dy * sin - gap);
-    // At normal zoom the same pair has room.
-    expect(captionLength(grid([9, 1]), 10, 0, 3, 400, 12)).toBe(400);
+  it("step further out (with a leader line) when the spot under the star is taken and badges sit above", () => {
+    const badge = { x: 120, y: 110, w: 60, h: 14 };
+    const [c] = placeCaptions([item("b", 100, 100, 150, false)], [star(100, 100), badge], 6);
+    expect(c).toMatchObject({ id: "b", level: 1, above: false, y: 111 + CAPTION_H });
   });
 
-  it("can run up into the open sky instead, stopping before commits above", () => {
-    // Top lane: nothing above, the whole length is free.
-    expect(captionLength(grid([12, 1]), 10, 0, 3, 300, 14, -1)).toBe(300);
-    // A commit on the lane above, a little to the right: its caption comes down across ours.
-    const len = captionLength(grid([9, 0]), 10, 1, 3, 300, 14, -1);
-    expect(len).toBeCloseTo(COL * cos + LANE * sin - 14);
+  it("never run a leader line through another label", () => {
+    // The first label runs under the second star: the second can't reach past it.
+    const placed = placeCaptions(
+      [item("a", 100, 100), item("b", 184, 100, 150, false)],
+      [star(100, 100), star(184, 100)],
+      6,
+    );
+    expect(placed.map((c) => c.id)).toEqual(["a"]);
   });
 
-  it("never runs up through a caption coming down from the left", () => {
-    expect(captionLength(grid([11, 0]), 10, 1, 3, 300, 14, -1)).toBe(0);
+  it("shorten before giving up, and leave out a label with no room at all", () => {
+    // A badge just right of the star's own spot leaves room for a short label only.
+    const badge = { x: 240, y: 105, w: 80, h: 60 };
+    const [c] = placeCaptions([item("a", 100, 100, 300, false)], [badge], 6);
+    expect(c.w).toBe(120);
+    const wall = { x: 0, y: 0, w: 1000, h: 1000 };
+    expect(placeCaptions([item("a", 100, 100)], [wall], 6)).toEqual([]);
+  });
+});
+
+describe("laneReach", () => {
+  it("is the furthest lane used by a commit or a line passing through each row", () => {
+    const layout = {
+      rowCount: 4,
+      nodes: [
+        { row: 0, lane: 0 },
+        { row: 1, lane: 2 },
+        { row: 3, lane: 0 },
+      ],
+      edges: [{ childRow: 0, parentRow: 3, via: 1 }],
+    } as unknown as Layout;
+    expect(laneReach(layout)).toEqual([0, 2, 1, 0]);
   });
 });
