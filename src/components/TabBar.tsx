@@ -4,11 +4,19 @@ import { t } from "../i18n";
 import { repoName } from "../recent";
 import type { Tabs } from "../tabs";
 import { PlanetDot } from "./Planet";
+import { WindowControls } from "./WindowControls";
+import { chromeOf } from "../chrome";
+import { isTauri } from "../api";
+
+/** The frame this window draws (fixed for the session). */
+const chrome = chromeOf(navigator.userAgent, isTauri);
 
 /**
  * The window's top row: the wordmark, the home tab (the galaxy dashboard), a tab per open repository (the open
  * tab's ▾ opens the repository menu: recent, open, clone, new), "+" for a new
- * tab, and settings at the far end.
+ * tab, and settings at the far end. In the desktop app on macOS and Windows the row is also
+ * the title bar: its empty parts drag the window (double-click maximizes), macOS's traffic
+ * lights sit at its start and Windows gets our own window buttons at its end.
  */
 export function TabBar(p: {
   tabs: Tabs;
@@ -29,9 +37,11 @@ export function TabBar(p: {
   onSettings(): void;
 }) {
   return (
-    <header className="tabrow">
-      <h1 className="wordmark small">ddugit</h1>
-      <nav className="tabbar" role="tablist" aria-label={t("tabs.label")}>
+    <header className={`tabrow chrome-${chrome}`} data-tauri-drag-region>
+      <h1 className="wordmark small" data-tauri-drag-region>
+        ddugit
+      </h1>
+      <nav className="tabbar" role="tablist" aria-label={t("tabs.label")} data-tauri-drag-region>
         <div
           role="tab"
           aria-selected={p.home}
@@ -99,6 +109,7 @@ export function TabBar(p: {
       >
         <Icon name="settings" />
       </button>
+      {chrome === "win" && <WindowControls />}
       {p.menu && (
         <div className="tab-menu-anchor" style={{ left: p.menu.x }}>
           {p.menu.node}

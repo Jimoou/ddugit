@@ -3926,3 +3926,31 @@ button.demo-pill {
 .tab.tab-home .icon-svg {
   color: var(--cyan);
 }
+
+/* The tab row as the title bar (desktop app). macOS: room for the traffic lights. */
+.tabrow.chrome-mac {
+  padding-left: 72px;
+}
+/* Windows: our own window buttons, flush with the top-right corner. */
+.win-controls {
+  display: flex;
+  align-self: stretch;
+}
+.win-controls button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text-2);
+}
+.win-controls button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.win-controls button.close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
