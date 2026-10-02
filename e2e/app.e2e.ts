@@ -1041,3 +1041,43 @@ test("groups repositories on the dashboard: create, move in, open all, ungroup",
   await expect(galaxy.locator(".band")).toHaveCount(0);
   await expect(galaxy.locator(".world")).toHaveCount(3);
 });
+
+test("groups: a suggestion by owner, picking several cards, and dragging between bands", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => {
+    const paths = ["/work/acme-main", "/work/acme-patches", "/home/me/dotfiles", "/srv/tools/lint"];
+    localStorage.setItem(
+      "ddugit.recent",
+      JSON.stringify(paths.map((path, i) => ({ path, starred: false, at: 9 - i }))),
+    );
+  });
+  await page.reload();
+  await page.locator(".tab-new").click();
+  const galaxy = page.locator(".welcome .galaxy");
+
+  // The two acme repositories are offered as a group.
+  await expect(galaxy.locator(".group-hint")).toContainText("acme 저장소 2개를 한 그룹으로 묶을까요?");
+  await galaxy.locator(".group-hint").getByRole("button", { name: "묶기" }).click();
+  const acme = galaxy.locator(".band").filter({ hasText: "acme" }).first();
+  await expect(acme.locator(".world")).toHaveCount(2);
+  await expect(galaxy.locator(".group-hint")).toHaveCount(0);
+
+  // Ctrl+click picks cards instead of opening them; the bar moves them together.
+  for (const name of ["dotfiles", "lint"])
+    await galaxy
+      .locator(".world")
+      .filter({ hasText: name })
+      .locator(".world-open")
+      .click({ modifiers: ["Control"] });
+  await expect(galaxy.locator(".pick-bar")).toContainText("2개 선택");
+  await galaxy.locator(".pick-bar").getByRole("button", { name: "acme(으)로 옮기기" }).click();
+  await expect(acme.locator(".world")).toHaveCount(4);
+  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+
+  // Drag a card out to the (now empty) ungrouped band.
+  const loose = galaxy.locator(".band.ungrouped");
+  await expect(loose).toContainText("그룹에 넣지 않은 저장소");
+  await galaxy.locator(".world").filter({ hasText: "lint" }).dragTo(loose);
+  await expect(acme.locator(".world")).toHaveCount(3);
+  await expect(loose.locator(".world")).toHaveCount(1);
+});

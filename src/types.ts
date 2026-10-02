@@ -374,6 +374,8 @@ export interface RepoGlance {
   state: string;
   stashes: number;
   remotes: number;
+  /** URL of `origin` (else the first remote). */
+  origin: string | null;
   last: { summary: string; author: string; time: number } | null;
 }
 

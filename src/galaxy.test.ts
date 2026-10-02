@@ -14,6 +14,7 @@ const g = (path: string, o: Partial<RepoGlance> = {}): RepoGlance => ({
   state: "clean",
   stashes: 0,
   remotes: 1,
+  origin: null,
   last: null,
   ...o,
 });

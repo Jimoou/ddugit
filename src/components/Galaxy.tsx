@@ -9,7 +9,7 @@ import { fmtAgo } from "../format";
 import { fetchable, signals, tally } from "../galaxy";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import { bands, nextHue, type RepoGroup } from "../groups";
+import { bands, nextHue, type RepoGroup, suggestGroup } from "../groups";
 import { repoName } from "../recent";
 import type { RepoGlance } from "../types";
 import type { Recent } from "./Connect";
@@ -18,6 +18,12 @@ import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { NameDialog, type NameRequest } from "./NameDialog";
 import { Icon } from "./Icon";
 import { PlanetDot } from "./Planet";
+
+/** Grouping suggestions the user said no to. */
+const HINTS = "ddugit.groupHints";
+
+/** Drag data type: the paths of the cards being moved. */
+const DRAG = "application/x-ddugit-repos";
 
 /** Fetches running side by side in "fetch all". */
 const FETCH_LANES = 3;
@@ -42,6 +48,17 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; title: string; items: MenuItem[] } | null>(null);
   const [nameReq, setNameReq] = useState<NameRequest | null>(null);
+  /** Cards picked with ⌘/Ctrl or Shift + click, to group or move together. */
+  const [picked, setPicked] = useState<string[]>([]);
+  /** The band a card is being dragged over (group id, "" for ungrouped). */
+  const [dropOn, setDropOn] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(HINTS) ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
   const byPath = loaded && loaded.key === key ? loaded.byPath : null;
 
   // Read every world now, and again whenever the window comes back to the front.
@@ -157,8 +174,30 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
     const starred = recent.list.find((r) => r.path === path)?.starred ?? false;
     const lit = g ? signals(g) : [];
     return (
-      <li key={path} className={`world ${g?.error ? "missing" : ""}`}>
-        <button className="world-open" title={g?.error ?? path} onClick={() => onOpen(path)}>
+      <li
+        key={path}
+        className={`world ${g?.error ? "missing" : ""} ${picked.includes(path) ? "picked" : ""}`}
+        draggable
+        onDragStart={(e) => {
+          // Dragging a picked card moves all the picked ones.
+          const moving = picked.includes(path) ? picked : [path];
+          e.dataTransfer.setData(DRAG, JSON.stringify(moving));
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragEnd={() => setDropOn(null)}
+      >
+        <button
+          className="world-open"
+          title={g?.error ?? path}
+          aria-pressed={picked.includes(path)}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || picked.length) {
+              setPicked((ps) => (ps.includes(path) ? ps.filter((x) => x !== path) : [...ps, path]));
+              return;
+            }
+            onOpen(path);
+          }}
+        >
           <span className="world-name">
             <PlanetDot path={path} big /> <b>{repoName(path)}</b>
           </span>
@@ -236,6 +275,46 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
     );
   };
 
+  const origins = new Map(glances.map((g) => [g.path, g.origin]));
+  const hint = byPath
+    ? suggestGroup(
+        recent.list.filter((r) => r.path !== DEMO_PATH),
+        origins,
+        recent.groups,
+        dismissed,
+      )
+    : null;
+  const dismiss = (key: string) => {
+    const next = [...dismissed, key];
+    setDismissed(next);
+    try {
+      localStorage.setItem(HINTS, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const moveTo = (paths: string[], id: string | null) => {
+    recent.setGroup(paths, id);
+    setPicked([]);
+  };
+  /** Drop target props for a band (`id` null: ungrouped). */
+  const dropZone = (id: string | null) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG)) return;
+      e.preventDefault();
+      setDropOn(id ?? "");
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropOn(null);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setDropOn(null);
+      const paths = JSON.parse(e.dataTransfer.getData(DRAG) || "[]") as string[];
+      if (paths.length) moveTo(paths, id);
+    },
+  });
+
   const laid = bands(
     recent.groups,
     recent.list.filter((r) => r.path !== DEMO_PATH),
@@ -254,7 +333,36 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
           <Icon name="fetch" size={13} /> {running ? t("galaxy.fetching") : t("galaxy.fetchAll")}
         </button>
       </header>
-      <div className="galaxy-body">
+      {hint && (
+        <div className="group-hint" role="note">
+          <Icon name="sparkle" size={12} />
+          <span>
+            <Rich k="group.hint" vars={{ name: hint.name, n: hint.paths.length }} />
+          </span>
+          <button onClick={() => recent.addGroup(hint.name, hint.paths)}>{t("group.hint.go")}</button>
+          <button className="ghost" onClick={() => dismiss(hint.key)}>
+            {t("group.hint.no")}
+          </button>
+        </div>
+      )}
+      {picked.length > 0 && (
+        <div className="pick-bar" role="toolbar" aria-label={t("group.picked", { n: picked.length })}>
+          <b>{t("group.picked", { n: picked.length })}</b>
+          <button onClick={() => askName(null, (name) => (recent.addGroup(name, picked), setPicked([])))}>
+            <Icon name="plus" size={12} /> {t("group.pickNew")}
+          </button>
+          {recent.groups.map((g) => (
+            <button key={g.id} onClick={() => moveTo(picked, g.id)}>
+              {t("group.moveTo", { name: g.name })}
+            </button>
+          ))}
+          <button onClick={() => moveTo(picked, null)}>{t("group.takeOut")}</button>
+          <button className="ghost" onClick={() => setPicked([])}>
+            {t("group.unpick")}
+          </button>
+        </div>
+      )}
+      <div className="galaxy-body" onKeyDown={(e) => e.key === "Escape" && setPicked([])}>
         {laid.map(({ group, repos }) => {
           const ps = repos.map((r) => r.path);
           // Before any group exists there is one plain list, as before.
@@ -264,12 +372,12 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
                 {ps.map(card)}
               </ul>
             );
-          if (!group && !ps.length) return null;
           const mine = fetchable(glancesOf(ps));
           return (
             <section
               key={group?.id ?? "ungrouped"}
-              className={`band ${group ? "" : "ungrouped"}`}
+              className={`band ${group ? "" : "ungrouped"} ${dropOn === (group?.id ?? "") ? "drop" : ""}`}
+              {...dropZone(group?.id ?? null)}
               style={group ? { ["--h" as string]: group.hue } : undefined}
               aria-label={group?.name ?? t("group.none")}
             >
@@ -310,7 +418,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
                 (ps.length ? (
                   <ul className="worlds">{ps.map(card)}</ul>
                 ) : (
-                  <p className="muted small band-empty">{t("group.empty")}</p>
+                  <p className="muted small band-empty">{t(group ? "group.empty" : "group.noneEmpty")}</p>
                 ))}
             </section>
           );

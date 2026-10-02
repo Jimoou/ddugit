@@ -34,6 +34,8 @@ pub struct RepoGlance {
     pub state: String,
     pub stashes: usize,
     pub remotes: usize,
+    /// URL of `origin` (else the first remote): who owns it, for grouping suggestions.
+    pub origin: Option<String>,
     pub last: Option<LastCommit>,
 }
 
@@ -51,6 +53,7 @@ impl RepoGlance {
             state: "clean".into(),
             stashes: 0,
             remotes: 0,
+            origin: None,
             last: None,
         }
     }
@@ -104,8 +107,20 @@ fn one(path: &str) -> RepoGlance {
         state: state_name(repo.state()).to_string(),
         stashes,
         remotes: repo.remotes().map(|r| r.len()).unwrap_or(0),
+        origin: origin_url(&repo),
         last,
     }
+}
+
+fn origin_url(repo: &Repository) -> Option<String> {
+    let names = repo.remotes().ok()?;
+    let name = names
+        .iter()
+        .flatten()
+        .find(|n| *n == "origin")
+        .or_else(|| names.iter().flatten().next())?
+        .to_string();
+    repo.find_remote(&name).ok()?.url().map(str::to_string)
 }
 
 /// Every path in order, read side by side (status walks are the slow part).
@@ -174,5 +189,6 @@ mod tests {
         assert_eq!(g.stashes, 1);
         assert_eq!(g.changes, 0);
         assert_eq!(g.remotes, 1);
+        assert_eq!(g.origin.as_deref(), Some(s(origin.path())));
     }
 }
