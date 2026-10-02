@@ -929,3 +929,15 @@ test("adds a worktree for a new branch, opens it in a tab, and removes it", asyn
   await demo.toast("worktree를 제거했어요");
   await expect(section.locator("li")).toHaveCount(1);
 });
+
+test("lists submodules with their state, updates them, and opens one in a tab", async ({ demo }) => {
+  const { page } = demo;
+  const section = page.locator(".app:not([hidden]) .sidebar .submodules");
+  const math = section.locator("li").filter({ hasText: "libs/orbit-math" });
+  await expect(math).toContainText("초기화 안 됨");
+  await section.getByRole("button", { name: /모두 업데이트/ }).click();
+  await demo.toast("서브모듈을 기록된 커밋으로 맞췄어요");
+  await expect(math).toContainText("최신");
+  await section.locator("li").filter({ hasText: "vendor/stardust" }).click();
+  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+});

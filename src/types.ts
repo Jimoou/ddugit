@@ -223,7 +223,21 @@ export interface RepoSnapshot {
   truncated: boolean;
   /** Every working tree of the repository, the main one first. */
   worktrees: WorktreeInfo[];
+  submodules: SubmoduleInfo[];
 }
+
+/** One submodule (see `git/submodule.rs`). `moved`: checked out at another commit than recorded. */
+export interface SubmoduleInfo {
+  name: string;
+  /** Relative to the working tree root. */
+  path: string;
+  url: string | null;
+  recorded: string | null;
+  checkedOut: string | null;
+  state: "uninitialized" | "clean" | "moved" | "dirty";
+}
+
+export type SubmoduleOp = { kind: "update"; path: string | null } | { kind: "sync" };
 
 /** One working tree (see `git/worktree.rs`). */
 export interface WorktreeInfo {

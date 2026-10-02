@@ -17,6 +17,7 @@ import type {
   ReflogEntry,
   RepoGlance,
   RepoSnapshot,
+  SubmoduleInfo,
 } from "./types";
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
@@ -59,6 +60,25 @@ class MockRepo {
   remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);
   /** Demo bisect (HEAD isn't moved; the probe is reported in the state instead). */
   bisect: { bad: string; good: string[]; skipped: string[] } | null = null;
+  /** Submodules: one in place, one not checked out yet (like a clone without --recursive). */
+  submodules: SubmoduleInfo[] = [
+    {
+      name: "vendor/stardust",
+      path: "vendor/stardust",
+      url: "https://github.com/ddugit/stardust.git",
+      recorded: "5d1c0a7e3b9f42c1a8e6d0b7f3c2a9e1d4b6c8f0",
+      checkedOut: "5d1c0a7e3b9f42c1a8e6d0b7f3c2a9e1d4b6c8f0",
+      state: "clean",
+    },
+    {
+      name: "libs/orbit-math",
+      path: "libs/orbit-math",
+      url: "https://github.com/ddugit/orbit-math.git",
+      recorded: "a3f9e2b4c6d8e0f1a2b3c4d5e6f708192a3b4c5d",
+      checkedOut: null,
+      state: "uninitialized",
+    },
+  ];
   /** Linked worktrees (the demo's own folder is the main one). */
   worktrees: { path: string; branch: string }[] = [];
   /** Where HEAD has been, newest first (like `git reflog`); `lost` is computed on read. */
@@ -183,6 +203,7 @@ class MockRepo {
         { path: DEMO_ROOT, branch: this.head, main: true, current: true },
         ...this.worktrees.map((w) => ({ ...w, main: false, current: false })),
       ].map((w) => ({ ...w, head: this.branches.get(w.branch) ?? null, locked: false, missing: false })),
+      submodules: this.submodules.map((m) => ({ ...m })),
     };
   }
 }
@@ -647,6 +668,13 @@ const mockTable: Table = {
     if (used) return delay(res("failed", `fatal: '${branch}' is already used by worktree at '${used}'`));
     repo.worktrees.push({ path: op.dir, branch });
     return delay(res("ok", `Preparing worktree (checking out '${branch}')`));
+  },
+
+  git_submodule({ op }) {
+    if (op.kind === "update")
+      for (const m of repo.submodules)
+        if (!op.path || m.path === op.path) Object.assign(m, { checkedOut: m.recorded, state: "clean" });
+    return delay(res("ok", op.kind === "sync" ? "Synchronizing submodule url for 'vendor/stardust'" : ""));
   },
 
   git_create_branch({ name, at, switch: sw }) {
