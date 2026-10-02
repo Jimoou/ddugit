@@ -121,7 +121,7 @@ fn repo_root(dir: String) -> Option<String> {
     git::setup::repo_root(&dir)
 }
 
-/// Repository passed on the command line (`otgit path/to/repo`), if any.
+/// Repository passed on the command line (`ddugit path/to/repo`), if any.
 #[tauri::command]
 fn initial_repo() -> Option<String> {
     let arg = std::env::args().skip(1).find(|a| !a.starts_with('-'))?;

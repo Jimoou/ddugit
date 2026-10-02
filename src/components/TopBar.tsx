@@ -45,7 +45,7 @@ export function TopBar(p: Props) {
 
   return (
     <header className="topbar">
-      <h1 className="wordmark small">otgit</h1>
+      <h1 className="wordmark small">ddugit</h1>
       <span className="repo-anchor">
         <button className="repo" onClick={p.onOpenRepo} title={p.repoPath} aria-expanded={!!p.repoMenu}>
           {p.repoName} <span className="muted">▾</span>

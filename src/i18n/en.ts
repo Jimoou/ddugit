@@ -343,9 +343,9 @@ export const en: Record<Key, string> = {
   "auth.ssh.test": "Test the connection.",
   "auth.title": "Authentication needed",
   "auth.bodySsh":
-    "Couldn't connect to <b>{host}</b> with an SSH key. otgit never opens terminal login prompts, so it can't hang on a hidden one. Set up the steps below once and it just works afterwards.",
+    "Couldn't connect to <b>{host}</b> with an SSH key. ddugit never opens terminal login prompts, so it can't hang on a hidden one. Set up the steps below once and it just works afterwards.",
   "auth.bodyHttps":
-    "Couldn't connect to <b>{host}</b> over HTTPS. otgit never opens terminal login prompts, so it can't hang on a hidden one. Set up the steps below once and it just works afterwards.",
+    "Couldn't connect to <b>{host}</b> over HTTPS. ddugit never opens terminal login prompts, so it can't hang on a hidden one. Set up the steps below once and it just works afterwards.",
   "auth.copy": "Copy",
   "auth.output": "Show git output",
   "auth.retry": "Retry",

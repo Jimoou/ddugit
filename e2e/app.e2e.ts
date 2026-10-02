@@ -223,7 +223,7 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
   await expect(dialog.locator("kbd", { hasText: "⌘/Ctrl + F" })).toBeVisible();
 
   await dialog.getByRole("checkbox").uncheck();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("otgit.settings")!).animate)).toBe(false);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).animate)).toBe(false);
   await expect(page.locator(".topbar button[title='반짝임 효과']")).not.toHaveClass(/\bon\b/);
 
   const git = dialog.getByPlaceholder("비워 두면 PATH의 git");
@@ -312,7 +312,7 @@ test("settings: switching to English relabels the app and is remembered", async 
 test("clones from a URL, remembers it in the repository menu and stars it", async ({ demo }) => {
   const { page } = demo;
   await page.evaluate(
-    () => ((window as unknown as { __otgitDemo: { nextFolder: string } }).__otgitDemo.nextFolder = "/work"),
+    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work"),
   );
   await page.locator(".topbar .repo").click();
   await page
@@ -332,14 +332,14 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   await row.getByRole("button", { name: "즐겨찾기", exact: true }).click();
   await expect(row.locator(".star")).toHaveText("★");
   await expect(row.locator(".star")).toHaveAttribute("aria-pressed", "true");
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("otgit.recent")!));
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.recent")!));
   expect(stored[0]).toMatchObject({ path: "/work/rocket", starred: true });
 });
 
 test("creates a new repository in a plain folder", async ({ demo }) => {
   const { page } = demo;
   await page.evaluate(
-    () => ((window as unknown as { __otgitDemo: { nextFolder: string } }).__otgitDemo.nextFolder = "/tmp/not-a-repo"),
+    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/tmp/not-a-repo"),
   );
   await page.locator(".topbar .repo").click();
   await page
@@ -367,7 +367,7 @@ test("opens repositories in tabs and keeps each tab's state", async ({ demo }) =
   await expect(tabs).toHaveCount(2);
   await expect(page.locator(".welcome")).toContainText("최근 저장소");
   await page.evaluate(
-    () => ((window as unknown as { __otgitDemo: { nextFolder: string } }).__otgitDemo.nextFolder = "/work/second"),
+    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work/second"),
   );
   await page
     .locator(".welcome")

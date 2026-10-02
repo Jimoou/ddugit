@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CommitInfo, RefInfo } from "../types";
 import { searchCommits } from "./search";
 
-const c = (id: string, message: string, author = "Jimin", email = "jimin@otgit.dev"): CommitInfo => ({
+const c = (id: string, message: string, author = "Jimin", email = "jimin@ddugit.dev"): CommitInfo => ({
   id,
   parents: [],
   summary: message.split("\n")[0],

@@ -17,8 +17,8 @@ import {
 } from "../recent";
 import type { OpResult, Progress } from "../types";
 
-const RECENT = "otgit.recent";
-const CLONE_PARENT = "otgit.cloneParent";
+const RECENT = "ddugit.recent";
+const CLONE_PARENT = "ddugit.cloneParent";
 
 function read(key: string): string | null {
   try {

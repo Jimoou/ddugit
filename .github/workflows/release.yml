@@ -53,10 +53,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || (inputs.release && 'v__VERSION__' || '') }}
-          releaseName: ${{ github.ref_type == 'tag' && format('otgit {0}', github.ref_name) || 'otgit v__VERSION__' }}
+          releaseName: ${{ github.ref_type == 'tag' && format('ddugit {0}', github.ref_name) || 'ddugit v__VERSION__' }}
           releaseCommitish: ${{ github.sha }}
           releaseBody: |
-            macOS: otgit_*_universal.dmg · Windows: otgit_*_x64-setup.exe
+            macOS: ddugit_*_universal.dmg · Windows: ddugit_*_x64-setup.exe
 
             Unsigned build: on macOS right-click → Open the first time; on Windows choose "More info → Run anyway".
           releaseDraft: true
@@ -65,7 +65,7 @@ jobs:
       - if: github.ref_type != 'tag' && !inputs.release
         uses: actions/upload-artifact@v4
         with:
-          name: otgit-${{ matrix.os }}
+          name: ddugit-${{ matrix.os }}
           path: |
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/nsis/*.exe

@@ -36,13 +36,13 @@ describe("recent repositories", () => {
   });
 
   it("names repositories from paths and URLs", () => {
-    expect(repoName("/home/me/otgit/")).toBe("otgit");
+    expect(repoName("/home/me/ddugit/")).toBe("ddugit");
     expect(repoName("C:\\work\\proj")).toBe("proj");
-    expect(nameFromUrl("https://github.com/Jimoou/otgit.git")).toBe("otgit");
+    expect(nameFromUrl("https://github.com/Jimoou/ddugit.git")).toBe("ddugit");
     expect(nameFromUrl("git@github.com:me/tool.git")).toBe("tool");
     expect(nameFromUrl("ssh://git@host:22/team/svc/")).toBe("svc");
     expect(nameFromUrl("")).toBe("");
-    expect(joinPath("/home/me/", "otgit")).toBe("/home/me/otgit");
-    expect(joinPath("C:\\work", "otgit")).toBe("C:\\work\\otgit");
+    expect(joinPath("/home/me/", "ddugit")).toBe("/home/me/ddugit");
+    expect(joinPath("C:\\work", "ddugit")).toBe("C:\\work\\ddugit");
   });
 });

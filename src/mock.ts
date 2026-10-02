@@ -47,7 +47,7 @@ class MockRepo {
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();
-  remoteUrls = new Map([["origin", "https://github.com/otgit/otgit-demo.git"]]);
+  remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);
   /** Demo bisect (HEAD isn't moved; the probe is reported in the state instead). */
   bisect: { bad: string; good: string[]; skipped: string[] } | null = null;
   /** Where HEAD has been, newest first (like `git reflog`); `lost` is computed on read. */
@@ -71,7 +71,7 @@ class MockRepo {
       summary,
       message: summary + "\n",
       author,
-      email: `${author.toLowerCase()}@otgit.dev`,
+      email: `${author.toLowerCase()}@ddugit.dev`,
       time: this.clock,
     });
     this.order.unshift(id);
@@ -151,8 +151,8 @@ class MockRepo {
     for (const r of refs) for (const id of this.ancestors(r.target)) reachable.add(id);
     const all = this.order.filter((id) => reachable.has(id));
     return {
-      path: "/demo/otgit-demo",
-      name: "otgit-demo",
+      path: "/demo/ddugit-demo",
+      name: "ddugit-demo",
       head: {
         branch: this.head,
         target: this.branches.get(this.head) ?? null,
@@ -341,7 +341,7 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
   return res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`);
 }
 
-/** Dev/e2e hooks, exposed as `window.__otgitDemo`. */
+/** Dev/e2e hooks, exposed as `window.__ddugitDemo`. */
 export const demoControls = {
   /** Make the next remote call fail authentication. */
   failNextRemote: null as null | "https" | "ssh",
@@ -359,7 +359,7 @@ export const demoControls = {
   },
 };
 if (import.meta.env.DEV && typeof window !== "undefined") {
-  (window as unknown as Record<string, unknown>).__otgitDemo = demoControls;
+  (window as unknown as Record<string, unknown>).__ddugitDemo = demoControls;
 }
 
 const AUTH_OUTPUT = {
@@ -605,7 +605,7 @@ const mockTable: Table = {
     if (!moved.length) return fail("No local changes to save");
     repo.changes = repo.changes.filter((c) => !set.has(c.path));
     repo.stashes.unshift({
-      message: `On ${repo.head}: ${message || "otgit stash"}`,
+      message: `On ${repo.head}: ${message || "ddugit stash"}`,
       id: fakeId(),
       base: repo.branches.get(repo.head)!,
       time: Math.floor(Date.now() / 1000),

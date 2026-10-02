@@ -71,7 +71,7 @@ pub fn rebase(path: &str, base: &str, steps: &[RebaseStep]) -> Result<OpResult> 
         .map(|s| format!("{} {}\n", s.action.word(), s.id))
         .collect();
     // Kept inside .git so it never shows up as a working-tree change.
-    let file = super::open(path)?.path().join("otgit-rebase-todo");
+    let file = super::open(path)?.path().join("ddugit-rebase-todo");
     std::fs::write(&file, todo).map_err(super::err)?;
     // git runs the editor through sh (Git for Windows ships one): forward
     // slashes and single quotes keep any path intact.

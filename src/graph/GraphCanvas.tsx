@@ -233,7 +233,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   // Dev-only hook so e2e scripts can find nodes on screen.
   useEffect(() => {
     if (!import.meta.env.DEV) return;
-    (window as unknown as Record<string, unknown>).__otgit = {
+    (window as unknown as Record<string, unknown>).__ddugit = {
       screenOf(id: string): Pt | null {
         const sc = sceneRef.current;
         const node = sc.layout.byId.get(id);
