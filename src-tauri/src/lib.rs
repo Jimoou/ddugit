@@ -72,6 +72,8 @@ command!(git_create_branch(path: String, name: String, at: Option<String>, switc
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
 command!(git_worktree(path: String, op: git::worktree::WorktreeOp) -> OpResult
     => git::worktree::apply(&path, &op));
+command!(git_submodule(path: String, op: git::submodule::SubmoduleOp) -> OpResult
+    => git::submodule::apply(&path, &op));
 command!(git_ref(path: String, op: RefOp) -> OpResult => git::refs::apply(&path, &op));
 command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
@@ -205,6 +207,7 @@ pub fn run() {
             git_create_branch,
             git_ref,
             git_worktree,
+            git_submodule,
             git_remote,
             git_reset,
             git_reflog,

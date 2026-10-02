@@ -23,6 +23,8 @@ import { MergeDialog } from "./components/MergeDialog";
 import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
 import { WorktreeDialog, WorktreeSection } from "./components/Worktrees";
+import { SubmoduleSection } from "./components/Submodules";
+import { joinPath } from "./recent";
 import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
 import { SyncConfirm } from "./components/SyncConfirm";
@@ -60,6 +62,8 @@ import type {
   RepoSnapshot,
   WorktreeInfo,
   WorktreeOp,
+  SubmoduleInfo,
+  SubmoduleOp,
 } from "./types";
 
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
@@ -692,6 +696,31 @@ export function RepoView({
           onConfirm: () => removeWorktree(w),
         }),
     },
+  ];
+
+  const submoduleRun = async (label: string, op: SubmoduleOp) => {
+    const r = await run(label, () => api.submodule(path, op));
+    if (r.status === "auth") toast("err", t("sub.auth"));
+  };
+
+  const submoduleMenu = (m: SubmoduleInfo): MenuItem[] => [
+    {
+      label: t("sub.menu.open"),
+      disabled: m.state === "uninitialized",
+      onSelect: () => snap && onOpenPath(joinPath(snap.path, m.path)),
+    },
+    {
+      label: t("sub.menu.update"),
+      disabled: m.state === "clean",
+      onSelect: () => void submoduleRun(t("sub.updated"), { kind: "update", path: m.path }),
+    },
+    "separator",
+    {
+      label: t("sub.menu.copyUrl"),
+      disabled: !m.url,
+      onSelect: () => void navigator.clipboard?.writeText(m.url ?? ""),
+    },
+    { label: t("sub.menu.sync"), onSelect: () => void submoduleRun(t("sub.synced"), { kind: "sync" }) },
   ];
 
   const askBranchAt = (at: string) =>
@@ -1384,6 +1413,13 @@ export function RepoView({
                 onOpen={(pr) => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e)))}
                 onMenu={(pr, x, y) => setMenu({ x, y, title: pr.title, items: prMenu(pr) })}
                 onConnect={setTokenFor}
+              />
+              <SubmoduleSection
+                submodules={snap.submodules}
+                busy={busy}
+                onOpen={(m) => onOpenPath(joinPath(snap.path, m.path))}
+                onUpdateAll={() => void submoduleRun(t("sub.updated"), { kind: "update", path: null })}
+                onMenu={(m, x, y) => setMenu({ x, y, title: m.path, items: submoduleMenu(m) })}
               />
               <WorktreeSection
                 worktrees={snap.worktrees}

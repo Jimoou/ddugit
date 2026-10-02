@@ -20,6 +20,7 @@ pub mod remote;
 pub mod setup;
 pub mod stage;
 pub mod stash;
+pub mod submodule;
 pub mod undo;
 pub mod watch;
 pub mod worktree;
@@ -191,6 +192,11 @@ fn command(dir: &Path, args: &[&str]) -> Command {
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_EDITOR", "true")
         .env("LC_ALL", "C");
+    // Tests use local folders as remotes (submodules too), which git blocks by default.
+    #[cfg(test)]
+    cmd.env("GIT_CONFIG_COUNT", "1")
+        .env("GIT_CONFIG_KEY_0", "protocol.file.allow")
+        .env("GIT_CONFIG_VALUE_0", "always");
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

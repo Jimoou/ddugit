@@ -88,6 +88,7 @@ pub struct RepoSnapshot {
     pub truncated: bool,
     /// Every working tree of the repository, the main one first.
     pub worktrees: Vec<super::worktree::WorktreeInfo>,
+    pub submodules: Vec<super::submodule::SubmoduleInfo>,
 }
 
 pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
@@ -115,6 +116,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
         incoming: incoming(&repo),
         truncated,
         worktrees: super::worktree::list(&repo),
+        submodules: super::submodule::list(&repo),
     })
 }
 

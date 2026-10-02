@@ -694,6 +694,26 @@ textarea:focus {
 .sidebar .worktrees li.missing {
   opacity: 0.55;
 }
+.sidebar .submodules li {
+  gap: 6px;
+  color: var(--text-2);
+}
+.sidebar .sub-state {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.sidebar .sub-uninitialized .sub-state,
+.sidebar .sub-moved .sub-state {
+  color: var(--cyan);
+}
+.sidebar .sub-dirty .sub-state {
+  color: var(--amber);
+}
+.sidebar .h3-add.lit {
+  color: var(--cyan);
+}
 .worktree-dialog {
   display: flex;
   flex-direction: column;
