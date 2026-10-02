@@ -43,10 +43,14 @@ export function SpaceBackdrop({ animate }: { animate: boolean }) {
 }
 
 /** A repository's planet as a small glyph (tabs, recent list). */
-export function PlanetDot({ path }: { path: string }) {
+export function PlanetDot({ path, big }: { path: string; big?: boolean }) {
   const look = planetLook(path);
   return (
-    <span className={`planet-dot ${look.ring ? "ringed" : ""}`} style={{ ["--h" as string]: look.hue }} aria-hidden />
+    <span
+      className={`planet-dot ${look.ring ? "ringed" : ""} ${big ? "big" : ""}`}
+      style={{ ["--h" as string]: look.hue }}
+      aria-hidden
+    />
   );
 }
 

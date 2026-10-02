@@ -282,6 +282,168 @@ textarea:focus {
   border-radius: 50%;
   transform: rotate(-20deg);
 }
+.planet-dot.big {
+  width: 20px;
+  height: 20px;
+  vertical-align: -5px;
+}
+.planet-dot.big.ringed::after {
+  left: -7px;
+  right: -7px;
+  top: 7px;
+  height: 7px;
+}
+
+/* The galaxy dashboard: every recent repository as a world card. */
+.galaxy {
+  width: min(1120px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 0;
+}
+.galaxy-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.galaxy-head .eyebrow {
+  margin: 0;
+}
+.galaxy-tally {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.worlds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.world {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.world:hover,
+.world:focus-within {
+  border-color: rgba(var(--signal), 0.45);
+}
+.world.missing {
+  opacity: 0.6;
+}
+.world-open {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  text-align: left;
+  min-width: 0;
+}
+.world-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding-right: 52px;
+}
+.world-path,
+.world-last,
+.world-branch {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.world-path {
+  color: var(--muted);
+  font: 11px var(--mono);
+}
+.world-branch {
+  font: 12px var(--mono);
+  color: var(--text-2);
+}
+.world-last {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.world-signals {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 18px;
+}
+.sig {
+  padding: 0 7px;
+  font: 600 10.5px/18px var(--sans);
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+}
+.sig-missing,
+.sig-stopped {
+  color: var(--red);
+  background: rgba(255, 77, 109, 0.14);
+}
+.sig-changes {
+  color: var(--amber);
+  background: rgba(255, 184, 77, 0.14);
+}
+.sig-behind {
+  color: var(--cyan);
+  background: rgba(34, 232, 255, 0.1);
+}
+.sig-ahead {
+  color: var(--lime);
+  background: rgba(166, 255, 77, 0.12);
+}
+.sig-quiet {
+  color: var(--muted);
+}
+.world-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+}
+/* Tools show on hover; a star stays lit. */
+.world-tools button:not(.on) {
+  opacity: 0;
+}
+.world:hover .world-tools button,
+.world:focus-within .world-tools button {
+  opacity: 1;
+}
+.world-tools .star.on {
+  color: var(--amber);
+}
+.world-fetch {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.world-fetch.ok {
+  color: var(--ok);
+}
+.world-fetch.auth,
+.world-fetch.failed {
+  color: var(--red);
+}
 .welcome p {
   color: var(--muted);
   margin: 0;

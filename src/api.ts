@@ -29,6 +29,7 @@ import type {
   SshStatus,
   SshTest,
   LicenseStatus,
+  RepoGlance,
 } from "./types";
 import { t } from "./i18n";
 
@@ -49,6 +50,7 @@ export interface Commands {
   git_clone: [{ url: string; dest: string; onProgress: Sink<Progress> }, OpResult];
   git_init: [{ dir: string }, OpResult];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
+  repo_glance: [{ paths: string[] }, RepoGlance[]];
   git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
   git_stage_hunks: [
     { path: string; file: string; hunks: number[]; lines: number[] | null; unstage: boolean },
@@ -131,6 +133,8 @@ export const api = {
   /** `git init` (on `main`) in an existing folder. */
   init: (dir: string) => call("git_init", { dir }),
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
+  /** Where each repository stands (branch, upstream distance, changes), in `paths` order. */
+  glance: (paths: string[]) => call("repo_glance", { paths }),
   commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
     call("git_commit", { path, message, paths, amend, stagedOnly }),
   stageHunks: (path: string, file: string, hunks: number[], unstage: boolean, lines?: number[]) =>

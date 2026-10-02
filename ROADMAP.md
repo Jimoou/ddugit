@@ -116,8 +116,16 @@
 - [x] SSH로 clone: 키 확인·만들기, 공개키 복사, 호스트 신뢰(지문 확인), 연결 확인을 앱 안에서 — `ssh.rs`(시스템 OpenSSH, 묻지 않음: `BatchMode`, stdin 없음). clone 창의 HTTPS/SSH 전환(`sshUrl.ts`)과 'SSH 준비하기' 4단계(`SshSetup`), 인증 실패 창에도 같은 패널. 호스트 신뢰는 GitHub·GitLab이 공개한 지문과 비교하고, 보여 준 지문과 다시 받은 지문이 같을 때만 known_hosts에 추가. 키는 ed25519·암호 없음(파일 권한 600)
 - [x] 오프라인 라이선스 검증(Ed25519 서명 파일, 폐쇄망은 파일로 활성화), 설정의 라이선스 화면 — `DDUGIT1.<payload>.<sig>` 텍스트, 공개키는 빌드 변수, 앱 설정 폴더에 저장, 기능 잠금 없음(신뢰 기반), `updatesUntil` 이후 버전이면 갱신 안내. 발급 스크립트 `scripts/license.mjs`(keygen·sign·verify, Node 내장 Ed25519)와 Rust 검증의 상호 확인 테스트
 - [x] 서명 파이프라인 준비: macOS Developer ID + 공증, Windows 서명(시크릿이 있을 때만), 발급 서버(Lemon Squeezy 웹훅 → 서명) 설계 문서 — `release.yml`이 시크릿이 있으면 서명(macOS: APPLE_*, Windows: `WINDOWS_SIGN_COMMAND`로 Tauri `signCommand`), 빌드 날짜·공개키 주입. `docs/RELEASE.md`
-- [ ] 여러 저장소 은하 대시보드
-- [ ] 서브모듈·LFS·worktree
+- [ ] 여러 저장소 은하 대시보드 → M10
+- [ ] 서브모듈·LFS·worktree → M10
+
+## M10 · 여러 세계 — 2026-10-02 사용자 결정 (끝나면 v0.4.0 릴리스, 서명은 준비되는 대로 나중에)
+
+- [x] 여러 저장소 은하 대시보드: 새 탭 화면의 최근 저장소를 행성 카드로(브랜치·upstream, 신호: 찾을 수 없음 / 멈춘 작업 / 변경 / 받을·보낼 커밋 / 보관함, 마지막 커밋), 신호별 집계, 모두 Fetch(3개씩 동시, 카드마다 결과, 설정의 fetch 확인을 따름). 백엔드 `glance.rs`(libgit2, 저장소마다 스레드, `discover`가 아닌 `open`), 순수 로직 `galaxy.ts`
+- [ ] worktree: 목록·추가·제거·탭으로 열기
+- [ ] 서브모듈: 상태, init/update/sync, 탭으로 열기
+- [ ] LFS: 사용 여부·설치 확인, pull, track, diff에서 포인터 대신 LFS 객체로 표시
+- [ ] v0.4.0 릴리스
 
 ## M5 · 배포 품질
 

@@ -15,6 +15,7 @@ import type {
   RefInfo,
   RemoteOp,
   ReflogEntry,
+  RepoGlance,
   RepoSnapshot,
 } from "./types";
 
@@ -406,6 +407,43 @@ function remoteOp(op: RemoteOp): OpResult | string {
   return pull(op === "pull" ? "ff" : op === "pullMerge" ? "merge" : "rebase");
 }
 
+const GLANCE_BRANCHES = ["main", "develop", "feature/orbit", "release/2.1"];
+const GLANCE_SUMMARIES = ["Tune lane spacing", "Fix login redirect", "Bump dependencies", "Add export dialog"];
+
+/**
+ * Every folder "is" the demo repository, but a dashboard of identical worlds
+ * shows nothing; each path gets its own steady, made-up state instead. Paths
+ * named like a missing folder (`gone`) can't be read.
+ */
+function demoGlance(path: string): RepoGlance {
+  let h = 2166136261;
+  for (const ch of path) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  const pick = (shift: number, n: number) => (h >>> shift) % n;
+  const empty = { branch: null, upstream: null, ahead: 0, behind: 0, changes: 0, conflicts: 0, stashes: 0 };
+  if (/gone/.test(path))
+    return { path, error: `could not find repository at '${path}'`, ...empty, state: "clean", remotes: 0, last: null };
+  const branch = GLANCE_BRANCHES[pick(0, 4)];
+  const stopped = pick(20, 7) === 0;
+  return {
+    path,
+    error: null,
+    branch,
+    upstream: `origin/${branch}`,
+    ahead: pick(3, 3),
+    behind: pick(6, 4),
+    changes: stopped ? 2 : pick(9, 3) === 0 ? 0 : pick(11, 6),
+    conflicts: stopped ? 1 : 0,
+    state: stopped ? "merge" : "clean",
+    stashes: pick(14, 3) === 0 ? 1 : 0,
+    remotes: 1,
+    last: {
+      summary: GLANCE_SUMMARIES[pick(16, 4)],
+      author: AUTHORS[pick(18, 4)],
+      time: Math.floor(Date.now() / 1000) - 600 - pick(22, 200) * 1800,
+    },
+  };
+}
+
 /** Candidates, the commit to test next (the middle one) and the culprit, like git computes them. */
 function mockBisect() {
   const b = repo.bisect!;
@@ -442,6 +480,7 @@ const mockTable: Table = {
   },
   git_init: () => delay(res("ok", "Initialized empty Git repository")),
   repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
+  repo_glance: ({ paths }) => delay(paths.map(demoGlance)),
 
   git_commit({ message, paths, amend, stagedOnly }) {
     if (!message.trim()) return fail("Commit message is empty");
