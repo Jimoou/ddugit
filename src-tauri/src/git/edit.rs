@@ -92,16 +92,29 @@ pub fn edit_commit(path: &str, id: &str, edit: &CommitEdit) -> Result<OpResult> 
             if first.is_empty() || first_message.trim().is_empty() || second_message.trim().is_empty() {
                 return Err("Pick files for the first commit and write both messages".into());
             }
-            let paths: Vec<String> = first.iter().map(|p| q(p)).collect();
+            // Paths go through a NUL-separated file, never the shell line: a file name may hold
+            // quotes or newlines, and the todo this line ends up in is read one line per command.
+            let mut list = Vec::new();
+            for p in first {
+                list.extend_from_slice(p.as_bytes());
+                list.push(0);
+            }
+            let list_file = scratch.join("paths");
+            std::fs::write(&list_file, list).map_err(err)?;
             format!(
-                "git reset -q HEAD~1 && git add -A -- {} && git commit -q -F {} && git add -A && git commit -q -F {}",
-                paths.join(" "),
+                "git reset -q HEAD~1 && git --literal-pathspecs add -A --pathspec-from-file={} --pathspec-file-nul && git commit -q -F {} && git add -A && git commit -q -F {}",
+                q(&list_file.to_string_lossy().replace('\\', "/")),
                 file("msg1", first_message)?,
                 file("msg2", second_message)?
             )
         }
     };
 
+    // One command per todo line: anything that would spill onto another is refused.
+    if exec.contains(['\n', '\r']) {
+        let _ = std::fs::remove_dir_all(&scratch);
+        return Err("A name or path holds a line break".into());
+    }
     let mut todo = String::new();
     for c in commits.lines() {
         todo.push_str(&format!("pick {c}\n"));
@@ -242,6 +255,28 @@ mod tests {
         assert_eq!(files("HEAD~2").trim(), "y y.txt");
         assert!(files("HEAD~1").contains("x.txt") && files("HEAD~1").contains("base.txt"));
         assert!(snapshot(s(d.path()), 10).unwrap().changes.is_empty());
+    }
+
+    /// A file name can hold a newline (macOS, Linux); it must not become a todo command.
+    #[cfg(unix)]
+    #[test]
+    fn a_file_name_with_a_newline_cannot_inject_a_command() {
+        let d = repo();
+        commit_file(d.path(), "base.txt", "base", "base");
+        let evil = "a\nexec touch PWNED #";
+        std::fs::write(d.path().join(evil), "x").unwrap();
+        std::fs::write(d.path().join("b.txt"), "y").unwrap();
+        commit_file(d.path(), "base.txt", "base2", "both");
+        let target = sha(d.path(), "HEAD");
+        let edit = CommitEdit::Split {
+            first: vec![evil.into()],
+            first_message: "evil only".into(),
+            second_message: "the rest".into(),
+        };
+        let r = edit_commit(s(d.path()), &target, &edit).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert!(!d.path().join("PWNED").exists());
+        assert_eq!(log(d.path(), "%s"), ["base", "evil only", "the rest"]);
     }
 
     #[test]

@@ -43,6 +43,18 @@ pub enum RefOp {
 }
 
 pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
+    let names: Vec<&String> = match op {
+        RefOp::RenameBranch { from, to } => vec![from, to],
+        RefOp::DeleteBranch { name, .. } | RefOp::DeleteTag { name } | RefOp::RemoveRemote { name } => {
+            vec![name]
+        }
+        RefOp::CreateTag { name, at, .. } => vec![name, at],
+        RefOp::CheckoutRemote { remote_ref } => vec![remote_ref],
+        RefOp::AddRemote { name, url } => vec![name, url],
+    };
+    for n in names {
+        super::operand(n.trim())?;
+    }
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     let args: Vec<String> = match op {

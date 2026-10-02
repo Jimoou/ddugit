@@ -40,6 +40,7 @@ pub struct RebaseStep {
 /// (oldest first). Every commit in `base..HEAD` must appear exactly once;
 /// leaving one out would silently drop it, so that is refused.
 pub fn rebase(path: &str, base: &str, steps: &[RebaseStep]) -> Result<OpResult> {
+    super::operand(base)?;
     let dir = prepare_on(path, None)?;
     let listed = super::git_ok(
         &dir,

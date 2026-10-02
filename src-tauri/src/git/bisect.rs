@@ -36,7 +36,16 @@ pub struct BisectState {
 pub fn bisect(path: &str, op: &BisectOp) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
     let o = match op {
-        BisectOp::Start { bad, good } => git(&dir, &["bisect", "start", bad, good, "--"])?,
+        BisectOp::Start { bad, good } => git(
+            &dir,
+            &[
+                "bisect",
+                "start",
+                super::operand(bad)?,
+                super::operand(good)?,
+                "--",
+            ],
+        )?,
         BisectOp::Good => git(&dir, &["bisect", "good"])?,
         BisectOp::Bad => git(&dir, &["bisect", "bad"])?,
         BisectOp::Skip => git(&dir, &["bisect", "skip"])?,

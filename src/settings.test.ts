@@ -21,6 +21,7 @@ describe("parseSettings", () => {
       rotation: 0,
       sidebarCollapsed: false,
       closedSections: [],
+      trustedForgeHosts: [],
     });
     expect(parseSettings(JSON.stringify({ closedSections: ["tag", "stash"] }), base).closedSections).toEqual([
       "tag",

@@ -44,6 +44,7 @@ const MARK: char = '\u{1}';
 /// Commits reachable from `rev` that changed `file`, newest first. Uses the
 /// CLI because libgit2 has no `--follow`.
 pub fn file_log(path: &str, rev: &str, file: &str) -> Result<Vec<FileTouch>> {
+    super::operand(rev)?;
     let dir = workdir(&open(path)?)?;
     let out = git_ok(
         &dir,

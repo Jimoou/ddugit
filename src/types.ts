@@ -101,6 +101,8 @@ export interface ForgeStatus {
   slug: string;
   /** Where the token came from: the forge CLI (`gh` / `glab`), the keychain, or nowhere yet. */
   token: "cli" | "keychain" | "none";
+  /** github.com / gitlab.com themselves (anything else is only named like one). */
+  public: boolean;
   /** The token was refused. */
   unauthorized: boolean;
   error: string | null;

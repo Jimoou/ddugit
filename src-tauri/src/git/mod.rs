@@ -71,6 +71,16 @@ impl From<Output> for OpResult {
     }
 }
 
+/// A ref, revision or name handed to git as an operand. One starting with `-`
+/// would be read as an option (`--upload-pack=…`, `--output=…`), so it is refused.
+pub(crate) fn operand(s: &str) -> Result<&str> {
+    if s.starts_with('-') {
+        Err(format!("'{s}' can't start with '-'"))
+    } else {
+        Ok(s)
+    }
+}
+
 fn err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
@@ -142,10 +152,27 @@ pub fn version(program: Option<&str>) -> Result<String> {
     Ok(text)
 }
 
+/// A git executable the user named: an absolute path to an existing file
+/// called `git` (`git.exe` on Windows). Checked before it is ever run.
+fn check_git_path(program: &str) -> Result<()> {
+    let p = Path::new(program);
+    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let named_git = name == "git" || name.eq_ignore_ascii_case("git.exe");
+    if !p.is_absolute() || !named_git || !p.is_file() {
+        return Err(format!(
+            "'{program}' is not a git executable (give the full path to git)"
+        ));
+    }
+    Ok(())
+}
+
 /// Use `program` for git (blank or `None`: back to PATH). Refused, keeping
-/// the current one, unless it answers `--version` like git.
+/// the current one, unless it is a full path to `git` that answers `--version` like git.
 pub fn set_program(program: Option<&str>) -> Result<String> {
     let program = program.map(str::trim).filter(|p| !p.is_empty());
+    if let Some(p) = program {
+        check_git_path(p)?;
+    }
     let v = version(Some(program.unwrap_or("git")))?;
     *GIT_PATH.write().map_err(err)? = program.map(str::to_string);
     Ok(v)
@@ -294,6 +321,25 @@ mod tests {
         // Blank means PATH again; the global never held the bad value.
         assert!(set_program(Some("  ")).unwrap().starts_with("git version"));
         assert_eq!(git_program(), "git");
+        // Only a full path to a file named git is ever run.
+        assert!(check_git_path("git").is_err());
+        assert!(check_git_path(if cfg!(windows) {
+            "C:\\Windows\\System32\\cmd.exe"
+        } else {
+            "/bin/sh"
+        })
+        .is_err());
+    }
+
+    #[test]
+    fn operands_that_look_like_options_are_refused() {
+        assert!(operand("--upload-pack=touch x").is_err());
+        assert!(operand("-x").is_err());
+        assert_eq!(operand("feature/x").unwrap(), "feature/x");
+        let d = testutil::repo();
+        testutil::commit_file(d.path(), "a.txt", "a", "a");
+        assert!(write::checkout(testutil::s(d.path()), "--orphan=x").is_err());
+        assert!(write::create_branch(testutil::s(d.path()), "-D", None, false).is_err());
     }
 }
 

@@ -86,7 +86,7 @@ command!(git_restore_file(path: String, source: String, file: String) -> OpResul
     => git::edit::restore_file(&path, &source, &file));
 command!(git_bisect(path: String, op: git::bisect::BisectOp) -> OpResult => git::bisect::bisect(&path, &op));
 command!(bisect_state(path: String) -> Option<git::bisect::BisectState> => git::bisect::state(&path));
-command!(pull_requests(path: String) -> forge::PrReport => forge::report(&path));
+command!(pull_requests(path: String, trusted: Vec<String>) -> forge::PrReport => forge::report(&path, &trusted));
 command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
 // Open a pull request page in the browser (web links only).
 command!(open_url(url: String) -> () => {

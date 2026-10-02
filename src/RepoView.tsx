@@ -192,6 +192,7 @@ export function RepoView({
   const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
+  const trustedHosts = settings.trustedForgeHosts;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
   // First-run tutorial, played on the demo repository only.
   const tour = useVoyage(path === DEMO_PATH);
@@ -348,7 +349,7 @@ export function RepoView({
   useEffect(() => {
     if (!active) return;
     let live = true;
-    api.pullRequests(path).then(
+    api.pullRequests(path, trustedHosts).then(
       (r) => live && setPulls(r),
       () => {}, // offline or no forge: the graph just has no PR labels
     );
@@ -357,7 +358,7 @@ export function RepoView({
       live = false;
       clearInterval(timer);
     };
-  }, [path, active, prTick]);
+  }, [path, active, prTick, trustedHosts]);
   const graphRefs = useMemo(
     () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
     [snap, pulls, commitById],
@@ -1812,6 +1813,10 @@ export function RepoView({
           busy={busy}
           onSave={(token) => void saveToken(tokenFor, token)}
           onOpenPage={(url) => void api.openUrl(path, url).catch((e) => toast("err", String(e)))}
+          onTrustCli={() => {
+            onChangeSettings({ trustedForgeHosts: [...trustedHosts, tokenFor.host] });
+            setTokenFor(null);
+          }}
           onCancel={() => setTokenFor(null)}
         />
       )}

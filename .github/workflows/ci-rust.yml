@@ -19,6 +19,10 @@ concurrency:
   group: ci-rust-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only token: CI only checks out and builds.
+permissions:
+  contents: read
+
 jobs:
   rust:
     name: Rust (${{ matrix.os }})
@@ -32,7 +36,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Linux deps
         if: runner.os == 'Linux'
         # A stalled apt mirror can hang this for hours; fail fast and re-run instead.
@@ -40,10 +44,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
         with:
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: src-tauri
       # tauri::generate_context! requires frontendDist to exist.

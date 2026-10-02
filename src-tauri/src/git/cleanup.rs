@@ -92,6 +92,9 @@ pub fn report(path: &str) -> Result<BranchReport> {
 
 /// Delete several local branches; `force` also deletes unmerged ones.
 pub fn delete_branches(path: &str, names: &[String], force: bool) -> Result<OpResult> {
+    for n in names {
+        super::operand(n)?;
+    }
     if names.is_empty() {
         return Err("No branches selected".into());
     }

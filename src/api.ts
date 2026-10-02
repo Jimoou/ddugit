@@ -65,7 +65,7 @@ export interface Commands {
   git_restore_file: [{ path: string; source: string; file: string }, OpResult];
   git_bisect: [{ path: string; op: BisectOp }, OpResult];
   bisect_state: [{ path: string }, BisectState | null];
-  pull_requests: [{ path: string }, PrReport];
+  pull_requests: [{ path: string; trusted: string[] }, PrReport];
   // `path` only routes the demo; the backend keys tokens by host.
   set_forge_token: [{ path: string; host: string; token: string | null }, null];
   open_url: [{ path: string; url: string }, null];
@@ -150,7 +150,8 @@ export const api = {
   bisect: (path: string, op: BisectOp) => call("git_bisect", { path, op }),
   bisectState: (path: string) => call("bisect_state", { path }),
   /** Open pull / merge requests on the repository's forge remotes (GitHub, GitLab). */
-  pullRequests: (path: string) => call("pull_requests", { path }),
+  /** `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used. */
+  pullRequests: (path: string, trusted: string[]) => call("pull_requests", { path, trusted }),
   /** Keep a forge token in the keychain (`null` forgets it). */
   setForgeToken: (path: string, host: string, token: string | null) => call("set_forge_token", { path, host, token }),
   openUrl: (path: string, url: string) => call("open_url", { path, url }),
