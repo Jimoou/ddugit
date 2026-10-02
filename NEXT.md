@@ -7,24 +7,22 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #44(첫 실행 튜토리얼 "항해 일지")를 squash merge했다(`6103882`).
+- PR #45(자체 SVG 아이콘)를 squash merge했다(`93cc711`).
 
 ## 지금 하는 일
 
-M7 자체 SVG 아이콘 → PR CI 대기
+M7 릴리스 ddugit v0.2.0
 
-- 외부 아이콘 라이브러리는 없었다. 아이콘이 모두 유니코드·이모지 글자라서 OS 글꼴마다 모양이 달랐다
-- `icons.ts`: 24×24 stroke path 표(`ICONS`), 채우는 아이콘 목록(`FILLED`), 캔버스용 `iconPath`(Path2D 캐시)
-- `components/Icon.tsx`: `<Icon name size filled className>`
-- 캔버스: 라벨 앞 아이콘(HEAD·원격·태그·PR)과 PR 리뷰 표시(✓/✎ → check/edit)를 `drawIcon`으로 그린다. 리뷰 상태는 이름 문자열 대신 `RefInfo.review`로 넘긴다
-- 문장 속 화살표(→)나 그래프의 ＋ 노드를 가리키는 글자는 그대로 둔다
+1. main에서 "CI · Rust"를 `all_os`로 수동 실행했다. macOS·Windows에서 keyring(apple-native/windows-native)·opener를 처음 빌드하는 것이라 확인이 필요하다
+2. 버전 0.2.0 PR(이것)을 머지한다
+3. Release workflow를 `release=true`로 main에서 수동 실행한다. `v0.2.0` 초안이 만들어지고 dmg·exe가 올라간다
+4. 사용자에게 알린다: 초안을 확인한 뒤 Publish하면 태그가 생긴다. 예전 v0.1.0(otgit) 초안은 지워 달라고 한다(세션에는 Release를 지우는 도구가 없다)
 
 ## 다음 단계 (M7 순서)
 
-1. 릴리스 초안 ddugit v0.2.0(튜토리얼과 아이콘 포함): 버전 세 곳을 올리고, "CI · Rust"를 `all_os`로 실행한 뒤 Release를 수동 실행한다. 예전 v0.1.0(otgit) 초안은 사용자에게 지워 달라고 한다
-2. 대각선 요약 라벨
-3. 미리보기 카드
-4. 90° 회전
+1. 대각선 요약 라벨
+2. 미리보기 카드
+3. 90° 회전
 
 ## 막힌 것 / 결정 필요
 
