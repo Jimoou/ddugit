@@ -7,27 +7,27 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- M9 전부 merge(#58–#62). M10 계획(사용자 결정: 대시보드 → 서브모듈·LFS·worktree → v0.4.0, 서명은 나중에).
-- M10-1 은하 대시보드 #63 merge(`3378170`), M10-2 worktree #64 merge(`a94753b`), M10-3 서브모듈 #65 merge(`48e0de7`).
+- M10 기능 전부 merge: 은하 대시보드 #63, worktree #64, 서브모듈 #65, LFS #66. CI · Rust all_os 통과.
 
 ## 지금 하는 일
 
-M10-4 LFS PR → CI 대기 후 merge. 다음: v0.4.0(버전 세 곳 + 잠금 파일 둘, Release 수동 실행).
+v0.4.0 릴리스 PR(버전 올림) → merge → Actions에서 Release를 `release` 체크로 수동 실행 → `ddugit v0.4.0` 초안.
 
 ## 다음 단계
 
-- 사용자가 할 일: v0.3.0 초안 Publish(v0.2.0 초안 삭제), `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수, Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
-- 데스크톱에서 SSH 실제 확인(샌드박스는 22번 포트가 막힘)
+- 사용자가 할 일: v0.4.0(그리고 v0.3.0) 초안 확인 후 Publish, 남은 v0.2.0 초안 삭제
+- 사용자가 할 일: `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수(없으면 그 빌드는 라이선스 확인 불가, 잠금은 없음), Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
+- 데스크톱에서 SSH·worktree·서브모듈·LFS 실제 확인
+- 다음 마일스톤은 사용자와 정한다
 
 ## 막힌 것 / 결정 필요
 
 - 브랜치 보호 규칙(`main` 직접 push 금지, CI 필수)은 사용자가 GitHub 설정에서 켜야 한다.
-- 공개키 변수 없이 v0.4.0을 빌드하면 그 빌드는 라이선스를 확인하지 못한다(설정 화면이 그렇게 알려 줌). 기능 잠금은 없으므로 출시는 막지 않는다.
 
 ## PR 운영 규칙 (중요)
 
 - **GitGuardian 검사가 "진행 중"으로 멈춰 있으면 GitHub의 "검사 묶음 완료" 이벤트가 오지 않는다.** 그래서 PR을 올리면 `send_later`로 **10분 뒤** 확인을 예약하고, CI가 통과했으면 바로 squash merge한다. 사용자가 CI 상태를 알려줄 때까지 기다리지 않는다.
-- CI는 새 push가 오면 이전 실행을 취소한다. Stop 훅이 push하지 않은 커밋을 막으므로, PR CI가 도는 동안에는 commit하지 않거나 merge 후 rebase해서 push한다.
+- CI는 새 push가 오면 이전 실행을 취소한다. Stop 훅이 push하지 않은 커밋과 커밋하지 않은 변경을 막으므로, PR CI가 도는 동안의 다음 작업은 `git stash`에 두거나 merge 후 rebase해서 push한다.
 - `merge_pull_request`의 `expectedHeadSha`는 40자 전체 SHA여야 한다.
 
 ## 알아둘 것
@@ -40,8 +40,10 @@ M10-4 LFS PR → CI 대기 후 merge. 다음: v0.4.0(버전 세 곳 + 잠금 파
   - 긴 직선 이력 만들기: `window.__ddugitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
   - 회전한 채로 열기: `localStorage["ddugit.settings"] = '{"rotation":3}'`
   - 은하 대시보드: `localStorage["ddugit.recent"]`에 경로를 넣고 새로고침 → 새 탭. 데모의 각 경로는 경로 해시로 만든 상태, `gone`이 든 경로는 찾을 수 없음
+  - 데모에는 서브모듈 둘(하나는 초기화 안 됨)과 LFS(패턴 둘, 받지 않은 파일 셋)가 있다. worktree는 `api.worktree("demo", …)`로 추가
 - mock.ts를 고친 뒤에는 vite를 다시 띄운다. 그러지 않으면 `import("/src/mock.ts")`가 앱과 다른 모듈 인스턴스를 가져온다(HMR `?t=`)
 - 데모의 첫 Fetch는 `origin/main`과 현재 브랜치의 upstream에 동료 커밋을 하나씩 추가한다.
+- Rust 테스트의 git은 로컬 폴더 원격을 허용한다(`mod.rs` `command()`의 `#[cfg(test)]`, 서브모듈 테스트용).
 - 실제 앱을 Linux에서 확인하는 법: Xvfb로 띄우고 `xdotool`로 클릭, `import -window root`로 스크린샷.
 - `pkill -f "vite --port 1420"`은 셸 자신까지 죽인다. `pkill -f "[v]ite --port 1420"`을 쓴다.
 - 릴리스 절차는 CLAUDE.md에 있다.
