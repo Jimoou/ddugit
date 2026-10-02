@@ -293,12 +293,12 @@ export function Sidebar(props: Props) {
                       count={mine.length}
                       actions={
                         <button
-                          className="h3-add"
+                          className="h3-add h3-more"
                           title={t("side.remoteMenu", { name: rm.name })}
                           aria-label={t("side.remoteMenu", { name: rm.name })}
                           onClick={(e) => props.onRemoteMenu(rm.name, e.clientX, e.clientY)}
                         >
-                          <Icon name="more" size={12} />
+                          <Icon name="more" size={14} />
                         </button>
                       }
                     >
