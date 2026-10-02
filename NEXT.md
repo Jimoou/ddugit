@@ -12,7 +12,7 @@ _마지막 갱신: 2026-10-02_
 
 ## 지금 하는 일
 
-수정 PR merge → v0.5.2 버전 올림 PR → CI · Rust all_os → merge → Release 수동 실행 → `ddugit v0.5.2` 초안.
+v0.5.2 버전 올림 PR(#78 merge 뒤) → CI · Rust all_os → merge → Release 수동 실행 → `ddugit v0.5.2` 초안.
 
 ## 다음 단계
 
