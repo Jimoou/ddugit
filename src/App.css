@@ -3233,3 +3233,30 @@ button.demo-pill {
   align-items: center;
   gap: 5px;
 }
+
+/* ------------------------------------------------ backport: how it works */
+.bp-guide {
+  margin: 8px 12px 0;
+  border: 1px solid rgba(var(--signal), 0.2);
+  background: var(--scanlines), rgba(var(--signal), 0.03);
+}
+.bp-guide-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(var(--signal), 0.85);
+}
+.bp-guide ol {
+  margin: 0;
+  padding: 0 14px 10px 32px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}

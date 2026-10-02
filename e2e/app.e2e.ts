@@ -221,6 +221,30 @@ test("asks before pull and push, lists what moves, and can stop asking", async (
   );
 });
 
+test("opens backport from the sidebar with a guide, into the current branch", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  await page
+    .locator(".sidebar")
+    .getByLabel(/백포트: 다른 브랜치에만 있는 커밋/)
+    .click();
+  const sheet = page.locator(".backport-sheet");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel("받는 쪽")).toHaveValue(snap.head.branch!);
+  await expect(sheet.getByLabel("가져올 쪽")).not.toHaveValue(snap.head.branch!);
+  const guide = sheet.locator(".bp-guide");
+  await expect(guide.locator("ol li")).toHaveCount(4);
+  // Folded once, it stays folded.
+  await guide.locator(".bp-guide-head").click();
+  await expect(guide.locator("ol")).toHaveCount(0);
+  await page.reload();
+  await page
+    .locator(".sidebar")
+    .getByLabel(/백포트: 다른 브랜치에만 있는 커밋/)
+    .click();
+  await expect(page.locator(".backport-sheet .bp-guide ol")).toHaveCount(0);
+});
+
 test("ignores are per target and the overview counts each branch", async ({ demo }) => {
   const { page } = demo;
   await page.click(".sidebar li >> text=feature/theme", { button: "right" });

@@ -27,6 +27,8 @@ interface Props {
   onAddRemote(): void;
   /** Open branch housekeeping (merged, gone, stale). */
   onCleanup(): void;
+  /** Open the backport sheet (commits another branch has that this one doesn't). */
+  onBackport(): void;
   /** Open pull requests (or how to connect the forge), shown after the refs. */
   pulls?: ReactNode;
 }
@@ -159,6 +161,16 @@ export function Sidebar(props: Props) {
                       onClick={props.onAddRemote}
                     >
                       <Icon name="plus" size={12} />
+                    </button>
+                  )}
+                  {g.kind === "local" && (
+                    <button
+                      className="h3-add"
+                      title={t("bp.open")}
+                      aria-label={t("bp.open")}
+                      onClick={props.onBackport}
+                    >
+                      <Icon name="backport" size={12} />
                     </button>
                   )}
                   {g.kind === "local" && (

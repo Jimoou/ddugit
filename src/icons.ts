@@ -44,6 +44,7 @@ export const ICONS = {
   cherry:
     "M8 14a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM17 12a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM8 14c1-5 4-8 9-10M17 12c-.5-3-1.5-5.5-3.5-7.5",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  backport: "M6 3v18M18 3v8a4 4 0 0 1-4 4H6M10 11l-4 4 4 4",
 } as const;
 
 export type IconName = keyof typeof ICONS;

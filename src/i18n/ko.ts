@@ -193,8 +193,8 @@ export const ko = {
     "<b>{name}</b>에는 다른 브랜치에 병합되지 않은 커밋이 있어요. 지우면 그 커밋들은 그래프에서 사라집니다(reflog로만 복구 가능).",
   "menu.mergeInto": "{branch}에 병합",
   "menu.mergeIntoHead": "HEAD에 병합",
-  "menu.compare": "{branch}에 없는 커밋 보기",
-  "menu.compareHead": "현재 브랜치에 없는 커밋 보기",
+  "menu.compare": "백포트: {branch}에 없는 커밋 보기",
+  "menu.compareHead": "백포트: 현재 브랜치에 없는 커밋 보기",
   "menu.compare.hint": "백포트",
   "menu.tag.goto": "태그 위치로 이동",
   "tag.delete.title": "태그 삭제",
@@ -306,6 +306,17 @@ export const ko = {
   "bp.state.picked": "반영됨 (-x)",
   "bp.state.ignored": "제외",
   "bp.title": "백포트",
+  "bp.open": "백포트: 다른 브랜치에만 있는 커밋을 찾아 이 브랜치로 가져오기",
+  "bp.needBranches": "비교할 다른 브랜치가 없어요. 원격을 추가하거나 브랜치를 만들어 보세요.",
+  "bp.guide.title": "백포트는 이렇게 써요",
+  "bp.guide.1":
+    "<b>가져올 쪽</b>({source})에는 고친 커밋이 쌓이는 브랜치를 고릅니다. 예: 원본 프로젝트의 <code>upstream/main</code>",
+  "bp.guide.2":
+    "<b>받는 쪽</b>({target})에는 그 수정이 필요한 브랜치를 고릅니다. 예: 고객사 <code>main</code>이나 릴리스 브랜치",
+  "bp.guide.3":
+    "<b>미반영</b> 목록에서 필요한 커밋을 고르고 <b>cherry-pick</b>합니다(오래된 것부터, <code>-x</code>로 출처를 남겨 다음에도 반영됨으로 보여요). 직접 옮길 수 없는 곳이면 <b>패치로 내보내기</b>",
+  "bp.guide.4":
+    "이 받는 쪽에 필요 없는 커밋은 <b>제외</b>해 두면 다음부터 목록에서 빠져요. <b>대상별</b> 탭에서 브랜치마다 남은 개수를 한눈에 봅니다",
   "bp.source": "가져올 쪽",
   "bp.target": "받는 쪽",
   "bp.counts": "미반영 <b>{missing}</b> · 반영됨 {applied} · 제외 {ignored}",

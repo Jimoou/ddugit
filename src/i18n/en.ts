@@ -194,8 +194,8 @@ export const en: Record<Key, string> = {
     "<b>{name}</b> has commits not merged into any other branch. Deleting it removes them from the graph (recoverable only from the reflog).",
   "menu.mergeInto": "Merge into {branch}",
   "menu.mergeIntoHead": "Merge into HEAD",
-  "menu.compare": "Commits missing from {branch}",
-  "menu.compareHead": "Commits missing from the current branch",
+  "menu.compare": "Backport: commits missing from {branch}",
+  "menu.compareHead": "Backport: commits missing from the current branch",
   "menu.compare.hint": "Backport",
   "menu.tag.goto": "Go to tag",
   "tag.delete.title": "Delete tag",
@@ -307,6 +307,17 @@ export const en: Record<Key, string> = {
   "bp.state.picked": "Applied (-x)",
   "bp.state.ignored": "Ignored",
   "bp.title": "Backport",
+  "bp.open": "Backport: find commits another branch has and bring them here",
+  "bp.needBranches": "There's no other branch to compare with. Add a remote or make a branch first.",
+  "bp.guide.title": "How backporting works",
+  "bp.guide.1":
+    "<b>From</b> ({source}): the branch where fixes land, e.g. the original project's <code>upstream/main</code>",
+  "bp.guide.2":
+    "<b>Into</b> ({target}): the branch that needs them, e.g. a customer's <code>main</code> or a release branch",
+  "bp.guide.3":
+    "Pick commits in the <b>missing</b> list and <b>cherry-pick</b> them (oldest first, with <code>-x</code> so they show as applied next time), or <b>export patches</b> where you can't push directly",
+  "bp.guide.4":
+    "<b>Ignore</b> commits this target doesn't need and they leave the list. The <b>per target</b> tab shows what's left for every branch",
   "bp.source": "From",
   "bp.target": "Into",
   "bp.counts": "Missing <b>{missing}</b> · applied {applied} · ignored {ignored}",
