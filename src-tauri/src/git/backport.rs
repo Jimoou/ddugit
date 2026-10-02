@@ -376,4 +376,34 @@ mod tests {
             BackportState::Missing
         );
     }
+
+    #[test]
+    fn a_pick_that_is_already_there_stops_as_empty_and_can_be_skipped() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "base", "base");
+        create_branch(p, "up", None, true).unwrap();
+        commit_file(d.path(), "a.txt", "fixed", "fix on upstream");
+        commit_file(d.path(), "b.txt", "new", "another fix");
+        let fixes: Vec<String> = git_ok(d.path(), &["rev-list", "--reverse", "main..up"])
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
+        checkout(p, "main").unwrap();
+        // The same change, made by hand on main: picking it again changes nothing.
+        commit_file(d.path(), "a.txt", "fixed", "same fix, by hand");
+
+        let r = apply(p, &fixes, "main").unwrap();
+        assert_eq!(r.status, OpStatus::Empty, "{}", r.output);
+        assert!(super::super::read::snapshot(p, 5)
+            .unwrap()
+            .changes
+            .iter()
+            .all(|c| !c.conflicted));
+        let r = super::super::write::skip(p).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(super::super::read::snapshot(p, 5).unwrap().state, "clean");
+        assert_eq!(std::fs::read_to_string(d.path().join("b.txt")).unwrap(), "new");
+    }
 }

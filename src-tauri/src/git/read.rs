@@ -66,6 +66,8 @@ pub struct FileChange {
 pub struct RemoteInfo {
     pub name: String,
     pub url: String,
+    /// False for a fetch-only remote (its push URL is disabled).
+    pub push: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -213,6 +215,7 @@ fn read_remotes(repo: &Repository) -> Vec<RemoteInfo> {
             Some(RemoteInfo {
                 name: n.to_string(),
                 url: r.url()?.to_string(),
+                push: r.pushurl() != Some(super::NO_PUSH),
             })
         })
         .collect()

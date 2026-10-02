@@ -48,6 +48,9 @@ pub enum OpStatus {
     Rejected,
     /// Credentials or SSH host trust missing; the UI explains how to set them up.
     Auth,
+    /// A cherry-pick / revert / rebase step stopped because the commit's change
+    /// is already there: nothing conflicts, nothing to commit. Skip it.
+    Empty,
     /// Refused without force: a branch with commits not merged anywhere, or a
     /// worktree with changes.
     Unmerged,
@@ -116,6 +119,9 @@ fn state_name(s: RepositoryState) -> &'static str {
         ApplyMailbox | ApplyMailboxOrRebase => "am",
     }
 }
+
+/// A remote's push URL meaning "never push here" (`git remote set-url --push`).
+pub(crate) const NO_PUSH: &str = "DISABLED";
 
 /// Repo has stopped mid-operation (after a failed merge / rebase).
 fn in_progress(path: &str) -> bool {

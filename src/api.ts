@@ -73,6 +73,8 @@ export interface Commands {
   git_lfs: [{ path: string; op: LfsOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_fetch_remote: [{ path: string; name: string; onProgress: Sink<Progress> }, OpResult];
+  git_push_to: [{ path: string; remote: string; onProgress: Sink<Progress> }, OpResult];
+  git_skip: [{ path: string }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
   branch_report: [{ path: string }, BranchReport];
@@ -170,6 +172,12 @@ export const api = {
   fetchRemote(path: string, name: string, onProgress: (p: Progress) => void = () => {}) {
     return call("git_fetch_remote", { path, name, onProgress: progressSink(onProgress, path) });
   },
+  /** Push the current branch to `remote` and track it there from now on. */
+  pushTo(path: string, remote: string, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_push_to", { path, remote, onProgress: progressSink(onProgress, path) });
+  },
+  /** Drop the cherry-pick / revert / rebase step that stopped, and go on. */
+  skip: (path: string) => call("git_skip", { path }),
   /** Move the current branch to `target`; `mode` decides what happens to the changes passed over. */
   reset: (path: string, target: string, mode: ResetMode) => call("git_reset", { path, target, mode }),
   /** Where HEAD has been, newest first. */

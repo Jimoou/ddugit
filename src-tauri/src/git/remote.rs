@@ -89,10 +89,17 @@ impl RemoteOp {
     }
 }
 
-/// Remote used when the branch has no upstream yet: `origin`, else the only/first one.
+/// A remote that may be pushed to (not made fetch-only).
+fn pushable(repo: &Repository, name: &str) -> bool {
+    repo.find_remote(name)
+        .is_ok_and(|r| r.pushurl() != Some(super::NO_PUSH))
+}
+
+/// Remote used when the branch has no upstream yet: `origin`, else the first
+/// one that may be pushed to.
 fn default_remote(repo: &Repository) -> Option<String> {
     let names = repo.remotes().ok()?;
-    let names: Vec<&str> = names.iter().flatten().collect();
+    let names: Vec<&str> = names.iter().flatten().filter(|n| pushable(repo, n)).collect();
     names
         .iter()
         .find(|n| **n == "origin")
@@ -111,6 +118,20 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
             .branch
             .clone()
             .ok_or("HEAD is detached; check out a branch first")?;
+        // Never push to a fetch-only remote (e.g. the original project of a fork).
+        let up_remote = head.upstream.as_deref().and_then(|u| upstream_remote(&repo, u));
+        if !op.needs_upstream() {
+            if let Some(r) = up_remote.as_deref().filter(|r| !pushable(&repo, r)) {
+                return Ok(OpResult {
+                    status: OpStatus::Failed,
+                    output: format!(
+                        "'{branch}' follows {}, and {r} is fetch-only: nothing is pushed there. \
+                         Push it to another remote instead.",
+                        head.upstream.as_deref().unwrap_or(r)
+                    ),
+                });
+            }
+        }
         if head.upstream.is_none() {
             if op.needs_upstream() {
                 return Err(format!("'{branch}' has no upstream branch; push it first"));
@@ -147,6 +168,49 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
         }
         RemoteOp::PullMerge | RemoteOp::PullRebase => return Ok(conflict_aware(path, o)),
         _ => OpStatus::Failed,
+    };
+    Ok(OpResult::with(status, o))
+}
+
+/// The remote of an upstream like `upstream/main` (remote names may hold slashes).
+fn upstream_remote(repo: &Repository, upstream: &str) -> Option<String> {
+    let names = repo.remotes().ok()?;
+    let found = names
+        .iter()
+        .flatten()
+        .filter(|n| upstream.starts_with(&format!("{n}/")))
+        .max_by_key(|n| n.len())
+        .map(str::to_string);
+    found
+}
+
+/// Push the current branch to `remote` and make it the branch's upstream
+/// (e.g. `origin`, when it followed the original project's branch).
+pub fn push_to(path: &str, remote: &str, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+    let repo = open(path)?;
+    let dir = workdir(&repo)?;
+    let branch = read_head(&repo)
+        .branch
+        .ok_or("HEAD is detached; check out a branch first")?;
+    if !pushable(&repo, super::operand(remote)?) {
+        return Err(format!("{remote} is fetch-only"));
+    }
+    let args = ["push", "--progress", "-u", remote, super::operand(&branch)?];
+    let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
+        Some(p) => {
+            on_progress(p);
+            true
+        }
+        None => false,
+    })?;
+    let status = if o.ok {
+        OpStatus::Ok
+    } else if is_auth_failure(&o.text) {
+        OpStatus::Auth
+    } else if o.text.contains("[rejected]") {
+        OpStatus::Rejected
+    } else {
+        OpStatus::Failed
     };
     Ok(OpResult::with(status, o))
 }
@@ -403,5 +467,51 @@ mod tests {
         assert_eq!(head(&b).behind, 0, "origin wasn't fetched");
         assert_eq!(fetch_one(pb, "nope", |_| {}).unwrap().status, OpStatus::Failed);
         assert!(fetch_one(pb, "--all", |_| {}).is_err());
+    }
+
+    #[test]
+    fn a_fetch_only_remote_is_never_pushed_to_and_push_to_moves_the_upstream() {
+        use super::super::refs::{apply, RefOp};
+        let (origin, a, b) = setup();
+        // `b` gets the original project as `upstream`, fetch-only, and follows it.
+        let pb = s(b.path());
+        let add = RefOp::AddRemote {
+            name: "upstream".into(),
+            url: s(a.path()).into(),
+            fetch_only: true,
+        };
+        assert_eq!(apply(pb, &add).unwrap().status, OpStatus::Ok);
+        let remotes = snapshot(pb, 1).unwrap().remotes;
+        assert!(!remotes.iter().find(|r| r.name == "upstream").unwrap().push);
+        assert!(remotes.iter().find(|r| r.name == "origin").unwrap().push);
+        git_ok(b.path(), &["fetch", "-q", "upstream"]).unwrap();
+        git_ok(b.path(), &["branch", "-q", "-u", "upstream/main"]).unwrap();
+        commit_file(b.path(), "b.txt", "b", "backported fix");
+
+        let r = remote(pb, RemoteOp::Push, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Failed);
+        assert!(r.output.contains("fetch-only"), "{}", r.output);
+        assert!(push_to(pb, "upstream", |_| {}).is_err());
+        // The original project never got the commit.
+        assert_ne!(
+            git_ok(a.path(), &["rev-parse", "main"]).unwrap(),
+            git_ok(b.path(), &["rev-parse", "HEAD"]).unwrap()
+        );
+
+        let r = push_to(pb, "origin", |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
+        assert_eq!(
+            git_ok(origin.path(), &["rev-parse", "main"]).unwrap(),
+            git_ok(b.path(), &["rev-parse", "HEAD"]).unwrap()
+        );
+
+        // Pushing can be allowed again.
+        let allow = RefOp::SetPushable {
+            name: "upstream".into(),
+            pushable: true,
+        };
+        assert_eq!(apply(pb, &allow).unwrap().status, OpStatus::Ok);
+        assert!(snapshot(pb, 1).unwrap().remotes.iter().all(|r| r.push));
     }
 }

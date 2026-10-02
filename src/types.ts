@@ -206,7 +206,8 @@ export type RefOp =
   | { kind: "deleteTag"; name: string }
   /** `name`: a local branch of another name (when the remote branch's own name is taken). */
   | { kind: "checkoutRemote"; remoteRef: string; name?: string }
-  | { kind: "addRemote"; name: string; url: string }
+  | { kind: "addRemote"; name: string; url: string; fetchOnly?: boolean }
+  | { kind: "setPushable"; name: string; pushable: boolean }
   | { kind: "removeRemote"; name: string };
 
 export interface RepoSnapshot {
@@ -261,7 +262,8 @@ export type WorktreeOp =
   | { kind: "remove"; dir: string; force: boolean }
   | { kind: "prune" };
 
-export type OpStatus = "ok" | "failed" | "conflict" | "diverged" | "rejected" | "auth" | "unmerged";
+/** `empty`: a cherry-pick / revert / rebase step stopped with nothing to do (its change is already there). */
+export type OpStatus = "ok" | "failed" | "conflict" | "empty" | "diverged" | "rejected" | "auth" | "unmerged";
 
 export interface OpResult {
   status: OpStatus;
@@ -279,6 +281,8 @@ export interface Progress {
 export interface RemoteInfo {
   name: string;
   url: string;
+  /** False for a fetch-only remote (pushing there is disabled). */
+  push: boolean;
 }
 
 export interface DiffLine {
