@@ -1,13 +1,11 @@
 // Galaxy backdrop for the graph canvas: a deep gradient, a few soft nebulae
 // and three star layers that drift slower than the graph when panning
-// (parallax), a couple of far planets and a distant galaxy. The sky turns
-// very slowly around the view's centre while animation is on, like a night
-// sky, and now and then something passes: a meteor every so often at an
+// (parallax). The sky turns very slowly around the view's centre while
+// animation is on, like a night sky, and now and then something passes: a meteor every so often at an
 // irregular pace, a slow comet rarely. Star layers are rendered once into
 // tiles, so a frame costs a handful of drawImage calls.
 
 import type { View } from "./renderer";
-import { drawPlanet, type PlanetLook } from "../planet";
 
 const TILE = 512;
 
@@ -67,45 +65,6 @@ const TWINKLES = (() => {
 })();
 
 const mod = (a: number, n: number) => ((a % n) + n) % n;
-
-/** Far objects: [x, y] as a fraction of the view, size as a fraction of its larger side (capped). */
-const FAR_PLANETS: { fx: number; fy: number; size: number; max: number; look: PlanetLook; alpha: number }[] = [
-  { fx: 0.87, fy: 0.16, size: 0.03, max: 36, look: { hue: 28, ring: true, bands: 3 }, alpha: 0.42 },
-  { fx: 0.09, fy: 0.84, size: 0.01, max: 11, look: { hue: 205, ring: false, bands: 0 }, alpha: 0.5 },
-];
-const GALAXY = { fx: 0.64, fy: 0.74, size: 0.05, tilt: -0.5 };
-
-/** A spiral galaxy far away: a tilted, softly glowing disc with a bright core. */
-function drawGalaxy(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, angle: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(GALAXY.tilt);
-  ctx.scale(1, 0.38);
-  const disc = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-  disc.addColorStop(0, "rgba(255, 236, 214, 0.5)");
-  disc.addColorStop(0.18, "rgba(196, 170, 255, 0.22)");
-  disc.addColorStop(1, "rgba(120, 100, 220, 0)");
-  ctx.fillStyle = disc;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-  // Two arms as trails of soft dust, thinning towards their ends.
-  ctx.rotate(angle * 4);
-  for (const k of [0, Math.PI]) {
-    for (let a = 0.3; a < Math.PI * 1.3; a += 0.12) {
-      const d = r * (0.12 + a * 0.36);
-      const px = Math.cos(a + k) * d,
-        py = Math.sin(a + k) * d;
-      const pr = r * 0.16 * (1 - a / (Math.PI * 1.6));
-      const g = ctx.createRadialGradient(px, py, 0, px, py, pr);
-      g.addColorStop(0, `rgba(205, 192, 255, ${0.07 * (1 - a / (Math.PI * 1.5))})`);
-      g.addColorStop(1, "rgba(205, 192, 255, 0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
-    }
-  }
-  ctx.restore();
-}
 
 /** Things passing through the sky now and then (screen px, seconds). */
 interface Streak {
@@ -263,16 +222,6 @@ export function drawSpace(
     ctx.fillRect(x - 4, y - 4, 8, 8);
   }
 
-  // Far away: barely moving with the camera.
-  const gx = mod(GALAXY.fx * w + view.tx * 0.015, w),
-    gy = mod(GALAXY.fy * h + view.ty * 0.015, h);
-  drawGalaxy(ctx, gx, gy, Math.min(64, GALAXY.size * side), angle);
-  for (const p of FAR_PLANETS) {
-    const r = Math.min(p.max, p.size * side);
-    const x = mod(p.fx * w + view.tx * 0.02, w + 4 * r) - 2 * r;
-    const y = mod(p.fy * h + view.ty * 0.02, h + 4 * r) - 2 * r;
-    drawPlanet(ctx, x, y, r, p.look, p.alpha);
-  }
   ctx.restore();
 
   drawPassing(ctx, w, h, time, animate);

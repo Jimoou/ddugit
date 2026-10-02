@@ -12,6 +12,19 @@
   --panel: var(--glass-strong);
   /* Side panels and dialogs: black like the chrome, so only the galaxy has colour. */
   --surface: #000;
+  /* Control console: square edges, a signal colour for what is live, corner brackets on panels. */
+  --signal: 34, 232, 255;
+  --bracket: rgba(var(--signal), 0.7);
+  --brackets:
+    linear-gradient(var(--bracket), var(--bracket)) top left / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top left / 1px 10px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top right / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top right / 1px 10px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom left / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom left / 1px 10px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom right / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom right / 1px 10px no-repeat;
+  --scanlines: repeating-linear-gradient(0deg, rgba(var(--signal), 0.03) 0 1px, transparent 1px 3px);
   --line: rgba(255, 255, 255, 0.09);
   --line-strong: rgba(255, 255, 255, 0.18);
   --text: #f3f1ff;
@@ -45,7 +58,6 @@
 }
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
-  border-radius: 6px;
   background: rgba(207, 198, 255, 0.16) padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -75,22 +87,39 @@ body {
   user-select: none;
 }
 
+/* Buttons are console keys: square, with corner ticks that light up in the signal colour. */
 button {
+  --tick: rgba(207, 198, 255, 0.35);
   font: inherit;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.045);
+  background-image:
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
+  background-size:
+    5px 1px,
+    1px 5px,
+    5px 1px,
+    1px 5px;
+  background-position:
+    top left,
+    top left,
+    bottom right,
+    bottom right;
+  background-repeat: no-repeat;
   border: 1px solid var(--line);
-  border-radius: 8px;
   padding: 6px 12px;
   cursor: pointer;
   transition:
     border-color 0.15s,
-    background 0.15s,
+    background-color 0.15s,
     box-shadow 0.15s;
 }
 button:hover:not(:disabled) {
-  border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.11);
+  --tick: rgba(var(--signal), 0.9);
+  border-color: rgba(var(--signal), 0.38);
+  background-color: rgba(var(--signal), 0.06);
+  box-shadow: inset 0 0 14px rgba(var(--signal), 0.08);
 }
 button:focus-visible,
 select:focus-visible,
@@ -107,14 +136,16 @@ button.primary {
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #fff;
   font-weight: 650;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  /* Clipped corners: the one key that commits to something. */
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
 button.primary:hover:not(:disabled) {
   background: var(--ui-hover);
   border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 0 14px rgba(255, 255, 255, 0.12);
 }
 button.ghost {
-  background: transparent;
+  background-color: transparent;
 }
 button.danger {
   border-color: rgba(229, 72, 95, 0.55);
@@ -122,6 +153,7 @@ button.danger {
 }
 button.danger:not(.ghost) {
   background: var(--danger);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
   color: #fff;
   font-weight: 650;
 }
@@ -132,7 +164,7 @@ button.danger:hover:not(:disabled) {
   color: var(--red);
 }
 button.ghost.on {
-  background: var(--ui-soft);
+  background-color: var(--ui-soft);
   color: var(--ui-text);
 }
 button.icon {
@@ -158,11 +190,15 @@ textarea {
   color: var(--text);
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--line);
-  border-radius: 8px;
   padding: 7px 10px;
   outline: none;
   width: 100%;
   user-select: text;
+}
+select,
+select option {
+  background-color: #0c0b20;
+  color: var(--text);
 }
 input.text:focus,
 textarea:focus {
@@ -327,7 +363,6 @@ textarea:focus {
   gap: 6px;
   max-width: 220px;
   padding: 0 6px 0 12px;
-  border-radius: 8px 8px 0 0;
   color: var(--muted);
   cursor: pointer;
   border: 1px solid transparent;
@@ -339,9 +374,13 @@ textarea:focus {
 }
 .tab.on {
   color: var(--text);
-  background: var(--bg-2);
+  background:
+    linear-gradient(var(--bracket), var(--bracket)) top left / 8px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top left / 1px 8px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top right / 8px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top right / 1px 8px no-repeat,
+    var(--bg-2);
   border-color: var(--line);
-  box-shadow: inset 0 2px 0 var(--ui);
 }
 .tab-name {
   overflow: hidden;
@@ -391,7 +430,6 @@ textarea:focus {
   min-width: 18px;
   height: 16px;
   padding: 0 5px;
-  border-radius: 9px;
   background: rgba(255, 255, 255, 0.16);
   color: var(--text);
   font: 700 10px/16px var(--mono);
@@ -405,10 +443,10 @@ textarea:focus {
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--line);
-  border-radius: 10px;
 }
 .remote-group button {
   border: none;
+  background-image: none;
 }
 .remote .ico {
   display: inline-block;
@@ -436,13 +474,11 @@ textarea:focus {
   right: 8px;
   bottom: 1px;
   height: 2px;
-  border-radius: 1px;
   background: var(--line);
 }
 .remote .progress i {
   display: block;
   height: 100%;
-  border-radius: 1px;
   background: var(--ui-text);
   transition: width 0.15s;
 }
@@ -480,7 +516,6 @@ textarea:focus {
   font: 700 9px/1 var(--mono);
   letter-spacing: 0.08em;
   padding: 3px 6px;
-  border-radius: 6px;
   border: 1px solid var(--amber);
   color: var(--amber);
 }
@@ -591,7 +626,6 @@ textarea:focus {
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
-  border-radius: 7px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -601,7 +635,6 @@ textarea:focus {
 /* The chosen ref in its own branch colour: a lit edge, a tint fading right, a brighter star. */
 .sidebar li.focused {
   background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--ui-text)) 24%, transparent), transparent 90%);
-  box-shadow: inset 2px 0 0 var(--c, var(--ui-text));
 }
 .sidebar li.focused .name {
   color: #fff;
@@ -737,7 +770,6 @@ textarea:focus {
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border-radius: 10px;
   background: var(--panel);
   border: 1px solid var(--line);
   backdrop-filter: blur(10px);
@@ -778,7 +810,6 @@ textarea:focus {
   color: var(--text-2);
   pointer-events: none;
   padding: 2px 8px;
-  border-radius: 6px;
   background: rgba(5, 4, 14, 0.6);
 }
 .drag-hint {
@@ -787,7 +818,6 @@ textarea:focus {
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 14px;
-  border-radius: 20px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
   pointer-events: none;
@@ -848,7 +878,6 @@ textarea:focus {
 .note {
   margin: 0;
   padding: 8px 10px;
-  border-radius: 8px;
   background: rgba(143, 124, 255, 0.1);
   border: 1px solid rgba(143, 124, 255, 0.3);
   font-size: 12px;
@@ -871,12 +900,10 @@ textarea:focus {
   max-height: 38vh;
   overflow-y: auto;
   border: 1px solid var(--line);
-  border-radius: 10px;
   background: rgba(0, 0, 0, 0.25);
 }
 .files li {
   padding: 3px 4px;
-  border-radius: 6px;
 }
 .files li:hover {
   background: rgba(255, 255, 255, 0.04);
@@ -908,7 +935,6 @@ textarea:focus {
   font: 700 10px/16px var(--mono);
   width: 18px;
   text-align: center;
-  border-radius: 4px;
   flex-shrink: 0;
 }
 .k-modified {
@@ -954,7 +980,6 @@ textarea:focus {
 .ref {
   font: 600 11px var(--mono);
   padding: 2px 8px;
-  border-radius: 10px;
   border: 1px solid var(--accent);
   color: var(--accent);
 }
@@ -1000,7 +1025,6 @@ textarea:focus {
   align-items: center;
   gap: 5px;
   padding: 2px 8px;
-  border-radius: 6px;
 }
 .inspector .ids .sha.parent {
   color: var(--muted);
@@ -1034,7 +1058,6 @@ textarea:focus {
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 10px;
 }
 .inspector .toolbar .spacer {
   flex: 1;
@@ -1124,9 +1147,8 @@ textarea:focus {
   flex-direction: column;
   gap: 14px;
   padding: 22px;
-  border-radius: 16px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
 }
 .dialog p {
@@ -1145,7 +1167,6 @@ textarea:focus {
 .chip-lg {
   font: 700 13px var(--mono);
   padding: 6px 12px;
-  border-radius: 18px;
   border: 1.5px solid var(--c);
   color: var(--c);
   box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent);
@@ -1160,14 +1181,12 @@ textarea:focus {
   position: relative;
   background: linear-gradient(90deg, var(--line-strong), var(--cyan));
   overflow: hidden;
-  border-radius: 2px;
 }
 .flow-arrow i {
   position: absolute;
   top: -2px;
   width: 24px;
   height: 6px;
-  border-radius: 3px;
   background: #fff;
   box-shadow:
     0 0 10px #fff,
@@ -1197,9 +1216,8 @@ textarea:focus {
 .toast {
   max-width: 380px;
   padding: 9px 14px;
-  border-radius: 10px;
-  background: var(--glass-strong);
-  border: 1px solid var(--line-strong);
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
   box-shadow:
     inset 3px 0 0 var(--ok),
     0 10px 30px rgba(0, 0, 0, 0.45);
@@ -1290,7 +1308,6 @@ textarea:focus {
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-  border-radius: 6px;
   cursor: pointer;
   min-width: 0;
 }
@@ -1343,7 +1360,6 @@ textarea:focus {
   width: 44px;
   height: 3px;
   margin-left: -22px;
-  border-radius: 2px;
   background: var(--line-strong);
 }
 .diff-sheet header {
@@ -1503,7 +1519,6 @@ table.diff tr.rem .sign {
   margin-top: 4px;
   padding: 4px 4px 4px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
   background: rgba(0, 0, 0, 0.35);
 }
 .cmd code {
@@ -1545,11 +1560,9 @@ table.diff tr.rem .sign {
   z-index: 30;
   min-width: 220px;
   padding: 5px;
-  border-radius: 10px;
-  background: var(--glass-strong);
-  border: 1px solid var(--line-strong);
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(16px);
   animation: slide-in 0.1s ease-out;
 }
 .context-menu .menu-title {
@@ -1574,7 +1587,6 @@ table.diff tr.rem .sign {
   width: 100%;
   padding: 7px 10px;
   border: none;
-  border-radius: 6px;
   background: none;
   text-align: left;
 }
@@ -1601,11 +1613,9 @@ table.diff tr.rem .sign {
   gap: 4px;
   width: min(460px, calc(100% - 32px));
   padding: 4px 6px 4px 12px;
-  border-radius: 12px;
-  background: var(--glass-strong);
-  border: 1px solid var(--line-strong);
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(16px);
   animation: slide-in 0.12s ease-out;
 }
 .search-bar .ico {
@@ -1635,7 +1645,6 @@ table.diff tr.rem .sign {
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--line);
-  border-radius: 8px;
 }
 .scope-tabs button {
   border: none;
@@ -1702,7 +1711,6 @@ table.diff tr.picked .no {
 }
 .block {
   border: 1px solid rgba(255, 77, 109, 0.45);
-  border-radius: 10px;
   overflow: hidden;
 }
 .block.picked {
@@ -1792,7 +1800,6 @@ table.diff tr.picked .no {
   color: var(--text);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
-  border-radius: 6px;
   padding: 3px 6px;
   max-width: 220px;
 }
@@ -1858,7 +1865,6 @@ table.diff tr.picked .no {
   width: auto;
   padding: 0 7px;
   font: 600 10px/17px var(--sans);
-  border-radius: 9px;
 }
 .chip.bp-missing {
   color: var(--amber);
@@ -1920,7 +1926,6 @@ b.bp-missing {
   padding: 5px 8px;
   margin-bottom: 4px;
   border: 1px solid var(--line);
-  border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
   font-size: 12px;
   white-space: nowrap;
@@ -1943,7 +1948,6 @@ b.bp-missing {
   color: var(--text);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
-  border-radius: 6px;
   padding: 2px 4px;
 }
 .rb-grip {
@@ -2008,7 +2012,6 @@ b.bp-missing {
   color: var(--text);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
-  border-radius: 6px;
   padding: 3px 6px;
 }
 .dialog.settings .small {
@@ -2040,7 +2043,6 @@ kbd {
   padding: 1px 6px;
   border: 1px solid var(--line-strong);
   border-bottom-width: 2px;
-  border-radius: 5px;
   font: 11px var(--mono);
   color: var(--text);
   background: rgba(255, 255, 255, 0.04);
@@ -2095,7 +2097,6 @@ kbd {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-radius: 8px;
 }
 .recent-list li:hover,
 .recent-list li.on {
@@ -2141,11 +2142,9 @@ kbd {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border-radius: 12px;
-  background: var(--glass-strong);
-  border: 1px solid var(--line-strong);
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(16px);
   animation: slide-in 0.1s ease-out;
 }
 .dialog .field.col {
@@ -2166,7 +2165,6 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 7px 10px;
-  border-radius: 8px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--line);
 }
@@ -2178,7 +2176,6 @@ kbd {
 }
 .clone-progress .progress {
   height: 4px;
-  border-radius: 2px;
   background: var(--line);
   overflow: hidden;
 }
@@ -2201,7 +2198,6 @@ kbd {
   z-index: 40;
   display: grid;
   place-items: center;
-  border-radius: 18px;
   border: 2px dashed var(--focus);
   background: rgba(10, 8, 30, 0.72);
   color: var(--text);
@@ -2216,7 +2212,6 @@ kbd {
   align-items: flex-start;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
   cursor: pointer;
 }
 .dialog.reset .choice > span {
@@ -2264,7 +2259,6 @@ kbd {
   color: var(--amber);
   border: 1px solid rgba(255, 184, 77, 0.5);
   padding: 1px 6px;
-  border-radius: 6px;
   font-size: 11px;
 }
 .reflog-list li.here {
@@ -2331,7 +2325,6 @@ kbd {
   align-items: center;
   gap: 12px;
   padding: 4px 6px;
-  border-radius: 8px;
   font-size: 12.5px;
 }
 .clean-group li:hover {
@@ -2413,7 +2406,6 @@ kbd {
   max-height: 180px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 10px;
 }
 .split-files li {
   padding: 3px 4px;
@@ -2521,7 +2513,6 @@ kbd {
   min-width: 0;
   padding: 3px 8px;
   border: 0;
-  border-radius: 0;
   background: transparent;
   color: var(--text-2);
   font: inherit;
@@ -2629,7 +2620,6 @@ kbd {
   width: 46px;
   height: 4px;
   margin: -2px 0 0 -42px;
-  border-radius: 2px;
   background: linear-gradient(90deg, transparent, rgba(34, 232, 255, 0.6) 60%, #fff);
   filter: drop-shadow(0 0 6px rgba(34, 232, 255, 0.95));
   offset-rotate: auto;
@@ -2664,7 +2654,6 @@ kbd {
   width: 90px;
   height: 3px;
   margin: -1.5px 0 0 -2px;
-  border-radius: 2px;
   background: linear-gradient(90deg, #fff, rgba(166, 255, 77, 0.6) 35%, transparent);
   filter: drop-shadow(0 0 5px rgba(166, 255, 77, 0.9));
   transform-origin: 2px 1.5px;
@@ -2805,7 +2794,6 @@ kbd {
   width: 40px;
   height: 4px;
   margin: -2px 0 0 -36px;
-  border-radius: 2px;
   background: linear-gradient(90deg, transparent, rgba(166, 255, 77, 0.6) 60%, #fff);
   filter: drop-shadow(0 0 6px rgba(166, 255, 77, 0.95));
   offset-rotate: auto;
@@ -2985,11 +2973,9 @@ kbd {
   z-index: 6;
   width: min(320px, calc(100% - 28px));
   padding: 10px 12px;
-  border: 1px solid rgba(255, 212, 121, 0.35);
-  border-radius: 14px;
-  background: var(--glass-strong);
+  border: 1px solid rgba(var(--signal), 0.22);
+  background: var(--brackets), var(--scanlines), var(--surface);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
   font-size: 12.5px;
 }
 .voyage header {
