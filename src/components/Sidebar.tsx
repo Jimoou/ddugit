@@ -25,6 +25,8 @@ interface Props {
   selectedStash: number | null;
   onStash(index: number): void;
   onAddRemote(): void;
+  /** A new branch where HEAD is. */
+  onNewBranch(): void;
   /** Open branch housekeeping (merged, gone, stale). */
   onCleanup(): void;
   /** Open the backport sheet (commits another branch has that this one doesn't). */
@@ -78,6 +80,8 @@ export function Sidebar(props: Props) {
       refs.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)),
     [refs, q],
   );
+
+  const localNames = useMemo(() => new Set(refs.filter((r) => r.kind === "local").map((r) => r.name)), [refs]);
 
   const fold = () => onLayout({ sidebarCollapsed: !collapsed });
   const toggle = (id: string) =>
@@ -145,8 +149,8 @@ export function Sidebar(props: Props) {
         </div>
         {GROUPS.map((g) => {
           const items = filtered.filter((r) => r.kind === g.kind);
-          // The remote group stays (with its add button) even before any remote exists.
-          if (!items.length && (g.kind !== "remote" || searching)) return null;
+          // Branches and remotes stay (with their add buttons) even when empty.
+          if (!items.length && (g.kind === "tag" || searching)) return null;
           return (
             <SideSection
               key={g.kind}
@@ -161,6 +165,16 @@ export function Sidebar(props: Props) {
                       title={t("side.addRemote")}
                       aria-label={t("side.addRemote")}
                       onClick={props.onAddRemote}
+                    >
+                      <Icon name="plus" size={12} />
+                    </button>
+                  )}
+                  {g.kind === "local" && (
+                    <button
+                      className="h3-add"
+                      title={t("branch.newMenu")}
+                      aria-label={t("branch.newMenu")}
+                      onClick={props.onNewBranch}
                     >
                       <Icon name="plus" size={12} />
                     </button>
@@ -188,9 +202,12 @@ export function Sidebar(props: Props) {
                 </>
               }
             >
+              {g.kind === "local" && !items.length && <p className="side-note muted">{t("branch.local.none")}</p>}
               <ul>
                 {items.map((r) => {
                   const key = `${r.kind}:${r.name}`;
+                  // A remote branch with no local branch of its name yet.
+                  const remoteOnly = r.kind === "remote" && !localNames.has(r.name.slice(r.name.indexOf("/") + 1));
                   const isHead = r.kind === "local" && r.name === headBranch;
                   return (
                     <li
@@ -208,6 +225,19 @@ export function Sidebar(props: Props) {
                       <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
                       <span className="name">{r.name}</span>
                       {isHead && <span className="head-pill">HEAD</span>}
+                      {remoteOnly && (
+                        <button
+                          className="icon to-local"
+                          title={t("side.toLocal")}
+                          aria-label={`${t("side.toLocal")}: ${r.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCheckout(r);
+                          }}
+                        >
+                          <Icon name="plus" size={11} />
+                        </button>
+                      )}
                       {r.kind === "local" && props.elsewhere[r.name] && (
                         <span className="elsewhere" title={t("wt.elsewhere", { path: props.elsewhere[r.name] })}>
                           <Icon name="folder" size={11} />

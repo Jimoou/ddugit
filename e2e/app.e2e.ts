@@ -958,3 +958,32 @@ test("LFS: downloads files left as pointers and tracks a new file type", async (
   await expect(section.locator("li")).toHaveCount(3);
   expect((await demo.snapshot()).changes.some((c) => c.path === ".gitattributes")).toBe(true);
 });
+
+test("makes local branches: from a remote-only branch, a new one at HEAD, and under another name", async ({ demo }) => {
+  const { page } = demo;
+  // The branch switcher lists the remote-only branch; picking it makes it local and tracking.
+  await page.locator(".topbar .branch-now").click();
+  await page.getByRole("menuitem", { name: /origin\/feature\/orbit-sync/ }).click();
+  await demo.toast("origin/feature/orbit-sync을(를) 로컬로 가져와 이동했어요");
+  expect((await demo.snapshot()).head.branch).toBe("feature/orbit-sync");
+
+  // New branch from the sidebar's +.
+  await page.locator(".app:not([hidden]) .sidebar").getByRole("button", { name: "새 브랜치…" }).click();
+  await page.locator(".dialog input.text").fill("spike/idea");
+  await page.locator(".dialog").getByRole("button", { name: "만들고 이동" }).click();
+  await demo.toast("spike/idea 브랜치를 만들었어요");
+  expect((await demo.snapshot()).head.branch).toBe("spike/idea");
+
+  // origin/main while our main has moved on: follow it under a new name instead of switching.
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+  await page
+    .locator(".app:not([hidden]) .sidebar li")
+    .filter({ hasText: /^origin\/main$/ })
+    .dblclick();
+  const name = page.locator(".dialog input.text");
+  await expect(name).toHaveValue("origin-main");
+  await page.locator(".dialog").getByRole("button", { name: "만들고 이동" }).click();
+  await demo.toast("origin/main을(를) 로컬로 가져와 이동했어요");
+  expect((await demo.snapshot()).head.branch).toBe("origin-main");
+});

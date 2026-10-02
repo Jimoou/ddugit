@@ -638,13 +638,57 @@ export function RepoView({
     [snap],
   );
 
-  const checkoutRef = (r: RefInfo) =>
+  /** `upstream/feature/x` → remote `upstream`, branch `feature/x` (remote names may hold slashes too). */
+  const splitRemote = (name: string) => {
+    const remote = snap?.remotes.map((x) => x.name).find((n) => name.startsWith(`${n}/`)) ?? name.split("/")[0];
+    return { remote, branch: name.slice(remote.length + 1) };
+  };
+
+  /** A local branch following remote branch `r`, under a name the user picks (`suggest` prefilled). */
+  const askLocalFor = (r: RefInfo, why: string, suggest: string) =>
+    setNameReq({
+      title: why,
+      placeholder: "feature/my-idea",
+      confirmLabel: t("branch.fromRemote.go"),
+      value: suggest,
+      onSubmit: (name) => {
+        setNameReq(null);
+        void refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name, name });
+      },
+    });
+
+  const checkoutRef = (r: RefInfo) => {
     // git can't check out a branch another worktree has; open that worktree instead.
-    r.kind === "local" && elsewhere[r.name]
-      ? (onOpenPath(elsewhere[r.name]), toast("ok", t("wt.checkedOut", { branch: r.name })))
-      : r.kind === "remote"
-        ? refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name })
-        : run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name));
+    if (r.kind === "local" && elsewhere[r.name]) {
+      onOpenPath(elsewhere[r.name]);
+      toast("ok", t("wt.checkedOut", { branch: r.name }));
+      return;
+    }
+    if (r.kind !== "remote") return void run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name));
+    const { remote, branch } = splitRemote(r.name);
+    const local = snap?.refs.find((x) => x.kind === "local" && x.name === branch);
+    // The same name already holds other work (e.g. `upstream/main` next to our `main`): don't
+    // silently switch to ours, follow theirs under a new name.
+    if (local && local.target !== r.target)
+      return askLocalFor(r, t("branch.fromRemote.taken", { local: branch, remote: r.name }), `${remote}-${branch}`);
+    void refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name });
+  };
+
+  const localNames = new Set(snap?.refs.filter((r) => r.kind === "local").map((r) => r.name));
+
+  /** A new branch where HEAD is (also the first branch of an empty repository). */
+  const askNewBranch = () => {
+    const from = snap?.head.branch ?? snap?.head.target?.slice(0, 7);
+    setNameReq({
+      title: from && snap?.head.target ? t("branch.newFromHead", { from }) : t("branch.newFirst"),
+      placeholder: "feature/my-idea",
+      confirmLabel: t("branch.new.go"),
+      onSubmit: (name) => {
+        setNameReq(null);
+        void run(t("branch.new.done", { name }), () => api.createBranch(path, name, null, true));
+      },
+    });
+  };
 
   const addWorktree = async (op: Extract<WorktreeOp, { kind: "add" }>) => {
     const branch = op.newBranch ?? op.branch ?? "";
@@ -1037,9 +1081,13 @@ export function RepoView({
         },
       ];
     if (r.kind === "remote") {
-      const name = snap.remotes.map((x) => x.name).find((n) => r.name.startsWith(`${n}/`)) ?? r.name.split("/")[0];
+      const { remote: name, branch } = splitRemote(r.name);
       return [
         { label: t("menu.checkoutLocal"), hint: t("menu.checkoutLocal.hint"), onSelect: () => void checkoutRef(r) },
+        {
+          label: t("menu.checkoutLocalAs"),
+          onSelect: () => askLocalFor(r, t("branch.fromRemote", { remote: r.name }), `${name}-${branch}`),
+        },
         merge,
         compare,
         "separator",
@@ -1240,20 +1288,34 @@ export function RepoView({
               x,
               y,
               title: t("top.branches"),
-              items: snap.refs
-                .filter((r) => r.kind === "local")
-                // Where HEAD is first, then the rest by name.
-                .sort(
-                  (a, b) =>
-                    Number(b.name === snap.head.branch) - Number(a.name === snap.head.branch) ||
-                    a.name.localeCompare(b.name),
-                )
-                .map((r) => ({
-                  label: r.name,
-                  hint: r.name === snap.head.branch ? "HEAD" : undefined,
-                  disabled: r.name === snap.head.branch,
-                  onSelect: () => checkoutRef(r),
-                })),
+              items: [
+                { label: t("branch.newMenu"), icon: "plus" as const, onSelect: askNewBranch },
+                "separator" as const,
+                ...snap.refs
+                  .filter((r) => r.kind === "local")
+                  // Where HEAD is first, then the rest by name.
+                  .sort(
+                    (a, b) =>
+                      Number(b.name === snap.head.branch) - Number(a.name === snap.head.branch) ||
+                      a.name.localeCompare(b.name),
+                  )
+                  .map((r) => ({
+                    label: r.name,
+                    hint: r.name === snap.head.branch ? "HEAD" : undefined,
+                    disabled: r.name === snap.head.branch,
+                    onSelect: () => void checkoutRef(r),
+                  })),
+                // Remote branches with no local one yet: picking one makes it local.
+                ...snap.refs
+                  .filter((r) => r.kind === "remote" && !localNames.has(splitRemote(r.name).branch))
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((r) => ({
+                    label: r.name,
+                    icon: "cloud" as const,
+                    hint: t("top.remoteOnly"),
+                    onSelect: () => void checkoutRef(r),
+                  })),
+              ],
             })
           }
           onCompose={() => show({ composer: true })}
@@ -1414,6 +1476,7 @@ export function RepoView({
           }}
           onCheckout={checkoutRef}
           onAddRemote={askRemote}
+          onNewBranch={askNewBranch}
           onBackport={openBackport}
           onCleanup={() => {
             setDiff(null);
