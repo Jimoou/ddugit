@@ -38,6 +38,11 @@ export class Demo {
     return this.page.evaluate(() => (window as unknown as DemoWindow).__ddugitDemo.snapshot());
   }
 
+  /** Go ahead in the "before pull / push" confirmation. */
+  async confirmSync() {
+    await this.page.locator(".dialog.sync-confirm button.primary").click();
+  }
+
   /** Change demo state outside the UI without telling the app (no refresh). */
   async mutateQuietly(fn: (demo: DemoWindow["__ddugitDemo"]) => void) {
     await this.page.evaluate(`(${fn.toString()})(window.__ddugitDemo)`);

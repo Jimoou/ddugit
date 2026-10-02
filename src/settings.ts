@@ -21,6 +21,8 @@ export interface Settings {
   closedSections: string[];
   /** Forge hosts (besides github.com / gitlab.com) whose `gh` / `glab` login the user agreed to use. */
   trustedForgeHosts: string[];
+  /** Ask before each kind of remote work (fetch only reads, so it isn't asked by default). */
+  confirmRemote: Record<"fetch" | "pull" | "push", boolean>;
 }
 
 export const HISTORY_PAGES = [1000, 3000, 10000] as const;
@@ -36,7 +38,15 @@ export function defaults(reducedMotion = false): Settings {
     sidebarCollapsed: false,
     closedSections: [],
     trustedForgeHosts: [],
+    confirmRemote: { fetch: false, pull: true, push: true },
   };
+}
+
+function parseConfirm(v: unknown, base: Settings["confirmRemote"]): Settings["confirmRemote"] {
+  if (!v || typeof v !== "object") return base;
+  const o = v as Record<string, unknown>;
+  const pick = (k: keyof typeof base) => (typeof o[k] === "boolean" ? (o[k] as boolean) : base[k]);
+  return { fetch: pick("fetch"), pull: pick("pull"), push: pick("push") };
 }
 
 /** Stored JSON → settings, keeping only well-formed fields. */
@@ -67,6 +77,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
       Array.isArray(o.trustedForgeHosts) && o.trustedForgeHosts.every((x) => typeof x === "string")
         ? o.trustedForgeHosts
         : base.trustedForgeHosts,
+    confirmRemote: parseConfirm(o.confirmRemote, base.confirmRemote),
   };
 }
 
