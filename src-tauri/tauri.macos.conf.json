@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "ddugit",
+        "width": 1400,
+        "height": 880,
+        "minWidth": 900,
+        "minHeight": 560,
+        "backgroundColor": "#05040e",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 14,
+          "y": 13
+        }
+      }
+    ]
+  }
+}
