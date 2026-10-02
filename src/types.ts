@@ -280,3 +280,27 @@ export interface ConflictFile {
 
 /** Mirrors `Resolution` in git/conflict.rs. */
 export type Resolution = { kind: "ours" } | { kind: "theirs" } | { kind: "content"; text: string };
+
+/** Mirrors `ssh.rs`: the user's SSH keys, a server's host key, a connection test. */
+export interface SshKey {
+  name: string;
+  /** The `.pub` line to add to the forge. */
+  public: string;
+}
+export interface SshStatus {
+  available: boolean;
+  keys: SshKey[];
+}
+export interface HostKey {
+  host: string;
+  port: number | null;
+  known: boolean;
+  fingerprints: string[];
+  /** Matches what the forge publishes (null: it publishes none we know). */
+  verified: boolean | null;
+}
+export interface SshTest {
+  ok: boolean;
+  user: string | null;
+  output: string;
+}

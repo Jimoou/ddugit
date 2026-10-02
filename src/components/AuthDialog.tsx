@@ -1,4 +1,6 @@
 import { Icon } from "./Icon";
+import { SshSetup } from "./SshSetup";
+import { api } from "../api";
 import { useState } from "react";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
@@ -97,6 +99,30 @@ export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onC
   const key = ssh ? (/Host key/i.test(output) ? "ssh-host" : `ssh:${os}`) : `https:${os}`;
   const signIn = fetchCmd ?? `git -C "${repoPath}" fetch`;
   const fill = (s: string) => s.replaceAll("{host}", host).replaceAll("{fetch}", signIn);
+  const steps = (
+    <ol className="steps">
+      {GUIDES[key].map((s, i) => (
+        <li key={i}>
+          <span>{fill(t(s.text))}</span>
+          {s.cmd && (
+            <div className="cmd">
+              <code>{fill(s.cmd)}</code>
+              <button
+                className="icon"
+                title={t("auth.copy")}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(fill(s.cmd!));
+                  setCopied(i);
+                }}
+              >
+                <Icon name={copied === i ? "check" : "copy"} />
+              </button>
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
 
   return (
     <div className="scrim" onClick={onClose}>
@@ -106,28 +132,18 @@ export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onC
           <Rich k={ssh ? "auth.bodySsh" : "auth.bodyHttps"} vars={{ host }} />
         </p>
         {url && <code className="url">{url}</code>}
-        <ol className="steps">
-          {GUIDES[key].map((s, i) => (
-            <li key={i}>
-              <span>{fill(t(s.text))}</span>
-              {s.cmd && (
-                <div className="cmd">
-                  <code>{fill(s.cmd)}</code>
-                  <button
-                    className="icon"
-                    title={t("auth.copy")}
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(fill(s.cmd!));
-                      setCopied(i);
-                    }}
-                  >
-                    <Icon name={copied === i ? "check" : "copy"} />
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ol>
+        {ssh && url && /Host key|publickey/i.test(output) ? (
+          // Set SSH up right here; the terminal route stays one click away.
+          <>
+            <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
+            <details>
+              <summary className="muted">{t("ssh.terminal")}</summary>
+              {steps}
+            </details>
+          </>
+        ) : (
+          steps
+        )}
         <details>
           <summary className="muted">{t("auth.output")}</summary>
           <pre className="raw">{output}</pre>

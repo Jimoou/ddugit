@@ -18,6 +18,9 @@ import type {
   RepoSnapshot,
 } from "./types";
 
+/** The demo's SSH state: keys made and hosts trusted in this session. */
+const demoSsh = { keys: [] as { name: string; public: string }[], trusted: [] as string[] };
+
 let seq = 0;
 const fakeId = () => {
   seq += 1;
@@ -834,6 +837,38 @@ const mockTable: Table = {
   },
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
+  ssh_status() {
+    return Promise.resolve({ available: true, keys: demoSsh.keys.slice() });
+  },
+  ssh_keygen({ comment }) {
+    const key = {
+      name: "id_ed25519",
+      public: `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDemoKeyForTheDdugitTour ${comment}`,
+    };
+    demoSsh.keys = [key];
+    return Promise.resolve(key);
+  },
+  ssh_host_key({ url }) {
+    const host = url.replace(/^.*@/, "").replace(/[:/].*$/, "");
+    return Promise.resolve({
+      host,
+      port: null,
+      known: demoSsh.trusted.includes(host),
+      fingerprints: ["SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU"],
+      verified: host === "github.com" ? true : null,
+    });
+  },
+  ssh_trust_host({ url }) {
+    demoSsh.trusted.push(url.replace(/^.*@/, "").replace(/[:/].*$/, ""));
+    return Promise.resolve(null);
+  },
+  ssh_test() {
+    return Promise.resolve(
+      demoSsh.keys.length
+        ? { ok: true, user: "demo", output: "Hi demo! You've successfully authenticated." }
+        : { ok: false, user: null, output: "git@github.com: Permission denied (publickey)." },
+    );
+  },
   pull_requests() {
     const token = demoControls.forgeToken;
     const ok = token === "cli" || token === "keychain";

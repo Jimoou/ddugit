@@ -444,6 +444,36 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   expect(stored[0]).toMatchObject({ path: "/work/rocket", starred: true });
 });
 
+test("sets up SSH for a clone inside the app: key, host trust, test", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".tab.on .tab-menu").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /URL로 가져오기/ })
+    .click();
+  const dialog = page.locator(".dialog.clone");
+  const url = dialog.getByPlaceholder("https://github.com/owner/repo.git");
+  await url.fill("https://github.com/acme/rocket.git");
+  await dialog.getByRole("radio", { name: "SSH" }).click();
+  await expect(dialog.locator("input.text").first()).toHaveValue("git@github.com:acme/rocket.git");
+
+  await dialog.locator(".ssh-ready summary").click();
+  const ssh = dialog.locator(".ssh-setup");
+  await ssh.getByRole("button", { name: "키 만들기" }).click();
+  await expect(ssh).toContainText("~/.ssh/id_ed25519");
+  await expect(ssh.getByRole("button", { name: /공개키 복사/ })).toBeVisible();
+  await ssh.getByRole("button", { name: "서버 확인" }).click();
+  await expect(ssh).toContainText("github.com가 공개한 지문과 일치해요");
+  await ssh.getByRole("button", { name: "이 서버 신뢰" }).click();
+  await expect(ssh).toContainText("이미 신뢰한 서버예요");
+  await ssh.getByRole("button", { name: "연결 확인" }).click();
+  await expect(ssh).toContainText("demo(으)로 인증됐어요");
+
+  // Back to HTTPS: the same repository.
+  await dialog.getByRole("radio", { name: "HTTPS" }).click();
+  await expect(dialog.locator("input.text").first()).toHaveValue("https://github.com/acme/rocket.git");
+});
+
 test("creates a new repository in a plain folder", async ({ demo }) => {
   const { page } = demo;
   await page.evaluate(

@@ -1,5 +1,6 @@
 mod forge;
 mod git;
+mod ssh;
 
 use git::backport::{BackportItem, BackportTally};
 use git::conflict::{ConflictFile, Resolution};
@@ -86,6 +87,11 @@ command!(git_restore_file(path: String, source: String, file: String) -> OpResul
     => git::edit::restore_file(&path, &source, &file));
 command!(git_bisect(path: String, op: git::bisect::BisectOp) -> OpResult => git::bisect::bisect(&path, &op));
 command!(bisect_state(path: String) -> Option<git::bisect::BisectState> => git::bisect::state(&path));
+command!(ssh_status() -> ssh::SshStatus => ssh::status());
+command!(ssh_keygen(comment: String) -> ssh::SshKey => ssh::keygen(&comment));
+command!(ssh_host_key(url: String) -> ssh::HostKey => ssh::host_key(&url));
+command!(ssh_trust_host(url: String, fingerprints: Vec<String>) -> () => ssh::trust_host(&url, &fingerprints));
+command!(ssh_test(url: String) -> ssh::SshTest => ssh::test(&url));
 command!(pull_requests(path: String, trusted: Vec<String>) -> forge::PrReport => forge::report(&path, &trusted));
 command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
 // Open a pull request page in the browser (web links only).
@@ -180,6 +186,11 @@ pub fn run() {
             bisect_state,
             file_log,
             pull_requests,
+            ssh_status,
+            ssh_keygen,
+            ssh_host_key,
+            ssh_trust_host,
+            ssh_test,
             set_forge_token,
             open_url,
             git_blame,

@@ -2,6 +2,8 @@
 // URL, or start a new one. Used by the welcome screen and the top bar menu.
 
 import { Icon } from "./Icon";
+import { SshSetup } from "./SshSetup";
+import { isSshUrl, toHttps, toSsh } from "../sshUrl";
 import { PlanetDot } from "./Planet";
 import { useCallback, useState } from "react";
 import { api } from "../api";
@@ -163,6 +165,8 @@ export function CloneDialog(p: {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const finalName = name ?? nameFromUrl(url);
+  const ssh = isSshUrl(url);
+  const [sshOpen, setSshOpen] = useState(false);
   const dest = parent && finalName ? joinPath(parent, finalName) : "";
   const ok = url.trim() !== "" && dest !== "" && !running;
 
@@ -202,17 +206,43 @@ export function CloneDialog(p: {
         onKeyDown={(e) => e.key === "Escape" && !running && p.onCancel()}
       >
         <div className="eyebrow">{t("connect.clone")}</div>
-        <label className="field col">
-          {t("connect.clone.url")}
+        <div className="field col">
+          <span className="row url-head">
+            <label htmlFor="clone-url">{t("connect.clone.url")}</label>
+            <span className="spacer" />
+            {/* Same repository, other transport: switch between the two forge address forms. */}
+            <span className="proto" role="radiogroup" aria-label={t("connect.clone.proto")}>
+              {(["https", "ssh"] as const).map((proto) => (
+                <button
+                  key={proto}
+                  type="button"
+                  role="radio"
+                  aria-checked={(proto === "ssh") === ssh}
+                  className={(proto === "ssh") === ssh ? "on" : ""}
+                  disabled={running}
+                  onClick={() => setUrl(proto === "ssh" ? toSsh(url) : toHttps(url))}
+                >
+                  {proto.toUpperCase()}
+                </button>
+              ))}
+            </span>
+          </span>
           <input
+            id="clone-url"
             className="text"
             autoFocus
-            placeholder="https://github.com/owner/repo.git"
+            placeholder={ssh ? "git@github.com:owner/repo.git" : "https://github.com/owner/repo.git"}
             value={url}
             disabled={running}
             onChange={(e) => setUrl(e.target.value)}
           />
-        </label>
+        </div>
+        {ssh && url.includes(":") && (
+          <details className="ssh-ready" open={sshOpen} onToggle={(e) => setSshOpen(e.currentTarget.open)}>
+            <summary>{t("ssh.title")}</summary>
+            <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
+          </details>
+        )}
         <div className="field col">
           <span>{t("connect.clone.where")}</span>
           <span className="row">
