@@ -36,7 +36,7 @@ export const ICONS = {
   key: "M8 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 11h9M18 11v3M21 11v2",
   external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
   fit: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
-  rotate: "M4 12a8 8 0 0 1 13.7-5.7M20 4v5h-5M20 12a8 8 0 0 1-13.7 5.7M4 20v-5h5",
+  rotate: "M4 11h9v9H4zM8 4h3a7 7 0 0 1 7 7v1.5M15 10l3 3 3-3",
 } as const;
 
 export type IconName = keyof typeof ICONS;

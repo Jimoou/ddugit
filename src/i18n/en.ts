@@ -105,6 +105,7 @@ export const en: Record<Key, string> = {
   "keys.plusMinus.what": "Zoom in / out",
   "keys.fit.what": "Fit all",
   "keys.head.what": "Go to HEAD",
+  "keys.rotate.what": "Turn the graph 90°",
   "keys.dragMerge": "Drag a dot onto a branch tip",
   "keys.dragMerge.what": "Merge",
   "keys.altDrag": "⌥/Alt + drag",
@@ -157,6 +158,7 @@ export const en: Record<Key, string> = {
   "hud.zoomIn": "Zoom in (+)",
   "hud.fit": "Fit all (0)",
   "hud.head": "Go to HEAD (H)",
+  "hud.rotate": "Turn the graph 90° (R) · now {deg}°",
   "pick.copy": "Copy",
   "pick.body":
     "Copies the changes of <b>“{summary}”</b> onto <b>{target}</b> as a new commit. The original SHA is recorded in the message.",

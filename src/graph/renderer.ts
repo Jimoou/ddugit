@@ -1,12 +1,13 @@
 import { stashTitle } from "../format";
-import { placeBadges } from "./labels";
+import { inlineBadges, placeBadges, type PlacedGroup } from "./labels";
 import { drawSpace } from "./space";
 import type { Run } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
-import { captionLength, SLANT } from "./captions";
+import { captionLength, laneReach, SLANT } from "./captions";
+import type { Layout } from "./layout";
 
 /** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
 const REF_ICON: Partial<Record<RefInfo["kind"], IconName>> = { remote: "cloud", tag: "tag", pr: "pull" };
@@ -32,10 +33,15 @@ function drawIcon(ctx: CanvasRenderingContext2D, name: IconName, x: number, y: n
   ctx.restore();
 }
 
+/** Quarter turns clockwise: 0 = time runs left → right, 1 = top → bottom, 2 = right → left, 3 = bottom → top. */
+export type Turn = 0 | 1 | 2 | 3;
+
 export interface View {
   k: number;
   tx: number;
   ty: number;
+  /** The graph turned on screen; text and badges stay upright. */
+  r: Turn;
 }
 
 export interface Drag {
@@ -158,8 +164,44 @@ export const runRadius = (k: number) => nodeRadius(k) + 2;
 const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace';
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", sans-serif';
 
-export const toScreen = (v: View, p: Pt): Pt => ({ x: p.x * v.k + v.tx, y: p.y * v.k + v.ty });
-export const toWorld = (v: View, p: Pt): Pt => ({ x: (p.x - v.tx) / v.k, y: (p.y - v.ty) / v.k });
+/** `p` turned `r` quarter turns clockwise about the origin (screen y points down). */
+export function turn(p: Pt, r: number): Pt {
+  switch (r & 3) {
+    case 1:
+      return { x: -p.y, y: p.x };
+    case 2:
+      return { x: -p.x, y: -p.y };
+    case 3:
+      return { x: p.y, y: -p.x };
+    default:
+      return p;
+  }
+}
+/** Time runs along the screen's y axis. */
+export const upright = (r: Turn) => r % 2 === 1;
+
+export const toScreen = (v: View, p: Pt): Pt => {
+  const q = turn(p, v.r);
+  return { x: q.x * v.k + v.tx, y: q.y * v.k + v.ty };
+};
+export const toWorld = (v: View, p: Pt): Pt => turn({ x: (p.x - v.tx) / v.k, y: (p.y - v.ty) / v.k }, 4 - v.r);
+/** The view at zoom `k`, turned `r`, that draws world point `world` at screen point `at`. */
+export function viewAt(world: Pt, at: Pt, k: number, r: Turn): View {
+  const q = turn(world, r);
+  return { k, r, tx: at.x - q.x * k, ty: at.y - q.y * k };
+}
+
+/** A cable from `a` to `b` (screen) that leaves and arrives along the time axis. */
+function cable(ctx: CanvasRenderingContext2D, a: Pt, b: Pt, r: Turn) {
+  ctx.moveTo(a.x, a.y);
+  if (upright(r)) {
+    const my = (a.y + b.y) / 2;
+    ctx.bezierCurveTo(a.x, my, b.x, my, b.x, b.y);
+  } else {
+    const mx = (a.x + b.x) / 2;
+    ctx.bezierCurveTo(mx, a.y, mx, b.y, b.x, b.y);
+  }
+}
 
 export function plusPosition(scene: Scene, headId: string | null): Pt {
   const node = headId ? scene.layout.byId.get(headId) : undefined;
@@ -215,15 +257,22 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   // Visible world rect (with margin).
   const m = 40 / k;
-  const vx0 = -view.tx / k - m,
-    vx1 = (w - view.tx) / k + m;
-  const vy0 = -view.ty / k - m,
-    vy1 = (h - view.ty) / k + m;
+  const corners = [
+    { x: 0, y: 0 },
+    { x: w, y: h },
+  ].map((p) => toWorld(view, p));
+  const vx0 = Math.min(corners[0].x, corners[1].x) - m,
+    vx1 = Math.max(corners[0].x, corners[1].x) + m;
+  const vy0 = Math.min(corners[0].y, corners[1].y) - m,
+    vy1 = Math.max(corners[0].y, corners[1].y) + m;
+  const offscreen = (p: Pt, pad: number) => p.x < -pad || p.x > w + pad || p.y < -pad || p.y > h + pad;
 
   const dim = (id: string) => s.focus !== null && !s.focus.has(id);
 
   // --- edges ----------------------------------------------------------------
-  ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * view.tx, dpr * view.ty);
+  const e1 = turn({ x: 1, y: 0 }, view.r),
+    e2 = turn({ x: 0, y: 1 }, view.r);
+  ctx.setTransform(dpr * k * e1.x, dpr * k * e1.y, dpr * k * e2.x, dpr * k * e2.y, dpr * view.tx, dpr * view.ty);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   const visible = scene.edges.filter((e) => e.maxX >= vx0 && e.minX <= vx1 && e.maxY >= vy0 && e.minY <= vy1);
@@ -260,7 +309,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       for (let i = 0; i < count; i++) {
         const t = ((((time * speed) / e.length + i / count + e.seed) % 1) + 1) % 1;
         const p = toScreen(view, pointAt(e, t));
-        if (p.x < -20 || p.x > w + 20 || p.y < -20 || p.y > h + 20) continue;
+        if (offscreen(p, 20)) continue;
         const fade = Math.sin(t * Math.PI); // fade in/out at the ends
         const r = Math.max(2, 4.5 * Math.min(k, 1.4));
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3);
@@ -282,7 +331,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const oldest = scene.layout.nodes[n - 1];
     const a = toScreen(view, { x: xOf(oldest.row, n), y: yOf(oldest.lane) });
     const b = toScreen(view, { x: xOf(oldest.row, n) - COL * 1.6, y: yOf(oldest.lane) });
-    const g = ctx.createLinearGradient(a.x, 0, b.x, 0);
+    const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
     g.addColorStop(0, alpha(NEON[oldest.color], 0.9));
     g.addColorStop(1, alpha(NEON[oldest.color], 0));
     ctx.save();
@@ -326,9 +375,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.strokeStyle = alpha(c, s.changeCount ? 0.85 : 0.4);
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(hs.x, hs.y);
-    const mx = (hs.x + plusS.x) / 2;
-    ctx.bezierCurveTo(mx, hs.y, mx, plusS.y, plusS.x, plusS.y);
+    cable(ctx, hs, plusS, view.r);
     ctx.stroke();
     ctx.restore();
   }
@@ -344,7 +391,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const node = nodes[row];
     if (!node || foldedRun(s, node.id)) continue;
     const p = toScreen(view, { x: xOf(node.row, n), y: yOf(node.lane) });
-    if (p.y < -30 || p.y > h + 30) continue;
+    if (offscreen(p, 30)) continue;
     const c = NEON[node.color];
     const d = dim(node.id);
     const born = s.births.get(node.id);
@@ -418,25 +465,29 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       if (run.last < firstCol || run.first > lastCol || !foldedRun(s, run.ids[0])) continue;
       const a = toScreen(view, { x: xOf(run.last, n), y: yOf(run.lane) });
       const b = toScreen(view, { x: xOf(run.first, n), y: yOf(run.lane) });
-      if (a.y < -30 || a.y > h + 30) continue;
+      const x = Math.min(a.x, b.x) - rr,
+        y = Math.min(a.y, b.y) - rr;
+      const bw = Math.abs(b.x - a.x) + rr * 2,
+        bh = Math.abs(b.y - a.y) + rr * 2;
+      if (x > w + 30 || y > h + 30 || x + bw < -30 || y + bh < -30) continue;
       const c = NEON[run.color];
       const on = run === s.runHover;
-      const x = a.x - rr,
-        bw = b.x - a.x + rr * 2;
-      roundRect(ctx, x, a.y - rr, bw, rr * 2, rr);
+      roundRect(ctx, x, y, bw, bh, rr);
       ctx.fillStyle = on ? alpha(c, 0.3) : "#0a0814";
       ctx.fill();
       ctx.lineWidth = on ? 2 : 1.5;
       ctx.strokeStyle = c;
       ctx.stroke();
       const label = `${run.ids.length}`;
-      if (ctx.measureText(label).width + 10 < bw) {
+      const cx = x + bw / 2,
+        cy = y + bh / 2;
+      if (ctx.measureText(label).width + 10 < Math.max(bw, bh * 2.5)) {
         ctx.fillStyle = on ? "#ffffff" : c;
-        ctx.fillText(label, (a.x + b.x) / 2, a.y + 0.5);
+        ctx.fillText(label, cx, cy + 0.5);
       }
       if (on) {
         ctx.fillStyle = c;
-        ctx.fillText(t("graph.run", { n: run.ids.length }), (a.x + b.x) / 2, a.y - rr - 10);
+        ctx.fillText(t("graph.run", { n: run.ids.length }), cx, y - 10);
       }
     }
   }
@@ -445,7 +496,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   for (const m of s.stashes) {
     const b = toScreen(view, m.base);
     const p = toScreen(view, m.pos);
-    if (p.x < -40 || p.x > w + 40 || p.y < -40 || p.y > h + 40) continue;
+    if (offscreen(p, 40)) continue;
     const c = NEON[3];
     const on = m.index === s.stashHover || m.index === s.stashSelected;
     const sr = stashRadius(k) * (on ? 1.2 : 1);
@@ -504,20 +555,38 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       });
       return { L, labels };
     });
-    const placed = placeBadges(
-      groups.map(({ L, labels }) => ({
-        x: L.x,
-        baseY: L.y - r - 10,
-        widths: labels.map((l) => l.w),
-        priority: L.id === s.headId,
-      })),
-    );
+    // Upright, a commit's row holds its badges and then its summary; otherwise badges stack above the star.
+    const side = turn({ x: 0, y: 1 }, view.r).x > 0 ? 1 : -1;
+    const rowText = new Map<string, number>();
+    const placed: PlacedGroup[] = upright(view.r)
+      ? groups.map(({ L, labels }) => {
+          const g = inlineBadges(
+            uprightStart(s, L.id, r, side),
+            side,
+            L.y,
+            labels.map((l) => l.w),
+            BADGE_H,
+          );
+          rowText.set(L.id, g.end);
+          return g;
+        })
+      : placeBadges(
+          groups.map(({ L, labels }) => ({
+            x: L.x,
+            baseY: L.y - r - 10,
+            widths: labels.map((l) => l.w),
+            priority: L.id === s.headId,
+          })),
+        );
 
     // Summaries go under the badges, so a caption crossing a lane never hides a branch name.
     for (const L of labelQueue) {
       const text = s.summaries.get(L.id) ?? "";
       if (!text) continue;
-      if (L.id === s.selected || L.id === s.hovered) {
+      if (upright(view.r)) {
+        if (k >= ZOOM.captions || L.id === s.selected || L.id === s.hovered)
+          drawUprightCaption(ctx, s, L, text, rowText.get(L.id) ?? 0, side);
+      } else if (L.id === s.selected || L.id === s.hovered) {
         // The commit in hand reads straight, in full.
         ctx.font = `12px ${SANS}`;
         ctx.textAlign = "center";
@@ -576,20 +645,18 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const a = toScreen(view, { x: xOf(src.row, n), y: yOf(src.lane) });
       const b = s.drag.to;
       const c = s.drag.valid ? "#ffffff" : NEON[src.color];
-      const cable =
+      const tint =
         s.drag.mode === "pick" ? NEON[3] : s.drag.mode === "move" ? NEON[4] : s.drag.valid ? NEON[6] : NEON[src.color];
-      const mx = (a.x + b.x) / 2;
       ctx.globalCompositeOperation = "lighter";
       for (const [lw, al] of [
         [10, 0.12],
         [5, 0.3],
         [2, 1],
       ] as const) {
-        ctx.strokeStyle = alpha(cable, s.drag.mode === "pick" && !s.drag.valid ? al * 0.6 : al);
+        ctx.strokeStyle = alpha(tint, s.drag.mode === "pick" && !s.drag.valid ? al * 0.6 : al);
         ctx.lineWidth = lw;
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.bezierCurveTo(mx, a.y, mx, b.y, b.x, b.y);
+        cable(ctx, a, b, view.r);
         ctx.stroke();
       }
       ctx.globalCompositeOperation = "source-over";
@@ -599,7 +666,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.fill();
       const dst = s.drag.valid && s.drag.target ? scene.layout.byId.get(s.drag.target) : undefined;
       if (dst)
-        drawGravityWell(ctx, toScreen(view, { x: xOf(dst.row, n), y: yOf(dst.lane) }), cable, s.animate ? time : 0);
+        drawGravityWell(ctx, toScreen(view, { x: xOf(dst.row, n), y: yOf(dst.lane) }), tint, s.animate ? time : 0);
     }
   }
 
@@ -607,7 +674,6 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const inNode = s.incoming ? scene.layout.byId.get(s.incoming) : undefined;
   if (inNode) {
     const a = toScreen(view, { x: xOf(inNode.row, n), y: yOf(inNode.lane) });
-    const mx = (a.x + plusS.x) / 2;
     const c = ALERT;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -620,8 +686,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.strokeStyle = alpha(c, al);
       ctx.lineWidth = lw;
       ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.bezierCurveTo(mx, a.y, mx, plusS.y, plusS.x, plusS.y);
+      cable(ctx, a, plusS, view.r);
       ctx.stroke();
     }
     ctx.restore();
@@ -728,8 +793,9 @@ function drawCaption(
   const k = s.view.k;
   ctx.font = `11.5px ${SANS}`;
   const want = Math.min(ctx.measureText(text).width, CAPTION_MAX);
+  const flip = s.view.r === 2;
   const room = (dir: 1 | -1) =>
-    captionLength(s.scene.grid, node.row, node.lane, s.scene.layout.laneCount, CAPTION_MAX / k, 14 / k, dir) * k -
+    captionLength(s.scene.grid, node.row, node.lane, s.scene.layout.laneCount, CAPTION_MAX / k, 14 / k, dir, flip) * k -
     r -
     6;
   let dir: 1 | -1 = 1;
@@ -753,6 +819,47 @@ function drawCaption(
   ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : "rgba(230,225,255,0.8)";
   ctx.fillText(line, 0, 0);
   ctx.restore();
+}
+
+/** Longest upright caption on screen, px. */
+const UPRIGHT_MAX = 440;
+const reachOf = new WeakMap<Layout, number[]>();
+
+/** Where an upright row's badges and summary begin: past the lanes in use on that row. */
+function uprightStart(s: DrawState, id: string, r: number, side: 1 | -1): number {
+  const { layout } = s.scene;
+  const node = layout.byId.get(id)!;
+  let reach = reachOf.get(layout);
+  if (!reach) reachOf.set(layout, (reach = laneReach(layout)));
+  const edge = toScreen(s.view, { x: xOf(node.row, layout.rowCount), y: yOf(reach[node.row] ?? node.lane) }).x;
+  return edge + side * (r + 10);
+}
+
+/**
+ * With time running down the screen every commit has a row of its own: its
+ * summary reads straight from `x` (after its badges), away from the graph.
+ */
+function drawUprightCaption(
+  ctx: CanvasRenderingContext2D,
+  s: DrawState,
+  L: { y: number; id: string; d: boolean },
+  text: string,
+  x: number,
+  side: 1 | -1,
+) {
+  const space = Math.min(UPRIGHT_MAX, side > 0 ? s.w - x - 8 : x - 8);
+  if (space < 24) return;
+  const on = L.id === s.selected || L.id === s.hovered;
+  ctx.font = `${on ? 600 : 400} 12px ${SANS}`;
+  ctx.textAlign = side > 0 ? "left" : "right";
+  ctx.textBaseline = "middle";
+  const line = truncate(ctx, text, space);
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = "rgba(5,4,14,0.85)";
+  ctx.strokeText(line, x, L.y);
+  ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : on ? "#ffffff" : "rgba(230,225,255,0.8)";
+  ctx.fillText(line, x, L.y);
 }
 
 const TRAIL = "#ffd479";

@@ -89,3 +89,25 @@ export function placeBadges(
   }
   return out;
 }
+
+/**
+ * Badges in a line on a commit's own row (graph turned upright), from `start`
+ * running away from the graph (`side` 1: rightwards, -1: leftwards), centred
+ * on `y`. `end` is where the summary can begin.
+ */
+export function inlineBadges(
+  start: number,
+  side: 1 | -1,
+  y: number,
+  widths: number[],
+  height = 18,
+  gap = 4,
+): PlacedGroup & { end: number } {
+  let at = start;
+  const badges = widths.map((w, index) => {
+    const x = side > 0 ? at : at - w;
+    at += side * (w + gap);
+    return { index, x, y: y - height / 2, w };
+  });
+  return { badges, lift: 0, hidden: 0, end: widths.length ? at + side * 2 : start };
+}

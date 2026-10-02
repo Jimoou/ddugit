@@ -114,6 +114,8 @@ export interface RepoViewProps {
   onLoaded(path: string): void;
   onSettings(): void;
   onToggleAnimate(): void;
+  /** Turn the graph a quarter turn clockwise (a setting shared by every tab). */
+  onRotate(): void;
   /** Toggle the repository menu; `repoMenu` is it when open. */
   onRepoMenu(): void;
   repoMenu: ReactNode;
@@ -129,6 +131,7 @@ export function RepoView({
   onLoaded,
   onSettings,
   onToggleAnimate,
+  onRotate,
   onRepoMenu,
   repoMenu,
 }: RepoViewProps) {
@@ -1335,6 +1338,8 @@ export function RepoView({
               onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
               onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}
+              rotation={settings.rotation}
+              onRotate={onRotate}
               onHover={(id) => {
                 clearTimeout(peekTimer.current);
                 setPeek(null);
@@ -1365,6 +1370,15 @@ export function RepoView({
               </button>
               <button onClick={() => graph.current?.centerOnHead()} title={t("hud.head")} aria-label={t("hud.head")}>
                 <Icon name="head" />
+              </button>
+              <button
+                className="turn"
+                onClick={onRotate}
+                title={t("hud.rotate", { deg: settings.rotation * 90 })}
+                aria-label={t("hud.rotate", { deg: settings.rotation * 90 })}
+              >
+                <Icon name="rotate" />
+                <span className="deg">{settings.rotation * 90}°</span>
               </button>
             </div>
             <div className="hint">
