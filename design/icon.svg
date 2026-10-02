@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#15103a"/>
+      <stop offset="1" stop-color="#05040e"/>
+    </linearGradient>
+    <linearGradient id="branch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff3df2"/>
+      <stop offset="1" stop-color="#b14dff"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Body: the macOS grid's 824px rounded square, centred. -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#bg)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+  <g filter="url(#glow)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- The branch: leaves the main line, runs in its own lane, comes back (a merge). -->
+    <path d="M392 708 C392 616 632 652 632 560 L632 464 C632 372 392 408 392 316" stroke="url(#branch)" stroke-width="56"/>
+    <!-- Main line. -->
+    <line x1="392" y1="260" x2="392" y2="764" stroke="#22e8ff" stroke-width="56"/>
+  </g>
+  <g filter="url(#glow)">
+    <circle cx="392" cy="252" r="66" fill="#22e8ff"/>
+    <circle cx="632" cy="512" r="58" fill="#ff3df2"/>
+    <circle cx="392" cy="772" r="66" fill="#22e8ff"/>
+  </g>
+  <!-- HEAD: the newest commit, hollowed. -->
+  <circle cx="392" cy="252" r="28" fill="#0b0920"/>
+</svg>
