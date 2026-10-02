@@ -941,3 +941,20 @@ test("lists submodules with their state, updates them, and opens one in a tab", 
   await section.locator("li").filter({ hasText: "vendor/stardust" }).click();
   await expect(page.locator(".tabbar .tab")).toHaveCount(2);
 });
+
+test("LFS: downloads files left as pointers and tracks a new file type", async ({ demo }) => {
+  const { page } = demo;
+  const section = page.locator(".app:not([hidden]) .sidebar .lfs");
+  await expect(section).toContainText("*.psd");
+  await expect(section).toContainText("받지 않은 파일 3개");
+  await section.getByRole("button", { name: "받기" }).click();
+  await demo.toast("LFS 파일을 받아왔어요");
+  await expect(section).not.toContainText("받지 않은 파일");
+
+  await section.getByRole("button", { name: "LFS로 관리할 파일 형식 추가" }).click();
+  await page.locator(".dialog input.text").fill("*.mp4");
+  await page.locator(".dialog").getByRole("button", { name: "추적" }).click();
+  await demo.toast(/\*\.mp4을\(를\) LFS로 관리해요/);
+  await expect(section.locator("li")).toHaveCount(3);
+  expect((await demo.snapshot()).changes.some((c) => c.path === ".gitattributes")).toBe(true);
+});

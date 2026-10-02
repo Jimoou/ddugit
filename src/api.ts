@@ -32,6 +32,8 @@ import type {
   RepoGlance,
   WorktreeOp,
   SubmoduleOp,
+  LfsOp,
+  LfsStatus,
 } from "./types";
 import { t } from "./i18n";
 
@@ -67,6 +69,8 @@ export interface Commands {
   git_ref: [{ path: string; op: RefOp }, OpResult];
   git_worktree: [{ path: string; op: WorktreeOp }, OpResult];
   git_submodule: [{ path: string; op: SubmoduleOp }, OpResult];
+  lfs_status: [{ path: string }, LfsStatus];
+  git_lfs: [{ path: string; op: LfsOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
@@ -155,6 +159,9 @@ export const api = {
   worktree: (path: string, op: WorktreeOp) => call("git_worktree", { path, op }),
   /** Check out submodules at their recorded commits (initializing them), or sync their URLs. */
   submodule: (path: string, op: SubmoduleOp) => call("git_submodule", { path, op }),
+  /** Git LFS: installed?, tracked patterns, files left as pointers. Shells out, so not part of the snapshot. */
+  lfsStatus: (path: string) => call("lfs_status", { path }),
+  lfs: (path: string, op: LfsOp) => call("git_lfs", { path, op }),
   remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
     return call("git_remote", { path, op, onProgress: progressSink(onProgress, path) });
   },

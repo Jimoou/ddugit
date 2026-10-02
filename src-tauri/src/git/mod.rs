@@ -12,6 +12,7 @@ pub mod diff;
 pub mod edit;
 pub mod glance;
 pub mod history;
+pub mod lfs;
 pub mod pick;
 pub mod read;
 pub mod rebase;

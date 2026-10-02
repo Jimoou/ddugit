@@ -22,6 +22,12 @@ import type {
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
 const demoLicense = { current: null as import("./types").LicenseInfo | null };
+/** The demo's LFS: two patterns, three files whose content isn't downloaded yet. */
+const demoLfs = {
+  patterns: ["*.psd", "assets/**/*.png"],
+  filters: true,
+  missing: ["art/cover.psd", "assets/hero.png", "assets/nebula.png"],
+};
 const demoSsh = { keys: [] as { name: string; public: string }[], trusted: [] as string[] };
 
 /** Where the demo repository "is" on disk. */
@@ -675,6 +681,29 @@ const mockTable: Table = {
       for (const m of repo.submodules)
         if (!op.path || m.path === op.path) Object.assign(m, { checkedOut: m.recorded, state: "clean" });
     return delay(res("ok", op.kind === "sync" ? "Synchronizing submodule url for 'vendor/stardust'" : ""));
+  },
+
+  lfs_status: () =>
+    delay({
+      version: "git-lfs/3.4.1 (demo)",
+      patterns: [...demoLfs.patterns],
+      filters: demoLfs.filters,
+      missing: demoLfs.missing.length,
+      missingFiles: [...demoLfs.missing],
+    }),
+  git_lfs({ op }) {
+    if (op.kind === "install") demoLfs.filters = true;
+    else if (op.kind === "pull") demoLfs.missing = [];
+    else {
+      const has = demoLfs.patterns.includes(op.pattern);
+      if (op.kind === "track" && !has) demoLfs.patterns.push(op.pattern);
+      if (op.kind === "untrack") demoLfs.patterns = demoLfs.patterns.filter((x) => x !== op.pattern);
+      // Tracking edits .gitattributes, which then waits to be committed.
+      if (!repo.changes.some((c) => c.path === ".gitattributes"))
+        repo.changes.push({ path: ".gitattributes", staged: null, unstaged: "modified", conflicted: false });
+      return delay(res("ok", `${op.kind === "track" ? "Tracking" : "Untracking"} "${op.pattern}"`));
+    }
+    return delay(res("ok"));
   },
 
   git_create_branch({ name, at, switch: sw }) {
