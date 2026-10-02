@@ -79,6 +79,8 @@ command!(git_lfs(path: String, op: git::lfs::LfsOp) -> OpResult => git::lfs::app
 command!(git_ref(path: String, op: RefOp) -> OpResult => git::refs::apply(&path, &op));
 command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
+command!(git_fetch_remote(path: String, name: String, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::fetch_one(&path, &name, |p| { let _ = on_progress.send(p); }));
 command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
     => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
 command!(git_init(dir: String) -> OpResult => git::setup::init(&dir));
@@ -213,6 +215,7 @@ pub fn run() {
             lfs_status,
             git_lfs,
             git_remote,
+            git_fetch_remote,
             git_reset,
             git_reflog,
             branch_report,

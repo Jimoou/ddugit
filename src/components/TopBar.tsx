@@ -1,7 +1,8 @@
+import { phase } from "./JobCard";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons";
 import { isTauri } from "../api";
-import { isKey, type Key, t } from "../i18n";
+import { type Key, t } from "../i18n";
 import type { HeadInfo, Progress, RemoteOp } from "../types";
 
 interface Props {
@@ -21,12 +22,6 @@ interface Props {
   onUndoHistory(): void;
   onRemote(op: RemoteOp): void;
 }
-
-/** git's progress phase, translated when known. */
-const phase = (name: string) => {
-  const key = `progress.${name}`;
-  return isKey(key) ? t(key) : name;
-};
 
 const REMOTE: { op: RemoteOp; icon: IconName; label: string; title: Key }[] = [
   { op: "fetch", icon: "fetch", label: "Fetch", title: "top.fetch.title" },

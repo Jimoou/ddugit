@@ -122,10 +122,16 @@ test("adds the original project as a remote and lists its fixes to backport", as
   await page.fill(".dialog input >> nth=0", "upstream");
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
-  await demo.toast("원격 upstream을(를) 추가했어요");
-  await expect(page.locator(".sidebar li >> text=upstream/main")).toBeVisible();
+  // The fetch of the new remote shows on the progress card, then says what came.
+  await expect(page.locator(".job-card")).toContainText("upstream에서 받아오는 중");
+  await demo.toast("upstream에서 브랜치 1개를 받아왔어요");
+  await expect(page.locator(".job-card")).toHaveCount(0);
 
-  await page.click(".sidebar li >> text=upstream/main", { button: "right" });
+  // Two remotes now: a fold per remote, branches without the prefix.
+  const upstream = page.locator(".sidebar section.sub").filter({ hasText: "upstream" });
+  await expect(page.locator(".sidebar section.sub")).toHaveCount(2);
+  await expect(upstream.locator("li")).toHaveText(["main"]);
+  await upstream.locator("li").click({ button: "right" });
   await page.click(".context-menu >> text=에 없는 커밋 보기");
   const sheet = page.locator(".backport-sheet");
   await expect(sheet.locator("tbody tr")).not.toHaveCount(0);

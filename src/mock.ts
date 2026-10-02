@@ -615,11 +615,6 @@ const mockTable: Table = {
       case "addRemote": {
         if (repo.remoteUrls.has(op.name)) return fail(`error: remote ${op.name} already exists.`);
         repo.remoteUrls.set(op.name, op.url);
-        // Stand-in for what the first fetch brings: the other project's main with two fixes.
-        let tip = repo.remotes.get("origin/main")!;
-        for (const fix of ["Fix crash on empty repository", "Escape branch names in labels"])
-          tip = repo.commit([tip], fix);
-        repo.remotes.set(`${op.name}/main`, tip);
         return delay(res("ok"));
       }
       case "removeRemote":
@@ -734,6 +729,23 @@ const mockTable: Table = {
     }
     const r = remoteOp(op);
     return typeof r === "string" ? fail(r) : r;
+  },
+
+  async git_fetch_remote({ name, onProgress }) {
+    if (!repo.remoteUrls.has(name)) return res("failed", `fatal: '${name}' does not appear to be a git repository`);
+    for (const phase of PHASES.fetch)
+      for (let pct = 0; pct <= 100; pct += 10) {
+        onProgress.onmessage({ phase, percent: pct });
+        await delay(null, 50);
+      }
+    // Stand-in for what the first fetch brings: the other project's main with two fixes.
+    if (![...repo.remotes.keys()].some((k) => k.startsWith(`${name}/`))) {
+      let tip = repo.remotes.get("origin/main")!;
+      for (const fix of ["Fix crash on empty repository", "Escape branch names in labels"])
+        tip = repo.commit([tip], fix);
+      repo.remotes.set(`${name}/main`, tip);
+    }
+    return res("ok", `From ${repo.remoteUrls.get(name)}`);
   },
 
   git_discard({ paths }) {
