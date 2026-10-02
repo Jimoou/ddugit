@@ -7,22 +7,25 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #45(자체 SVG 아이콘)를 squash merge했다(`93cc711`).
+- PR #46(버전 0.2.0)을 squash merge했다(`80b2a07`).
+- main에서 "CI · Rust" `all_os`가 통과했다(macOS·Windows에서 keyring·opener 빌드 확인).
+- Release workflow를 `release=true`로 수동 실행했다. v0.2.0 초안이 만들어진다. 사용자에게 링크와 함께 알리고, Publish와 예전 v0.1.0(otgit) 초안 삭제를 부탁한다.
 
 ## 지금 하는 일
 
-M7 릴리스 ddugit v0.2.0
+M7 대각선 요약 라벨 → PR CI 대기
 
-1. main에서 "CI · Rust"를 `all_os`로 수동 실행했다. macOS·Windows에서 keyring(apple-native/windows-native)·opener를 처음 빌드하는 것이라 확인이 필요하다
-2. 버전 0.2.0 PR(이것)을 머지한다
-3. Release workflow를 `release=true`로 main에서 수동 실행한다. `v0.2.0` 초안이 만들어지고 dmg·exe가 올라간다
-4. 사용자에게 알린다: 초안을 확인한 뒤 Publish하면 태그가 생긴다. 예전 v0.1.0(otgit) 초안은 지워 달라고 한다(세션에는 Release를 지우는 도구가 없다)
+- `graph/captions.ts`의 `captionLength(grid, row, lane, laneCount, max, gap, dir)`: 월드 좌표로 계산한다
+  - 아래 방향(1): 레인을 하나씩 내려가며 별을 지나치면(수직 거리 < 15) 반 레인 전에 멈춘다. 평행한 이웃 요약과의 거리가 gap(줄 높이, 줌에 따라 14/k)보다 가까우면 그 요약이 시작하는 곳에서 멈춘다
+  - 위 방향(-1): 위 레인에 커밋이 있으면(왼쪽 3칸까지 포함) 그 지점에서 멈춘다. 그 커밋의 아래 방향 요약과 교차하기 때문이다
+- renderer `drawCaption`
+  - 아래 방향이 우선이다. 모자라고 라벨이 없는 커밋이면 위 방향과 비교한다
+  - 어두운 테두리로 레인 선 위에서도 읽히게 한다. 배지보다 먼저 그린다(배지가 위에 온다)
 
 ## 다음 단계 (M7 순서)
 
-1. 대각선 요약 라벨
-2. 미리보기 카드
-3. 90° 회전
+1. 미리보기 카드(마우스를 올려 두면 요약·본문·파일·+/−·PR)
+2. 90° 회전(0/90/180/270, 글자는 바로 서게, 설정에 저장)
 
 ## 막힌 것 / 결정 필요
 

@@ -6,6 +6,7 @@ import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
+import { captionLength, SLANT } from "./captions";
 
 /** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
 const REF_ICON: Partial<Record<RefInfo["kind"], IconName>> = { remote: "cloud", tag: "tag", pr: "pull" };
@@ -139,7 +140,7 @@ export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
 const BADGE_H = 18;
 
 /** Zoom thresholds for semantic zoom. */
-export const ZOOM = { dots: 0.35, fold: 0.5, branches: 0.55, allRefs: 0.8, summaries: 1.25 };
+export const ZOOM = { dots: 0.35, fold: 0.5, branches: 0.55, allRefs: 0.8, captions: 0.6, summaries: 1.25 };
 
 /**
  * The run drawn as a bar instead of dots for `id`, if any. Nothing folds while
@@ -512,6 +513,20 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       })),
     );
 
+    // Summaries go under the badges, so a caption crossing a lane never hides a branch name.
+    for (const L of labelQueue) {
+      const text = s.summaries.get(L.id) ?? "";
+      if (!text) continue;
+      if (L.id === s.selected || L.id === s.hovered) {
+        // The commit in hand reads straight, in full.
+        ctx.font = `12px ${SANS}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = L.d ? "rgba(220,215,255,0.25)" : "rgba(230,225,255,0.85)";
+        ctx.fillText(truncate(ctx, text, 260), L.x, L.y + r + 9);
+      } else if (k >= ZOOM.captions) drawCaption(ctx, s, L, text, r);
+    }
+
     groups.forEach(({ L, labels }, gi) => {
       const pg = placed[gi];
       if (pg.lift > 0 && pg.badges.length) {
@@ -552,18 +567,6 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         if (item) s.labelHits.push({ x: b.x, y: b.y, w: b.w, h: BADGE_H, ref: item.rf });
       }
     });
-
-    for (const L of labelQueue) {
-      if (k >= ZOOM.summaries || L.id === s.selected || L.id === s.hovered) {
-        const text = s.summaries.get(L.id) ?? "";
-        ctx.font = `12px ${SANS}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        const max = L.id === s.hovered || L.id === s.selected ? 260 : COL * k - 10;
-        ctx.fillStyle = L.d ? "rgba(220,215,255,0.25)" : "rgba(230,225,255,0.85)";
-        ctx.fillText(truncate(ctx, text, max), L.x, L.y + r + 9);
-      }
-    }
   }
 
   // --- drag cable (merge / cherry-pick) ------------------------------------------------
@@ -703,6 +706,52 @@ function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: 
   ctx.beginPath();
   ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Longest caption on screen, px. */
+const CAPTION_MAX = 230;
+
+/**
+ * A commit's summary on a slant below its star (see `captions.ts`), with a dark
+ * halo so it stays readable where it crosses a lane.
+ */
+function drawCaption(
+  ctx: CanvasRenderingContext2D,
+  s: DrawState,
+  L: { x: number; y: number; id: string; d: boolean },
+  text: string,
+  r: number,
+) {
+  const node = s.scene.layout.byId.get(L.id);
+  if (!node) return;
+  const k = s.view.k;
+  ctx.font = `11.5px ${SANS}`;
+  const want = Math.min(ctx.measureText(text).width, CAPTION_MAX);
+  const room = (dir: 1 | -1) =>
+    captionLength(s.scene.grid, node.row, node.lane, s.scene.layout.laneCount, CAPTION_MAX / k, 14 / k, dir) * k -
+    r -
+    6;
+  let dir: 1 | -1 = 1;
+  let space = room(1);
+  // Under the lanes first; a commit without labels may use the open sky above when that fits more.
+  if (space < want && !s.refs.get(L.id)?.length) {
+    const up = room(-1);
+    if (up > space) [dir, space] = [-1, up];
+  }
+  if (space < 24) return;
+  ctx.save();
+  ctx.translate(L.x + (r + 5) * Math.cos(SLANT), L.y + dir * (r + 5) * Math.sin(SLANT));
+  ctx.rotate(dir * SLANT);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  const line = truncate(ctx, text, space);
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = "rgba(5,4,14,0.85)";
+  ctx.strokeText(line, 0, 0);
+  ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : "rgba(230,225,255,0.8)";
+  ctx.fillText(line, 0, 0);
   ctx.restore();
 }
 
