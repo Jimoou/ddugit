@@ -34,7 +34,7 @@ import { planMove, rebaseRange } from "./rebasePlan";
 import type { Settings } from "./settings";
 import { isKey, type Key, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
-import type { Drag, NodeBadge } from "./graph/renderer";
+import type { Drag, NodeBadge, Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
 import type {
   BisectState,
@@ -113,9 +113,8 @@ export interface RepoViewProps {
   /** Loaded for the first time (recent list). */
   onLoaded(path: string): void;
   onSettings(): void;
-  onToggleAnimate(): void;
-  /** Turn the graph a quarter turn clockwise (a setting shared by every tab). */
-  onRotate(): void;
+  /** Change settings shared by every tab (sparkles, rotation, sidebar layout). */
+  onChangeSettings(patch: Partial<Settings>): void;
   /** Toggle the repository menu; `repoMenu` is it when open. */
   onRepoMenu(): void;
   repoMenu: ReactNode;
@@ -130,8 +129,7 @@ export function RepoView({
   toast,
   onLoaded,
   onSettings,
-  onToggleAnimate,
-  onRotate,
+  onChangeSettings,
   onRepoMenu,
   repoMenu,
 }: RepoViewProps) {
@@ -198,6 +196,7 @@ export function RepoView({
   const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
+  const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
   // First-run tutorial, played on the demo repository only.
   const tour = useVoyage(path === DEMO_PATH);
   const foundCulprit = useCallback(() => tour.mission("bisect"), [tour.mission]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1096,7 +1095,7 @@ export function RepoView({
             setReflogOpen((o) => !o);
           }}
           onRemote={(op) => void remote(op)}
-          onToggleAnimate={onToggleAnimate}
+          onToggleAnimate={() => onChangeSettings({ animate: !settings.animate })}
           onSettings={onSettings}
         />
       )}
@@ -1227,6 +1226,10 @@ export function RepoView({
 
       <div className="main">
         <Sidebar
+          collapsed={settings.sidebarCollapsed}
+          closed={settings.closedSections}
+          onLayout={onChangeSettings}
+          active={active}
           refs={snap.refs}
           headBranch={snap.head.branch}
           colorOf={colorOf}
@@ -1339,7 +1342,7 @@ export function RepoView({
               onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}
               rotation={settings.rotation}
-              onRotate={onRotate}
+              onRotate={rotate}
               onHover={(id) => {
                 clearTimeout(peekTimer.current);
                 setPeek(null);
@@ -1373,7 +1376,7 @@ export function RepoView({
               </button>
               <button
                 className="turn"
-                onClick={onRotate}
+                onClick={rotate}
                 title={t("hud.rotate", { deg: settings.rotation * 90 })}
                 aria-label={t("hud.rotate", { deg: settings.rotation * 90 })}
               >

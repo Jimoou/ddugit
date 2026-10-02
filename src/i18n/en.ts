@@ -32,6 +32,8 @@ export const en: Record<Key, string> = {
 
   // sidebar
   "side.search": "Find branch",
+  "side.fold": "Fold the sidebar (⌘/Ctrl+B)",
+  "side.unfold": "Unfold the sidebar (⌘/Ctrl+B)",
   "side.local": "Branches",
   "side.remote": "Remotes",
   "side.tag": "Tags",
@@ -106,6 +108,7 @@ export const en: Record<Key, string> = {
   "keys.fit.what": "Fit all",
   "keys.head.what": "Go to HEAD",
   "keys.rotate.what": "Turn the graph 90°",
+  "keys.sidebar.what": "Fold or unfold the sidebar",
   "keys.dragMerge": "Drag a dot onto a branch tip",
   "keys.dragMerge.what": "Merge",
   "keys.altDrag": "⌥/Alt + drag",

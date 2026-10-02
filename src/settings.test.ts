@@ -13,7 +13,20 @@ describe("parseSettings", () => {
       JSON.stringify({ animate: false, historyPage: 7, gitPath: "/opt/git", language: "fr" }),
       base,
     );
-    expect(s).toEqual({ animate: false, historyPage: 3000, gitPath: "/opt/git", language: "system", rotation: 0 });
+    expect(s).toEqual({
+      animate: false,
+      historyPage: 3000,
+      gitPath: "/opt/git",
+      language: "system",
+      rotation: 0,
+      sidebarCollapsed: false,
+      closedSections: [],
+    });
+    expect(parseSettings(JSON.stringify({ closedSections: ["tag", "stash"] }), base).closedSections).toEqual([
+      "tag",
+      "stash",
+    ]);
+    expect(parseSettings(JSON.stringify({ closedSections: [1] }), base).closedSections).toEqual([]);
     expect(parseSettings(JSON.stringify({ rotation: 3 }), base).rotation).toBe(3);
     expect(parseSettings(JSON.stringify({ rotation: 4 }), base).rotation).toBe(0);
     expect(parseSettings(JSON.stringify({ language: "en" }), base).language).toBe("en");

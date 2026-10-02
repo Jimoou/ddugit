@@ -7,6 +7,7 @@ export const ICONS = {
   minus: "M5 12h14",
   chevronDown: "M6 9l6 6 6-6",
   chevronUp: "M6 15l6-6 6 6",
+  chevronRight: "M9 6l6 6-6 6",
   arrowLeft: "M19 12H5M11 6l-6 6 6 6",
   arrowRight: "M5 12h14M13 6l6 6-6 6",
   arrowUp: "M12 19V5M6 11l6-6 6 6",
@@ -37,6 +38,9 @@ export const ICONS = {
   external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
   fit: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
   rotate: "M4 11h9v9H4zM8 4h3a7 7 0 0 1 7 7v1.5M15 10l3 3 3-3",
+  sidebar: "M4 5h16v14H4zM9 5v14",
+  branch: "M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 9c0 5-12 3-12 6",
+  stash: "M4 8h16M6 8v11h12V8M8 4h8l2 4H6z",
 } as const;
 
 export type IconName = keyof typeof ICONS;
