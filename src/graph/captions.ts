@@ -1,60 +1,89 @@
-// Commit summaries written on a slant below each star, so they fit even at
-// normal zoom: parallel slanted lines never overlap each other, and a caption
-// stops just before it would run into a commit on a lane below. With the graph
-// turned upright every commit has a screen row of its own, and its summary is
-// written straight past the lanes in use on that row (`laneReach`).
+// Commit summaries as map labels: written straight (left to right), each
+// hanging just under or over its star. Like place names on a map they are
+// placed greedily by importance and a label that would cover a star, a badge
+// or another label tries the next slot (a step further from the lane, or
+// shorter) and is left out when none is free; zooming in frees more room, so
+// more appear. With the graph turned upright every commit has a screen row of
+// its own, and its summary is written straight past the lanes in use on that
+// row (`laneReach`).
 
 import type { Layout } from "./layout";
-import { COL, LANE } from "./scene";
 
-/** Captions run down and to the right at this angle (radians). */
-export const SLANT = (38 * Math.PI) / 180;
-/** World px of clearance kept around a commit a caption passes. */
-const CLEAR = 15;
+/** A screen rectangle. */
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface CaptionItem {
+  id: string;
+  /** Star centre, screen px. */
+  x: number;
+  y: number;
+  /** Width the whole summary wants. */
+  w: number;
+  /** May hang above the star (it has no badges there). */
+  up: boolean;
+}
+
+export interface PlacedCaption extends Box {
+  id: string;
+  /** Steps away from the star (0 = right under or over it): > 0 gets a leader line. */
+  level: number;
+  /** Hangs above the star. */
+  above: boolean;
+}
+
+/** Caption line height, px. */
+export const CAPTION_H = 15;
+/** A label starts this far left of its star's centre, so it reads as starting at the star. */
+const LEAD = 6;
+/** A long label tries this much of itself before stepping further out. */
+const SHORT_W = 120;
+
+const hit = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /**
- * How long (world px) the caption of the commit at `row`/`lane` can be before it
- * would cross another commit or run into another caption, capped at `max`.
- * `dir` 1 runs down to the right (the default, under the lanes), -1 up to the
- * right (into the open sky above, for commits without labels). `gap` is the
- * caption line height in world px (it grows as the view zooms out). Rows grow
- * to the left (older), so moving right along the caption means smaller rows.
- * `flip`: the graph is turned half round, so on screen rows grow to the right
- * and lanes upwards.
+ * Place `items` (most important first) around their stars of radius `r`,
+ * avoiding `obstacles` (stars, badges) and each other. Items that find no
+ * free slot are left out.
  */
-export function captionLength(
-  grid: ReadonlyMap<string, string>,
-  row: number,
-  lane: number,
-  laneCount: number,
-  max: number,
-  gap = 14,
-  dir: 1 | -1 = 1,
-  flip = false,
-): number {
-  const sin = Math.sin(SLANT),
-    cos = Math.cos(SLANT);
-  const lanes = flip ? -dir : dir,
-    rows = flip ? -1 : 1;
-  let len = max;
-  for (let d = 1; lane + d * lanes >= 0 && lane + d * lanes < laneCount && (d * LANE) / sin < len + gap; d++) {
-    const dy = d * LANE;
-    // Commits on that lane whose star or caption ours could reach.
-    const reach = Math.ceil((len + dy) / COL) + 1;
-    // Going up, commits a little to the left count too: their captions come down across ours.
-    for (let c = dir === -1 ? -3 : -1; c <= reach; c++) {
-      if (!grid.has(`${row - c * rows}:${lane + d * lanes}`)) continue;
-      const dx = c * COL;
-      const along = dx * cos + dy * sin; // where that commit sits along our caption
-      const off = Math.abs(dx * sin - dy * cos); // and how far from its line
-      if (off < CLEAR)
-        len = Math.min(len, along - CLEAR - LANE / 2); // we would cross the star itself
-      else if (dir === -1)
-        len = Math.min(len, along - gap); // its own caption comes down across ours
-      else if (off < gap && along > 0) len = Math.min(len, along - gap); // its caption runs alongside ours
+export function placeCaptions(items: CaptionItem[], obstacles: Box[], r: number): PlacedCaption[] {
+  const taken: Box[] = [...obstacles];
+  const out: PlacedCaption[] = [];
+  for (const it of items) {
+    const below = (level: number) => it.y + r + 5 + level * CAPTION_H;
+    const above = (level: number) => it.y - r - 5 - (level + 1) * CAPTION_H;
+    const slots: { y: number; level: number; above: boolean }[] = [
+      { y: below(0), level: 0, above: false },
+      ...(it.up ? [{ y: above(0), level: 0, above: true }] : []),
+      { y: below(1), level: 1, above: false },
+      ...(it.up ? [{ y: above(1), level: 1, above: true }] : []),
+      { y: below(2), level: 2, above: false },
+    ];
+    const widths = it.w > SHORT_W ? [it.w, SHORT_W] : [it.w];
+    let placed: PlacedCaption | null = null;
+    for (const slot of slots) {
+      for (const w of widths) {
+        const box = { x: it.x - LEAD, y: slot.y, w, h: CAPTION_H };
+        // A label further out gets a leader line from the star: keep that clear too.
+        const top = slot.above ? slot.y + CAPTION_H : it.y + r + 3;
+        const bottom = slot.above ? it.y - r - 3 : slot.y;
+        const stem = slot.level ? { x: it.x - 1, y: top, w: 2, h: bottom - top } : null;
+        if (taken.some((b) => hit(b, box) || (stem !== null && hit(b, stem)))) continue;
+        placed = { id: it.id, ...box, level: slot.level, above: slot.above };
+        break;
+      }
+      if (placed) break;
+    }
+    if (placed) {
+      taken.push(placed);
+      out.push(placed);
     }
   }
-  return Math.max(0, len);
+  return out;
 }
 
 /**
