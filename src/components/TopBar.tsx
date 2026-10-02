@@ -1,6 +1,5 @@
 import { Icon } from "./Icon";
 import type { IconName } from "../icons";
-import type { ReactNode } from "react";
 import { isTauri } from "../api";
 import { isKey, type Key, t } from "../i18n";
 import type { HeadInfo, Progress, RemoteOp } from "../types";
@@ -8,8 +7,6 @@ import type { HeadInfo, Progress, RemoteOp } from "../types";
 interface Props {
   /** Demo with the tutorial closed: the demo badge reopens it. */
   onVoyage?(): void;
-  repoName: string;
-  repoPath: string;
   head: HeadInfo;
   headColor: string;
   changeCount: number;
@@ -17,18 +14,12 @@ interface Props {
   /** Remote operation currently running, for its spinner. */
   remoteBusy: RemoteOp | null;
   progress: Progress | null;
-  animate: boolean;
-  /** Toggle the repository menu (recent, open, clone, new). */
-  onOpenRepo(): void;
-  /** The open repository menu, shown under the name. */
-  repoMenu?: ReactNode;
+  /** Open the branch switcher under the button at (x, y) window px. */
+  onBranches(x: number, y: number): void;
   onCompose(): void;
-  onRefresh(): void;
   /** Open the undo history (reflog). */
   onUndoHistory(): void;
   onRemote(op: RemoteOp): void;
-  onToggleAnimate(): void;
-  onSettings(): void;
 }
 
 /** git's progress phase, translated when known. */
@@ -43,25 +34,34 @@ const REMOTE: { op: RemoteOp; icon: IconName; label: string; title: Key }[] = [
   { op: "push", icon: "arrowUp", label: "Push", title: "top.push.title" },
 ];
 
+/**
+ * The open repository's context row, under the tabs: where HEAD is (a branch
+ * switcher) and its upstream on the left; syncing, committing and undo on the right.
+ */
 export function TopBar(p: Props) {
   const { head, onVoyage } = p;
   const badge = (op: RemoteOp) => (op === "pull" ? head.behind : op === "push" ? head.ahead : 0);
 
   return (
     <header className="topbar">
-      <h1 className="wordmark small">ddugit</h1>
-      <span className="repo-anchor">
-        <button className="repo" onClick={p.onOpenRepo} title={p.repoPath} aria-expanded={!!p.repoMenu}>
-          {p.repoName} <Icon name="chevronDown" size={12} className="muted" />
-        </button>
-        {p.repoMenu}
-      </span>
-      <span className="branch-now" style={{ ["--c" as string]: p.headColor }}>
-        <Icon name="head" size={12} />{" "}
-        {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
-      </span>
+      <button
+        className="branch-now"
+        style={{ ["--c" as string]: p.headColor }}
+        title={t("top.branches")}
+        aria-haspopup="menu"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          p.onBranches(r.left, r.bottom + 6);
+        }}
+      >
+        <Icon name="head" size={12} />
+        <span className="branch-name">
+          {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
+        </span>
+        <Icon name="chevronDown" size={12} className="muted" />
+      </button>
       {head.upstream && (
-        <span className="upstream muted">
+        <span className="upstream muted" title={t("top.upstream")}>
           <Icon name="pull" size={12} /> {head.upstream}
         </span>
       )}
@@ -86,7 +86,7 @@ export function TopBar(p: Props) {
               title={op === "push" && !head.upstream ? t("top.push.first") : t(title)}
               onClick={() => p.onRemote(op)}
             >
-              <Icon name={icon} className="ico" />{" "}
+              <Icon name={icon} className="ico" />
               {running && p.progress ? `${phase(p.progress.phase)} ${p.progress.percent}%` : label}
               {n > 0 && !running && <span className={`count ${op}`}>{n}</span>}
               {running && p.progress && (
@@ -99,25 +99,11 @@ export function TopBar(p: Props) {
         })}
       </div>
 
-      <button className="ghost" onClick={p.onCompose} disabled={p.busy}>
+      <button className="ghost commit-btn" onClick={p.onCompose} disabled={p.busy}>
         <Icon name="plus" /> {t("top.commit")} {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
       </button>
       <button className="ghost" onClick={p.onUndoHistory} title={t("undo.log.open")} aria-label={t("undo.log.open")}>
         <Icon name="history" />
-      </button>
-      <button className="ghost" onClick={p.onRefresh} title={t("top.refresh")} aria-label={t("top.refresh")}>
-        <Icon name="refresh" />
-      </button>
-      <button
-        className={`ghost ${p.animate ? "on" : ""}`}
-        title={t("top.sparkle")}
-        aria-label={t("top.sparkle")}
-        onClick={p.onToggleAnimate}
-      >
-        <Icon name="sparkle" />
-      </button>
-      <button className="ghost" title={t("top.settings")} aria-label={t("top.settings.label")} onClick={p.onSettings}>
-        <Icon name="settings" />
       </button>
     </header>
   );

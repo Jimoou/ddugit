@@ -1,5 +1,5 @@
 import { Icon } from "./components/Icon";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH } from "./api";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
@@ -111,13 +111,11 @@ export interface RepoViewProps {
   page: number;
   toast(kind: "ok" | "err", text: string): void;
   /** Loaded for the first time (recent list). */
-  onLoaded(path: string): void;
-  onSettings(): void;
+  onLoaded(path: string, name: string): void;
   /** Change settings shared by every tab (sparkles, rotation, sidebar layout). */
   onChangeSettings(patch: Partial<Settings>): void;
-  /** Toggle the repository menu; `repoMenu` is it when open. */
+  /** Open the repository menu (recent, open, clone, new) under the tab. */
   onRepoMenu(): void;
-  repoMenu: ReactNode;
 }
 
 /** One open repository: its graph, panels, sheets and every git action on it. */
@@ -128,10 +126,8 @@ export function RepoView({
   page,
   toast,
   onLoaded,
-  onSettings,
   onChangeSettings,
   onRepoMenu,
-  repoMenu,
 }: RepoViewProps) {
   const [snap, setSnap] = useState<RepoSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -252,7 +248,7 @@ export function RepoView({
       (s) => {
         if (!live) return;
         applySnapshot(s);
-        onLoaded(path);
+        onLoaded(path, s.name);
       },
       (e) => live && setLoadError(String(e)),
     );
@@ -451,14 +447,19 @@ export function RepoView({
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "f") {
         e.preventDefault();
         setSearch((s) => s ?? { query: "", index: 0 });
+      } else if ((mod && e.key.toLowerCase() === "r") || e.key === "F5") {
+        // Re-read the repository (the file watcher usually has already); never reload the window.
+        e.preventDefault();
+        void refresh();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active]);
+  }, [active, refresh]);
   const colorOf = useCallback((id: string) => NEON[layout?.byId.get(id)?.color ?? 0], [layout]);
 
   /** Local branch a merge can land on at commit `id`. */
@@ -1074,19 +1075,34 @@ export function RepoView({
       {active && (
         <TopBar
           onVoyage={path === DEMO_PATH && !tour.shown ? tour.reopen : undefined}
-          repoName={snap.name}
-          repoPath={snap.path}
           head={snap.head}
           headColor={headColor}
           changeCount={snap.changes.length}
           busy={busy}
           remoteBusy={remoteBusy}
           progress={progress}
-          animate={animate}
-          onOpenRepo={onRepoMenu}
-          repoMenu={repoMenu}
+          onBranches={(x, y) =>
+            setMenu({
+              x,
+              y,
+              title: t("top.branches"),
+              items: snap.refs
+                .filter((r) => r.kind === "local")
+                // Where HEAD is first, then the rest by name.
+                .sort(
+                  (a, b) =>
+                    Number(b.name === snap.head.branch) - Number(a.name === snap.head.branch) ||
+                    a.name.localeCompare(b.name),
+                )
+                .map((r) => ({
+                  label: r.name,
+                  hint: r.name === snap.head.branch ? "HEAD" : undefined,
+                  disabled: r.name === snap.head.branch,
+                  onSelect: () => checkoutRef(r),
+                })),
+            })
+          }
           onCompose={() => show({ composer: true })}
-          onRefresh={() => void refresh()}
           onUndoHistory={() => {
             setDiff(null);
             setBackport(null);
@@ -1095,8 +1111,6 @@ export function RepoView({
             setReflogOpen((o) => !o);
           }}
           onRemote={(op) => void remote(op)}
-          onToggleAnimate={() => onChangeSettings({ animate: !settings.animate })}
-          onSettings={onSettings}
         />
       )}
 

@@ -235,14 +235,41 @@ textarea:focus {
 }
 
 /* --------------------------------------------------------------- tab bar */
+/* The window's top row: wordmark · tabs · + · settings. */
+.tabrow {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 38px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
+}
+.tabrow > .wordmark {
+  align-self: center;
+  padding: 0 10px 0 14px;
+}
+.tabrow-settings {
+  align-self: center;
+  margin: 0 8px;
+  padding: 5px 8px;
+  border-color: transparent;
+  background: none;
+}
+.tab-menu-anchor {
+  position: absolute;
+  top: 100%;
+  z-index: 30;
+}
+.tab-menu-anchor .repo-menu {
+  top: 6px;
+}
 .tabbar {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: stretch;
   gap: 2px;
-  height: 34px;
-  padding: 4px 8px 0;
-  background: var(--chrome);
-  border-bottom: 1px solid var(--line);
+  padding: 6px 4px 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -275,6 +302,7 @@ textarea:focus {
   font-size: 12.5px;
 }
 .tab-close,
+.tab-menu,
 .tab-new {
   padding: 0 6px;
   height: 22px;
@@ -285,6 +313,7 @@ textarea:focus {
   opacity: 0.6;
 }
 .tab-close:hover,
+.tab-menu:hover,
 .tab-new:hover {
   opacity: 1;
 }
@@ -300,11 +329,6 @@ textarea:focus {
   padding: 8px 14px;
   border-bottom: 1px solid var(--line);
   background: var(--chrome);
-}
-.topbar .repo {
-  background: none;
-  border-color: transparent;
-  font-weight: 600;
 }
 .topbar .spacer {
   flex: 1;
@@ -382,9 +406,26 @@ textarea:focus {
   background: rgba(79, 209, 165, 0.2);
   color: #b8f2dd;
 }
+/* The branch switcher: HEAD's branch in its own colour. */
 .branch-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  background: color-mix(in srgb, var(--c) 10%, transparent);
   font: 600 12px var(--mono);
   color: var(--c);
+}
+.branch-now:hover:not(:disabled) {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
+}
+.branch-now .branch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .demo-pill,
 .head-pill {
@@ -1912,9 +1953,6 @@ kbd {
 }
 .recent-empty {
   margin: 4px 10px;
-}
-.repo-anchor {
-  position: relative;
 }
 .menu-catch {
   position: fixed;

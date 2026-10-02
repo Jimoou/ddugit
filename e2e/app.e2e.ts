@@ -224,7 +224,6 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
 
   await dialog.getByRole("checkbox").uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).animate)).toBe(false);
-  await expect(page.locator(".topbar button[title='반짝임 효과']")).not.toHaveClass(/\bon\b/);
 
   const git = dialog.getByPlaceholder("비워 두면 PATH의 git");
   await git.fill("/usr/bin/nope");
@@ -344,12 +343,34 @@ test("settings: switching to English relabels the app and is remembered", async 
   expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
 });
 
+test("switches branch from the top bar and re-reads the repository with Cmd/Ctrl+R", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".topbar .branch-now").click();
+  const menu = page.locator(".context-menu");
+  await expect(menu).toContainText("브랜치 바꾸기");
+  await menu.getByRole("menuitem", { name: "feature/theme" }).click();
+  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
+  await expect(page.locator(".topbar .branch-now")).toContainText("feature/theme");
+
+  // A commit made outside the app shows up on Cmd/Ctrl+R.
+  await demo.mutateQuietly((d) => d.grow(1));
+  const tip = (await demo.snapshot()).head.target!;
+  const drawn = () =>
+    page.evaluate(
+      (id) => (window as unknown as { __ddugit: { screenOf(id: string): unknown } }).__ddugit.screenOf(id),
+      tip,
+    );
+  expect(await drawn()).toBeNull();
+  await page.keyboard.press("Control+r");
+  await expect.poll(drawn).not.toBeNull();
+});
+
 test("clones from a URL, remembers it in the repository menu and stars it", async ({ demo }) => {
   const { page } = demo;
   await page.evaluate(
     () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work"),
   );
-  await page.locator(".topbar .repo").click();
+  await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
     .getByRole("button", { name: /URL로 가져오기/ })
@@ -361,7 +382,7 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   await dialog.getByRole("button", { name: "가져오기" }).click();
   await demo.toast("rocket을(를) 가져왔어요");
 
-  await page.locator(".topbar .repo").click();
+  await page.locator(".tab.on .tab-menu").click();
   const row = page.locator(".repo-menu .recent-list li").filter({ hasText: "/work/rocket" });
   await expect(row).toHaveClass(/on/);
   await row.getByRole("button", { name: "즐겨찾기", exact: true }).click();
@@ -375,13 +396,13 @@ test("creates a new repository in a plain folder", async ({ demo }) => {
   await page.evaluate(
     () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/tmp/not-a-repo"),
   );
-  await page.locator(".topbar .repo").click();
+  await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
     .getByRole("button", { name: /새 저장소 만들기/ })
     .click();
   await demo.toast("새 저장소를 만들었어요");
-  await page.locator(".topbar .repo").click();
+  await page.locator(".tab.on .tab-menu").click();
   await expect(page.locator(".repo-menu .recent-list li.on")).toContainText("/tmp/not-a-repo");
 });
 
@@ -635,8 +656,10 @@ test("a push rides a comet into orbit and fetched commits arrive as meteors, unl
   await demo.toast("원격 커밋을 가져왔어요");
   await expect(meteors).toHaveCount(2);
 
-  // Sparkles off: the same moments play nothing.
-  await page.locator(".topbar button[title='반짝임 효과']").click();
+  // Sparkles off (in settings): the same moments play nothing.
+  await page.keyboard.press("?");
+  await page.getByRole("dialog", { name: "설정" }).getByRole("checkbox").uncheck();
+  await page.keyboard.press("Escape");
   await expect(meteors).toHaveCount(0, { timeout: 5000 });
   await page.getByRole("button", { name: /Fetch/ }).click();
   await demo.toast("원격 커밋을 가져왔어요");
@@ -717,7 +740,7 @@ test("the tutorial voyage ticks off missions as they are done, and can be closed
   await log.getByRole("button", { name: "닫기" }).click();
   await expect(log).toHaveCount(0);
   await page.reload();
-  await expect(page.locator(".topbar")).toContainText("ddugit-demo");
+  await expect(page.locator(".tab.on")).toContainText("ddugit-demo");
   await expect(log).toHaveCount(0);
   await page.getByRole("button", { name: /데모 모드/ }).click();
   await expect(log).toContainText("2 / 6");

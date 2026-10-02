@@ -58,7 +58,10 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tabs, setTabsState] = useState(loadTabs);
   const recent = useRecent();
-  const [repoMenu, setRepoMenu] = useState(false);
+  /** The repository menu is open under the active tab, at this x (window px). */
+  const [repoMenu, setRepoMenu] = useState<number | null>(null);
+  /** Repository names as their snapshots report them, for the tab labels. */
+  const [names, setNames] = useState<Record<string, string>>({});
   const [clone, setClone] = useState<CloneInit | null>(null);
   const [cloneAuth, setCloneAuth] = useState<{ req: Required<CloneInit>; output: string } | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -75,7 +78,7 @@ export default function App() {
       if (isTauri) store(TABS, serializeTabs(next));
       return next;
     });
-    setRepoMenu(false);
+    setRepoMenu(null);
   }, []);
 
   const toast = useCallback((kind: Toast["kind"], text: string) => {
@@ -94,7 +97,13 @@ export default function App() {
 
   const openPath = useCallback((p: string) => setTabs((tb) => openIn(tb, p)), [setTabs]);
   const touchRecent = recent.touch;
-  const onLoaded = useCallback((p: string) => p !== DEMO_PATH && touchRecent(p), [touchRecent]);
+  const onLoaded = useCallback(
+    (p: string, name: string) => {
+      setNames((n) => (n[p] === name ? n : { ...n, [p]: name }));
+      if (p !== DEMO_PATH) touchRecent(p);
+    },
+    [touchRecent],
+  );
 
   useEffect(() => {
     void api.initialRepo().then((p) => p && openPath(p));
@@ -212,9 +221,28 @@ export default function App() {
     <div className="shell">
       <TabBar
         tabs={tabs}
+        names={names}
         onSelect={(id) => setTabs((tb) => ({ ...tb, active: id }))}
         onClose={(id) => setTabs((tb) => closeTab(tb, id))}
         onNew={() => setTabs(addEmpty)}
+        onRepoMenu={(x) => setRepoMenu((o) => (o === null ? x : null))}
+        onSettings={() => setSettingsOpen(true)}
+        menu={
+          repoMenu !== null && current.path
+            ? {
+                x: repoMenu,
+                node: (
+                  <RepoMenu
+                    recent={recent}
+                    current={current.path}
+                    onOpenPath={openPath}
+                    {...connect}
+                    onClose={() => setRepoMenu(null)}
+                  />
+                ),
+              }
+            : undefined
+        }
       />
       {tabs.list.map((tab) =>
         tab.path ? (
@@ -226,21 +254,8 @@ export default function App() {
             page={page}
             toast={toast}
             onLoaded={onLoaded}
-            onSettings={() => setSettingsOpen(true)}
             onChangeSettings={updateSettings}
-            onRepoMenu={() => setRepoMenu((o) => !o)}
-            repoMenu={
-              repoMenu &&
-              tab.id === tabs.active && (
-                <RepoMenu
-                  recent={recent}
-                  current={tab.path}
-                  onOpenPath={openPath}
-                  {...connect}
-                  onClose={() => setRepoMenu(false)}
-                />
-              )
-            }
+            onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
           />
         ) : (
           tab.id === tabs.active && (
