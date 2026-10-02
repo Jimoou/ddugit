@@ -11,6 +11,7 @@ import { Rich } from "./i18n/Rich";
 import { repoName } from "./recent";
 import { RepoView } from "./RepoView";
 import { defaults, parseSettings, type Settings } from "./settings";
+import type { Turn } from "./graph/renderer";
 import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
 import "./App.css";
 
@@ -231,6 +232,7 @@ export default function App() {
             onLoaded={onLoaded}
             onSettings={() => setSettingsOpen(true)}
             onToggleAnimate={() => updateSettings({ animate: !settings.animate })}
+            onRotate={() => updateSettings({ rotation: ((settings.rotation + 1) % 4) as Turn })}
             onRepoMenu={() => setRepoMenu((o) => !o)}
             repoMenu={
               repoMenu &&

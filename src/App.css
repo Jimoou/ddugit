@@ -532,6 +532,23 @@ textarea:focus {
   background: rgba(8, 7, 22, 0.88);
   cursor: pointer;
 }
+/* Time runs down the screen: the overview stands along the right side. */
+.graph.upright {
+  flex-direction: row;
+}
+.graph.upright .minimap.tall {
+  width: auto;
+  height: auto;
+  border-top: none;
+  border-left: 1px solid var(--line);
+}
+.graph.upright ~ .hud {
+  right: 68px;
+  bottom: 16px;
+}
+.graph.upright ~ .hint {
+  bottom: 16px;
+}
 
 .hud {
   position: absolute;
@@ -556,6 +573,17 @@ textarea:focus {
 .hud button:hover:not(:disabled) {
   color: var(--text);
   background: rgba(255, 255, 255, 0.1);
+}
+.hud button.turn {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+}
+.hud .deg {
+  font: 10px var(--mono);
+  color: var(--muted);
 }
 .hud .zoom {
   font: 11px var(--mono);

@@ -1,6 +1,7 @@
 // User settings kept in localStorage. Parsing is pure (and tested) so a
 // corrupt or older stored value falls back to defaults instead of breaking.
 
+import type { Turn } from "./graph/renderer";
 import type { Key, LanguagePref } from "./i18n";
 
 export interface Settings {
@@ -12,13 +13,15 @@ export interface Settings {
   gitPath: string;
   /** UI language; "system" follows the OS (Korean if it is Korean, else English). */
   language: LanguagePref;
+  /** The graph turned in quarter turns clockwise (0: time runs left → right). */
+  rotation: Turn;
 }
 
 export const HISTORY_PAGES = [1000, 3000, 10000] as const;
 export const LANGUAGES: readonly LanguagePref[] = ["system", "ko", "en"];
 
 export function defaults(reducedMotion = false): Settings {
-  return { animate: !reducedMotion, historyPage: 3000, gitPath: "", language: "system" };
+  return { animate: !reducedMotion, historyPage: 3000, gitPath: "", language: "system", rotation: 0 };
 }
 
 /** Stored JSON → settings, keeping only well-formed fields. */
@@ -39,6 +42,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
         : base.historyPage,
     gitPath: typeof o.gitPath === "string" ? o.gitPath : base.gitPath,
     language: LANGUAGES.find((l) => l === o.language) ?? base.language,
+    rotation: ([0, 1, 2, 3] as const).find((r) => r === o.rotation) ?? base.rotation,
   };
 }
 
@@ -59,6 +63,7 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
       { keys: "+ / -", what: "keys.plusMinus.what" },
       { keys: "0", what: "keys.fit.what" },
       { keys: "H", what: "keys.head.what" },
+      { keys: "R", what: "keys.rotate.what" },
       { keys: "keys.dragMerge", what: "keys.dragMerge.what" },
       { keys: "keys.altDrag", what: "cherry-pick" },
       { keys: "keys.shiftDrag", what: "keys.shiftDrag.what" },

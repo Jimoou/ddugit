@@ -259,6 +259,41 @@ test("moves through commits with the keyboard and announces them", async ({ demo
   await expect(page.locator(".context-menu")).toContainText("여기서 새 브랜치");
 });
 
+test("turns the graph a quarter at a time and keeps commits, arrows and the setting with it", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const head = snap.commits.find((c) => c.id === snap.head.target)!;
+  const parent = snap.commits.find((c) => c.id === head.parents[0])!;
+  const turn = page.locator(".hud button.turn");
+  await expect(turn).toContainText("0°");
+
+  // 270°: time runs up the screen, so the parent sits below HEAD on the same column.
+  for (const deg of ["90°", "180°", "270°"]) {
+    await turn.click();
+    await expect(turn).toContainText(deg);
+  }
+  await expect(page.locator(".graph.upright")).toHaveCount(1);
+  const h = (await demo.screenOf(head.id))!;
+  const p = (await demo.screenOf(parent.id))!;
+  expect(p.y).toBeGreaterThan(h.y + 20);
+  expect(Math.abs(p.x - h.x)).toBeLessThan(2);
+
+  // A click still lands on the star, and ↓ now walks to the older commit.
+  await page.mouse.click(h.x, h.y);
+  const live = page.locator(".graph .sr-only");
+  await expect(live).toContainText(head.summary);
+  await page.keyboard.press("ArrowDown");
+  await expect(live).toContainText(parent.summary);
+
+  // R turns it back round to 0°, and the angle is kept across a reload.
+  await page.keyboard.press("r");
+  await expect(turn).toContainText("0°");
+  await page.keyboard.press("r");
+  await expect(turn).toContainText("90°");
+  await page.reload();
+  await expect(page.locator(".hud button.turn")).toContainText("90°");
+});
+
 test("shift-dragging a commit onto another opens the rebase plan with it moved", async ({ demo }) => {
   const { page } = demo;
   await demo.mutate((d) => d.grow(3));

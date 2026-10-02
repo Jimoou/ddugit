@@ -104,6 +104,7 @@ export const ko = {
   "keys.plusMinus.what": "확대 / 축소",
   "keys.fit.what": "전체 보기",
   "keys.head.what": "HEAD로",
+  "keys.rotate.what": "그래프를 90°씩 돌리기",
   "keys.dragMerge": "점 끌어 브랜치 끝에 놓기",
   "keys.dragMerge.what": "병합",
   "keys.altDrag": "⌥/Alt + 끌기",
@@ -156,6 +157,7 @@ export const ko = {
   "hud.zoomIn": "확대 (+)",
   "hud.fit": "전체 보기 (0)",
   "hud.head": "HEAD로 (H)",
+  "hud.rotate": "그래프 90° 돌리기 (R) · 지금 {deg}°",
   "pick.copy": "복사",
   "pick.body":
     "<b>“{summary}”</b> 커밋의 변경을 <b>{target}</b>에 새 커밋으로 복사합니다. 원래 커밋 SHA가 메시지에 기록돼요.",

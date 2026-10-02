@@ -14,7 +14,11 @@ import {
   stashRadius,
   toScreen,
   toWorld,
+  turn,
+  type Turn,
+  upright,
   type View,
+  viewAt,
   ZOOM,
 } from "./renderer";
 import { type Step, stepFrom } from "./navigate";
@@ -24,7 +28,7 @@ const NO_BADGES = new Map<string, NodeBadge>();
 const NO_TRAIL: string[] = [];
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
-import { type Bounds, clampView } from "./camera";
+import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap } from "./Minimap";
 import { t } from "../i18n";
 
@@ -66,13 +70,27 @@ interface Props {
   onLoadMore(): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
   onZoomChange?(k: number): void;
+  /** How the graph is turned on screen (quarter turns clockwise). */
+  rotation: Turn;
+  /** The rotate key was pressed. */
+  onRotate?(): void;
   /** The commit under the pointer changed (null: none, or the view moved). For the preview card. */
   onHover?(id: string | null): void;
 }
 
 type DragHint = `${"merge" | "pick" | "move"}:${"idle" | "ok" | "bad"}`;
 
-const ARROWS: Record<string, Step> = { ArrowLeft: "older", ArrowRight: "newer", ArrowUp: "up", ArrowDown: "down" };
+/** Arrow keys as screen directions; turned back into the graph they become a step. */
+const ARROWS: Record<string, Pt> = {
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+};
+function arrowStep(key: string, r: Turn): Step {
+  const d = turn(ARROWS[key], 4 - r);
+  return d.x < 0 ? "older" : d.x > 0 ? "newer" : d.y < 0 ? "up" : "down";
+}
 
 const MIN_K = 0.08;
 const MAX_K = 3;
@@ -126,7 +144,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
 
   // Mutable interaction state lives in a ref so pointer moves never re-render React.
   const st = useRef({
-    view: { k: 1, tx: 0, ty: 0 } as View,
+    view: { k: 1, tx: 0, ty: 0, r: props.rotation } as View,
     target: null as View | null, // camera animation goal
     size: { w: 0, h: 0 },
     hovered: null as string | null,
@@ -165,8 +183,12 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const anchor = s.anchor && byId.get(s.anchor.id);
     if (s.anchor && anchor) {
       const dx = xOf(anchor.row, rowCount) - s.anchor.x;
-      s.view = { ...s.view, tx: s.view.tx - dx * s.view.k };
-      if (s.target) s.target = { ...s.target, tx: s.target.tx - dx * s.target.k };
+      const shift = (v: View): View => {
+        const d = turn({ x: dx * v.k, y: 0 }, v.r);
+        return { ...v, tx: v.tx - d.x, ty: v.ty - d.y };
+      };
+      s.view = shift(s.view);
+      if (s.target) s.target = shift(s.target);
     }
     if (s.known) {
       for (const n of nodes) if (!s.known.has(n.id) && (!anchor || n.row < anchor.row)) s.births.set(n.id, now());
@@ -183,15 +205,17 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
 
   const viewFor = (world: Pt, k: number): View => {
     const { w, h } = st.current.size;
-    return { k, tx: w / 2 - world.x * k, ty: h / 2 - world.y * k };
+    return viewAt(world, { x: w / 2, y: h / 2 }, k, st.current.view.r);
   };
+  /** Screen length of the time axis. */
+  const timeSpan = () => (upright(st.current.view.r) ? st.current.size.h : st.current.size.w);
 
-  /** Frame HEAD and the [+] node, biased right like a timeline's "now". */
+  /** Frame HEAD and the [+] node, biased towards "now" like a timeline. */
   const headWorld = (k: number): Pt => {
     const sc = sceneRef.current;
     const node = propsRef.current.headId ? sc.layout.byId.get(propsRef.current.headId) : undefined;
     if (!node) return plusPosition(sc, null);
-    return { x: xOf(node.row, sc.layout.rowCount) + COL * 0.5 - (st.current.size.w * 0.18) / k, y: sc.height / 2 };
+    return { x: xOf(node.row, sc.layout.rowCount) + COL * 0.5 - (timeSpan() * 0.18) / k, y: sc.height / 2 };
   };
 
   /** A commit's position on the canvas, or null if it isn't loaded. */
@@ -223,7 +247,10 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       const sc = sceneRef.current;
       const { w, h } = st.current.size;
       const { left, right } = graphBounds();
-      const k = clampK(Math.min((w - 160) / Math.max(right - left, 1), (h - 160) / Math.max(sc.height + LANE, 1), 1.2));
+      const box = turnBounds({ left, right, top: -LANE / 2, bottom: sc.height + LANE / 2 }, st.current.view.r);
+      const k = clampK(
+        Math.min((w - 160) / Math.max(box.right - box.left, 1), (h - 160) / Math.max(box.bottom - box.top, 1), 1.2),
+      );
       st.current.target = viewFor({ x: (left + right) / 2, y: sc.height / 2 }, k);
     },
     zoomBy(f) {
@@ -252,9 +279,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   function zoomAt(p: Pt, f: number, animated = false) {
     const s = st.current;
     const base = s.target ?? s.view;
-    const k = clampK(base.k * f);
-    const world = toWorld(base, p);
-    const next = { k, tx: p.x - world.x * k, ty: p.y - world.y * k };
+    const next = viewAt(toWorld(base, p), p, clampK(base.k * f), base.r);
     if (animated) s.target = next;
     else {
       s.view = next;
@@ -292,7 +317,26 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     });
     ro.observe(el);
     return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reads only refs
   }, []);
+
+  // Turning keeps the point at the centre of the screen where it is.
+  useEffect(() => {
+    const s = st.current;
+    if (s.view.r === props.rotation) return;
+    const { w, h } = s.size;
+    const mid = { x: w / 2, y: h / 2 };
+    const b = graphBounds();
+    // The pivot: the point at the centre, pulled onto the graph so empty sky never takes its place.
+    const pivot = (v: View): Pt => {
+      const p = toWorld(v, mid);
+      return { x: Math.min(b.right, Math.max(b.left, p.x)), y: Math.min(b.bottom, Math.max(b.top, p.y)) };
+    };
+    const goal = s.target;
+    s.view = viewAt(pivot(s.view), mid, s.view.k, props.rotation);
+    s.target = goal ? viewAt(pivot(goal), mid, goal.k, props.rotation) : null;
+    reportHover(true);
+  }, [props.rotation]);
 
   // Render loop.
   useEffect(() => {
@@ -309,7 +353,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         const a = 0.2;
         // Interpolate in log-zoom space so zooming feels even.
         const k = Math.exp(Math.log(v.k) + (Math.log(t.k) - Math.log(v.k)) * a);
-        s.view = { k, tx: v.tx + (t.tx - v.tx) * a, ty: v.ty + (t.ty - v.ty) * a };
+        s.view = { k, r: t.r, tx: v.tx + (t.tx - v.tx) * a, ty: v.ty + (t.ty - v.ty) * a };
         if (Math.abs(t.k - k) < 0.001 && Math.abs(t.tx - s.view.tx) < 0.5 && Math.abs(t.ty - s.view.ty) < 0.5) {
           s.view = t;
           s.target = null;
@@ -394,18 +438,18 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     if (v.k >= ZOOM.fold) return null;
     const sc = sceneRef.current;
     const n = sc.layout.rowCount;
-    const node = sc.layout.nodes[Math.round(n - 1 - toWorld(v, p).x / COL)];
+    const w = toWorld(v, p);
+    const node = sc.layout.nodes[Math.round(n - 1 - w.x / COL)];
     const run = node && foldedRun(foldState(), node.id);
     if (!run) return null;
-    const y = toScreen(v, { x: 0, y: yOf(run.lane) }).y;
-    return Math.abs(y - p.y) <= runRadius(v.k) + 4 ? run : null;
+    return Math.abs(w.y - yOf(run.lane)) * v.k <= runRadius(v.k) + 4 ? run : null;
   }
   /** Zoom in far enough that the run unfolds, framing as much of it as fits. */
   function openRun(run: Run) {
     const sc = sceneRef.current;
     const n = sc.layout.rowCount;
     const [x0, x1] = [xOf(run.last, n), xOf(run.first, n)];
-    const k = clampK(Math.max(ZOOM.fold * 1.3, Math.min(1, (st.current.size.w - 200) / Math.max(x1 - x0, 1))));
+    const k = clampK(Math.max(ZOOM.fold * 1.3, Math.min(1, (timeSpan() - 200) / Math.max(x1 - x0, 1))));
     st.current.target = viewFor({ x: (x0 + x1) / 2, y: yOf(run.lane) }, k);
   }
   function stashAt(p: Pt): number | null {
@@ -531,13 +575,18 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       if (e.ctrlKey || e.metaKey) {
         // Pinch on trackpads arrives as ctrl+wheel.
         zoomAt(local(e), Math.exp(-e.deltaY * scale * 0.0022));
-      } else if (e.shiftKey) {
-        s.view = { ...s.view, ty: s.view.ty - e.deltaY * scale };
       } else if (e.deltaX !== 0) {
         s.view = { ...s.view, tx: s.view.tx - e.deltaX * scale, ty: s.view.ty - e.deltaY * scale };
       } else {
-        // Plain mouse wheel scrolls the timeline.
-        s.view = { ...s.view, tx: s.view.tx + e.deltaY * scale };
+        const d = e.deltaY * scale;
+        if (upright(s.view.r)) {
+          // Time runs down the screen: the wheel scrolls it like a list, Shift across the lanes.
+          s.view = e.shiftKey ? { ...s.view, tx: s.view.tx - d } : { ...s.view, ty: s.view.ty - d };
+        } else {
+          // Plain mouse wheel scrolls the timeline towards older history, Shift across the lanes.
+          const along = turn({ x: 1, y: 0 }, s.view.r).x;
+          s.view = e.shiftKey ? { ...s.view, ty: s.view.ty - d } : { ...s.view, tx: s.view.tx + along * d };
+        }
       }
     };
     c.addEventListener("wheel", onWheel, { passive: false });
@@ -549,10 +598,13 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Every tab keeps its graph mounted; only the one on screen takes keys.
+      if (!canvasRef.current?.offsetParent) return;
       if (e.key === "=" || e.key === "+") api.zoomBy(1.25);
       else if (e.key === "-") api.zoomBy(0.8);
       else if (e.key === "0") api.fit();
       else if (e.key === "h" || e.key === "H") api.centerOnHead();
+      else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) propsRef.current.onRotate?.();
       else if (e.key === "Escape") {
         st.current.drag = null;
         propsRef.current.onSelect(null);
@@ -563,7 +615,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         if (ARROWS[e.key]) {
           e.preventDefault();
           // The first arrow picks HEAD; later ones move from the selection.
-          const next = selected ? stepFrom(sceneRef.current.layout, selected, ARROWS[e.key]) : headId;
+          const step = arrowStep(e.key, st.current.view.r);
+          const next = selected ? stepFrom(sceneRef.current.layout, selected, step) : headId;
           if (next) {
             propsRef.current.onSelect(next);
             reveal(next);
@@ -581,7 +634,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   });
 
   return (
-    <div className="graph">
+    <div className={`graph ${upright(props.rotation) ? "upright" : ""}`}>
       <div className="graph-area" ref={wrapRef}>
         <canvas
           ref={canvasRef}
@@ -619,6 +672,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       )}
       <Minimap
         scene={scene}
+        rotation={props.rotation}
         getView={() => st.current.view}
         getSize={() => st.current.size}
         onJump={(world) => {

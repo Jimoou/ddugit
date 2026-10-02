@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeBadges } from "./labels";
+import { inlineBadges, placeBadges } from "./labels";
 
 const H = 18;
 
@@ -45,5 +45,20 @@ describe("placeBadges", () => {
   it("skips empty groups", () => {
     const [g] = placeBadges([{ x: 0, baseY: 0, widths: [] }]);
     expect(g.badges).toEqual([]);
+  });
+});
+
+describe("inlineBadges", () => {
+  it("lines badges up away from the graph, leaving the rest of the row to the summary", () => {
+    const right = inlineBadges(100, 1, 50, [40, 60]);
+    expect(right.badges.map((b) => [b.x, b.y])).toEqual([
+      [100, 41],
+      [144, 41],
+    ]);
+    expect(right.end).toBe(210);
+    const left = inlineBadges(100, -1, 50, [40]);
+    expect(left.badges[0].x).toBe(60);
+    expect(left.end).toBe(54);
+    expect(inlineBadges(100, 1, 50, []).end).toBe(100);
   });
 });
