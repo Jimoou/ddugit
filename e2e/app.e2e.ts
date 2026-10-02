@@ -993,3 +993,51 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   await demo.toast("origin/main을(를) 로컬로 가져와 이동했어요");
   expect((await demo.snapshot()).head.branch).toBe("origin-main");
 });
+
+test("groups repositories on the dashboard: create, move in, open all, ungroup", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => {
+    const paths = ["/work/api-gateway", "/work/payments", "/home/me/dotfiles"];
+    localStorage.setItem(
+      "ddugit.recent",
+      JSON.stringify(paths.map((path, i) => ({ path, starred: false, at: 9 - i }))),
+    );
+  });
+  await page.reload();
+  await page.locator(".tab-new").click();
+  const galaxy = page.locator(".welcome .galaxy");
+  await expect(galaxy.locator(".band")).toHaveCount(0);
+
+  await galaxy.getByRole("button", { name: "그룹", exact: true }).click();
+  await page.locator(".dialog input.text").fill("결제 플랫폼");
+  await page.locator(".dialog").getByRole("button", { name: "만들기" }).click();
+  const band = galaxy.locator(".band").filter({ hasText: "결제 플랫폼" });
+  await expect(band).toContainText("아직 비어 있어요");
+
+  for (const name of ["api-gateway", "payments"]) {
+    await galaxy.locator(".world").filter({ hasText: name }).getByRole("button", { name: "그룹으로 옮기기" }).click();
+    await page.getByRole("menuitem", { name: "결제 플랫폼(으)로 옮기기" }).click();
+  }
+  await expect(band.locator(".world")).toHaveCount(2);
+  await expect(galaxy.locator(".band.ungrouped .world")).toHaveCount(1);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.recent")!));
+  expect(stored.filter((r: { group?: string }) => r.group).length).toBe(2);
+
+  // Fold and unfold, then open the whole group as tabs.
+  await band.locator(".fold").click();
+  await expect(band.locator(".world")).toHaveCount(0);
+  await band.locator(".fold").click();
+  await band.getByRole("button", { name: "모두 열기" }).click();
+  await expect(page.locator(".tabbar .tab")).toHaveCount(3);
+
+  // Ungrouping keeps the repositories.
+  await page.locator(".tabbar .tab-new").click();
+  await galaxy
+    .locator(".band")
+    .filter({ hasText: "결제 플랫폼" })
+    .getByRole("button", { name: "결제 플랫폼 메뉴" })
+    .click();
+  await page.getByRole("menuitem", { name: /그룹 해제/ }).click();
+  await expect(galaxy.locator(".band")).toHaveCount(0);
+  await expect(galaxy.locator(".world")).toHaveCount(3);
+});

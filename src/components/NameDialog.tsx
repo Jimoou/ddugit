@@ -9,6 +9,8 @@ export interface NameRequest {
   initial?: string;
   /** Prefilled suggestion that can be taken as it is. */
   value?: string;
+  /** Free text (a display name): spaces stay, instead of becoming dashes like a ref name. */
+  free?: boolean;
   /** A second field: a tag message (multiline, optional) or a remote URL (required). */
   extra?: { placeholder: string; multiline?: boolean; required?: boolean };
   onSubmit(name: string, extra: string): void;
@@ -36,7 +38,7 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
           autoFocus
           placeholder={placeholder}
           value={name}
-          onChange={(e) => setName(e.target.value.replace(/\s+/g, "-"))}
+          onChange={(e) => setName(req.free ? e.target.value : e.target.value.replace(/\s+/g, "-"))}
           onKeyDown={(e) => e.key === "Escape" && onCancel()}
         />
         {extra?.multiline && (
