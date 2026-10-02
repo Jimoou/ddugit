@@ -19,8 +19,8 @@ interface Props {
   colorOf(target: string): string;
   /** Picked refs, as `kind:name`. */
   focused: string[];
-  /** Click on a ref; `add` (⌘/Ctrl/Shift held) adds it to or takes it out of the picked set. */
-  onFocus(ref: RefInfo, add: boolean): void;
+  /** Click on a ref: adds it to the picked set, or takes it out if already picked. */
+  onFocus(ref: RefInfo): void;
   onClearFocus(): void;
   onCheckout(ref: RefInfo): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
@@ -109,7 +109,7 @@ export function Sidebar(props: Props) {
         aria-selected={focused.includes(key)}
         style={{ ["--c" as string]: colorOf(r.target) }}
         title={`${r.name}\n${r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}`}
-        onClick={(e) => onFocus(r, e.metaKey || e.ctrlKey || e.shiftKey)}
+        onClick={() => onFocus(r)}
         onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -280,9 +280,14 @@ export function Sidebar(props: Props) {
                       id={`remote:${rm.name}`}
                       className="sub"
                       title={
-                        <span title={rm.url}>
-                          {rm.name}
-                          {!rm.push && <span className="fetch-only">{t("side.fetchOnly")}</span>}
+                        <span className="remote-name" title={rm.url}>
+                          <Icon name="cloud" size={12} />
+                          <span className="nm">{rm.name}</span>
+                          {!rm.push && (
+                            <span className="fetch-only" title={t("side.fetchOnly.hint")}>
+                              {t("side.fetchOnly")}
+                            </span>
+                          )}
                         </span>
                       }
                       count={mine.length}

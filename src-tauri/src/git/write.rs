@@ -281,4 +281,23 @@ mod tests {
         let snap = snapshot(p, 5).unwrap();
         assert_eq!(snap.head.branch.as_deref(), Some("trunk"));
     }
+
+    #[test]
+    fn a_new_branch_in_an_empty_repository_can_start_from_a_fetched_remote() {
+        // `init` + add remote + fetch: no local branch, HEAD on an unborn `main`.
+        let origin = repo();
+        commit_file(origin.path(), "a.txt", "a", "theirs");
+        let d = repo();
+        let p = s(d.path());
+        super::super::git_ok(d.path(), &["remote", "add", "origin", s(origin.path())]).unwrap();
+        super::super::git_ok(d.path(), &["fetch", "-q", "origin"]).unwrap();
+
+        let r = create_branch(p, "feat", Some("origin/main"), true).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(p, 5).unwrap();
+        assert_eq!(snap.head.branch.as_deref(), Some("feat"));
+        assert_eq!(snap.head.upstream.as_deref(), Some("origin/main"));
+        assert_eq!(snap.commits.len(), 1);
+        assert!(d.path().join("a.txt").exists());
+    }
 }

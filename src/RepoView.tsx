@@ -143,6 +143,14 @@ export interface RepoViewProps {
   onOpenPath(path: string): void;
 }
 
+/** The remote branch a first branch starts from: a `main`/`master` (origin's first), else any. */
+function remoteBase(refs: RefInfo[]): string | null {
+  const remote = refs.filter((r) => r.kind === "remote" && !r.name.endsWith("/HEAD")).map((r) => r.name);
+  const rank = (n: string) =>
+    (n.startsWith("origin/") ? 0 : 2) + (/\/(main|master)$/.test(n) ? 0 : 4) + (n.endsWith("/master") ? 1 : 0);
+  return remote.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))[0] ?? null;
+}
+
 /** One open repository: its graph, panels, sheets and every git action on it. */
 export function RepoView({
   path,
@@ -744,14 +752,20 @@ export function RepoView({
 
   /** A new branch where HEAD is (also the first branch of an empty repository). */
   const askNewBranch = () => {
-    const from = snap?.head.branch ?? snap?.head.target?.slice(0, 7);
+    const head = snap?.head;
+    // No commit yet (a fresh `init`, maybe with a remote fetched): a branch made here
+    // would stay empty and unseen, so start from a remote branch when there is one.
+    const base = head?.target ? null : remoteBase(snap?.refs ?? []);
+    const from = base ?? head?.branch ?? head?.target?.slice(0, 7);
     setNameReq({
-      title: from && snap?.head.target ? t("branch.newFromHead", { from }) : t("branch.newFirst"),
+      title: head?.target || base ? t("branch.newFromHead", { from: from ?? "" }) : t("branch.newFirst"),
+      hint: head?.target || base ? undefined : t("branch.newFirst.hint"),
       placeholder: "feature/my-idea",
       confirmLabel: t("branch.new.go"),
       onSubmit: (name) => {
         setNameReq(null);
-        void run(t("branch.new.done", { name }), () => api.createBranch(path, name, null, true));
+        const done = head?.target || base ? t("branch.new.done", { name }) : t("branch.newFirst.done", { name });
+        void run(done, () => api.createBranch(path, name, base, true));
       },
     });
   };
@@ -1602,17 +1616,11 @@ export function RepoView({
           headBranch={snap.head.branch}
           colorOf={colorOf}
           focused={focusRefs.map((r) => `${r.kind}:${r.name}`)}
-          onFocus={(r, add) => {
+          onFocus={(r) => {
             const key = (x: RefInfo) => `${x.kind}:${x.name}`;
             const on = focusRefs.some((x) => key(x) === key(r));
-            // A plain click picks just this one (or clears it); with ⌘/Ctrl/Shift it joins or leaves the set.
-            const next = add
-              ? on
-                ? focusRefs.filter((x) => key(x) !== key(r))
-                : [...focusRefs, r]
-              : on && focusRefs.length === 1
-                ? []
-                : [r];
+            // Each click toggles one ref in or out of the picked set.
+            const next = on ? focusRefs.filter((x) => key(x) !== key(r)) : [...focusRefs, r];
             setFocusRefs(next);
             if (next.some((x) => key(x) === key(r))) graph.current?.centerOn(r.target);
           }}

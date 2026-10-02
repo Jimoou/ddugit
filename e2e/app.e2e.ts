@@ -514,7 +514,7 @@ test("creates a new repository in a plain folder", async ({ demo }) => {
 
 test("opens repositories in tabs and keeps each tab's state", async ({ demo }) => {
   const { page } = demo;
-  const tabs = page.locator(".tabbar .tab");
+  const tabs = page.locator(".tabbar .tab:not(.tab-home)");
   await expect(tabs).toHaveCount(1);
 
   // Select a commit in the first tab so we can see it survive a switch.
@@ -884,7 +884,9 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
     localStorage.setItem("ddugit.recent", JSON.stringify(paths.map((path, i) => ({ path, starred: false, at: i }))));
   });
   await page.reload();
-  await page.locator(".tab-new").click();
+  // The home tab shows the galaxy over the open repository, without a new tab.
+  await page.locator(".tab-home").click();
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(1);
   const galaxy = page.locator(".welcome .galaxy");
   await expect(galaxy).toContainText("내 은하 · 저장소 3개");
   const worlds = galaxy.locator(".world");
@@ -897,12 +899,12 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
   await demo.toast("저장소 2개에서 새 커밋을 받아왔어요");
   await expect(galaxy.locator(".world-fetch.ok")).toHaveCount(2);
 
-  // Forget the missing one, then open a world in this tab.
+  // Forget the missing one, then open a world: it gets its own tab beside the demo.
   await worlds.filter({ hasText: "gone-project" }).getByRole("button", { name: "목록에서 지우기" }).click();
   await expect(worlds).toHaveCount(2);
   await worlds.filter({ hasText: "api-server" }).locator(".world-open").click();
   await expect(page.locator(".app:not([hidden]) .topbar")).toBeVisible();
-  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 });
 
 test("adds a worktree for a new branch, opens it in a tab, and removes it", async ({ demo }) => {
@@ -916,19 +918,19 @@ test("adds a worktree for a new branch, opens it in a tab, and removes it", asyn
   await expect(dialog.getByLabel("worktree 폴더")).toHaveValue("/demo/ddugit-demo-hotfix");
   await dialog.getByRole("button", { name: "추가하고 탭으로 열기" }).click();
   await demo.toast("hotfix을(를) 새 worktree에 꺼냈어요");
-  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 
   // Back in the first tab: the branch is out elsewhere, so checking it out opens that tab.
-  await page.locator(".tabbar .tab").nth(0).click();
+  await page.locator(".tabbar .tab:not(.tab-home)").nth(0).click();
   await expect(section.locator("li")).toHaveCount(2);
   const branch = page.locator(".app:not([hidden]) .sidebar li").filter({ hasText: /^hotfix$/ });
   await expect(branch.locator(".elsewhere")).toBeVisible();
   await branch.dblclick();
   await demo.toast(/다른 worktree에 꺼내져 있어서/);
   await expect(page.locator(".tab.on")).toHaveCount(1);
-  await expect(page.locator(".tabbar .tab").nth(1)).toHaveClass(/on/);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)").nth(1)).toHaveClass(/on/);
 
-  await page.locator(".tabbar .tab").nth(0).click();
+  await page.locator(".tabbar .tab:not(.tab-home)").nth(0).click();
   await section.locator("li").filter({ hasText: "ddugit-demo-hotfix" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "worktree 제거…" }).click();
   await page.locator(".dialog").getByRole("button", { name: "제거" }).click();
@@ -945,7 +947,7 @@ test("lists submodules with their state, updates them, and opens one in a tab", 
   await demo.toast("서브모듈을 기록된 커밋으로 맞췄어요");
   await expect(math).toContainText("최신");
   await section.locator("li").filter({ hasText: "vendor/stardust" }).click();
-  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 });
 
 test("LFS: downloads files left as pointers and tracks a new file type", async ({ demo }) => {
@@ -1030,7 +1032,7 @@ test("groups repositories on the dashboard: create, move in, open all, ungroup",
   await expect(band.locator(".world")).toHaveCount(0);
   await band.locator(".fold").click();
   await band.getByRole("button", { name: "모두 열기" }).click();
-  await expect(page.locator(".tabbar .tab")).toHaveCount(3);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(3);
 
   // Ungrouping keeps the repositories.
   await page.locator(".tabbar .tab-new").click();
@@ -1074,7 +1076,7 @@ test("groups: a suggestion by owner, picking several cards, and dragging between
   await expect(galaxy.locator(".pick-bar")).toContainText("2개 선택");
   await galaxy.locator(".pick-bar").getByRole("button", { name: "acme(으)로 옮기기" }).click();
   await expect(acme.locator(".world")).toHaveCount(4);
-  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 
   // Drag a card out to the (now empty) ungrouped band.
   const loose = galaxy.locator(".band.ungrouped");
@@ -1102,7 +1104,7 @@ test("groups show in the repository menu, and grouped tabs carry the group's col
   await expect(group.locator(".recent-list li")).toHaveCount(2);
   await expect(menu.locator(".recent-groups section").filter({ hasText: "미분류" })).toContainText("dotfiles");
   await group.getByRole("button", { name: "모두 열기" }).click();
-  await expect(page.locator(".tabbar .tab")).toHaveCount(3);
+  await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(3);
   await expect(page.locator(".tabbar .tab.grouped")).toHaveCount(2);
   await expect(page.locator(".tabbar .tab.grouped").first()).toHaveAttribute("title", /^결제 플랫폼 · /);
 });
@@ -1175,18 +1177,21 @@ test("several branches can be picked in the sidebar, lighting their histories to
       .locator("li")
       .filter({ hasText: new RegExp(`^${name}`) })
       .first();
+  // Each plain click adds a branch; clicking a picked one again takes only that one out.
   await branch("feature/login").click();
   await expect(side.locator("li.focused")).toHaveCount(1);
-  await branch("hotfix/crash").click({ modifiers: ["Control"] });
-  await branch("feature/theme").click({ modifiers: ["Shift"] });
+  await branch("hotfix/crash").click();
+  await branch("feature/theme").click();
   await expect(side.locator("li.focused")).toHaveCount(3);
   await expect(side.locator(".side-picked")).toContainText("브랜치 3개 선택");
-  // ⌘/Ctrl+click again takes one out; a plain click keeps only that one.
-  await branch("hotfix/crash").click({ modifiers: ["Control"] });
+  await branch("hotfix/crash").click();
   await expect(side.locator("li.focused")).toHaveCount(2);
+  await expect(branch("feature/login")).toHaveClass(/focused/);
+  await branch("feature/login").click();
+  await branch("feature/theme").click();
+  await expect(side.locator("li.focused")).toHaveCount(0);
   await branch("main").click();
-  await expect(side.locator("li.focused")).toHaveCount(1);
-  await branch("feature/login").click({ modifiers: ["Control"] });
+  await branch("feature/login").click();
   await side.getByRole("button", { name: "선택 해제" }).click();
   await expect(side.locator("li.focused")).toHaveCount(0);
 });

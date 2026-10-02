@@ -7,17 +7,18 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- M11: 로컬 브랜치 만들기 #68, 원격 다듬기 #69, 그룹 #70·#71·#72. CI · Rust all_os 통과.
+- v0.5.1 릴리스 초안, 새 "ddu" 아이콘(#77).
+- v0.5.2 수정 PR: 브랜치 단순 클릭 토글, 원격 접기·'받기만' 뱃지, 은하 카드 ⋯, 고정 '내 은하' 탭(⌘/Ctrl+0), 빈 저장소에서 새 브랜치를 원격 브랜치에서 시작.
 
 ## 지금 하는 일
 
-v0.5.1 버전 올림 PR → merge → Release 수동 실행 → `ddugit v0.5.1` 초안. 이전 초안(v0.5.0·v0.4.0·…)은 사용자가 정리.
+수정 PR merge → v0.5.2 버전 올림 PR → CI · Rust all_os → merge → Release 수동 실행 → `ddugit v0.5.2` 초안.
 
 ## 다음 단계
 
-- 사용자가 할 일: v0.5.1 초안 확인 후 Publish(이전 초안 v0.5.0·v0.4.0·v0.3.0·v0.2.0은 공개하거나 삭제). 이미 추가해 둔 upstream 원격은 ⋯ 메뉴에서 '보내기 막기'를 한 번 눌러야 가져오기 전용이 된다
-- 사용자가 할 일: `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수(없으면 그 빌드는 라이선스 확인 불가, 잠금은 없음), Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
-- 데스크톱에서 SSH·worktree·서브모듈·LFS 실제 확인
+- 사용자가 할 일: v0.5.2 초안 확인 후 Publish(이전 초안 v0.5.1·v0.5.0·…은 공개하거나 삭제). 이미 추가해 둔 upstream 원격은 ⋯ 메뉴에서 '보내기 막기'를 한 번 눌러야 가져오기 전용이 된다
+- 사용자가 할 일: `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수, Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
+- 데스크톱에서 SSH·worktree·서브모듈·LFS·빈 저장소 새 브랜치 실제 확인
 - 다음 마일스톤은 사용자와 정한다
 
 ## 막힌 것 / 결정 필요
