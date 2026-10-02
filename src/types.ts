@@ -18,6 +18,8 @@ export interface RefInfo {
   name: string;
   kind: RefKind;
   target: string;
+  /** `pr` refs only: CI on the pull request's head, which colors its label. */
+  checks?: Checks | null;
 }
 
 export interface HeadInfo {
@@ -81,7 +83,14 @@ export interface PullRequest {
   /** Head commit. */
   sha: string;
   author: string;
+  /** CI on the head commit, if any runs. */
+  checks: Checks | null;
+  review: Review | null;
 }
+
+export type Checks = "success" | "failure" | "pending";
+/** `changes`: changes requested; `required`: waiting for a required review. */
+export type Review = "approved" | "changes" | "required";
 
 export interface ForgeStatus {
   remote: string;

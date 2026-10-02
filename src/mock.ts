@@ -840,8 +840,24 @@ const mockTable: Table = {
     const tip = (b: string) => repo.branches.get(b)!;
     const prs: PullRequest[] = ok
       ? [
-          { number: 12, branch: "feature/theme", title: "Warmer theme glow", draft: false, author: "seoyeon" },
-          { number: 15, branch: "hotfix/crash", title: "Fix crash on empty repo", draft: true, author: "hyunwoo" },
+          {
+            number: 12,
+            branch: "feature/theme",
+            title: "Warmer theme glow",
+            draft: false,
+            author: "seoyeon",
+            checks: "success" as const,
+            review: "approved" as const,
+          },
+          {
+            number: 15,
+            branch: "hotfix/crash",
+            title: "Fix crash on empty repo",
+            draft: true,
+            author: "hyunwoo",
+            checks: "failure" as const,
+            review: null,
+          },
         ]
           .filter((p) => repo.branches.has(p.branch))
           .map((p) => ({

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../types";
+import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo, Review } from "../types";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
 
@@ -15,12 +15,24 @@ export function prLabel(pr: PullRequest, report: PrReport): string {
 /** Pull requests as graph labels on their head commits (only those in the loaded history). */
 export function prRefs(report: PrReport | null, has: (id: string) => boolean): RefInfo[] {
   if (!report) return [];
-  return report.prs.filter((p) => has(p.sha)).map((p) => ({ name: prLabel(p, report), kind: "pr", target: p.sha }));
+  return report.prs
+    .filter((p) => has(p.sha))
+    .map((p) => ({
+      name: prLabel(p, report) + REVIEW_MARK[p.review ?? "none"],
+      kind: "pr",
+      target: p.sha,
+      checks: p.checks,
+    }));
 }
+
+/** Appended to a label so the review state reads at a glance. */
+const REVIEW_MARK: Record<Review | "none", string> = { approved: " ✓", changes: " ✎", required: "", none: "" };
 
 /** The pull request a `pr` label stands for. */
 export function prOf(report: PrReport | null, ref: RefInfo): PullRequest | undefined {
-  return report?.prs.find((p) => p.sha === ref.target && prLabel(p, report) === ref.name);
+  return report?.prs.find(
+    (p) => p.sha === ref.target && prLabel(p, report) + REVIEW_MARK[p.review ?? "none"] === ref.name,
+  );
 }
 
 /** A forge we can't read yet: no token, or the token was refused. */
@@ -88,8 +100,12 @@ export function PullSection(p: {
               p.onMenu(pr, e.clientX, e.clientY);
             }}
           >
+            <span className={`pr-ci ${pr.checks ?? "none"}`} title={t(`pr.checks.${pr.checks ?? "none"}`)} />
             <span className="pr-num">{prLabel(pr, report)}</span>
             <span className="name">{pr.title}</span>
+            {pr.review && pr.review !== "required" && (
+              <span className={`chip review ${pr.review}`}>{t(`pr.review.${pr.review}`)}</span>
+            )}
             {pr.draft && <span className="chip">{t("pr.draft")}</span>}
           </li>
         ))}
