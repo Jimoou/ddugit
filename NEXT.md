@@ -7,15 +7,15 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- M10 끝: 은하 대시보드 #63, worktree #64, 서브모듈 #65, LFS #66, v0.4.0 #67 → `ddugit v0.4.0` 초안(서명 없음).
+- M11: 로컬 브랜치 만들기 #68, 원격 다듬기 #69, 그룹 #70·#71·#72. CI · Rust all_os 통과.
 
 ## 지금 하는 일
 
-M11: 원격 다듬기 #69, 그룹 1 #70, 그룹 2 #71 merge. 그룹 3 PR → v0.5.0(버전 세 곳 + 잠금 파일 둘, all_os, Release 수동 실행).
+v0.5.0 버전 올림 PR → merge → Actions에서 Release를 `release` 체크로 수동 실행 → `ddugit v0.5.0` 초안.
 
 ## 다음 단계
 
-- 사용자가 할 일: v0.4.0 초안 확인 후 Publish(v0.3.0 초안은 공개 또는 삭제), v0.2.0 초안 삭제
+- 사용자가 할 일: v0.5.0 초안 확인 후 Publish(이전 초안 v0.4.0·v0.3.0·v0.2.0은 공개하거나 삭제)
 - 사용자가 할 일: `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수(없으면 그 빌드는 라이선스 확인 불가, 잠금은 없음), Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
 - 데스크톱에서 SSH·worktree·서브모듈·LFS 실제 확인
 - 다음 마일스톤은 사용자와 정한다
