@@ -37,6 +37,10 @@ jobs:
     # A draft release is made from main only (a tag push is already a deliberate release).
     if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.os }}
+    env:
+      # Code signing turns on by itself once its secrets exist (docs/RELEASE.md).
+      HAS_APPLE: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      HAS_WINDOWS_SIGN: ${{ secrets.WINDOWS_SIGN_COMMAND != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -50,6 +54,37 @@ jobs:
         with:
           workspaces: src-tauri
       - run: npm ci
+      # This build's date, and the license issuer's public key (public: an Actions variable).
+      - name: Build info
+        shell: bash
+        env:
+          PUBKEY: ${{ vars.DDUGIT_LICENSE_PUBKEY }}
+        run: |
+          echo "DDUGIT_BUILD_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
+          echo "DDUGIT_LICENSE_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
+      - name: macOS signing and notarization
+        if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            echo "$v=${!v}" >> "$GITHUB_ENV"
+          done
+      # The sign command comes from the certificate provider (cloud HSM tools), with %1 for the file.
+      - name: Windows signing
+        if: runner.os == 'Windows' && env.HAS_WINDOWS_SIGN == 'true'
+        shell: bash
+        env:
+          WINDOWS_SIGN_COMMAND: ${{ secrets.WINDOWS_SIGN_COMMAND }}
+        run: |
+          node -e "require('fs').writeFileSync('src-tauri/tauri.sign.json', JSON.stringify({bundle:{windows:{signCommand:process.env.WINDOWS_SIGN_COMMAND}}}))"
+          echo "SIGN_ARGS=--config src-tauri/tauri.sign.json" >> "$GITHUB_ENV"
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +97,7 @@ jobs:
 
             Unsigned build: on macOS right-click → Open the first time; on Windows choose "More info → Run anyway".
           releaseDraft: true
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ env.SIGN_ARGS }}
       # Other manual runs keep the installers as workflow artifacts instead.
       - if: github.ref_type != 'tag' && !inputs.release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

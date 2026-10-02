@@ -1,5 +1,6 @@
 mod forge;
 mod git;
+mod license;
 mod ssh;
 
 use git::backport::{BackportItem, BackportTally};
@@ -87,6 +88,30 @@ command!(git_restore_file(path: String, source: String, file: String) -> OpResul
     => git::edit::restore_file(&path, &source, &file));
 command!(git_bisect(path: String, op: git::bisect::BisectOp) -> OpResult => git::bisect::bisect(&path, &op));
 command!(bisect_state(path: String) -> Option<git::bisect::BisectState> => git::bisect::state(&path));
+/// Where the license text is kept: the app's own config folder, not the webview's storage.
+fn license_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    app.path().app_config_dir().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn license_status(app: tauri::AppHandle) -> Result<license::LicenseStatus, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || Ok(license::status_in(&dir))).await
+}
+
+#[tauri::command]
+async fn license_install(app: tauri::AppHandle, text: String) -> Result<license::LicenseStatus, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || license::install_in(&dir, &text)).await
+}
+
+#[tauri::command]
+async fn license_remove(app: tauri::AppHandle) -> Result<license::LicenseStatus, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || license::remove_in(&dir)).await
+}
+
 command!(ssh_status() -> ssh::SshStatus => ssh::status());
 command!(ssh_keygen(comment: String) -> ssh::SshKey => ssh::keygen(&comment));
 command!(ssh_host_key(url: String) -> ssh::HostKey => ssh::host_key(&url));
@@ -186,6 +211,9 @@ pub fn run() {
             bisect_state,
             file_log,
             pull_requests,
+            license_status,
+            license_install,
+            license_remove,
             ssh_status,
             ssh_keygen,
             ssh_host_key,

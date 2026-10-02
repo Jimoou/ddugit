@@ -26,3 +26,7 @@ dist-ssr
 # Playwright
 test-results
 playwright-report
+
+# License issuer keys and CI-generated signing config: never committed.
+*.pem
+src-tauri/tauri.sign.json

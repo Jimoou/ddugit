@@ -7,19 +7,17 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- M8+ 우주 제어 시스템 스타일 merge(`0f93552`).
-- M9 결정(ROADMAP M9): 개인 무료 + 상업용 유료, Lemon Squeezy, 개인 이름 서명, 다음 기능은 은하 대시보드·서브모듈/LFS/worktree.
+- M9: 보안 보강(#58), 원격 작업 확인(#59), 백포트 진입점(#60), SSH(#61) merge(`100d6ef`).
 
 ## 지금 하는 일
 
-M9-1 보안 보강 merge(`2d07b5e`). M9-2 원격 작업 확인 merge(`43ca6c9`). M9-3 백포트 merge(`fc22eb1`). M9-4 SSH PR → CI 대기. 이어서 M9-3 백포트 찾기 쉽게, M9-4 SSH, M9-5 라이선스·서명 준비.
+M9-5 라이선스·서명 준비 PR → CI 대기.
 
 ## 다음 단계
 
-- 확인 창: pull/push 기본 켬, fetch는 읽기만 하므로 기본 끔(설정에서 켤 수 있음). 보낼/받을 커밋 목록, "다시 묻지 않기"
-- 백포트: 사이드바 브랜치 섹션 머리에 진입 버튼, 시트 상단에 사용법 안내, 메뉴 이름을 분명하게
-- SSH: Rust에 `ssh_status`(키·에이전트), `ssh_keygen`, `ssh_host_key`(keyscan 지문 + 알려진 지문 비교)·`ssh_trust_host`(known_hosts에 추가), `ssh_test`. clone 창과 인증 창에서 사용
-- 라이선스: 공개키를 앱에 넣고 서명 파일을 오프라인 검증. 발급 서버는 문서로 설계(코드는 저장소 밖)
+- 사용자가 할 일: `scripts/license.mjs keygen`으로 발급 키 만들기 → `DDUGIT_LICENSE_PUBKEY` 변수, Apple Developer(개인) 가입·시크릿, Windows 인증서 고르기, Lemon Squeezy 상품, `BUY_URL`
+- 데스크톱에서 SSH 실제 확인(샌드박스는 22번 포트가 막힘)
+- 다음 기능(사용자 결정): 여러 저장소 은하 대시보드, 서브모듈·LFS·worktree
 
 ## 막힌 것 / 결정 필요
 

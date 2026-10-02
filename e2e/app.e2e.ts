@@ -378,6 +378,23 @@ test("shift-dragging a commit onto another opens the rebase plan with it moved",
   expect(now.get(snap.head.target!)!.summary).toBe("Step 2 of 3");
 });
 
+test("settings: a commercial license is pasted, shown and removed", async ({ demo }) => {
+  const { page } = demo;
+  await page.keyboard.press("?");
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  const lic = dialog.locator("section.license");
+  await expect(lic).toContainText("개인·오픈소스 사용은 무료");
+  await lic.getByLabel("라이선스 붙여 넣기").fill("not a license");
+  await lic.getByRole("button", { name: "라이선스 적용" }).click();
+  await expect(lic.locator(".note.warn")).toContainText("not a ddugit license");
+  await lic.getByLabel("라이선스 붙여 넣기").fill("DDUGIT1.payload.signature");
+  await lic.getByRole("button", { name: "라이선스 적용" }).click();
+  await expect(lic).toContainText("Demo Corp");
+  await expect(lic).toContainText("2027-10-02까지 나온 버전");
+  await lic.getByRole("button", { name: /라이선스 지우기/ }).click();
+  await expect(lic).toContainText("개인·오픈소스 사용은 무료");
+});
+
 test("settings: switching to English relabels the app and is remembered", async ({ demo }) => {
   const { page } = demo;
   await page.keyboard.press("?");
