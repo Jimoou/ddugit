@@ -1081,3 +1081,26 @@ test("groups: a suggestion by owner, picking several cards, and dragging between
   await expect(acme.locator(".world")).toHaveCount(3);
   await expect(loose.locator(".world")).toHaveCount(1);
 });
+
+test("groups show in the repository menu, and grouped tabs carry the group's colour", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => {
+    localStorage.setItem("ddugit.groups", JSON.stringify([{ id: "pay", name: "결제 플랫폼", hue: 190 }]));
+    const recent = [
+      { path: "/work/api-gateway", group: "pay" },
+      { path: "/work/payments", group: "pay" },
+      { path: "/home/me/dotfiles" },
+    ];
+    localStorage.setItem("ddugit.recent", JSON.stringify(recent.map((r, i) => ({ ...r, starred: false, at: 9 - i }))));
+  });
+  await page.reload();
+  await page.locator(".tab.on .tab-menu").click();
+  const menu = page.locator(".repo-menu");
+  const group = menu.locator(".recent-groups section").filter({ hasText: "결제 플랫폼" });
+  await expect(group.locator(".recent-list li")).toHaveCount(2);
+  await expect(menu.locator(".recent-groups section").filter({ hasText: "미분류" })).toContainText("dotfiles");
+  await group.getByRole("button", { name: "모두 열기" }).click();
+  await expect(page.locator(".tabbar .tab")).toHaveCount(3);
+  await expect(page.locator(".tabbar .tab.grouped")).toHaveCount(2);
+  await expect(page.locator(".tabbar .tab.grouped").first()).toHaveAttribute("title", /^결제 플랫폼 · /);
+});

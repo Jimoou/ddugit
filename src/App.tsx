@@ -108,6 +108,15 @@ export default function App() {
     },
     [openTab, settings.animate, tabs],
   );
+  /** Open several repositories as tabs (a group's "open all"). */
+  const openMany = (paths: string[]) => setTabs((tb) => paths.reduce(openIn, tb));
+  /** Grouped repositories by path, for the tab colours. */
+  const groupOf = Object.fromEntries(
+    recent.list.flatMap((r) => {
+      const g = recent.groups.find((x) => x.id === r.group);
+      return g ? [[r.path, { name: g.name, hue: g.hue }]] : [];
+    }),
+  );
   const touchRecent = recent.touch;
   const onLoaded = useCallback(
     (p: string, name: string) => {
@@ -234,6 +243,7 @@ export default function App() {
       <TabBar
         tabs={tabs}
         names={names}
+        groupOf={groupOf}
         onSelect={(id) => setTabs((tb) => ({ ...tb, active: id }))}
         onClose={(id) => setTabs((tb) => closeTab(tb, id))}
         onNew={() => setTabs(addEmpty)}
@@ -248,6 +258,7 @@ export default function App() {
                     recent={recent}
                     current={current.path}
                     onOpenPath={openPath}
+                    onOpenMany={openMany}
                     {...connect}
                     onClose={() => setRepoMenu(null)}
                   />
@@ -282,7 +293,7 @@ export default function App() {
                   recent={recent}
                   confirmFetch={settings.confirmRemote.fetch}
                   onOpen={openPath}
-                  onOpenMany={(paths) => setTabs((tb) => paths.reduce(openIn, tb))}
+                  onOpenMany={openMany}
                   toast={toast}
                 />
               ) : (

@@ -20,7 +20,16 @@ import {
   touchRecent,
 } from "../recent";
 import type { OpResult, Progress } from "../types";
-import { addGroup, assignGroup, moveGroup, parseGroups, removeGroup, type RepoGroup, updateGroup } from "../groups";
+import {
+  addGroup,
+  assignGroup,
+  bands,
+  moveGroup,
+  parseGroups,
+  removeGroup,
+  type RepoGroup,
+  updateGroup,
+} from "../groups";
 
 const RECENT = "ddugit.recent";
 const GROUPS = "ddugit.groups";
@@ -110,12 +119,44 @@ export function ConnectActions(p: { onOpen(): void; onClone(): void; onInit(): v
   );
 }
 
-export function RecentList(p: { recent: Recent; current?: string | null; onOpen(path: string): void }) {
-  const { list, star, forget } = p.recent;
+export function RecentList(p: {
+  recent: Recent;
+  current?: string | null;
+  onOpen(path: string): void;
+  /** A group's "open all" (shown when there are groups). */
+  onOpenMany?(paths: string[]): void;
+}) {
+  const { list, groups } = p.recent;
   if (list.length === 0) return <p className="muted small recent-empty">{t("connect.noRecent")}</p>;
+  if (!groups.length) return <RecentRows {...p} rows={list} />;
+  // Under each group's name, then the ungrouped.
+  return (
+    <div className="recent-groups">
+      {bands(groups, list).map(({ group, repos }) =>
+        repos.length ? (
+          <section key={group?.id ?? "none"} style={group ? { ["--h" as string]: group.hue } : undefined}>
+            <div className="recent-group">
+              {group && <span className="band-star" aria-hidden />}
+              <span>{group?.name ?? t("group.none")}</span>
+              {group && p.onOpenMany && (
+                <button className="ghost" onClick={() => p.onOpenMany!(repos.map((r) => r.path))}>
+                  {t("group.openAll")}
+                </button>
+              )}
+            </div>
+            <RecentRows {...p} rows={repos} />
+          </section>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
+function RecentRows(p: { recent: Recent; current?: string | null; onOpen(path: string): void; rows: RecentRepo[] }) {
+  const { star, forget } = p.recent;
   return (
     <ul className="recent-list" aria-label={t("connect.recent")}>
-      {list.map((r) => (
+      {p.rows.map((r) => (
         <li key={r.path} className={r.path === p.current ? "on" : ""}>
           <button className="recent-open" title={r.path} onClick={() => p.onOpen(r.path)}>
             <b>
@@ -151,6 +192,7 @@ export function RepoMenu(p: {
   recent: Recent;
   current: string;
   onOpenPath(path: string): void;
+  onOpenMany(paths: string[]): void;
   onOpen(): void;
   onClone(): void;
   onInit(): void;
@@ -171,7 +213,12 @@ export function RepoMenu(p: {
       >
         <ConnectActions onOpen={pick(p.onOpen)} onClone={pick(p.onClone)} onInit={pick(p.onInit)} />
         <div className="eyebrow">{t("connect.recent")}</div>
-        <RecentList recent={p.recent} current={p.current} onOpen={(path) => pick(() => p.onOpenPath(path))()} />
+        <RecentList
+          recent={p.recent}
+          current={p.current}
+          onOpen={(path) => pick(() => p.onOpenPath(path))()}
+          onOpenMany={(paths) => pick(() => p.onOpenMany(paths))()}
+        />
       </div>
     </>
   );
