@@ -630,6 +630,7 @@ export const ko = {
   "voyage.end": "항해 완료! 이제 내 저장소로 떠나 볼까요?",
   "voyage.openRepo": "내 저장소 열기",
   "voyage.again": "처음부터 다시",
+  "peek.more": "외 파일 {n}개",
 } as const;
 
 export type Key = keyof typeof ko;

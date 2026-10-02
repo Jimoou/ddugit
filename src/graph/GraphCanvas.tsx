@@ -66,6 +66,8 @@ interface Props {
   onLoadMore(): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
   onZoomChange?(k: number): void;
+  /** The commit under the pointer changed (null: none, or the view moved). For the preview card. */
+  onHover?(id: string | null): void;
 }
 
 type DragHint = `${"merge" | "pick" | "move"}:${"idle" | "ok" | "bad"}`;
@@ -128,6 +130,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     target: null as View | null, // camera animation goal
     size: { w: 0, h: 0 },
     hovered: null as string | null,
+    /** Last hover reported through `onHover`. */
+    hoverSent: null as string | null,
     plusHover: false,
     stashHover: null as number | null,
     runHover: null as Run | null,
@@ -424,7 +428,17 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   };
 
   // --- pointer handlers ----------------------------------------------------
+  /** Report the hovered commit when it changes; `force` clears it (the view is about to move). */
+  const reportHover = (force?: boolean) => {
+    const s = st.current;
+    const id = force ? null : s.hovered;
+    if (id === s.hoverSent && !force) return;
+    s.hoverSent = force ? null : id;
+    propsRef.current.onHover?.(id);
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
+    reportHover(true);
     if (e.button !== 0) return;
     const p = local(e);
     const s = st.current;
@@ -486,6 +500,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     s.hovered = s.plusHover || s.stashHover !== null ? null : nodeAt(p);
     s.runHover = s.plusHover || s.hovered || s.stashHover !== null ? null : runAt(p);
     setCursor(s.plusHover || s.hovered || s.runHover || s.stashHover !== null ? "pointer" : "grab");
+    reportHover();
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -508,6 +523,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   useEffect(() => {
     const c = canvasRef.current!;
     const onWheel = (e: WheelEvent) => {
+      reportHover(true);
       e.preventDefault();
       const s = st.current;
       s.target = null;
@@ -590,6 +606,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           onPointerLeave={() => {
             st.current.hovered = null;
             st.current.plusHover = false;
+            reportHover(true);
           }}
         />
       </div>

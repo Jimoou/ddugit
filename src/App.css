@@ -2754,3 +2754,94 @@ button.demo-pill {
   flex-shrink: 0;
   vertical-align: -0.15em;
 }
+
+/* ------------------------------------------------- commit preview card (hover) */
+.peek {
+  position: absolute;
+  z-index: 5;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--glass-strong);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  font-size: 12px;
+  pointer-events: none;
+  animation: peek-in 0.12s ease-out;
+}
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.peek-summary {
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+.peek-body {
+  margin-top: 4px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.peek-body div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.peek-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+.peek-pr {
+  margin-left: 6px;
+  color: #c9b8ff;
+}
+.peek-files {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--line);
+}
+.peek-files li {
+  display: grid;
+  grid-template-columns: 1fr 52px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0;
+}
+.peek-files .path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.peek-files .bar {
+  display: flex;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.peek-files .bar .add {
+  background: var(--lime);
+}
+.peek-files .bar .del {
+  background: var(--red);
+}
+.peek-files .num {
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .peek {
+    animation: none;
+  }
+}

@@ -664,3 +664,22 @@ test("the tutorial voyage ticks off missions as they are done, and can be closed
   await page.getByRole("button", { name: /데모 모드/ }).click();
   await expect(log).toContainText("2 / 6");
 });
+
+test("resting the pointer on a star shows a preview card of the commit", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const tip = snap.refs.find((r) => r.kind === "local" && r.name === "feature/theme")!.target;
+  const commit = snap.commits.find((c) => c.id === tip)!;
+  const at = (await demo.screenOf(tip))!;
+  await page.mouse.move(at.x, at.y);
+  const card = page.locator(".stage-graph .peek");
+  await expect(card).toContainText(commit.summary);
+  await expect(card).toContainText(commit.id.slice(0, 7));
+  await expect(card.locator(".peek-files li").first()).toBeVisible();
+  // Its pull request rides along.
+  await expect(card).toContainText("#12");
+
+  // Moving off the star (or clicking it) puts the card away.
+  await page.mouse.move(at.x, at.y + 200);
+  await expect(card).toHaveCount(0);
+});

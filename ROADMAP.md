@@ -69,7 +69,7 @@
 - [ ] 릴리스 초안 ddugit v0.2.0 (M6 마일스톤, 이름 변경 반영). 그 전에 "CI · Rust"를 `all_os`로 수동 실행한다
 - [x] 자체 SVG 아이콘: 화면의 글자·이모지 아이콘(OS 글꼴마다 모양이 다름)을 한 세트(`icons.ts`, `components/Icon.tsx`)로 바꿨다. 그래프 라벨의 HEAD·원격·태그·PR·리뷰 표시는 같은 path를 Path2D로 그린다
 - [x] 커밋 내용이 첫눈에: 대각선 요약 라벨(38°, 60% 이상에서 표시). 평행이라 서로 겹치지 않고, 아래 레인의 별이나 그 요약에 닿기 전에 멈춘다. 라벨이 없는 커밋은 자리가 더 있으면 위쪽 하늘로. 선택·호버한 커밋은 가로 전체 요약
-- [ ] 커밋 미리보기 카드(마우스를 올려 두면 요약·본문 앞부분·바뀐 파일·+/−·PR)
+- [x] 커밋 미리보기 카드: 별에 0.35초 머물면 요약·본문 앞 3줄·ID·작성자·시각·PR·바뀐 파일 5개와 +/− 막대. 오른쪽 끝에서는 왼쪽으로 뒤집힘, 클릭·끌기·휠·떠나기에 닫힘
 - [ ] 브랜치 맵 90° 단위 회전(0/90/180/270, 사용자가 고정). 글자는 늘 바로 서게. 세로 목록 보기 대신 이것으로 한다
 - 하지 않기로 한 것: 커밋 종류 기호와 변경량 밝기(2026-10-02 사용자 결정)
 
@@ -169,3 +169,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-02 | PR #44 squash merge(`6103882`). 자체 SVG 아이콘: `icons.ts`(24×24 stroke path 표, `iconPath` Path2D 캐시), `Icon` 컴포넌트, 탑바·사이드바·시트 닫기·HUD·연결·검색·튜토리얼, 캔버스 라벨 아이콘(`drawIcon`), PR 리뷰 표시는 `RefInfo.review`로 옮김(e2e 26)                                                                                                                      |
 | 2026-10-02 | PR #45 squash merge(`93cc711`). 릴리스 준비: 버전 0.2.0(세 곳 + 잠금 파일). main에서 "CI · Rust" `all_os` 수동 실행(macOS·Windows에서 keyring·opener 첫 빌드 확인)                                                                                                                                                                                                              |
 | 2026-10-02 | PR #46 squash merge(`80b2a07`), Release workflow 수동 실행(v0.2.0 초안). 대각선 요약: `graph/captions.ts`(`captionLength`: 아래·위 방향, 별 충돌, 평행 요약 겹침, 위쪽은 왼쪽 위 커밋의 요약과 교차 방지, vitest 5), renderer `drawCaption`(어두운 테두리, 배지 아래에 그림), `ZOOM.captions` 0.6                                                                               |
+| 2026-10-02 | PR #47 squash merge(`f3e250b`). 미리보기 카드: GraphCanvas `onHover`(바뀔 때만, 누르기·휠·떠나기에 null), `components/Peek.tsx`(`bodyPreview` vitest 1, 파일은 `api.commitDiff` 캐시), RepoView `PEEK_DELAY_MS` 타이머(e2e 27)                                                                                                                                                  |
