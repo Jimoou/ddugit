@@ -367,6 +367,24 @@ export function RepoView({
     () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
     [snap, pulls, commitById],
   );
+  /**
+   * The backport sheet from the sidebar: into the current branch, from the
+   * branch most likely to have fixes it lacks (the original project first).
+   */
+  const openBackport = () => {
+    if (!snap) return;
+    const { branch, upstream } = snap.head;
+    const names = snap.refs
+      .filter((r) => (r.kind === "local" || r.kind === "remote") && !r.name.endsWith("/HEAD"))
+      .map((r) => r.name)
+      .filter((n) => n !== branch && n !== upstream);
+    const prefer = ["upstream/main", "upstream/master", "origin/main", "origin/master", "main", "master", "develop"];
+    const source = prefer.find((n) => names.includes(n)) ?? names[0];
+    if (!branch || !source) return toast("err", t("bp.needBranches"));
+    setDiff(null);
+    setRebaseFrom(null);
+    setBackport({ source, target: branch });
+  };
   const backportTargets = useMemo(
     () => (snap?.refs ?? []).filter((r) => r.kind === "local").map((r) => r.name),
     [snap],
@@ -1258,6 +1276,7 @@ export function RepoView({
           }}
           onCheckout={checkoutRef}
           onAddRemote={askRemote}
+          onBackport={openBackport}
           onCleanup={() => {
             setDiff(null);
             setBackport(null);

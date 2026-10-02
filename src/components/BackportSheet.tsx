@@ -28,6 +28,44 @@ interface Props {
   onClose(): void;
 }
 
+const GUIDE_KEY = "ddugit.backportGuide";
+const guideOpen = () => {
+  try {
+    return localStorage.getItem(GUIDE_KEY) !== "closed";
+  } catch {
+    return true;
+  }
+};
+
+/** How backporting goes, open until the user folds it (then a one-line "how to" stays). */
+function BackportGuide({ source, target }: { source: string; target: string }) {
+  const [open, setOpen] = useState(guideOpen);
+  const fold = (o: boolean) => {
+    setOpen(o);
+    try {
+      localStorage.setItem(GUIDE_KEY, o ? "open" : "closed");
+    } catch {
+      // storage unavailable: folded for this session only
+    }
+  };
+  return (
+    <div className={`bp-guide ${open ? "open" : ""}`}>
+      <button className="bp-guide-head" aria-expanded={open} onClick={() => fold(!open)}>
+        <Icon name={open ? "chevronDown" : "chevronRight"} size={12} /> {t("bp.guide.title")}
+      </button>
+      {open && (
+        <ol>
+          {(["bp.guide.1", "bp.guide.2", "bp.guide.3", "bp.guide.4"] as const).map((k) => (
+            <li key={k}>
+              <Rich k={k} vars={{ source, target }} />
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 const STATE: Record<BackportState["kind"], Key> = {
   missing: "bp.state.missing",
   applied: "bp.state.applied",
@@ -157,6 +195,7 @@ export function BackportSheet(p: Props) {
       </header>
 
       <div className="bp-body">
+        <BackportGuide source={source} target={target} />
         {error && <p className="note warn">{error}</p>}
         {view === "targets" ? (
           <Overview
