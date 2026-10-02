@@ -66,9 +66,6 @@ export default function App() {
   /** A folder is being dragged over the window. */
   const [dropping, setDropping] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  /** Bumped on every tab switch to replay the warp (adjusted while rendering). */
-  const [warp, setWarp] = useState({ n: 0, active: tabs.active });
-  if (warp.active !== tabs.active) setWarp({ n: warp.n + 1, active: tabs.active });
   const toastId = useRef(0);
   const page = PAGE_OVERRIDE ?? settings.historyPage;
   const current = activeTab(tabs);
@@ -264,8 +261,6 @@ export default function App() {
           )
         ),
       )}
-
-      {settings.animate && warp.n > 0 && <div key={warp.n} className="warp" aria-hidden />}
 
       {clone && (
         <CloneDialog

@@ -634,4 +634,5 @@ export const en: Record<Key, string> = {
   "voyage.openRepo": "Open my repository",
   "voyage.again": "Start over",
   "peek.more": "and {n} more files",
+  "peek.signal": "Incoming",
 };

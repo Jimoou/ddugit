@@ -52,6 +52,11 @@ export function PeekCard(p: {
   const left = p.at.x + 18 + WIDTH > p.width ? p.at.x - 18 - WIDTH : p.at.x + 18;
   return (
     <div className="peek" style={{ left: Math.max(8, left), top: Math.max(8, p.at.y - 24), width: WIDTH }} aria-hidden>
+      <div className="peek-signal">
+        <i className="beacon" /> {t("peek.signal")} · <code>{commit.id.slice(0, 7)}</code>
+        <span className="spacer" />
+        {fmtTime(commit.time, false)}
+      </div>
       <div className="peek-summary">{commit.summary}</div>
       {body.length > 0 && (
         <div className="peek-body">
@@ -61,7 +66,7 @@ export function PeekCard(p: {
         </div>
       )}
       <div className="peek-meta muted">
-        <code>{commit.id.slice(0, 7)}</code> · {commit.author} · {fmtTime(commit.time, false)}
+        {commit.author}
         {p.refs
           .filter((r) => r.kind === "pr")
           .map((r) => (

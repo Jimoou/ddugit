@@ -633,6 +633,7 @@ export const ko = {
   "voyage.openRepo": "내 저장소 열기",
   "voyage.again": "처음부터 다시",
   "peek.more": "외 파일 {n}개",
+  "peek.signal": "수신",
 } as const;
 
 export type Key = keyof typeof ko;
