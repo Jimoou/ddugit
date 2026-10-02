@@ -222,3 +222,13 @@ export function ancestors(commits: CommitInfo[], id: string): Set<string> {
   }
   return out;
 }
+
+const ancestorSets = new WeakMap<CommitInfo[], Map<string, Set<string>>>();
+/** `ancestors`, remembered per commit list (a new snapshot is a new list). */
+export function ancestorsOf(commits: CommitInfo[], id: string): Set<string> {
+  let byTip = ancestorSets.get(commits);
+  if (!byTip) ancestorSets.set(commits, (byTip = new Map()));
+  let set = byTip.get(id);
+  if (!set) byTip.set(id, (set = ancestors(commits, id)));
+  return set;
+}

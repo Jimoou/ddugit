@@ -41,6 +41,9 @@ export const ICONS = {
   sidebar: "M4 5h16v14H4zM9 5v14",
   branch: "M6 3v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 9c0 5-12 3-12 6",
   stash: "M4 8h16M6 8v11h12V8M8 4h8l2 4H6z",
+  cherry:
+    "M8 14a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM17 12a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zM8 14c1-5 4-8 9-10M17 12c-.5-3-1.5-5.5-3.5-7.5",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
 } as const;
 
 export type IconName = keyof typeof ICONS;
