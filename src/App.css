@@ -681,6 +681,15 @@ textarea:focus {
   border: 1px solid var(--amber);
   color: var(--amber);
 }
+/* Make a local branch from a remote-only one: shown on hover. */
+.sidebar li .to-local {
+  margin-left: auto;
+  opacity: 0;
+}
+.sidebar li:hover .to-local,
+.sidebar li .to-local:focus-visible {
+  opacity: 1;
+}
 /* A branch checked out in another worktree. */
 .sidebar .elsewhere {
   margin-left: auto;

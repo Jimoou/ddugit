@@ -7,15 +7,15 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- M10 기능 전부 merge: 은하 대시보드 #63, worktree #64, 서브모듈 #65, LFS #66. CI · Rust all_os 통과.
+- M10 끝: 은하 대시보드 #63, worktree #64, 서브모듈 #65, LFS #66, v0.4.0 #67 → `ddugit v0.4.0` 초안(서명 없음).
 
 ## 지금 하는 일
 
-v0.4.0 릴리스 PR(버전 올림) → merge → Actions에서 Release를 `release` 체크로 수동 실행 → `ddugit v0.4.0` 초안.
+사용자 피드백 수정: 로컬 브랜치 만들기 진입점 PR → CI 대기 후 merge.
 
 ## 다음 단계
 
-- 사용자가 할 일: v0.4.0(그리고 v0.3.0) 초안 확인 후 Publish, 남은 v0.2.0 초안 삭제
+- 사용자가 할 일: v0.4.0 초안 확인 후 Publish(v0.3.0 초안은 공개 또는 삭제), v0.2.0 초안 삭제
 - 사용자가 할 일: `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수(없으면 그 빌드는 라이선스 확인 불가, 잠금은 없음), Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
 - 데스크톱에서 SSH·worktree·서브모듈·LFS 실제 확인
 - 다음 마일스톤은 사용자와 정한다
@@ -40,6 +40,7 @@ v0.4.0 릴리스 PR(버전 올림) → merge → Actions에서 Release를 `relea
   - 긴 직선 이력 만들기: `window.__ddugitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
   - 회전한 채로 열기: `localStorage["ddugit.settings"] = '{"rotation":3}'`
   - 은하 대시보드: `localStorage["ddugit.recent"]`에 경로를 넣고 새로고침 → 새 탭. 데모의 각 경로는 경로 해시로 만든 상태, `gone`이 든 경로는 찾을 수 없음
+  - 데모에는 원격에만 있는 브랜치 `origin/feature/orbit-sync`가 있다
   - 데모에는 서브모듈 둘(하나는 초기화 안 됨)과 LFS(패턴 둘, 받지 않은 파일 셋)가 있다. worktree는 `api.worktree("demo", …)`로 추가
 - mock.ts를 고친 뒤에는 vite를 다시 띄운다. 그러지 않으면 `import("/src/mock.ts")`가 앱과 다른 모듈 인스턴스를 가져온다(HMR `?t=`)
 - 데모의 첫 Fetch는 `origin/main`과 현재 브랜치의 upstream에 동료 커밋을 하나씩 추가한다.

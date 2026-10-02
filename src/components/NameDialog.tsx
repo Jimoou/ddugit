@@ -5,8 +5,10 @@ export interface NameRequest {
   title: string;
   placeholder: string;
   confirmLabel: string;
-  /** Prefilled name (rename). */
+  /** Prefilled name (rename): submitting needs a different one. */
   initial?: string;
+  /** Prefilled suggestion that can be taken as it is. */
+  value?: string;
   /** A second field: a tag message (multiline, optional) or a remote URL (required). */
   extra?: { placeholder: string; multiline?: boolean; required?: boolean };
   onSubmit(name: string, extra: string): void;
@@ -15,7 +17,7 @@ export interface NameRequest {
 /** Asks for a ref-like name (spaces become dashes) and optionally a second value. */
 export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: boolean; onCancel(): void }) {
   const { title, placeholder, confirmLabel, initial = "", extra, onSubmit } = req;
-  const [name, setName] = useState(initial);
+  const [name, setName] = useState(req.value ?? initial);
   const [message, setMessage] = useState("");
   const ok = name.trim() !== "" && name.trim() !== initial && !busy && (!extra?.required || message.trim() !== "");
   return (

@@ -245,6 +245,11 @@ function seed(): MockRepo {
   r.remotes.set("origin/main", r.branches.get("main")!);
   r.remotes.set("origin/feature/theme", r.branches.get("feature/theme")!);
   r.remotes.set("origin/feature/graph-zoom", r.branches.get("feature/graph-zoom")!);
+  // A teammate's branch that exists only on the remote (no local branch yet).
+  r.branch("feature/orbit-sync", "main");
+  r.add("feature/orbit-sync", "Sync orbits across tabs");
+  r.remotes.set("origin/feature/orbit-sync", r.branches.get("feature/orbit-sync")!);
+  r.branches.delete("feature/orbit-sync");
   r.add("feature/graph-zoom", "Zoom to cursor");
   r.stashes.push({
     message: "On main: try warmer glow palette",
@@ -622,7 +627,8 @@ const mockTable: Table = {
         for (const r of [...repo.remotes.keys()]) if (r.startsWith(`${op.name}/`)) repo.remotes.delete(r);
         return delay(res("ok"));
       case "checkoutRemote": {
-        const local = op.remoteRef.replace(/^[^/]+\//, "");
+        const local = op.name ?? op.remoteRef.replace(/^[^/]+\//, "");
+        if (op.name && repo.branches.has(op.name)) return fail(`Branch '${op.name}' already exists`);
         if (!repo.branches.has(local)) repo.branches.set(local, repo.remotes.get(op.remoteRef)!);
         repo.head = local;
         return delay(res("ok"));

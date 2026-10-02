@@ -28,8 +28,12 @@ pub enum RefOp {
         name: String,
     },
     /// `origin/feature` → local `feature` tracking it (or switch to it if it exists).
+    /// With `name`, a new local branch of that name instead (when `feature` is
+    /// already taken by another line of work, e.g. `upstream/main` next to `main`).
     CheckoutRemote {
         remote_ref: String,
+        #[serde(default)]
+        name: Option<String>,
     },
     /// Another repository to fetch from, e.g. the original project in a customer fork.
     AddRemote {
@@ -49,7 +53,9 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
             vec![name]
         }
         RefOp::CreateTag { name, at, .. } => vec![name, at],
-        RefOp::CheckoutRemote { remote_ref } => vec![remote_ref],
+        RefOp::CheckoutRemote { remote_ref, name } => {
+            [Some(remote_ref), name.as_ref()].into_iter().flatten().collect()
+        }
         RefOp::AddRemote { name, url } => vec![name, url],
     };
     for n in names {
@@ -80,7 +86,25 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
             ]
         }
         RefOp::DeleteTag { name } => vec!["tag".into(), "-d".into(), name.clone()],
-        RefOp::CheckoutRemote { remote_ref } => {
+        RefOp::CheckoutRemote {
+            remote_ref,
+            name: Some(name),
+        } => {
+            if repo.find_branch(name.trim(), BranchType::Local).is_ok() {
+                return Err(format!("Branch '{}' already exists", name.trim()));
+            }
+            vec![
+                "checkout".into(),
+                "-b".into(),
+                name.trim().into(),
+                "--track".into(),
+                remote_ref.clone(),
+            ]
+        }
+        RefOp::CheckoutRemote {
+            remote_ref,
+            name: None,
+        } => {
             let local = remote_ref.split_once('/').map(|(_, b)| b).unwrap_or(remote_ref);
             if repo.find_branch(local, BranchType::Local).is_ok() {
                 vec!["checkout".into(), local.into()]
@@ -200,6 +224,7 @@ mod tests {
         let pb = s(b.path());
         let op = RefOp::CheckoutRemote {
             remote_ref: "origin/topic".into(),
+            name: None,
         };
         let r = apply(pb, &op).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
@@ -210,6 +235,19 @@ mod tests {
         checkout(pb, "main").unwrap();
         assert_eq!(apply(pb, &op).unwrap().status, OpStatus::Ok); // existing local reused
         assert_eq!(snapshot(pb, 1).unwrap().head.branch.as_deref(), Some("topic"));
+
+        // `main` is taken: the remote's main as a branch of another name, tracking it.
+        let named = |name: &str| RefOp::CheckoutRemote {
+            remote_ref: "origin/main".into(),
+            name: Some(name.into()),
+        };
+        let r = apply(pb, &named("origin-main")).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let h = snapshot(pb, 1).unwrap().head;
+        assert_eq!(h.branch.as_deref(), Some("origin-main"));
+        assert_eq!(h.upstream.as_deref(), Some("origin/main"));
+        assert!(apply(pb, &named("main")).is_err(), "an existing name is refused");
+        assert!(apply(pb, &named("-f")).is_err());
     }
 
     #[test]
@@ -218,7 +256,8 @@ mod tests {
         assert_eq!(
             op,
             RefOp::CheckoutRemote {
-                remote_ref: "origin/x".into()
+                remote_ref: "origin/x".into(),
+                name: None
             }
         );
         let op: RefOp = serde_json::from_str(r#"{"kind":"deleteBranch","name":"x","force":true}"#).unwrap();

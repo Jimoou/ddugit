@@ -252,4 +252,15 @@ mod tests {
         assert_eq!(snap.commits.len(), 2);
         assert!(snap.changes.is_empty());
     }
+
+    #[test]
+    fn a_new_branch_in_an_empty_repository_becomes_its_first_branch() {
+        let d = repo();
+        let p = s(d.path());
+        let r = create_branch(p, "trunk", None, true).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        commit_file(d.path(), "a.txt", "a", "first");
+        let snap = snapshot(p, 5).unwrap();
+        assert_eq!(snap.head.branch.as_deref(), Some("trunk"));
+    }
 }

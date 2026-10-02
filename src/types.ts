@@ -204,7 +204,8 @@ export type RefOp =
   | { kind: "deleteBranch"; name: string; force: boolean }
   | { kind: "createTag"; name: string; at: string; message: string }
   | { kind: "deleteTag"; name: string }
-  | { kind: "checkoutRemote"; remoteRef: string }
+  /** `name`: a local branch of another name (when the remote branch's own name is taken). */
+  | { kind: "checkoutRemote"; remoteRef: string; name?: string }
   | { kind: "addRemote"; name: string; url: string }
   | { kind: "removeRemote"; name: string };
 
