@@ -24,6 +24,10 @@ import type {
   RepoSnapshot,
   Resolution,
   StashOp,
+  HostKey,
+  SshKey,
+  SshStatus,
+  SshTest,
 } from "./types";
 import { t } from "./i18n";
 
@@ -66,6 +70,11 @@ export interface Commands {
   git_bisect: [{ path: string; op: BisectOp }, OpResult];
   bisect_state: [{ path: string }, BisectState | null];
   pull_requests: [{ path: string; trusted: string[] }, PrReport];
+  ssh_status: [Record<string, never>, SshStatus];
+  ssh_keygen: [{ comment: string }, SshKey];
+  ssh_host_key: [{ url: string }, HostKey];
+  ssh_trust_host: [{ url: string; fingerprints: string[] }, null];
+  ssh_test: [{ url: string }, SshTest];
   // `path` only routes the demo; the backend keys tokens by host.
   set_forge_token: [{ path: string; host: string; token: string | null }, null];
   open_url: [{ path: string; url: string }, null];
@@ -152,6 +161,12 @@ export const api = {
   /** Open pull / merge requests on the repository's forge remotes (GitHub, GitLab). */
   /** `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used. */
   pullRequests: (path: string, trusted: string[]) => call("pull_requests", { path, trusted }),
+  sshStatus: () => call("ssh_status", {}),
+  sshKeygen: (comment: string) => call("ssh_keygen", { comment }),
+  sshHostKey: (url: string) => call("ssh_host_key", { url }),
+  /** Trust the server only if it still presents exactly `fingerprints` (what the user saw). */
+  sshTrustHost: (url: string, fingerprints: string[]) => call("ssh_trust_host", { url, fingerprints }),
+  sshTest: (url: string) => call("ssh_test", { url }),
   /** Keep a forge token in the keychain (`null` forgets it). */
   setForgeToken: (path: string, host: string, token: string | null) => call("set_forge_token", { path, host, token }),
   openUrl: (path: string, url: string) => call("open_url", { path, url }),

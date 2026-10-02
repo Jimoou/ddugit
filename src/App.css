@@ -3260,3 +3260,84 @@ button.demo-pill {
   line-height: 1.6;
   color: var(--text-2);
 }
+
+/* ------------------------------------------------ SSH, set up in the app */
+.url-head {
+  align-items: center;
+}
+.proto {
+  display: inline-flex;
+}
+.proto button {
+  padding: 2px 8px;
+  font: 600 10.5px var(--mono);
+  letter-spacing: 0.06em;
+}
+.proto button.on {
+  border-color: rgba(var(--signal), 0.6);
+  color: rgb(var(--signal));
+  background-color: rgba(var(--signal), 0.08);
+}
+.ssh-ready summary {
+  cursor: pointer;
+  color: rgb(var(--signal));
+  font: 600 11px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ssh-setup ol {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ssh-setup li {
+  counter-increment: step;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-left: 26px;
+  position: relative;
+}
+.ssh-setup li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  font: 600 10px var(--mono);
+  color: var(--muted);
+}
+.ssh-setup li.done::before {
+  content: "✓";
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.ssh-setup li.later {
+  opacity: 0.55;
+}
+.ssh-setup .what {
+  flex-basis: 100%;
+}
+.ssh-setup .host-key {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.ssh-setup .host-key code {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.ssh-setup .ok {
+  color: var(--ok);
+  font-size: 12px;
+}
