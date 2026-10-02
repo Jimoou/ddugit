@@ -18,12 +18,12 @@ type Toast = { id: number; kind: "ok" | "err"; text: string };
 /** `?page=N` overrides the history page size for demos and e2e. */
 const PAGE_OVERRIDE = Number(new URLSearchParams(window.location.search).get("page")) || null;
 
-const TABS = "otgit.tabs";
+const TABS = "ddugit.tabs";
 /** Before tabs, only the last repository was remembered. */
-const LAST_REPO = "otgit.lastRepo";
-const SETTINGS = "otgit.settings";
+const LAST_REPO = "ddugit.lastRepo";
+const SETTINGS = "ddugit.settings";
 /** Before the settings screen, only this one flag was stored. */
-const LEGACY_ANIMATE = "otgit.animate";
+const LEGACY_ANIMATE = "ddugit.animate";
 
 function store(key: string, value?: string): string | null {
   try {
@@ -247,7 +247,7 @@ export default function App() {
         ) : (
           tab.id === tabs.active && (
             <div key={tab.id} className="welcome">
-              <h1 className="wordmark">otgit</h1>
+              <h1 className="wordmark">ddugit</h1>
               <p>{t("app.tagline")}</p>
               <ConnectActions primary {...connect} />
               <section className="welcome-recent">

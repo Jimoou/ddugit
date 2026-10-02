@@ -1,0 +1,62 @@
+name: CI · Web
+
+# Pull requests only: main gets the same commit squash-merged, so it isn't
+# checked twice. Runs only when the frontend (or its tooling) changes.
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "e2e/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "*.config.*"
+      - "tsconfig*.json"
+      - ".prettier*"
+      - ".github/workflows/ci-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web (typecheck · lint · format · test · build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: E2E (Playwright · demo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # A stalled apt mirror can hang this for hours; fail fast and re-run instead.
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
+      - run: npm run e2e
+        timeout-minutes: 15
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results
+          retention-days: 7

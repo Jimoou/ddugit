@@ -1,0 +1,58 @@
+name: CI · Rust
+
+# Pull requests that touch the backend run on Linux only (fmt, clippy, tests).
+# macOS and Windows runners bill at 10x / 2x, so those builds run by hand
+# (Run workflow) before a release, and the release workflow builds both anyway.
+on:
+  pull_request:
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/ci-rust.yml"
+  workflow_dispatch:
+    inputs:
+      all_os:
+        description: "Also build and test on macOS and Windows"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.all_os && '["ubuntu-22.04","macos-latest","windows-latest"]' || '["ubuntu-22.04"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux deps
+        if: runner.os == 'Linux'
+        # A stalled apt mirror can hang this for hours; fail fast and re-run instead.
+        timeout-minutes: 8
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # tauri::generate_context! requires frontendDist to exist.
+      - run: mkdir -p dist
+      - if: runner.os == 'Linux'
+        run: cargo fmt --check
+        working-directory: src-tauri
+      - if: runner.os == 'Linux'
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: src-tauri
+      - run: cargo test
+        working-directory: src-tauri

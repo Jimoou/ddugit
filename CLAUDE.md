@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-otgit(옷깃): 그래프 중심의 크로스플랫폼(macOS / Windows) Git 클라이언트. Tauri 2(Rust) + React/TS + Canvas.
+ddugit: 그래프 중심의 크로스플랫폼(macOS / Windows) Git 클라이언트. Tauri 2(Rust) + React/TS + Canvas.
 
 ## 세션 시작 / 컨텍스트 압축 후 할 일
 
@@ -58,7 +58,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src/settings.ts`: 사용자 설정(localStorage, 파싱은 순수 함수)과 단축키 표. 단축키를 바꾸면 `SHORTCUTS`도 고친다.
 - `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`
 - `src/components/`: 패널과 다이얼로그
-- `e2e/`: Playwright e2e (`*.e2e.ts`). 데모 모드를 대상으로 돌리고, `fixtures.ts`의 `demo`로 데모 상태를 읽거나 바꾼다(`window.__otgitDemo`). 페이지 오류가 하나라도 나면 실패한다
+- `e2e/`: Playwright e2e (`*.e2e.ts`). 데모 모드를 대상으로 돌리고, `fixtures.ts`의 `demo`로 데모 상태를 읽거나 바꾼다(`window.__ddugitDemo`). 페이지 오류가 하나라도 나면 실패한다
 - `src/App.tsx`: 창(탭 셸). 탭(`tabs.ts`, 순수 함수), 설정, 저장소 연결(clone·init·끌어다 놓기), 알림. 탭마다 `RepoView`를 띄워 두고 안 보이는 탭은 `hidden`으로 숨긴다(상태 유지). 단축키 중 창 전체 것(탭, `?`)은 여기서 처리한다
 - `src/RepoView.tsx`: 저장소 하나의 화면 조립과 git 작업 흐름. 모든 작업은 `run()`을 거친다. 보이는 탭(`active`)만 키 입력·파일 감시·탑바를 갖는다
 
@@ -75,7 +75,10 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - type: `feat` `fix` `refactor` `perf` `test` `docs` `chore` `ci` `style`
   - scope 예: `graph` `git` `ui` `diff` `remote` `mock` `ci`
   - 예: `feat(remote): add fetch/pull/push with ahead/behind badges`
-- PR: `.github/pull_request_template.md`를 채운다. CI(web + e2e + rust × ubuntu/macos/windows)가 통과해야 merge한다. merge는 squash로 한다.
+- PR: `.github/pull_request_template.md`를 채운다. CI가 통과해야 merge한다. merge는 squash로 한다.
+  - CI는 **PR에서만, 바뀐 쪽만** 돈다. `ci-web.yml`(web + e2e)은 `src/`·`e2e/`·설정이 바뀔 때 돌고, `ci-rust.yml`(ubuntu: fmt·clippy·test)은 `src-tauri/`가 바뀔 때 돈다. 문서만 바꾸면 아무것도 돌지 않는다. main push에서는 다시 돌지 않는다(같은 커밋이 squash로 들어가기 때문)
+  - macOS·Windows Rust 빌드는 비싸다(분당 10배·2배). 릴리스 전에 Actions에서 "CI · Rust"를 수동 실행(`all_os`)한다
+  - push는 로컬 검사를 모두 통과시킨 뒤 PR당 가능한 한 한 번만 한다. CI가 10분 넘게 멈추면 취소하고 한 번 다시 돌린다
 - 릴리스: `main`에 `vX.Y.Z` 태그(SemVer)를 push한다. 0.x 동안은 minor = 마일스톤. 태그를 push하면 `.github/workflows/release.yml`이 macOS universal `.dmg`와 Windows NSIS `.exe`를 만들어 **초안** Release에 올린다. 내용을 확인한 뒤 공개한다. 태그를 push할 수 없으면(예: 세션 브랜치만 push되는 환경) Actions에서 Release를 `release` 체크하고 수동 실행한다. 그러면 `v<버전>` 초안이 만들어지고, 공개할 때 GitHub가 태그를 만든다. 배포 형식은 dmg/exe만 쓴다(`bundle.targets`). 서명과 자동 업데이트는 나중에 한다. 버전은 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` 세 곳을 함께 올린다
 - push 전에 반드시 `npm run check`와 `cargo fmt --check && cargo clippy && cargo test`를 통과시킨다. UI 흐름을 바꿨으면 `npm run e2e`도 돌린다.
 

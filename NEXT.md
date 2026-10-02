@@ -7,21 +7,27 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #39(그래프 작업 연출: 중력장, 병합 융합, cherry-pick 혜성, rebase 별자리)를 squash merge했다(`10ce8c6`).
+- PR #40(충돌 붉은 성운)을 squash merge했다(`5c118dc`). M6가 끝났다.
+- 사용자 결정(2026-10-02)
+  - PR 연동 토큰은 gh/glab 먼저, 없으면 키체인. M4 PR 연동부터 한다
+  - **이름을 otgit에서 ddugit으로 바꾼다**(저장소도 `Jimoou/ddugit`). 저장소는 public으로 바꿨다
+  - CI 절감 1·2·3을 적용한다
 
 ## 지금 하는 일
 
-게임 같은 연출 3단계(마지막) "충돌" → PR CI 대기
+이름 변경 + CI 절감 → PR CI 대기
 
-- `Fx.tsx`의 `Nebula`: 항상 마운트되어 있다(`.fx-clip` 안). 충돌 파일이 있으면 `.on`이 붙어 붉은 성운이 천천히 흐른다(14초 주기). 마지막 파일을 해결하면 `.on`이 빠지면서 transition으로 커지고 흐려지며 흩어진다
-- 반짝임을 끄면(`still`) 움직임 없이 색만 남긴다
-- e2e: 충돌 테스트에서 성운이 끼고, 두 번째 파일을 "파일 전체"로 해결하면 걷히는 것을 확인한다
+- 이름: 화면, 크레이트(`ddugit`, `ddugit_lib`), 패키지, `tauri.conf`(productName, identifier `com.ddugit.app`), 창 전역(`__ddugit`, `__ddugitDemo`), localStorage 키(`ddugit.*`), 데모(`ddugit-demo`), 문서
+  - identifier가 바뀌어 앱 데이터 폴더가 달라진다. 0.1.0 빌드의 설정·최근 목록은 넘어오지 않는다(배포 전이라 이전하지 않았다)
+  - 백포트 제외 config는 사용자 저장소에 남는 데이터다. 그래서 `ddugit.<target>.backportIgnored`에 쓰고, 예전 `otgit.<target>.backportIgnored`와 `otgit.backportIgnored`도 계속 읽고 지운다(테스트 추가)
+  - git remote를 `https://github.com/Jimoou/ddugit`으로 바꿨다
+- CI: `ci.yml`을 `ci-web.yml`과 `ci-rust.yml`로 나눴다. PR에서만 돌고, 경로 필터를 건다. Rust는 ubuntu만 돌고 macOS·Windows는 수동 `all_os`로 돌린다. 작업 단위마다 timeout을 둔다
 
 ## 다음 단계
 
-1. M6가 끝난다. 다음은 M4 PR 연동(그래프에 PR 상태 표시). **토큰 방식 결정이 필요하다:** `gh auth token` 재사용 vs 키체인 저장. 사용자에게 묻는다
-2. 제안 중: 첫 실행 튜토리얼(미션). 사용자 답을 기다린다
-3. 사용자가 v0.1.0 초안 Release를 Publish해야 태그가 생긴다. M6가 끝났으니 v0.2.0 초안도 제안할 수 있다
+1. M4 PR 연동: 코드는 `m4-pr` 로컬 브랜치(`acc1f8e`, origin 세션 브랜치에도 한때 push했다)에 있다. 이름 변경 뒤에 cherry-pick하고 `otgit` 문자열(키체인 서비스, User-Agent, 토큰 설명, 데모 URL, 테스트)을 ddugit으로 바꿔 PR을 연다
+2. 제안 중: 첫 실행 튜토리얼(미션)
+3. 사용자가 v0.1.0 초안 Release를 Publish해야 태그가 생긴다(이름이 바뀌었으니 다음 릴리스는 ddugit 이름으로 나간다)
 
 ## 막힌 것 / 결정 필요
 
@@ -37,10 +43,10 @@ _마지막 갱신: 2026-10-01_
 
 - 작업 브랜치: `claude/sync-common-errors-both-projects-dyt6jg`
 - 데모: `npm run dev`
-  - e2e 좌표: `window.__otgit.screenOf(id)`
+  - e2e 좌표: `window.__ddugit.screenOf(id)`
   - 데모 상태: `import("/src/mock.ts")`
-  - 인증 실패 재현: `window.__otgitDemo.failNextRemote = "https" | "ssh"`
-  - 긴 직선 이력 만들기: `window.__otgitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
+  - 인증 실패 재현: `window.__ddugitDemo.failNextRemote = "https" | "ssh"`
+  - 긴 직선 이력 만들기: `window.__ddugitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
 - mock.ts를 고친 뒤에는 vite를 다시 띄운다. 그러지 않으면 `import("/src/mock.ts")`가 앱과 다른 모듈 인스턴스를 가져온다(HMR `?t=`)
 - 데모의 첫 Fetch는 `origin/main`과 현재 브랜치의 upstream에 동료 커밋을 하나씩 추가한다.
 - 실제 앱을 Linux에서 확인하는 법: Xvfb로 띄우고 `xdotool`로 클릭, `import -window root`로 스크린샷.

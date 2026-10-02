@@ -57,7 +57,7 @@ pub fn edit_commit(path: &str, id: &str, edit: &CommitEdit) -> Result<OpResult> 
     }
 
     // Scratch files live in .git so they never show up as changes.
-    let scratch = repo.path().join("otgit-edit");
+    let scratch = repo.path().join("ddugit-edit");
     std::fs::create_dir_all(&scratch).map_err(err)?;
     let file = |name: &str, body: &str| -> Result<String> {
         let p = scratch.join(name);

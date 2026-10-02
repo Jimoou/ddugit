@@ -1,4 +1,4 @@
-# otgit (옷깃)
+# ddugit
 
 그래프로 보고, 그래프로 다루는 Git 클라이언트. macOS · Windows (Linux도 빌드 가능).
 
@@ -17,10 +17,10 @@
 
 ## 설치
 
-[Releases](https://github.com/Jimoou/otgit/releases)에서 받습니다.
+[Releases](https://github.com/Jimoou/ddugit/releases)에서 받습니다.
 
-- **macOS**: `otgit_<버전>_universal.dmg` (Apple silicon과 Intel 모두 지원). 열어서 otgit을 응용 프로그램으로 끌어 놓습니다.
-- **Windows**: `otgit_<버전>_x64-setup.exe`. 관리자 권한 없이 사용자 계정에 설치합니다.
+- **macOS**: `ddugit_<버전>_universal.dmg` (Apple silicon과 Intel 모두 지원). 열어서 ddugit을 응용 프로그램으로 끌어 놓습니다.
+- **Windows**: `ddugit_<버전>_x64-setup.exe`. 관리자 권한 없이 사용자 계정에 설치합니다.
 
 아직 코드 서명을 하지 않았습니다. 처음 실행할 때 macOS에서는 앱을 우클릭 → **열기**, Windows에서는 SmartScreen에서 **추가 정보 → 실행**을 누릅니다.
 

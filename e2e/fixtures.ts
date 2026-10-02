@@ -2,8 +2,8 @@ import { test as base, expect, type Page } from "@playwright/test";
 import type { RepoSnapshot } from "../src/types";
 
 interface DemoWindow {
-  __otgit: { screenOf(id: string): { x: number; y: number } | null };
-  __otgitDemo: {
+  __ddugit: { screenOf(id: string): { x: number; y: number } | null };
+  __ddugitDemo: {
     conflictNext: boolean;
     snapshot(): RepoSnapshot;
     grow(n: number): void;
@@ -17,7 +17,7 @@ export const test = base.extend<{ demo: Demo }>({
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
     await page.goto("/");
-    await expect(page.locator(".topbar")).toContainText("otgit-demo");
+    await expect(page.locator(".topbar")).toContainText("ddugit-demo");
     await use(new Demo(page));
     expect(errors).toEqual([]);
   },
@@ -28,17 +28,17 @@ export class Demo {
   constructor(readonly page: Page) {}
 
   snapshot(): Promise<RepoSnapshot> {
-    return this.page.evaluate(() => (window as unknown as DemoWindow).__otgitDemo.snapshot());
+    return this.page.evaluate(() => (window as unknown as DemoWindow).__ddugitDemo.snapshot());
   }
 
   /** Change demo state outside the UI, then refresh like returning to the window. */
-  async mutate(fn: (demo: DemoWindow["__otgitDemo"]) => void) {
-    await this.page.evaluate(`(${fn.toString()})(window.__otgitDemo)`);
+  async mutate(fn: (demo: DemoWindow["__ddugitDemo"]) => void) {
+    await this.page.evaluate(`(${fn.toString()})(window.__ddugitDemo)`);
     await this.page.evaluate(() => window.dispatchEvent(new Event("focus")));
   }
 
   private rawScreenOf(id: string) {
-    return this.page.evaluate((id) => (window as unknown as DemoWindow).__otgit.screenOf(id), id);
+    return this.page.evaluate((id) => (window as unknown as DemoWindow).__ddugit.screenOf(id), id);
   }
 
   /** Screen position of a commit once the camera has stopped moving (it eases after loads). */

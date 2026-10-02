@@ -19,10 +19,19 @@ use super::{git, git_ok, repo_dir, OpResult, Result};
 const MAX_ITEMS: usize = 1000;
 /// Before ignores were per target they had one repository-wide key; it still applies everywhere.
 const LEGACY_IGNORE_KEY: &str = "otgit.backportIgnored";
-/// `otgit.<target>.backportIgnored`: git splits keys at the first and last dot,
+/// `ddugit.<target>.backportIgnored`: git splits keys at the first and last dot,
 /// so a branch name with `/` or `.` is a valid subsection.
 fn ignore_key(target: &str) -> String {
-    format!("otgit.{target}.backportIgnored")
+    format!("ddugit.{target}.backportIgnored")
+}
+/// Every key an ignore for `target` may live under: the current one, the same
+/// key from before the app was renamed (otgit → ddugit), and the old repository-wide one.
+fn ignore_keys(target: &str) -> [String; 3] {
+    [
+        ignore_key(target),
+        format!("otgit.{target}.backportIgnored"),
+        LEGACY_IGNORE_KEY.to_string(),
+    ]
 }
 const TRAILER: &str = "(cherry picked from commit ";
 
@@ -125,7 +134,7 @@ fn picked_in(dir: &Path, range: &str) -> Result<HashMap<String, String>> {
 
 fn ignored(dir: &Path, target: &str) -> Result<HashSet<String>> {
     let mut out = HashSet::new();
-    for key in [ignore_key(target), LEGACY_IGNORE_KEY.to_string()] {
+    for key in ignore_keys(target) {
         // Exit code 1 just means the key is not set.
         let o = git(dir, &["config", "--local", "--get-all", &key])?;
         if o.ok {
@@ -143,9 +152,9 @@ pub fn set_ignored(path: &str, target: &str, id: &str, ignore: bool) -> Result<(
         git_ok(&dir, &["config", "--local", "--add", &key, id])?;
     } else if !ignore {
         let pattern = format!("^{id}$");
-        // Unset from both keys; a missing value is not an error here.
-        for k in [key.as_str(), LEGACY_IGNORE_KEY] {
-            let _ = git(&dir, &["config", "--local", "--unset-all", k, &pattern])?;
+        // Unset from every key; a missing value is not an error here.
+        for k in ignore_keys(target) {
+            let _ = git(&dir, &["config", "--local", "--unset-all", &k, &pattern])?;
         }
     }
     Ok(())
@@ -324,6 +333,28 @@ mod tests {
         git_ok(
             d.path(),
             &["config", "--local", "--add", LEGACY_IGNORE_KEY, &fix3],
+        )
+        .unwrap();
+        assert_eq!(
+            compare(p, "main", "acme/main").unwrap()[0].state,
+            BackportState::Ignored
+        );
+        set_ignored(p, "acme/main", &fix3, false).unwrap();
+        assert_eq!(
+            compare(p, "main", "acme/main").unwrap()[0].state,
+            BackportState::Missing
+        );
+
+        // So does a per-target key saved before the rename (otgit → ddugit).
+        git_ok(
+            d.path(),
+            &[
+                "config",
+                "--local",
+                "--add",
+                "otgit.acme/main.backportIgnored",
+                &fix3,
+            ],
         )
         .unwrap();
         assert_eq!(
