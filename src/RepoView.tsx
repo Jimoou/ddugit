@@ -26,7 +26,7 @@ import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
-import { ancestors, computeLayout } from "./graph/layout";
+import { ancestors, ancestorsOf, computeLayout } from "./graph/layout";
 import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
@@ -472,19 +472,7 @@ export function RepoView({
     [snap],
   );
 
-  const ancestorCache = useRef(new Map<string, Set<string>>());
-  useEffect(() => {
-    ancestorCache.current.clear();
-  }, [snap]);
-  const isAncestor = (anc: string, of: string | null) => {
-    if (!snap || !of) return false;
-    let set = ancestorCache.current.get(of);
-    if (!set) {
-      set = ancestors(snap.commits, of);
-      ancestorCache.current.set(of, set);
-    }
-    return set.has(anc);
-  };
+  const isAncestor = (anc: string, of: string | null) => !!snap && !!of && ancestorsOf(snap.commits, of).has(anc);
   const canDropOn = useCallback(
     (target: string, source: string, mode: Drag["mode"]) => {
       if (!snap || snap.state !== "clean") return false;
@@ -965,21 +953,24 @@ export function RepoView({
       parentOf.length <= 1 &&
       (isHead || !parentOf.length || typeof rebaseRange(commitById, head!, parentOf[0]) !== "string");
     return [
-      { label: t("menu.branchHere"), onSelect: () => askBranchAt(id) },
-      { label: t("menu.tagHere"), onSelect: () => askTagAt(id) },
+      { label: t("menu.branchHere"), icon: "branch", onSelect: () => askBranchAt(id) },
+      { label: t("menu.tagHere"), icon: "tag", onSelect: () => askTagAt(id) },
       ...locals.map((r) => ({
         label: t("menu.checkoutName", { name: r.name }),
+        icon: "head" as const,
         onSelect: () => void run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name)),
       })),
       "separator" as const,
       {
         label: snap.head.branch ? t("menu.pickInto", { branch: snap.head.branch }) : t("menu.pickIntoHead"),
         hint: t("menu.pick.hint"),
+        icon: "cherry",
         disabled: !clean || onHead || !snap.head.branch,
         onSelect: () => confirmPick(id, snap.head.branch!),
       },
       {
         label: t("menu.revert"),
+        icon: "undo",
         disabled: !clean || !onHead,
         onSelect: () =>
           setConfirm({
@@ -998,6 +989,7 @@ export function RepoView({
       },
       {
         label: t("menu.amend"),
+        icon: "edit",
         disabled: !isHead || !clean,
         onSelect: () => show({ composer: true, amend: true }),
       },
@@ -1013,6 +1005,7 @@ export function RepoView({
       },
       {
         label: t("undo.toHere"),
+        icon: "history",
         disabled: !clean || !onHead || isHead,
         onSelect: () => askReset(id),
       },
@@ -1691,11 +1684,15 @@ export function RepoView({
         {!composer && selectedCommit && (
           <Inspector
             commit={selectedCommit}
-            refs={snap.refs.filter((r) => r.target === selectedCommit.id)}
+            refs={graphRefs.filter((r) => r.target === selectedCommit.id)}
+            containedIn={snap.refs.filter(
+              (r) => (r.kind === "local" || r.kind === "remote") && isAncestor(selectedCommit.id, r.target),
+            )}
             files={panelFiles}
             color={colorOf(selectedCommit.id)}
             isHead={selectedCommit.id === snap.head.target}
-            busy={busy}
+            actions={nodeMenu(selectedCommit.id)}
+            onMore={(x, y) => setMenu({ x, y, title: selectedCommit.summary, items: nodeMenu(selectedCommit.id) })}
             onClose={() => setSelected(null)}
             onSelect={(id) => {
               setSelected(id);
@@ -1705,10 +1702,6 @@ export function RepoView({
               loadDiff({ kind: "commit", id: selectedCommit.id }, selectedCommit.summary || selectedCommit.id, file)
             }
             onFileMenu={(file, x, y) => fileMenu(selectedCommit, file, x, y)}
-            onCheckout={(name) => run(t("checkout.done", { name }), () => api.checkout(path, name))}
-            onCreateBranch={(name, at) =>
-              run(t("branch.new.done", { name }), () => api.createBranch(path, name, at, true))
-            }
           />
         )}
         {stashSel && !composer && (

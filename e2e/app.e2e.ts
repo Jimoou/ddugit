@@ -559,7 +559,7 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
   const now = await demo.snapshot();
   const tip = (await demo.screenOf(now.head.target!))!;
   await page.mouse.click(tip.x, tip.y);
-  const file = page.locator(".inspector .changed li").first();
+  const file = page.locator(".inspector .changed li:not(.dir)").first();
   await file.click({ button: "right" });
   await page.click(".context-menu >> text=이 커밋 이전 상태로");
   await expect(page.locator(".toast").filter({ hasText: "되돌렸어요" })).toBeVisible();
@@ -611,7 +611,7 @@ test("traces a file through history and shows who changed each line", async ({ d
   const snap = await demo.snapshot();
   const tip = (await demo.screenOf(snap.head.target!))!;
   await page.mouse.click(tip.x, tip.y);
-  const file = page.locator(".inspector .changed li").first();
+  const file = page.locator(".inspector .changed li:not(.dir)").first();
   await file.click({ button: "right" });
   await page.click(".context-menu >> text=이 파일이 지나온 커밋 보기");
 

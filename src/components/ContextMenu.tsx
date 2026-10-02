@@ -1,7 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { IconName } from "../icons";
+import { Icon } from "./Icon";
 
+/** A menu entry; one with an `icon` also shows in toolbars built from the same menu (the commit panel's). */
 export type MenuItem =
-  { label: string; hint?: string; danger?: boolean; disabled?: boolean; onSelect(): void } | "separator";
+  | { label: string; hint?: string; icon?: IconName; danger?: boolean; disabled?: boolean; onSelect(): void }
+  | "separator";
 
 interface Props {
   x: number;
@@ -60,7 +64,10 @@ export function ContextMenu({ x, y, title, items, onClose }: Props) {
               it.onSelect();
             }}
           >
-            <span>{it.label}</span>
+            <span className="menu-label">
+              {it.icon && <Icon name={it.icon} size={13} />}
+              {it.label}
+            </span>
             {it.hint && <kbd>{it.hint}</kbd>}
           </button>
         ),
