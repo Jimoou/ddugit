@@ -3341,3 +3341,8 @@ button.demo-pill {
   color: var(--ok);
   font-size: 12px;
 }
+.dialog.settings .license-text {
+  font: 11px var(--mono);
+  resize: vertical;
+  margin-bottom: 6px;
+}

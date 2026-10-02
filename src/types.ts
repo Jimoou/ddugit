@@ -304,3 +304,19 @@ export interface SshTest {
   user: string | null;
   output: string;
 }
+
+/** Mirrors `license.rs`. */
+export interface LicenseInfo {
+  id: string;
+  name: string;
+  email: string;
+  kind: "commercial" | "site" | string;
+  seats: number;
+  issued: string;
+  updatesUntil: string;
+}
+export interface LicenseStatus {
+  license: LicenseInfo | null;
+  newerThanLicense: boolean;
+  checkable: boolean;
+}

@@ -28,6 +28,7 @@ import type {
   SshKey,
   SshStatus,
   SshTest,
+  LicenseStatus,
 } from "./types";
 import { t } from "./i18n";
 
@@ -71,6 +72,9 @@ export interface Commands {
   bisect_state: [{ path: string }, BisectState | null];
   pull_requests: [{ path: string; trusted: string[] }, PrReport];
   ssh_status: [Record<string, never>, SshStatus];
+  license_status: [Record<string, never>, LicenseStatus];
+  license_install: [{ text: string }, LicenseStatus];
+  license_remove: [Record<string, never>, LicenseStatus];
   ssh_keygen: [{ comment: string }, SshKey];
   ssh_host_key: [{ url: string }, HostKey];
   ssh_trust_host: [{ url: string; fingerprints: string[] }, null];
@@ -162,6 +166,9 @@ export const api = {
   /** `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used. */
   pullRequests: (path: string, trusted: string[]) => call("pull_requests", { path, trusted }),
   sshStatus: () => call("ssh_status", {}),
+  licenseStatus: () => call("license_status", {}),
+  licenseInstall: (text: string) => call("license_install", { text }),
+  licenseRemove: () => call("license_remove", {}),
   sshKeygen: (comment: string) => call("ssh_keygen", { comment }),
   sshHostKey: (url: string) => call("ssh_host_key", { url }),
   /** Trust the server only if it still presents exactly `fingerprints` (what the user saw). */

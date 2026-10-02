@@ -19,6 +19,7 @@ import type {
 } from "./types";
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
+const demoLicense = { current: null as import("./types").LicenseInfo | null };
 const demoSsh = { keys: [] as { name: string; public: string }[], trusted: [] as string[] };
 
 let seq = 0;
@@ -837,6 +838,26 @@ const mockTable: Table = {
   },
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
+  license_status() {
+    return Promise.resolve({ license: demoLicense.current, newerThanLicense: false, checkable: true });
+  },
+  license_install({ text }) {
+    if (!text.trim().startsWith("DDUGIT1.")) return Promise.reject("This is not a ddugit license");
+    demoLicense.current = {
+      id: "lic_demo",
+      name: "Demo Corp",
+      email: "it@demo.example",
+      kind: "commercial",
+      seats: 5,
+      issued: "2026-10-02",
+      updatesUntil: "2027-10-02",
+    };
+    return Promise.resolve({ license: demoLicense.current, newerThanLicense: false, checkable: true });
+  },
+  license_remove() {
+    demoLicense.current = null;
+    return Promise.resolve({ license: null, newerThanLicense: false, checkable: true });
+  },
   ssh_status() {
     return Promise.resolve({ available: true, keys: demoSsh.keys.slice() });
   },

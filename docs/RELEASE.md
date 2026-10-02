@@ -1,0 +1,92 @@
+# 출시 준비: 라이선스와 코드 서명
+
+ddugit은 **개인·오픈소스 무료, 회사 업무용 유료**(영구 라이선스, 1년 업데이트)다. 로그인 없이 쓰고, 라이선스는 앱이 **오프라인으로** 확인한다(폐쇄망 가능). 판매는 Lemon Squeezy, 코드 서명은 개인 이름으로 한다(2026-10-02 결정).
+
+## 1. 라이선스
+
+### 구조
+
+- 라이선스 텍스트: `DDUGIT1.<payload>.<signature>` (base64url)
+  - payload: `{ id, name, email, kind: "commercial" | "site", seats, issued, updatesUntil }`
+  - signature: payload 바이트에 대한 Ed25519 서명
+- 앱에는 **공개키만** 들어간다(`src-tauri/src/license.rs`, 빌드할 때 `DDUGIT_LICENSE_PUBKEY`). 그래서 서버·계정 없이 확인되고, 폐쇄망에서도 똑같이 동작한다.
+- `updatesUntil`까지 나온 버전은 계속 쓸 수 있다. 그 뒤에 나온 버전이면 설정에 갱신 안내만 띄운다. 기능은 막지 않는다(신뢰 기반).
+- 라이선스는 앱 설정 폴더의 `license.txt`에 저장한다(webview 저장소가 아님).
+
+### 발급 키 만들기 (한 번, 내 컴퓨터에서)
+
+```bash
+node scripts/license.mjs keygen ~/secure/ddugit-license-private.pem
+# → DDUGIT_LICENSE_PUBKEY=xxxx 가 출력된다
+```
+
+1. 출력된 공개키를 GitHub 저장소 **Settings → Secrets and variables → Actions → Variables**에 `DDUGIT_LICENSE_PUBKEY`로 넣는다. 공개 값이라 Secret이 아니라 Variable로 넣는다. 그 뒤로 Release 빌드는 라이선스를 확인할 수 있다.
+2. 개인키(`.pem`)는 비밀번호 관리자와 오프라인 백업에 둔다. 저장소에는 절대 넣지 않는다(`.gitignore`에 `*.pem` 있음).
+   - 잃어버리면 새 라이선스를 발급할 수 없다.
+   - 새어 나가면 누구나 라이선스를 만들 수 있다. 이때는 키를 새로 만들고, 새 공개키로 빌드하고, 기존 고객에게 재발급한다.
+
+### 수동 발급 (초기, 주문이 적을 때)
+
+```bash
+node scripts/license.mjs sign --key ~/secure/ddugit-license-private.pem \
+  --name "Acme Corp" --email it@acme.example --kind commercial --seats 5 --until 2027-10-02
+node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   # 앱과 같은 방식으로 확인
+```
+
+출력된 텍스트를 메일로 보내면 된다. 고객은 앱 **설정 → 라이선스**에 붙여 넣는다.
+
+### Lemon Squeezy 자동 발급 (주문이 늘면)
+
+1. 상품
+   - "ddugit 상업용"(좌석 수 = 수량)
+   - "ddugit 사이트 라이선스"(기관 전체, 폐쇄망 고객용, `kind: "site"`)
+2. Webhook `order_created` → 작은 서버리스 함수(예: Cloudflare Worker)를 둔다
+   - `X-Signature` 헤더(HMAC-SHA256, Lemon Squeezy signing secret)를 검증한다
+   - 주문에서 이름·메일·수량을 읽어 `scripts/license.mjs`의 `licenseText`와 같은 payload를 만든다
+   - Ed25519로 서명한다. Workers는 Web Crypto `Ed25519`를 지원하고, 개인키는 Worker secret에 둔다
+   - 고객에게 메일로 보낸다(예: Resend). 또는 구매 완료 페이지에서 주문 번호로 조회하게 한다
+3. 앱의 구매 버튼은 `src/components/License.tsx`의 `BUY_URL`에 스토어 주소를 넣으면 나타난다.
+
+## 2. 코드 서명 (개인 이름)
+
+서명용 시크릿이 저장소에 있으면 `release.yml`이 **알아서 서명**한다. 없으면 지금처럼 서명 없이 빌드한다.
+
+### macOS: Developer ID + 공증
+
+1. [Apple Developer Program](https://developer.apple.com/programs/)에 **개인(Individual)**으로 가입한다(연 99달러). 설치 창에는 개인 이름이 보인다.
+2. Xcode나 developer.apple.com에서 **Developer ID Application** 인증서를 만들고, 키체인에서 `.p12`로 내보낸다(암호 설정).
+3. appleid.apple.com에서 **앱 암호**를 만든다(공증용).
+4. GitHub Actions **Secrets**:
+
+| Secret                       | 값                                        |
+| ---------------------------- | ----------------------------------------- |
+| `APPLE_CERTIFICATE`          | `base64 -i cert.p12` 결과                 |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` 암호                               |
+| `APPLE_SIGNING_IDENTITY`     | `Developer ID Application: 이름 (TEAMID)` |
+| `APPLE_ID`                   | Apple 계정 메일                           |
+| `APPLE_PASSWORD`             | 앱 암호                                   |
+| `APPLE_TEAM_ID`              | 팀 ID(10자)                               |
+
+Tauri가 서명과 공증(notarytool)을 함께 한다. 그러면 첫 실행 때 Gatekeeper 경고가 사라진다.
+
+### Windows
+
+2023년 6월부터 코드 서명 키는 하드웨어 보안 모듈(HSM)이나 클라우드 서명에만 둘 수 있다. 개인 이름으로 받을 수 있는 경로는 이렇다(발급 조건과 가격은 신청 전에 각 회사에 확인한다).
+
+- **Certum** 개인 코드 서명 인증서 + SimplySign(클라우드)
+- **SSL.com** 개인(IV) 코드 서명 + eSigner(클라우드, `CodeSignTool`)
+- **Azure Trusted Signing**: 개인 가입이 가능한 국가가 제한적이다. 한국 거주자가 쓸 수 있는지 확인이 필요하다.
+
+인증서를 받으면 서명 명령을 `WINDOWS_SIGN_COMMAND` 시크릿에 넣는다. 파일 자리는 `%1`로 쓴다. 예:
+
+```
+CodeSignTool.bat sign -username=... -password=... -credential_id=... -totp_secret=... -input_file_path=%1 -override
+```
+
+서명 도구를 설치하는 단계(다운로드·압축 해제)는 제공사마다 달라서, 인증서를 고른 뒤 `release.yml`의 "Windows signing" 앞에 추가한다.
+
+SmartScreen 경고는 서명해도 처음에는 나올 수 있다. 다운로드 평판이 쌓이면 사라진다.
+
+### 서명한 뒤
+
+`release.yml`의 `releaseBody`에 적힌 "Unsigned build…" 안내를 지운다.
