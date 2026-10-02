@@ -320,3 +320,21 @@ export interface LicenseStatus {
   newerThanLicense: boolean;
   checkable: boolean;
 }
+
+/** Where one repository stands, read without its history (the galaxy dashboard, `git/glance.rs`). */
+export interface RepoGlance {
+  path: string;
+  /** Why it couldn't be read (moved, deleted, no longer a repository). */
+  error: string | null;
+  branch: string | null;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  /** Files with any change, untracked included. */
+  changes: number;
+  conflicts: number;
+  state: string;
+  stashes: number;
+  remotes: number;
+  last: { summary: string; author: string; time: number } | null;
+}

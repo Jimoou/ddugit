@@ -50,6 +50,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `cleanup.rs`: 브랜치 정리 보고(기준 브랜치에 병합됨 / 원격에서 사라짐(gone) / 마지막 커밋 시각)와 여러 브랜치 한 번에 삭제
   - `undo.rs`: reset(soft/mixed/hard, 진행 중이면 거부), reflog(HEAD가 지나온 자리 + 어느 참조에서도 닿지 않는 `lost` 표시)
   - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)
+  - `glance.rs`: 여러 저장소를 이력 없이 한 번에 훑기(브랜치·upstream 거리·변경·멈춘 작업·보관함·마지막 커밋). 새 탭의 은하 대시보드(`components/Galaxy.tsx`, 순수 로직 `galaxy.ts`)가 쓴다
   - `backport.rs`: 두 브랜치(예: `upstream/main` ↔ 고객사 `main`) 사이 미반영 커밋 비교(`--cherry-mark` + `-x` 트레일러), 제외 표시(받는 쪽별 로컬 config), 대상별 요약, 일괄 cherry-pick, 패치 내보내기
 - `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). 토큰은 webview로 넘기지 않는다
 - `src-tauri/src/ssh.rs`: SSH 준비(키 목록·생성, 호스트 키 지문을 GitHub·GitLab 공개 지문과 비교해 known_hosts에 추가, 연결 확인). 시스템 OpenSSH, 프롬프트 없음

@@ -4,6 +4,7 @@ import { api, DEMO_PATH, isTauri } from "./api";
 import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
+import { Galaxy } from "./components/Galaxy";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { PlanetBirth, SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
@@ -275,10 +276,14 @@ export default function App() {
               <h1 className="wordmark">ddugit</h1>
               <p>{t("app.tagline")}</p>
               <ConnectActions primary {...connect} />
-              <section className="welcome-recent">
-                <div className="eyebrow">{t("connect.recent")}</div>
-                <RecentList recent={recent} onOpen={openPath} />
-              </section>
+              {recent.list.some((r) => r.path !== DEMO_PATH) ? (
+                <Galaxy recent={recent} confirmFetch={settings.confirmRemote.fetch} onOpen={openPath} toast={toast} />
+              ) : (
+                <section className="welcome-recent">
+                  <div className="eyebrow">{t("connect.recent")}</div>
+                  <RecentList recent={recent} onOpen={openPath} />
+                </section>
+              )}
               <button className="ghost" onClick={() => openPath(DEMO_PATH)}>
                 <Icon name="sparkle" /> {t("app.demo")}
               </button>

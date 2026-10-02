@@ -39,6 +39,7 @@ macro_rules! command {
 
 command!(repo_snapshot(path: String, limit: Option<usize>) -> RepoSnapshot
     => git::read::snapshot(&path, limit.unwrap_or(3000)));
+command!(repo_glance(paths: Vec<String>) -> Vec<git::glance::RepoGlance> => Ok(git::glance::glance(&paths)));
 command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool, staged_only: bool) -> OpResult
 => if staged_only {
     git::write::commit_index(&path, &message, amend)
@@ -184,6 +185,7 @@ pub fn run() {
             git_init,
             watch_repo,
             repo_snapshot,
+            repo_glance,
             git_commit,
             git_stage_hunks,
             set_git_path,

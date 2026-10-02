@@ -870,3 +870,31 @@ test("resting the pointer on a star shows a preview card of the commit", async (
   await page.mouse.move(at.x, at.y + 200);
   await expect(card).toHaveCount(0);
 });
+
+test("the galaxy dashboard reads every recent repository and fetches them all", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => {
+    const paths = ["/work/rocket", "/work/gone-project", "/srv/api-server"];
+    localStorage.setItem("ddugit.recent", JSON.stringify(paths.map((path, i) => ({ path, starred: false, at: i }))));
+  });
+  await page.reload();
+  await page.locator(".tab-new").click();
+  const galaxy = page.locator(".welcome .galaxy");
+  await expect(galaxy).toContainText("내 은하 · 저장소 3개");
+  const worlds = galaxy.locator(".world");
+  await expect(worlds).toHaveCount(3);
+  await expect(worlds.filter({ hasText: "gone-project" })).toContainText("찾을 수 없음");
+  await expect(worlds.filter({ hasText: "rocket" }).locator(".world-branch")).toContainText("origin/");
+
+  // Fetch reaches the two readable ones.
+  await galaxy.getByRole("button", { name: /모두 Fetch/ }).click();
+  await demo.toast("저장소 2개에서 새 커밋을 받아왔어요");
+  await expect(galaxy.locator(".world-fetch.ok")).toHaveCount(2);
+
+  // Forget the missing one, then open a world in this tab.
+  await worlds.filter({ hasText: "gone-project" }).getByRole("button", { name: "목록에서 지우기" }).click();
+  await expect(worlds).toHaveCount(2);
+  await worlds.filter({ hasText: "api-server" }).locator(".world-open").click();
+  await expect(page.locator(".app:not([hidden]) .topbar")).toBeVisible();
+  await expect(page.locator(".tabbar .tab")).toHaveCount(2);
+});

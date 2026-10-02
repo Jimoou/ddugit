@@ -7,21 +7,21 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- M9: 보안 보강(#58), 원격 작업 확인(#59), 백포트 진입점(#60), SSH(#61) merge(`100d6ef`).
+- M9 전부 merge(#58–#62). M10 계획(사용자 결정: 대시보드 → 서브모듈·LFS·worktree → v0.4.0, 서명은 나중에).
 
 ## 지금 하는 일
 
-M9-5 라이선스·서명 준비 PR → CI 대기.
+M10-1 은하 대시보드 PR → CI 대기 후 merge. 다음: worktree → 서브모듈 → LFS → v0.4.0(버전 세 곳 + 잠금 파일 둘, Release 수동 실행).
 
 ## 다음 단계
 
-- 사용자가 할 일: `scripts/license.mjs keygen`으로 발급 키 만들기 → `DDUGIT_LICENSE_PUBKEY` 변수, Apple Developer(개인) 가입·시크릿, Windows 인증서 고르기, Lemon Squeezy 상품, `BUY_URL`
+- 사용자가 할 일: v0.3.0 초안 Publish(v0.2.0 초안 삭제), `scripts/license.mjs keygen` → `DDUGIT_LICENSE_PUBKEY` 변수, Apple Developer(개인)·Windows 인증서, Lemon Squeezy 상품과 `BUY_URL`
 - 데스크톱에서 SSH 실제 확인(샌드박스는 22번 포트가 막힘)
-- 다음 기능(사용자 결정): 여러 저장소 은하 대시보드, 서브모듈·LFS·worktree
 
 ## 막힌 것 / 결정 필요
 
 - 브랜치 보호 규칙(`main` 직접 push 금지, CI 필수)은 사용자가 GitHub 설정에서 켜야 한다.
+- 공개키 변수 없이 v0.4.0을 빌드하면 그 빌드는 라이선스를 확인하지 못한다(설정 화면이 그렇게 알려 줌). 기능 잠금은 없으므로 출시는 막지 않는다.
 
 ## PR 운영 규칙 (중요)
 
@@ -38,6 +38,7 @@ M9-5 라이선스·서명 준비 PR → CI 대기.
   - 인증 실패 재현: `window.__ddugitDemo.failNextRemote = "https" | "ssh"`
   - 긴 직선 이력 만들기: `window.__ddugitDemo.grow(20)` 후 `window.dispatchEvent(new Event("focus"))`
   - 회전한 채로 열기: `localStorage["ddugit.settings"] = '{"rotation":3}'`
+  - 은하 대시보드: `localStorage["ddugit.recent"]`에 경로를 넣고 새로고침 → 새 탭. 데모의 각 경로는 경로 해시로 만든 상태, `gone`이 든 경로는 찾을 수 없음
 - mock.ts를 고친 뒤에는 vite를 다시 띄운다. 그러지 않으면 `import("/src/mock.ts")`가 앱과 다른 모듈 인스턴스를 가져온다(HMR `?t=`)
 - 데모의 첫 Fetch는 `origin/main`과 현재 브랜치의 upstream에 동료 커밋을 하나씩 추가한다.
 - 실제 앱을 Linux에서 확인하는 법: Xvfb로 띄우고 `xdotool`로 클릭, `import -window root`로 스크린샷.
