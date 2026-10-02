@@ -634,3 +634,34 @@ test("lists open pull requests, checks one out, and connects or forgets a forge 
   await demo.toast("저장된 토큰을 지웠어요");
   await expect(section.getByRole("button", { name: "GitHub 연결" })).toBeVisible();
 });
+
+test("the tutorial voyage ticks off missions as they are done, and can be closed and reopened", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => localStorage.setItem("ddugit.voyage", JSON.stringify({ done: [], dismissed: false })));
+  await page.reload();
+  const log = page.getByRole("complementary", { name: "항해 일지" });
+  await expect(log).toContainText("0 / 6");
+  await expect(log.locator("li.now")).toContainText("별 하나 살펴보기");
+
+  // Mission 1: look at a commit.
+  const snap = await demo.snapshot();
+  const at = (await demo.screenOf(snap.head.target!))!;
+  await page.mouse.click(at.x, at.y);
+  await expect(log).toContainText("1 / 6");
+  await expect(log.locator("li.now")).toContainText("새 별 띄우기");
+
+  // Mission 6 out of order: push.
+  await page.getByRole("button", { name: /Push/ }).click();
+  await demo.toast("원격에 올렸어요");
+  await expect(log).toContainText("2 / 6");
+  await expect(log.locator("li.done")).toHaveCount(2);
+
+  // Closed, it stays closed after a reload; the demo badge brings it back with progress kept.
+  await log.getByRole("button", { name: "닫기" }).click();
+  await expect(log).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(".topbar")).toContainText("ddugit-demo");
+  await expect(log).toHaveCount(0);
+  await page.getByRole("button", { name: /데모 모드/ }).click();
+  await expect(log).toContainText("2 / 6");
+});

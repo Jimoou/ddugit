@@ -63,6 +63,16 @@
   - [x] CI 상태·리뷰 상태 표시: 라벨 색(초록 통과·빨강 실패·주황 진행 중), 승인 ✓·수정 요청 ✎, 사이드바 점·칩. GraphQL 한 번으로 PR 목록과 상태를 함께 받는다
   - [ ] 닫힌·병합된 PR
 
+## M7 · 첫인상과 읽기 — 2026-10-02 사용자 결정
+
+- [x] 첫 실행 튜토리얼 "항해 일지": 데모 저장소에서 미션 6개(살펴보기·커밋·병합·되감기·bisect·push), 실제 작업이 일어나면 체크, 진행 저장, 닫아도 데모 표시로 다시 열기
+- [ ] 릴리스 초안 ddugit v0.2.0 (M6 마일스톤, 이름 변경 반영). 그 전에 "CI · Rust"를 `all_os`로 수동 실행한다
+- [ ] 자체 SVG 아이콘: 화면의 글자·이모지 아이콘(OS 글꼴마다 모양이 다름)을 한 세트로 바꾼다. 그래프 캔버스의 ◉·☁·◆·⇄는 Path2D로
+- [ ] 커밋 내용이 첫눈에: 대각선 요약 라벨(약 40°, 100%에서도 30~40자, 줌 단계별 정보량)
+- [ ] 커밋 미리보기 카드(마우스를 올려 두면 요약·본문 앞부분·바뀐 파일·+/−·PR)
+- [ ] 브랜치 맵 90° 단위 회전(0/90/180/270, 사용자가 고정). 글자는 늘 바로 서게. 세로 목록 보기 대신 이것으로 한다
+- 하지 않기로 한 것: 커밋 종류 기호와 변경량 밝기(2026-10-02 사용자 결정)
+
 ## M5 · 배포 품질
 
 - [ ] (나중에) macOS 서명 + 공증, Windows 코드 서명 — 2026-10-01 결정: 뒤로 미룸. Apple Developer 계정, Windows 인증서가 필요하다
@@ -155,3 +165,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-02 | PR #40 squash merge(`5c118dc`). 이름 변경 otgit → ddugit(저장소 `Jimoou/ddugit`, 앱 identifier `com.ddugit.app`, 크레이트·패키지·화면·문서). 백포트 제외 config는 예전 `otgit.*` 키도 계속 읽는다. CI 절감: PR에서만, 바뀐 쪽만(`ci-web.yml`/`ci-rust.yml` 경로 필터), Rust는 ubuntu만(macOS·Windows는 수동 `all_os`), main push 검사 없음. 사용자가 저장소를 public으로 바꿨다 |
 | 2026-10-02 | PR #41 squash merge(`0bc7ca2`). M4 PR 연동: `forge.rs`(원격 URL → GitHub/GitLab, 토큰 gh/glab → keyring, ureq로 열린 PR·MR, 테스트 4: URL·API 주소·로컬 서버로 응답·401), `components/Pulls.tsx`(`prRefs` 가짜 `pr` ref로 그래프 라벨, 사이드바 섹션, 토큰 창), `open_url`(https만), 5분마다·원격 작업 후 다시 읽기(e2e 25)                                                     |
 | 2026-10-02 | PR #42 squash merge(`95b6fff`). PR 상태: `forge.rs`를 GraphQL로 바꿈(GitHub `statusCheckRollup`·`reviewDecision`, GitLab `headPipeline`·`approved`, GraphQL 오류도 실패로), `Checks`/`Review`, 라벨 색·표시, 사이드바 점·칩(cargo test forge 5, vitest 61)                                                                                                                      |
+| 2026-10-02 | PR #43 squash merge(`d38c81e`). M7 계획(사용자 결정: 튜토리얼, ddugit 릴리스, SVG 아이콘, 대각선 요약, 미리보기 카드, 90° 회전). 튜토리얼: `missions.ts`(순수, vitest 2), `components/Missions.tsx`(`useVoyage`, `MissionPanel`), RepoView 작업 지점마다 `tour.mission`, 탑바 데모 표시로 다시 열기, e2e는 기본으로 닫아 둠(e2e 26)                                             |

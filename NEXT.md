@@ -7,26 +7,34 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #42(M4 PR 연동)를 squash merge했다(`95b6fff`).
-- 사용자 결정(2026-10-02): 세 작업을 차례로 한다. 1) PR CI·리뷰 상태 표시, 2) 첫 실행 튜토리얼, 3) ddugit 이름의 릴리스 초안. 그리고 "브랜치 맵에서 커밋 내용이 첫눈에 보이게"를 기획해서 제안했다(답을 기다린다):
-  1. 대각선 요약 라벨(40°, 100%에서도 30~40자)과 줌 단계별 정보량
-  2. 종류 기호(Conventional/키워드)와 변경량을 별 밝기로
-  3. 미리보기 카드(요약·본문·파일·+/−)
-  4. (선택) 세로 목록 보기 전환
+- PR #43(PR CI·리뷰 상태 표시)을 squash merge했다(`d38c81e`).
+- 사용자 결정(2026-10-02, ROADMAP M7): 커밋 내용 기획 중 1(대각선 요약)과 3(미리보기 카드)은 하고, 2(종류 기호·변경량)는 하지 않는다. 4는 세로 목록 대신 **브랜치 맵 90° 단위 회전**으로 한다. 아이콘은 자체 SVG로 바꾼다(외부 아이콘 라이브러리는 없고, 지금은 유니코드·이모지 글자다)
 
 ## 지금 하는 일
 
-1. PR CI·리뷰 상태 → PR CI 대기
+M7 튜토리얼 → PR CI 대기
 
-- `forge.rs`: REST 대신 GraphQL 한 번으로 PR 목록과 상태를 함께 받는다(GitHub `statusCheckRollup`·`reviewDecision`, GitLab `headPipeline.status`·`approved`). HTTP 200이어도 GraphQL 오류가 있으면 실패로 본다
-- `PullRequest.checks`(success/failure/pending)와 `review`(approved/changes/required)
-- 라벨 색은 `PR_COLOR[checks]`(renderer), 이름 뒤에 ✓/✎. 사이드바에는 CI 점과 승인·수정 요청 칩
+- `missions.ts`: `MISSIONS`, `Voyage {done, dismissed}`, `parseVoyage`, `complete`, `current`
+- `components/Missions.tsx`
+  - `useVoyage(enabled)`: localStorage `ddugit.voyage`에 저장한다. 데모 경로에서만 켜진다. `mission(id)`
+  - `MissionPanel`: 그래프 왼쪽 아래 패널. 접기·닫기, 끝나면 "내 저장소 열기"(`onRepoMenu`)
+- RepoView 호출 지점
+  - `show({commit})` → inspect
+  - 커밋 성공 → commit
+  - 병합 `.then` → merge
+  - `doReset` → undo
+  - 범인을 찾으면 → bisect
+  - push 성공 → push
+- 닫았으면 탑바 "데모 모드 · ✦" 버튼으로 다시 연다
+- e2e fixture는 `addInitScript`로 튜토리얼을 기본으로 닫아 둔다(그래프를 가리지 않게). 튜토리얼 테스트만 연다
 
-## 다음 단계
+## 다음 단계 (M7 순서)
 
-2. 첫 실행 튜토리얼(미션)
-3. 릴리스: v0.1.0(otgit) 초안을 지우고, "CI · Rust"를 `all_os`로 수동 실행한 뒤 ddugit v0.1.0 초안을 만든다
-4. 커밋 내용 보이기: 사용자 답에 따라
+1. 릴리스 초안 ddugit v0.2.0: 버전 세 곳을 올리고, "CI · Rust"를 `all_os`로 실행한 뒤 Release를 수동 실행한다. 예전 v0.1.0(otgit) 초안은 사용자에게 지워 달라고 한다
+2. 자체 SVG 아이콘(`components/Icon.tsx`)과 캔버스 Path2D 아이콘
+3. 대각선 요약 라벨
+4. 미리보기 카드
+5. 90° 회전(카메라·히트 테스트·미니맵·라벨이 바로 서게, 설정에 저장)
 
 ## 막힌 것 / 결정 필요
 
