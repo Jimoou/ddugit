@@ -13,6 +13,8 @@ export function Icon({
   className?: string;
 }) {
   const fill = filled ?? FILLED.has(name);
+  // Dots (the "more" mark) need a heavy pen to read at icon sizes.
+  const stroke = fill ? 1 : name === "more" ? 3.2 : 1.9;
   return (
     <svg
       className={`icon-svg ${className ?? ""}`}
@@ -21,7 +23,7 @@ export function Icon({
       viewBox="0 0 24 24"
       fill={fill ? "currentColor" : "none"}
       stroke="currentColor"
-      strokeWidth={fill ? 1 : 1.9}
+      strokeWidth={stroke}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden

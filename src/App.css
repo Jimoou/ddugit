@@ -507,20 +507,23 @@ textarea:focus {
   border: 1px solid transparent;
   border-radius: 6px;
 }
-.world-tools .icon-svg,
-.band-head button.icon .icon-svg {
-  stroke-width: 3.4;
-}
 .world-tools .more {
   color: var(--text);
   border-color: var(--line);
   opacity: 0.85;
 }
-.world-tools .star:not(.on) {
-  opacity: 0;
+/* Unstarred: a clear outline, brighter on hover; starred: filled amber. */
+.world-tools .star {
+  color: var(--text-2);
+  opacity: 0.75;
+}
+.world-tools .star .icon-svg {
+  width: 16px;
+  height: 16px;
 }
 .world:hover .world-tools button,
-.world:focus-within .world-tools button {
+.world:focus-within .world-tools button,
+.world-tools .star.on {
   opacity: 1;
 }
 .world-tools button:hover {
@@ -1142,6 +1145,22 @@ button.link {
 }
 .sidebar h3 .h3-add:hover {
   color: var(--text);
+}
+/* A remote's menu: framed so it reads as a button, not a stray mark. */
+.sidebar h3 .h3-add.h3-more {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.sidebar h3 .h3-add.h3-more:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.06);
 }
 .sidebar ul {
   list-style: none;
