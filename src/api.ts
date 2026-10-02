@@ -72,6 +72,7 @@ export interface Commands {
   lfs_status: [{ path: string }, LfsStatus];
   git_lfs: [{ path: string; op: LfsOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
+  git_fetch_remote: [{ path: string; name: string; onProgress: Sink<Progress> }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
   branch_report: [{ path: string }, BranchReport];
@@ -164,6 +165,10 @@ export const api = {
   lfs: (path: string, op: LfsOp) => call("git_lfs", { path, op }),
   remote(path: string, op: RemoteOp, onProgress: (p: Progress) => void = () => {}) {
     return call("git_remote", { path, op, onProgress: progressSink(onProgress, path) });
+  },
+  /** Fetch one remote only (e.g. just added). */
+  fetchRemote(path: string, name: string, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_fetch_remote", { path, name, onProgress: progressSink(onProgress, path) });
   },
   /** Move the current branch to `target`; `mode` decides what happens to the changes passed over. */
   reset: (path: string, target: string, mode: ResetMode) => call("git_reset", { path, target, mode }),

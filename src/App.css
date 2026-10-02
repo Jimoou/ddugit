@@ -681,9 +681,85 @@ textarea:focus {
   border: 1px solid var(--amber);
   color: var(--amber);
 }
+/* A long remote operation: bottom-centre card, faded in after a moment. */
+.job-card {
+  position: fixed;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: 24;
+  width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(var(--signal), 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: job-in 0.25s ease-out 0.6s both;
+}
+@keyframes job-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+.job-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.job-phase {
+  font: 11px var(--mono);
+}
+.job-bar {
+  position: relative;
+  height: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.job-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgb(var(--signal));
+  transition: width 0.2s;
+}
+/* Nothing reported yet: a sweep instead of an empty bar. */
+.job-bar.waiting i {
+  width: 30% !important;
+  animation: job-sweep 1.2s ease-in-out infinite;
+}
+@keyframes job-sweep {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .job-card,
+  .job-bar.waiting i {
+    animation: none;
+  }
+}
+/* Fold per remote inside the remote section. */
+.sidebar section.sub h3 {
+  margin: 6px 0 2px;
+  padding-left: 10px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font: 600 11px var(--mono);
+}
+.sidebar section.sub li {
+  padding-left: 22px;
+}
+.sidebar section.sub .side-note {
+  margin-left: 22px;
+}
 /* Make a local branch from a remote-only one: shown on hover. */
 .sidebar li .to-local {
-  margin-left: auto;
+  margin: -4px 0 -4px auto;
+  padding: 2px;
+  height: 18px;
   opacity: 0;
 }
 .sidebar li:hover .to-local,

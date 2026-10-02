@@ -151,6 +151,27 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
     Ok(OpResult::with(status, o))
 }
 
+/// Fetch one remote (e.g. one just added), not all of them.
+pub fn fetch_one(path: &str, name: &str, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+    let dir = workdir(&open(path)?)?;
+    let args = ["fetch", "--prune", "--progress", super::operand(name)?];
+    let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
+        Some(p) => {
+            on_progress(p);
+            true
+        }
+        None => false,
+    })?;
+    let status = if o.ok {
+        OpStatus::Ok
+    } else if is_auth_failure(&o.text) {
+        OpStatus::Auth
+    } else {
+        OpStatus::Failed
+    };
+    Ok(OpResult::with(status, o))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::read::snapshot;
@@ -362,5 +383,25 @@ mod tests {
             "connection refused is not an auth problem: {}",
             r.output
         );
+    }
+
+    #[test]
+    fn fetches_one_remote_only() {
+        let (_origin, a, b) = setup();
+        let other = repo();
+        commit_file(other.path(), "o.txt", "o", "other work");
+        let pb = s(b.path());
+        git_ok(b.path(), &["remote", "add", "other", s(other.path())]).unwrap();
+        // A new commit on origin that fetching `other` must not bring.
+        commit_file(a.path(), "a2.txt", "a2", "more");
+        remote(s(a.path()), RemoteOp::Push, |_| {}).unwrap();
+
+        let r = fetch_one(pb, "other", |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let refs = snapshot(pb, 100).unwrap().refs;
+        assert!(refs.iter().any(|r| r.name == "other/main"));
+        assert_eq!(head(&b).behind, 0, "origin wasn't fetched");
+        assert_eq!(fetch_one(pb, "nope", |_| {}).unwrap().status, OpStatus::Failed);
+        assert!(fetch_one(pb, "--all", |_| {}).is_err());
     }
 }

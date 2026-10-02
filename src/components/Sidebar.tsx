@@ -3,7 +3,7 @@ import type { IconName } from "../icons";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { Settings } from "../settings";
 import { stashTitle } from "../format";
-import type { RefInfo, StashInfo } from "../types";
+import type { RefInfo, RemoteInfo, StashInfo } from "../types";
 import { type Key, t } from "../i18n";
 
 interface Props {
@@ -25,6 +25,10 @@ interface Props {
   selectedStash: number | null;
   onStash(index: number): void;
   onAddRemote(): void;
+  /** Remotes, for a fold per remote when there are several. */
+  remotes: RemoteInfo[];
+  /** The ⋯ on a remote's fold: fetch it alone, copy its URL, remove it. */
+  onRemoteMenu(name: string, x: number, y: number): void;
   /** A new branch where HEAD is. */
   onNewBranch(): void;
   /** Open branch housekeeping (merged, gone, stale). */
@@ -82,6 +86,56 @@ export function Sidebar(props: Props) {
   );
 
   const localNames = useMemo(() => new Set(refs.filter((r) => r.kind === "local").map((r) => r.name)), [refs]);
+
+  /** `origin/feature/x` → `feature/x` (remote names may hold slashes too). */
+  const branchOf = (name: string) => {
+    const rm = props.remotes.find((x) => name.startsWith(`${x.name}/`))?.name ?? name.split("/")[0];
+    return name.slice(rm.length + 1);
+  };
+  const remotes = props.remotes;
+
+  const row = (r: RefInfo, label: string) => {
+    const key = `${r.kind}:${r.name}`;
+    // A remote branch with no local branch of its name yet.
+    const remoteOnly = r.kind === "remote" && !localNames.has(branchOf(r.name));
+    const isHead = r.kind === "local" && r.name === headBranch;
+    return (
+      <li
+        key={key}
+        className={`${focused === key ? "focused" : ""} ${isHead ? "head" : ""}`}
+        style={{ ["--c" as string]: colorOf(r.target) }}
+        title={`${r.name}\n${r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}`}
+        onClick={() => onFocus(focused === key ? null : r)}
+        onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onRefMenu(r, e.clientX, e.clientY);
+        }}
+      >
+        <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
+        <span className="name">{label}</span>
+        {isHead && <span className="head-pill">HEAD</span>}
+        {remoteOnly && (
+          <button
+            className="icon to-local"
+            title={t("side.toLocal")}
+            aria-label={`${t("side.toLocal")}: ${r.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCheckout(r);
+            }}
+          >
+            <Icon name="plus" size={11} />
+          </button>
+        )}
+        {r.kind === "local" && props.elsewhere[r.name] && (
+          <span className="elsewhere" title={t("wt.elsewhere", { path: props.elsewhere[r.name] })}>
+            <Icon name="folder" size={11} />
+          </span>
+        )}
+      </li>
+    );
+  };
 
   const fold = () => onLayout({ sidebarCollapsed: !collapsed });
   const toggle = (id: string) =>
@@ -203,50 +257,37 @@ export function Sidebar(props: Props) {
               }
             >
               {g.kind === "local" && !items.length && <p className="side-note muted">{t("branch.local.none")}</p>}
-              <ul>
-                {items.map((r) => {
-                  const key = `${r.kind}:${r.name}`;
-                  // A remote branch with no local branch of its name yet.
-                  const remoteOnly = r.kind === "remote" && !localNames.has(r.name.slice(r.name.indexOf("/") + 1));
-                  const isHead = r.kind === "local" && r.name === headBranch;
+              {g.kind === "remote" && remotes.length > 1 ? (
+                // Several remotes: a fold per remote, branches listed without its prefix.
+                remotes.map((rm) => {
+                  const mine = items.filter((r) => r.name.startsWith(`${rm.name}/`));
+                  if (searching && !mine.length) return null;
                   return (
-                    <li
-                      key={key}
-                      className={`${focused === key ? "focused" : ""} ${isHead ? "head" : ""}`}
-                      style={{ ["--c" as string]: colorOf(r.target) }}
-                      title={r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}
-                      onClick={() => onFocus(focused === key ? null : r)}
-                      onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        onRefMenu(r, e.clientX, e.clientY);
-                      }}
-                    >
-                      <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
-                      <span className="name">{r.name}</span>
-                      {isHead && <span className="head-pill">HEAD</span>}
-                      {remoteOnly && (
+                    <SideSection
+                      key={rm.name}
+                      id={`remote:${rm.name}`}
+                      className="sub"
+                      title={<span title={rm.url}>{rm.name}</span>}
+                      count={mine.length}
+                      actions={
                         <button
-                          className="icon to-local"
-                          title={t("side.toLocal")}
-                          aria-label={`${t("side.toLocal")}: ${r.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCheckout(r);
-                          }}
+                          className="h3-add"
+                          title={t("side.remoteMenu", { name: rm.name })}
+                          aria-label={t("side.remoteMenu", { name: rm.name })}
+                          onClick={(e) => props.onRemoteMenu(rm.name, e.clientX, e.clientY)}
                         >
-                          <Icon name="plus" size={11} />
+                          <Icon name="more" size={12} />
                         </button>
-                      )}
-                      {r.kind === "local" && props.elsewhere[r.name] && (
-                        <span className="elsewhere" title={t("wt.elsewhere", { path: props.elsewhere[r.name] })}>
-                          <Icon name="folder" size={11} />
-                        </span>
-                      )}
-                    </li>
+                      }
+                    >
+                      {!mine.length && <p className="side-note muted">{t("side.remoteEmpty")}</p>}
+                      <ul>{mine.map((r) => row(r, r.name.slice(rm.name.length + 1)))}</ul>
+                    </SideSection>
                   );
-                })}
-              </ul>
+                })
+              ) : (
+                <ul>{items.map((r) => row(r, r.name))}</ul>
+              )}
             </SideSection>
           );
         })}

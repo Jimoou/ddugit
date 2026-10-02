@@ -24,6 +24,7 @@ import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
 import { WorktreeDialog, WorktreeSection } from "./components/Worktrees";
 import { SubmoduleSection } from "./components/Submodules";
+import { JobCard } from "./components/JobCard";
 import { LfsSection } from "./components/Lfs";
 import { joinPath } from "./recent";
 import { StashPanel } from "./components/StashPanel";
@@ -89,6 +90,16 @@ const REMOTE_DONE: Record<RemoteOp, Key> = {
   pullRebase: "remote.done.pullRebase",
   push: "remote.done.push",
   forcePush: "remote.done.forcePush",
+};
+
+/** What the progress card says while a remote operation runs. */
+const JOB: Record<RemoteOp, Key> = {
+  fetch: "job.fetch",
+  pull: "job.pull",
+  pullMerge: "job.pull",
+  pullRebase: "job.pull",
+  push: "job.push",
+  forcePush: "job.push",
 };
 
 /** In-progress operations (`state.<name>` and `.hint` in the dictionary) and whether "continue" applies. */
@@ -162,6 +173,8 @@ export function RepoView({
   const [syncAsk, setSyncAsk] = useState<SyncOp | null>(null);
   const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  /** A remote being fetched on its own (just added, or from its menu), shown on the progress card. */
+  const [fetchingRemote, setFetchingRemote] = useState<string | null>(null);
   const [diff, setDiff] = useState<DiffState | null>(null);
   const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
   const [backport, setBackport] = useState<{ source: string; target: string } | null>(null);
@@ -817,6 +830,57 @@ export function RepoView({
     });
 
   /** Add another repository (e.g. the original project) as a remote and fetch it. */
+  const removeRemoteItem = (name: string): MenuItem => ({
+    label: t("remote.delete.menu", { name }),
+    danger: true,
+    onSelect: () =>
+      setConfirm({
+        title: t("remote.delete.title"),
+        danger: true,
+        confirmLabel: t("common.delete"),
+        body: (
+          <p>
+            <Rich k="remote.delete.body" vars={{ name }} />
+          </p>
+        ),
+        onConfirm: () => {
+          setConfirm(null);
+          void refRun(t("remote.delete.done", { name }), { kind: "removeRemote", name });
+        },
+      }),
+  });
+
+  /** Fetch one remote with the progress card up, then say what came: its branch count. */
+  const fetchOne = async (name: string) => {
+    setFetchingRemote(name);
+    setProgress(null);
+    try {
+      const r = await api.fetchRemote(path, name, setProgress);
+      await refresh();
+      const n = latest.current?.refs.filter((x) => x.kind === "remote" && x.name.startsWith(`${name}/`)).length ?? 0;
+      if (r.status === "ok") {
+        setPrTick((k) => k + 1);
+        toast("ok", n ? t("remote.fetched", { name, n }) : t("remote.fetchedNone", { name }));
+      } else if (r.status === "auth") setAuth({ op: "fetch", output: r.output });
+      else toast("err", r.output || t("app.failed", { label: t("job.fetchRemote", { name }) }));
+    } catch (e) {
+      toast("err", String(e));
+    } finally {
+      setFetchingRemote(null);
+      setProgress(null);
+    }
+  };
+
+  const remoteMenu = (name: string): MenuItem[] => [
+    { label: t("remote.fetchOne", { name }), icon: "fetch", onSelect: () => void fetchOne(name) },
+    {
+      label: t("remote.copyUrl"),
+      onSelect: () => void navigator.clipboard?.writeText(snap?.remotes.find((x) => x.name === name)?.url ?? ""),
+    },
+    "separator",
+    removeRemoteItem(name),
+  ];
+
   const askRemote = () =>
     setNameReq({
       title: t("remote.add.title"),
@@ -827,8 +891,14 @@ export function RepoView({
       confirmLabel: t("remote.add.go"),
       onSubmit: async (name, url) => {
         setNameReq(null);
-        const r = await refRun(t("remote.add.done", { name }), { kind: "addRemote", name, url });
-        if (r.status === "ok") await remote("fetch");
+        // Added quietly; what the user waits for is the fetch, shown on the progress card.
+        const r = await api.ref(path, { kind: "addRemote", name, url }).catch((e) => ({
+          status: "failed" as const,
+          output: String(e),
+        }));
+        if (r.status !== "ok") return toast("err", r.output);
+        await refresh();
+        await fetchOne(name);
       },
     });
 
@@ -1093,25 +1163,7 @@ export function RepoView({
         "separator",
         { label: t("menu.branchHere"), onSelect: () => askBranchAt(r.target) },
         "separator",
-        {
-          label: t("remote.delete.menu", { name }),
-          danger: true,
-          onSelect: () =>
-            setConfirm({
-              title: t("remote.delete.title"),
-              danger: true,
-              confirmLabel: t("common.delete"),
-              body: (
-                <p>
-                  <Rich k="remote.delete.body" vars={{ name }} />
-                </p>
-              ),
-              onConfirm: () => {
-                setConfirm(null);
-                void refRun(t("remote.delete.done", { name }), { kind: "removeRemote", name });
-              },
-            }),
-        },
+        removeRemoteItem(name),
       ];
     }
     return [
@@ -1476,6 +1528,8 @@ export function RepoView({
           }}
           onCheckout={checkoutRef}
           onAddRemote={askRemote}
+          remotes={snap.remotes}
+          onRemoteMenu={(name, x, y) => setMenu({ x, y, title: name, items: remoteMenu(name) })}
           onNewBranch={askNewBranch}
           onBackport={openBackport}
           onCleanup={() => {
@@ -2013,6 +2067,12 @@ export function RepoView({
         <ContextMenu x={menu.x} y={menu.y} title={menu.title} items={menu.items} onClose={() => setMenu(null)} />
       )}
 
+      {(fetchingRemote || remoteBusy) && (
+        <JobCard
+          title={fetchingRemote ? t("job.fetchRemote", { name: fetchingRemote }) : t(JOB[remoteBusy!])}
+          progress={progress}
+        />
+      )}
       {worktreeReq && (
         <WorktreeDialog
           worktrees={snap.worktrees}
