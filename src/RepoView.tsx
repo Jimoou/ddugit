@@ -8,6 +8,7 @@ import { BlameSheet } from "./components/History";
 import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
 import { FORGE_NAME, PullSection, TokenDialog, prOf, prRefs } from "./components/Pulls";
 import { MissionPanel, useVoyage } from "./components/Missions";
+import { PeekCard } from "./components/Peek";
 import { CleanupSheet } from "./components/Cleanup";
 import { EditCommitDialog, type EditMode } from "./components/EditCommit";
 import { RebaseSheet } from "./components/RebaseSheet";
@@ -59,6 +60,9 @@ import type {
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
 type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
 type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
+
+/** How long the pointer rests on a star before its preview card shows. */
+const PEEK_DELAY_MS = 350;
 
 /** Open pull requests are re-read this often while the tab is visible (and after remote work). */
 const PR_REFRESH_MS = 5 * 60_000;
@@ -160,6 +164,10 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  /** Preview card: the commit the pointer has rested on, where its star was then. */
+  const [peek, setPeek] = useState<{ id: string; at: Pt; width: number } | null>(null);
+  const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const stageGraph = useRef<HTMLDivElement>(null);
   /** Open pull requests on the forge remotes; `prTick` re-reads them. */
   const [pulls, setPulls] = useState<PrReport | null>(null);
   const [prTick, setPrTick] = useState(0);
@@ -1253,7 +1261,7 @@ export function RepoView({
         />
 
         <section className="stage">
-          <div className="stage-graph">
+          <div className="stage-graph" ref={stageGraph}>
             {search && (
               <SearchBar
                 query={search.query}
@@ -1268,6 +1276,15 @@ export function RepoView({
               />
             )}
             <FxLayer playing={fx} />
+            {peek && commitById.has(peek.id) && peek.id !== selected && !menu && (
+              <PeekCard
+                path={path}
+                commit={commitById.get(peek.id)!}
+                refs={graphRefs.filter((r) => r.target === peek.id)}
+                at={peek.at}
+                width={peek.width}
+              />
+            )}
             <Nebula on={conflicts > 0} still={!animate} />
             {tour.shown && (
               <MissionPanel
@@ -1318,6 +1335,15 @@ export function RepoView({
               onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
               onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
               onZoomChange={setZoom}
+              onHover={(id) => {
+                clearTimeout(peekTimer.current);
+                setPeek(null);
+                if (!id) return;
+                peekTimer.current = setTimeout(() => {
+                  const at = graph.current?.screenOf(id);
+                  if (at) setPeek({ id, at, width: stageGraph.current?.clientWidth ?? 0 });
+                }, PEEK_DELAY_MS);
+              }}
             />
 
             {snap.commits.length === 0 && (
