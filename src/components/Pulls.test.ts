@@ -21,6 +21,8 @@ const pr = (number: number, sha: string, remote = "origin"): PullRequest => ({
   branch: `b${number}`,
   sha,
   author: "a",
+  checks: null,
+  review: null,
 });
 
 describe("pull request labels", () => {
@@ -37,9 +39,22 @@ describe("pull request labels", () => {
   it("labels only commits in the loaded history and maps a label back to its PR", () => {
     const report: PrReport = { forges: [forge()], prs: [pr(1, "in"), pr(2, "out")] };
     const refs = prRefs(report, (id) => id === "in");
-    expect(refs).toEqual([{ name: "#1", kind: "pr", target: "in" }]);
+    expect(refs).toEqual([{ name: "#1", kind: "pr", target: "in", checks: null }]);
     expect(prOf(report, refs[0])?.number).toBe(1);
     expect(prRefs(null, () => true)).toEqual([]);
+  });
+});
+
+describe("pull request status on labels", () => {
+  it("carries CI for the label color and marks the review in the name", () => {
+    const approved = { ...pr(4, "a"), checks: "failure" as const, review: "approved" as const };
+    const report: PrReport = { forges: [forge()], prs: [approved, { ...pr(5, "b"), review: "changes" }] };
+    const refs = prRefs(report, () => true);
+    expect(refs.map((r) => [r.name, r.checks])).toEqual([
+      ["#4 ✓", "failure"],
+      ["#5 ✎", null],
+    ]);
+    expect(prOf(report, refs[0])?.number).toBe(4);
   });
 });
 

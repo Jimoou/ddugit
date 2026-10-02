@@ -601,6 +601,12 @@ export const ko = {
   "pr.token.forget": "저장된 토큰 지우기",
   "pr.token.saved": "{forge}에 연결했어요",
   "pr.token.forgotten": "저장된 토큰을 지웠어요",
+  "pr.checks.success": "CI 통과",
+  "pr.checks.failure": "CI 실패",
+  "pr.checks.pending": "CI 진행 중",
+  "pr.checks.none": "CI 없음",
+  "pr.review.approved": "승인",
+  "pr.review.changes": "수정 요청",
 } as const;
 
 export type Key = keyof typeof ko;

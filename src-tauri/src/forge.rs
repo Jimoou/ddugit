@@ -50,6 +50,27 @@ pub struct PullRequest {
     /// Head commit of the pull request.
     pub sha: String,
     pub author: String,
+    /// CI on the head commit, if any runs.
+    pub checks: Option<Checks>,
+    pub review: Option<Review>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Checks {
+    Success,
+    Failure,
+    Pending,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Review {
+    Approved,
+    /// Changes requested.
+    Changes,
+    /// Waiting for a required review.
+    Required,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -104,12 +125,12 @@ pub fn parse_remote(url: &str) -> Option<Forge> {
     Some(Forge { kind, host, slug })
 }
 
-/// REST API root for a forge host (GitHub Enterprise and self-hosted GitLab included).
-pub fn api_base(kind: ForgeKind, host: &str) -> String {
+/// GraphQL endpoint for a forge host (GitHub Enterprise and self-hosted GitLab included).
+/// One query per project brings every open pull request with its CI and review state.
+pub fn graphql_url(kind: ForgeKind, host: &str) -> String {
     match kind {
-        ForgeKind::Github if host == "github.com" => "https://api.github.com".into(),
-        ForgeKind::Github => format!("https://{host}/api/v3"),
-        ForgeKind::Gitlab => format!("https://{host}/api/v4"),
+        ForgeKind::Github if host == "github.com" => "https://api.github.com/graphql".into(),
+        ForgeKind::Github | ForgeKind::Gitlab => format!("https://{host}/api/graphql"),
     }
 }
 
@@ -178,41 +199,120 @@ fn token_for(kind: ForgeKind, host: &str) -> (Option<String>, TokenSource) {
     }
 }
 
+const GITHUB_QUERY: &str =
+    "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { \
+    pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { \
+    number title url isDraft headRefName headRefOid author { login } reviewDecision \
+    commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
+
+const GITLAB_QUERY: &str = "query($path: ID!) { project(fullPath: $path) { \
+    mergeRequests(state: opened, first: 100) { nodes { \
+    iid title webUrl draft sourceBranch diffHeadSha author { username } headPipeline { status } approved } } } }";
+
 #[derive(Deserialize)]
-struct GhPull {
-    number: u64,
-    title: String,
-    html_url: String,
+struct Gql<T> {
+    data: Option<T>,
     #[serde(default)]
-    draft: bool,
-    head: GhHead,
-    user: Option<GhUser>,
+    errors: Vec<GqlError>,
 }
 #[derive(Deserialize)]
-struct GhHead {
-    #[serde(rename = "ref")]
-    branch: String,
-    sha: String,
+struct GqlError {
+    message: String,
 }
 #[derive(Deserialize)]
-struct GhUser {
+struct Nodes<T> {
+    nodes: Vec<T>,
+}
+#[derive(Deserialize)]
+struct Login {
+    #[serde(alias = "username")]
     login: String,
 }
 
 #[derive(Deserialize)]
-struct GlMerge {
-    iid: u64,
-    title: String,
-    web_url: String,
-    #[serde(default)]
-    draft: bool,
-    source_branch: String,
-    sha: String,
-    author: Option<GlUser>,
+struct GhData {
+    repository: Option<GhRepo>,
 }
 #[derive(Deserialize)]
-struct GlUser {
-    username: String,
+#[serde(rename_all = "camelCase")]
+struct GhRepo {
+    pull_requests: Nodes<GhPull>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GhPull {
+    number: u64,
+    title: String,
+    url: String,
+    is_draft: bool,
+    head_ref_name: String,
+    head_ref_oid: String,
+    author: Option<Login>,
+    review_decision: Option<String>,
+    commits: Nodes<GhCommitNode>,
+}
+#[derive(Deserialize)]
+struct GhCommitNode {
+    commit: GhCommit,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GhCommit {
+    status_check_rollup: Option<State>,
+}
+#[derive(Deserialize)]
+struct State {
+    #[serde(alias = "status")]
+    state: String,
+}
+
+#[derive(Deserialize)]
+struct GlData {
+    project: Option<GlProject>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GlProject {
+    merge_requests: Nodes<GlMerge>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GlMerge {
+    iid: String,
+    title: String,
+    web_url: String,
+    draft: bool,
+    source_branch: String,
+    diff_head_sha: Option<String>,
+    author: Option<Login>,
+    head_pipeline: Option<State>,
+    #[serde(default)]
+    approved: bool,
+}
+
+/// GitHub's rollup state or a GitLab pipeline status, as one of three outcomes.
+fn checks_of(state: &str) -> Option<Checks> {
+    match state.to_ascii_uppercase().as_str() {
+        "SUCCESS" => Some(Checks::Success),
+        "FAILURE" | "FAILED" | "ERROR" | "CANCELED" => Some(Checks::Failure),
+        "PENDING"
+        | "EXPECTED"
+        | "RUNNING"
+        | "CREATED"
+        | "PREPARING"
+        | "WAITING_FOR_RESOURCE"
+        | "SCHEDULED" => Some(Checks::Pending),
+        _ => None, // skipped, manual: nothing to report
+    }
+}
+
+fn review_of(decision: &str) -> Option<Review> {
+    match decision {
+        "APPROVED" => Some(Review::Approved),
+        "CHANGES_REQUESTED" => Some(Review::Changes),
+        "REVIEW_REQUIRED" => Some(Review::Required),
+        _ => None,
+    }
 }
 
 enum FetchError {
@@ -220,9 +320,12 @@ enum FetchError {
     Other(String),
 }
 
-fn get_json<T: serde::de::DeserializeOwned>(
+/// POST a GraphQL query; GraphQL errors (HTTP 200) count as failures too.
+fn graphql<T: serde::de::DeserializeOwned>(
     url: &str,
-    auth: (&str, String),
+    token: &str,
+    query: &str,
+    variables: serde_json::Value,
 ) -> std::result::Result<T, FetchError> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
@@ -230,59 +333,82 @@ fn get_json<T: serde::de::DeserializeOwned>(
         .build()
         .into();
     let mut resp = agent
-        .get(url)
-        .header(auth.0, &auth.1)
+        .post(url)
+        .header("Authorization", &format!("Bearer {token}"))
         .header("User-Agent", "ddugit")
         .header("Accept", "application/json")
-        .call()
+        .send_json(serde_json::json!({ "query": query, "variables": variables }))
         .map_err(|e| FetchError::Other(e.to_string()))?;
-    match resp.status().as_u16() {
+    let reply: Gql<T> = match resp.status().as_u16() {
         200..=299 => resp
             .body_mut()
-            .read_json::<T>()
-            .map_err(|e| FetchError::Other(e.to_string())),
-        401 | 403 => Err(FetchError::Unauthorized),
-        s => Err(FetchError::Other(format!("HTTP {s} from {url}"))),
+            .read_json()
+            .map_err(|e| FetchError::Other(e.to_string()))?,
+        401 | 403 => return Err(FetchError::Unauthorized),
+        s => return Err(FetchError::Other(format!("HTTP {s} from {url}"))),
+    };
+    match (reply.data, reply.errors.first()) {
+        (_, Some(e)) => Err(FetchError::Other(e.message.clone())),
+        (Some(d), None) => Ok(d),
+        (None, None) => Err(FetchError::Other(format!("Empty reply from {url}"))),
     }
 }
 
 fn open_pulls(
-    base: &str,
+    endpoint: &str,
     forge: &Forge,
     remote: &str,
     token: &str,
 ) -> std::result::Result<Vec<PullRequest>, FetchError> {
+    let not_found = || FetchError::Other(format!("{} not found on {}", forge.slug, forge.host));
     Ok(match forge.kind {
         ForgeKind::Github => {
-            let url = format!("{base}/repos/{}/pulls?state=open&per_page=100", forge.slug);
-            get_json::<Vec<GhPull>>(&url, ("Authorization", format!("Bearer {token}")))?
+            let (owner, name) = forge.slug.split_once('/').unwrap_or((&forge.slug, ""));
+            let vars = serde_json::json!({ "owner": owner, "name": name });
+            let data: GhData = graphql(endpoint, token, GITHUB_QUERY, vars)?;
+            data.repository
+                .ok_or_else(not_found)?
+                .pull_requests
+                .nodes
                 .into_iter()
                 .map(|p| PullRequest {
                     remote: remote.to_string(),
                     number: p.number,
                     title: p.title,
-                    url: p.html_url,
-                    draft: p.draft,
-                    branch: p.head.branch,
-                    sha: p.head.sha,
-                    author: p.user.map(|u| u.login).unwrap_or_default(),
+                    url: p.url,
+                    draft: p.is_draft,
+                    branch: p.head_ref_name,
+                    sha: p.head_ref_oid,
+                    author: p.author.map(|a| a.login).unwrap_or_default(),
+                    checks: p
+                        .commits
+                        .nodes
+                        .first()
+                        .and_then(|n| n.commit.status_check_rollup.as_ref())
+                        .and_then(|r| checks_of(&r.state)),
+                    review: p.review_decision.as_deref().and_then(review_of),
                 })
                 .collect()
         }
         ForgeKind::Gitlab => {
-            let project = forge.slug.replace('/', "%2F");
-            let url = format!("{base}/projects/{project}/merge_requests?state=opened&per_page=100");
-            get_json::<Vec<GlMerge>>(&url, ("PRIVATE-TOKEN", token.to_string()))?
+            let vars = serde_json::json!({ "path": forge.slug });
+            let data: GlData = graphql(endpoint, token, GITLAB_QUERY, vars)?;
+            data.project
+                .ok_or_else(not_found)?
+                .merge_requests
+                .nodes
                 .into_iter()
                 .map(|m| PullRequest {
                     remote: remote.to_string(),
-                    number: m.iid,
+                    number: m.iid.parse().unwrap_or(0),
                     title: m.title,
                     url: m.web_url,
                     draft: m.draft,
                     branch: m.source_branch,
-                    sha: m.sha,
-                    author: m.author.map(|u| u.username).unwrap_or_default(),
+                    sha: m.diff_head_sha.unwrap_or_default(),
+                    author: m.author.map(|a| a.login).unwrap_or_default(),
+                    checks: m.head_pipeline.and_then(|p| checks_of(&p.state)),
+                    review: m.approved.then_some(Review::Approved),
                 })
                 .collect()
         }
@@ -325,7 +451,7 @@ pub fn report(path: &str) -> Result<PrReport> {
             error: None,
         };
         if let Some(token) = token {
-            match open_pulls(&api_base(forge.kind, &forge.host), &forge, &name, &token) {
+            match open_pulls(&graphql_url(forge.kind, &forge.host), &forge, &name, &token) {
                 Ok(prs) => report.prs.extend(prs),
                 Err(FetchError::Unauthorized) => status.unauthorized = true,
                 Err(FetchError::Other(e)) => status.error = Some(e),
@@ -376,62 +502,100 @@ mod tests {
     }
 
     #[test]
-    fn api_roots_cover_enterprise_and_self_hosted() {
+    fn graphql_endpoints_cover_enterprise_and_self_hosted() {
         assert_eq!(
-            api_base(ForgeKind::Github, "github.com"),
-            "https://api.github.com"
+            graphql_url(ForgeKind::Github, "github.com"),
+            "https://api.github.com/graphql"
         );
         assert_eq!(
-            api_base(ForgeKind::Github, "github.corp.io"),
-            "https://github.corp.io/api/v3"
+            graphql_url(ForgeKind::Github, "github.corp.io"),
+            "https://github.corp.io/api/graphql"
         );
         assert_eq!(
-            api_base(ForgeKind::Gitlab, "gitlab.com"),
-            "https://gitlab.com/api/v4"
+            graphql_url(ForgeKind::Gitlab, "gitlab.com"),
+            "https://gitlab.com/api/graphql"
         );
     }
 
-    /// Serve one canned HTTP response and hand back the request it got.
+    #[test]
+    fn maps_ci_and_review_states() {
+        assert_eq!(checks_of("SUCCESS"), Some(Checks::Success));
+        assert_eq!(checks_of("failed"), Some(Checks::Failure));
+        assert_eq!(checks_of("RUNNING"), Some(Checks::Pending));
+        assert_eq!(checks_of("SKIPPED"), None);
+        assert_eq!(review_of("CHANGES_REQUESTED"), Some(Review::Changes));
+        assert_eq!(review_of(""), None);
+    }
+
+    /// Serve one canned HTTP response and hand back the request (headers and body) it got.
     fn serve_once(status: &str, body: &str) -> (String, std::thread::JoinHandle<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let base = format!("http://{}", listener.local_addr().unwrap());
+        let url = format!("http://{}/graphql", listener.local_addr().unwrap());
         let reply = format!(
             "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
         );
         let handle = std::thread::spawn(move || {
             let (mut sock, _) = listener.accept().unwrap();
+            let mut got = Vec::new();
             let mut buf = [0u8; 4096];
-            let n = sock.read(&mut buf).unwrap();
+            // Read the headers, then as much body as they announce.
+            loop {
+                let n = sock.read(&mut buf).unwrap();
+                got.extend_from_slice(&buf[..n]);
+                let text = String::from_utf8_lossy(&got).to_string();
+                if let Some(end) = text.find("\r\n\r\n") {
+                    let len = text
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|v| v.trim().parse::<usize>().unwrap_or(0))
+                        })
+                        .unwrap_or(0);
+                    if got.len() >= end + 4 + len || n == 0 {
+                        break;
+                    }
+                } else if n == 0 {
+                    break;
+                }
+            }
             sock.write_all(reply.as_bytes()).unwrap();
-            String::from_utf8_lossy(&buf[..n]).to_string()
+            String::from_utf8_lossy(&got).to_string()
         });
-        (base, handle)
+        (url, handle)
     }
 
     #[test]
-    fn reads_github_pulls_with_the_token() {
-        let body = r#"[{"number":7,"title":"Graph zoom","html_url":"https://github.com/o/r/pull/7","draft":true,
-            "head":{"ref":"feature/zoom","sha":"abc123"},"user":{"login":"jimin"},"extra":1}]"#;
-        let (base, server) = serve_once("200 OK", body);
-        let prs = match open_pulls(&base, &gh("o/r").unwrap(), "origin", "t0ken") {
+    fn reads_github_pulls_with_their_checks_and_review() {
+        let body = r#"{"data":{"repository":{"pullRequests":{"nodes":[
+            {"number":7,"title":"Graph zoom","url":"https://github.com/o/r/pull/7","isDraft":true,
+             "headRefName":"feature/zoom","headRefOid":"abc123","author":{"login":"jimin"},
+             "reviewDecision":"APPROVED","commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
+            {"number":8,"title":"Docs","url":"https://github.com/o/r/pull/8","isDraft":false,
+             "headRefName":"docs","headRefOid":"def","author":null,"reviewDecision":null,
+             "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}]}}}}"#;
+        let (url, server) = serve_once("200 OK", body);
+        let prs = match open_pulls(&url, &gh("o/r").unwrap(), "origin", "t0ken") {
             Ok(p) => p,
             Err(_) => panic!("fetch failed"),
         };
         let request = server.join().unwrap();
-        assert!(
-            request.starts_with("GET /repos/o/r/pulls?state=open&per_page=100 "),
-            "{request}"
-        );
+        assert!(request.starts_with("POST /graphql "), "{request}");
         assert!(
             request
                 .to_ascii_lowercase()
                 .contains("authorization: bearer t0ken"),
             "{request}"
         );
+        let compact = request.replace([' ', '\n'], "");
+        assert!(
+            compact.contains(r#""owner":"o""#) && compact.contains(r#""name":"r""#),
+            "{request}"
+        );
         assert_eq!(
-            prs,
-            [PullRequest {
+            prs[0],
+            PullRequest {
                 remote: "origin".into(),
                 number: 7,
                 title: "Graph zoom".into(),
@@ -440,34 +604,63 @@ mod tests {
                 branch: "feature/zoom".into(),
                 sha: "abc123".into(),
                 author: "jimin".into(),
-            }]
+                checks: Some(Checks::Failure),
+                review: Some(Review::Approved),
+            }
+        );
+        assert_eq!(
+            (prs[1].checks, prs[1].review, prs[1].author.as_str()),
+            (None, None, "")
         );
     }
 
     #[test]
-    fn reads_gitlab_merge_requests_and_flags_a_refused_token() {
+    fn reads_gitlab_merge_requests_and_flags_refused_tokens_and_errors() {
         let forge = Forge {
             kind: ForgeKind::Gitlab,
             host: "gitlab.com".into(),
             slug: "group/sub/project".into(),
         };
-        let body = r#"[{"iid":3,"title":"Fix","web_url":"https://gitlab.com/x/-/merge_requests/3",
-            "source_branch":"fix/x","sha":"def456","author":{"username":"minji"}}]"#;
-        let (base, server) = serve_once("200 OK", body);
-        let prs = open_pulls(&base, &forge, "origin", "glpat").ok().unwrap();
+        let body = r#"{"data":{"project":{"mergeRequests":{"nodes":[{"iid":"3","title":"Fix",
+            "webUrl":"https://gitlab.com/x/-/merge_requests/3","draft":false,"sourceBranch":"fix/x",
+            "diffHeadSha":"def456","author":{"username":"minji"},"headPipeline":{"status":"RUNNING"},"approved":true}]}}}}"#;
+        let (url, server) = serve_once("200 OK", body);
+        let prs = open_pulls(&url, &forge, "origin", "glpat").ok().unwrap();
         let request = server.join().unwrap();
-        assert!(request.starts_with("GET /projects/group%2Fsub%2Fproject/merge_requests?state=opened"));
-        assert!(request.to_ascii_lowercase().contains("private-token: glpat"));
+        assert!(
+            request
+                .replace([' ', '\n'], "")
+                .contains(r#""path":"group/sub/project""#),
+            "{request}"
+        );
         assert_eq!(
-            (prs[0].number, prs[0].draft, prs[0].sha.as_str()),
-            (3, false, "def456")
+            (
+                prs[0].number,
+                prs[0].sha.as_str(),
+                prs[0].author.as_str(),
+                prs[0].checks,
+                prs[0].review
+            ),
+            (
+                3,
+                "def456",
+                "minji",
+                Some(Checks::Pending),
+                Some(Review::Approved)
+            )
         );
 
-        let (base, server) = serve_once("401 Unauthorized", r#"{"message":"Bad credentials"}"#);
+        let (url, server) = serve_once("401 Unauthorized", r#"{"message":"Bad credentials"}"#);
         assert!(matches!(
-            open_pulls(&base, &forge, "origin", "old"),
+            open_pulls(&url, &forge, "origin", "old"),
             Err(FetchError::Unauthorized)
         ));
+        server.join().unwrap();
+
+        let (url, server) = serve_once("200 OK", r#"{"data":null,"errors":[{"message":"no access"}]}"#);
+        assert!(
+            matches!(open_pulls(&url, &forge, "origin", "t"), Err(FetchError::Other(m)) if m == "no access")
+        );
         server.join().unwrap();
     }
 }

@@ -7,30 +7,26 @@ _마지막 갱신: 2026-10-01_
 
 ## 방금 끝난 것
 
-- PR #41(이름 변경 otgit → ddugit, CI 절감)을 squash merge했다(`0bc7ca2`). CI는 PR에서만, 바뀐 쪽만 돌고 Rust는 ubuntu만 돈다.
-- 저장소가 `Jimoou/ddugit`(public)이 됐다. git remote도 바꿨다. 세션에 `jimoou/ddugit`을 추가해야 push된다(이미 했다).
+- PR #42(M4 PR 연동)를 squash merge했다(`95b6fff`).
+- 사용자 결정(2026-10-02): 세 작업을 차례로 한다. 1) PR CI·리뷰 상태 표시, 2) 첫 실행 튜토리얼, 3) ddugit 이름의 릴리스 초안. 그리고 "브랜치 맵에서 커밋 내용이 첫눈에 보이게"를 기획해서 제안했다(답을 기다린다):
+  1. 대각선 요약 라벨(40°, 100%에서도 30~40자)과 줌 단계별 정보량
+  2. 종류 기호(Conventional/키워드)와 변경량을 별 밝기로
+  3. 미리보기 카드(요약·본문·파일·+/−)
+  4. (선택) 세로 목록 보기 전환
 
 ## 지금 하는 일
 
-M4 PR 연동 → PR CI 대기
+1. PR CI·리뷰 상태 → PR CI 대기
 
-- Rust `forge.rs`
-  - `parse_remote`: https, scp, ssh 형식에서 GitHub·GitLab과 slug를 읽는다
-  - 토큰: `gh auth token` / `glab config get token`이 먼저, 없으면 keyring(서비스 `ddugit`, 사용자 = host)
-  - ureq로 열린 PR·MR을 받는다. 401·403이면 `unauthorized`
-  - 테스트 4개
-- 명령: `pull_requests`, `set_forge_token`, `open_url`(https만)
-- 프론트
-  - `components/Pulls.tsx`: `prRefs`(그래프 라벨), `PullSection`(사이드바), `TokenDialog`
-  - `RepoView`: 탭이 보일 때 읽고 5분마다 다시 읽는다. 원격 작업이 성공해도 다시 읽는다
-  - ⚿(토큰 관리)는 키체인 토큰을 쓸 때만 보인다
-- 데모: `demoControls.forgeToken`
+- `forge.rs`: REST 대신 GraphQL 한 번으로 PR 목록과 상태를 함께 받는다(GitHub `statusCheckRollup`·`reviewDecision`, GitLab `headPipeline.status`·`approved`). HTTP 200이어도 GraphQL 오류가 있으면 실패로 본다
+- `PullRequest.checks`(success/failure/pending)와 `review`(approved/changes/required)
+- 라벨 색은 `PR_COLOR[checks]`(renderer), 이름 뒤에 ✓/✎. 사이드바에는 CI 점과 승인·수정 요청 칩
 
 ## 다음 단계
 
-1. PR 연동 2단계(선택): PR의 CI·리뷰 상태(체크 성공·실패·대기, 승인·변경 요청)를 라벨 색으로 보여 준다
-2. 제안 중: 첫 실행 튜토리얼(미션)
-3. 릴리스: 이름이 바뀌었으니 v0.1.0 초안은 지우고 ddugit 이름으로 새 초안을 만드는 것을 제안한다. 릴리스 전에 "CI · Rust"를 `all_os`로 수동 실행한다
+2. 첫 실행 튜토리얼(미션)
+3. 릴리스: v0.1.0(otgit) 초안을 지우고, "CI · Rust"를 `all_os`로 수동 실행한 뒤 ddugit v0.1.0 초안을 만든다
+4. 커밋 내용 보이기: 사용자 답에 따라
 
 ## 막힌 것 / 결정 필요
 

@@ -2624,3 +2624,30 @@ kbd {
 .token-dialog .token-page {
   align-self: flex-start;
 }
+.pulls .pr-ci {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c9b8ff;
+  opacity: 0.5;
+}
+.pulls .pr-ci.success {
+  background: var(--ok);
+  opacity: 1;
+}
+.pulls .pr-ci.failure {
+  background: var(--red);
+  opacity: 1;
+}
+.pulls .pr-ci.pending {
+  background: var(--amber);
+  opacity: 1;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.pulls .chip.review.approved {
+  color: var(--ok);
+}
+.pulls .chip.review.changes {
+  color: var(--amber);
+}

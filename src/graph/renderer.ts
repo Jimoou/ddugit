@@ -499,7 +499,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       }
       for (const b of pg.badges) {
         const item = b.index >= 0 ? labels[b.index] : null;
-        const col = item?.rf.kind === "tag" ? NEON[3] : item?.rf.kind === "pr" ? PR_COLOR : L.color;
+        const col =
+          item?.rf.kind === "tag" ? NEON[3] : item?.rf.kind === "pr" ? PR_COLOR[item.rf.checks ?? "none"] : L.color;
         ctx.globalAlpha = L.d ? 0.3 : item?.rf.kind === "remote" || !item ? 0.75 : 1;
         roundRect(ctx, b.x, b.y, b.w, BADGE_H, 9);
         ctx.fillStyle = item?.isHead ? col : "rgba(10,8,20,0.85)";
@@ -671,8 +672,8 @@ function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: 
 }
 
 const TRAIL = "#ffd479";
-/** Pull request labels: a pale violet, apart from every lane color. */
-const PR_COLOR = "#c9b8ff";
+/** Pull request labels by CI state: green, red, amber; pale violet when nothing runs. */
+const PR_COLOR = { success: "#4fd1a5", failure: "#ff4d6d", pending: "#ffb84d", none: "#c9b8ff" } as const;
 
 /**
  * A star chart through the commits that touched a file, oldest to newest,

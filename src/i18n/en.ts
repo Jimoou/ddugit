@@ -603,4 +603,10 @@ export const en: Record<Key, string> = {
   "pr.token.forget": "Forget the saved token",
   "pr.token.saved": "Connected to {forge}",
   "pr.token.forgotten": "Forgot the saved token",
+  "pr.checks.success": "Checks passed",
+  "pr.checks.failure": "Checks failed",
+  "pr.checks.pending": "Checks running",
+  "pr.checks.none": "No checks",
+  "pr.review.approved": "Approved",
+  "pr.review.changes": "Changes requested",
 };

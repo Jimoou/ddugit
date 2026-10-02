@@ -607,6 +607,10 @@ test("lists open pull requests, checks one out, and connects or forgets a forge 
   await expect(section.locator("li")).toHaveCount(2);
   await expect(section.locator("li").nth(0)).toContainText("#12");
   await expect(section.locator("li").nth(1)).toContainText("초안");
+  // CI and review state ride along: #12 passed and is approved, #15 failed.
+  await expect(section.locator("li").nth(0).locator(".pr-ci")).toHaveClass(/success/);
+  await expect(section.locator("li").nth(0)).toContainText("승인");
+  await expect(section.locator("li").nth(1).locator(".pr-ci")).toHaveClass(/failure/);
   await expect(section.getByRole("button", { name: "토큰 관리" })).toHaveCount(0);
 
   await section.locator("li").nth(0).click({ button: "right" });

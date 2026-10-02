@@ -60,7 +60,8 @@
   - [x] 정리한 뒤 강제 push: Push 거부 화면에 "덮어쓰기"(`--force-with-lease`)
 - [x] GitHub / GitLab PR 연동 (그래프에 PR 상태 표시) — 2026-10-02 결정: 토큰은 `gh`/`glab` 로그인 먼저, 없으면 앱에서 받아 OS 키체인
   - [x] 열린 PR·MR을 head 커밋 라벨(⇄ #12 / !3)과 사이드바 PR 목록으로, 우클릭: 브라우저·그래프에서 보기·브랜치 체크아웃, 토큰 없음·거절 시 연결 안내와 토큰 만들기 링크
-  - [ ] CI 상태·리뷰 상태 표시, 닫힌·병합된 PR
+  - [x] CI 상태·리뷰 상태 표시: 라벨 색(초록 통과·빨강 실패·주황 진행 중), 승인 ✓·수정 요청 ✎, 사이드바 점·칩. GraphQL 한 번으로 PR 목록과 상태를 함께 받는다
+  - [ ] 닫힌·병합된 PR
 
 ## M5 · 배포 품질
 
@@ -153,3 +154,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-01 | PR #39 squash merge(`10ce8c6`). 연출 3단계 충돌: `Nebula`(충돌 파일 수 > 0이면 `.on`, 해결되면 transition으로 흩어짐, 반짝임을 끄면 움직임 없이 색만), 충돌 e2e에 성운이 끼고 걷히는 것 확인. 게임 같은 연출 완료(e2e 24)                                                                                                                                                       |
 | 2026-10-02 | PR #40 squash merge(`5c118dc`). 이름 변경 otgit → ddugit(저장소 `Jimoou/ddugit`, 앱 identifier `com.ddugit.app`, 크레이트·패키지·화면·문서). 백포트 제외 config는 예전 `otgit.*` 키도 계속 읽는다. CI 절감: PR에서만, 바뀐 쪽만(`ci-web.yml`/`ci-rust.yml` 경로 필터), Rust는 ubuntu만(macOS·Windows는 수동 `all_os`), main push 검사 없음. 사용자가 저장소를 public으로 바꿨다 |
 | 2026-10-02 | PR #41 squash merge(`0bc7ca2`). M4 PR 연동: `forge.rs`(원격 URL → GitHub/GitLab, 토큰 gh/glab → keyring, ureq로 열린 PR·MR, 테스트 4: URL·API 주소·로컬 서버로 응답·401), `components/Pulls.tsx`(`prRefs` 가짜 `pr` ref로 그래프 라벨, 사이드바 섹션, 토큰 창), `open_url`(https만), 5분마다·원격 작업 후 다시 읽기(e2e 25)                                                     |
+| 2026-10-02 | PR #42 squash merge(`95b6fff`). PR 상태: `forge.rs`를 GraphQL로 바꿈(GitHub `statusCheckRollup`·`reviewDecision`, GitLab `headPipeline`·`approved`, GraphQL 오류도 실패로), `Checks`/`Review`, 라벨 색·표시, 사이드바 점·칩(cargo test forge 5, vitest 61)                                                                                                                      |
