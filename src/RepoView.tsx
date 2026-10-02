@@ -24,6 +24,7 @@ import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
 import { WorktreeDialog, WorktreeSection } from "./components/Worktrees";
 import { SubmoduleSection } from "./components/Submodules";
+import { LfsSection } from "./components/Lfs";
 import { joinPath } from "./recent";
 import { StashPanel } from "./components/StashPanel";
 import { SyncDialog } from "./components/SyncDialog";
@@ -64,6 +65,8 @@ import type {
   WorktreeOp,
   SubmoduleInfo,
   SubmoduleOp,
+  LfsOp,
+  LfsStatus,
 } from "./types";
 
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
@@ -175,6 +178,9 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  /** Git LFS, read apart from the snapshot (it runs `git lfs`). */
+  const [lfs, setLfs] = useState<LfsStatus | null>(null);
+  const [lfsTick, setLfsTick] = useState(0);
   /** Adding a worktree, maybe for a branch picked from its menu. */
   const [worktreeReq, setWorktreeReq] = useState<{ branch?: string } | null>(null);
   /** Preview card: the commit the pointer has rested on, where its star was then. */
@@ -697,6 +703,26 @@ export function RepoView({
         }),
     },
   ];
+
+  // Re-read LFS when the checkout moves (new files may be pointers) or after an LFS command.
+  const lfsKey = `${path}\n${snap?.head.target ?? ""}\n${lfsTick}`;
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    api.lfsStatus(path).then(
+      (status) => live && setLfs(status),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [path, active, lfsKey]);
+
+  const lfsRun = async (label: string, op: LfsOp) => {
+    const r = await run(label, () => api.lfs(path, op));
+    if (r.status === "auth") toast("err", t("lfs.auth"));
+    setLfsTick((n) => n + 1);
+  };
 
   const submoduleRun = async (label: string, op: SubmoduleOp) => {
     const r = await run(label, () => api.submodule(path, op));
@@ -1420,6 +1446,25 @@ export function RepoView({
                 onOpen={(m) => onOpenPath(joinPath(snap.path, m.path))}
                 onUpdateAll={() => void submoduleRun(t("sub.updated"), { kind: "update", path: null })}
                 onMenu={(m, x, y) => setMenu({ x, y, title: m.path, items: submoduleMenu(m) })}
+              />
+              <LfsSection
+                status={lfs}
+                busy={busy}
+                onTrack={() =>
+                  setNameReq({
+                    title: t("lfs.track.title"),
+                    placeholder: t("lfs.track.placeholder"),
+                    confirmLabel: t("lfs.track.go"),
+                    onSubmit: (pattern) => {
+                      setNameReq(null);
+                      void lfsRun(t("lfs.tracked", { pattern }), { kind: "track", pattern });
+                    },
+                  })
+                }
+                onUntrack={(pattern) => void lfsRun(t("lfs.untracked", { pattern }), { kind: "untrack", pattern })}
+                onTurnOn={() => void lfsRun(t("lfs.turnedOn"), { kind: "install" })}
+                onPull={() => void lfsRun(t("lfs.pulled"), { kind: "pull" })}
+                onOpenUrl={(url) => void api.openUrl(path, url).catch((e) => toast("err", String(e)))}
               />
               <WorktreeSection
                 worktrees={snap.worktrees}

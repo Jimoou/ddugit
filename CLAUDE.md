@@ -52,6 +52,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)
   - `worktree.rs`: worktree 목록(스냅샷의 `worktrees`, libgit2)과 추가·제거·정리(`WorktreeOp`). 화면은 `components/Worktrees.tsx`(사이드바 섹션·추가 창), 다른 worktree 폴더는 `onOpenPath`로 탭에 연다
   - `submodule.rs`: 서브모듈 상태(스냅샷의 `submodules`, libgit2)와 update(`--init --recursive`)·sync(`SubmoduleOp`). 화면은 `components/Submodules.tsx`
+  - `lfs.rs`: Git LFS 상태(`git lfs` CLI: 설치·패턴·필터·받지 않은 파일)와 install/pull/track/untrack(`LfsOp`). 스냅샷과 따로 읽는다(셸 실행). 화면은 `components/Lfs.tsx`(사이드바 섹션, 포인터 diff), 순수 로직 `lfs.ts`
   - `glance.rs`: 여러 저장소를 이력 없이 한 번에 훑기(브랜치·upstream 거리·변경·멈춘 작업·보관함·마지막 커밋). 새 탭의 은하 대시보드(`components/Galaxy.tsx`, 순수 로직 `galaxy.ts`)가 쓴다
   - `backport.rs`: 두 브랜치(예: `upstream/main` ↔ 고객사 `main`) 사이 미반영 커밋 비교(`--cherry-mark` + `-x` 트레일러), 제외 표시(받는 쪽별 로컬 config), 대상별 요약, 일괄 cherry-pick, 패치 내보내기
 - `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). 토큰은 webview로 넘기지 않는다

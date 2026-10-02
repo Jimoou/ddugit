@@ -375,3 +375,19 @@ export interface RepoGlance {
   remotes: number;
   last: { summary: string; author: string; time: number } | null;
 }
+
+/** Git LFS in one repository (see `git/lfs.rs`). */
+export interface LfsStatus {
+  /** `git lfs version`; null when git-lfs isn't installed. */
+  version: string | null;
+  /** Patterns the root `.gitattributes` sends through LFS. */
+  patterns: string[];
+  /** Filters configured: checkouts download the real content. */
+  filters: boolean;
+  /** Files still only pointers (content not downloaded). */
+  missing: number;
+  missingFiles: string[];
+}
+
+export type LfsOp =
+  { kind: "install" } | { kind: "pull" } | { kind: "track"; pattern: string } | { kind: "untrack"; pattern: string };

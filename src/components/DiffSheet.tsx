@@ -1,4 +1,6 @@
 import { Icon } from "./Icon";
+import { LfsDiff } from "./Lfs";
+import { lfsChange } from "../lfs";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
@@ -169,6 +171,7 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
     setPicked((cur) => ({ file, pick: next(cur.file === file ? cur.pick : null) }));
 
   if (file.binary) return <p className="muted pad">{t("diff.binary")}</p>;
+  if (lfsChange(file)) return <LfsDiff file={file} />;
   if (file.hunks.length === 0) return <p className="muted pad">{t("diff.modeOnly")}</p>;
 
   const toggle = (hunk: number, line: number, range: boolean) =>
