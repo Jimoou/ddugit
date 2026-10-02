@@ -14,6 +14,8 @@ export function TabBar(p: {
   tabs: Tabs;
   /** Repository names as the snapshots report them, by path (the folder name until loaded). */
   names: Record<string, string>;
+  /** Group of each grouped repository, by path: its colour runs along the tab's top. */
+  groupOf: Record<string, { name: string; hue: number }>;
   onSelect(id: number): void;
   onClose(id: number): void;
   onNew(): void;
@@ -30,13 +32,15 @@ export function TabBar(p: {
         {p.tabs.list.map((tab) => {
           const on = tab.id === p.tabs.active;
           const name = tab.path ? (p.names[tab.path] ?? repoName(tab.path)) : t("tabs.new");
+          const group = tab.path ? p.groupOf[tab.path] : undefined;
           return (
             <div
               key={tab.id}
               role="tab"
               aria-selected={on}
-              className={`tab ${on ? "on" : ""}`}
-              title={tab.path ?? undefined}
+              className={`tab ${on ? "on" : ""} ${group ? "grouped" : ""}`}
+              style={group ? { ["--h" as string]: group.hue } : undefined}
+              title={tab.path ? (group ? `${group.name} · ${tab.path}` : tab.path) : undefined}
               onClick={() => p.onSelect(tab.id)}
               onAuxClick={(e) => e.button === 1 && p.onClose(tab.id)}
             >
