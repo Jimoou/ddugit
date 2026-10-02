@@ -2,6 +2,7 @@
 // URL, or start a new one. Used by the welcome screen and the top bar menu.
 
 import { Icon } from "./Icon";
+import { PlanetDot } from "./Planet";
 import { useCallback, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -80,7 +81,9 @@ export function RecentList(p: { recent: Recent; current?: string | null; onOpen(
       {list.map((r) => (
         <li key={r.path} className={r.path === p.current ? "on" : ""}>
           <button className="recent-open" title={r.path} onClick={() => p.onOpen(r.path)}>
-            <b>{repoName(r.path)}</b>
+            <b>
+              <PlanetDot path={r.path} /> {repoName(r.path)}
+            </b>
             <span className="muted">{r.path}</span>
           </button>
           <button

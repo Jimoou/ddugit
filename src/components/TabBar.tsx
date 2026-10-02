@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { t } from "../i18n";
 import { repoName } from "../recent";
 import type { Tabs } from "../tabs";
+import { PlanetDot } from "./Planet";
 
 /**
  * The window's top row: the wordmark, a tab per open repository (the open
@@ -39,6 +40,7 @@ export function TabBar(p: {
               onClick={() => p.onSelect(tab.id)}
               onAuxClick={(e) => e.button === 1 && p.onClose(tab.id)}
             >
+              {tab.path && <PlanetDot path={tab.path} />}
               <span className="tab-name">{name}</span>
               {on && tab.path && (
                 <button

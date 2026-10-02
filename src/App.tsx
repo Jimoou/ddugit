@@ -5,6 +5,7 @@ import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsDialog } from "./components/SettingsDialog";
+import { PlanetBirth, SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
@@ -95,7 +96,17 @@ export default function App() {
     if (patch.language) setLocale(resolveLocale(patch.language));
   };
 
-  const openPath = useCallback((p: string) => setTabs((tb) => openIn(tb, p)), [setTabs]);
+  const openTab = useCallback((p: string) => setTabs((tb) => openIn(tb, p)), [setTabs]);
+  /** A repository being born (opened, cloned or created by the user), played over the window. */
+  const [birth, setBirth] = useState<{ n: number; path: string } | null>(null);
+  const openPath = useCallback(
+    (p: string) => {
+      // Switching to a tab that already has it is not a new world.
+      if (settings.animate && !tabs.list.some((x) => x.path === p)) setBirth((b) => ({ n: (b?.n ?? 0) + 1, path: p }));
+      openTab(p);
+    },
+    [openTab, settings.animate, tabs],
+  );
   const touchRecent = recent.touch;
   const onLoaded = useCallback(
     (p: string, name: string) => {
@@ -106,8 +117,8 @@ export default function App() {
   );
 
   useEffect(() => {
-    void api.initialRepo().then((p) => p && openPath(p));
-  }, [openPath]);
+    void api.initialRepo().then((p) => p && openTab(p));
+  }, [openTab]);
 
   // A git executable chosen in settings applies from startup.
   const startGitPath = useRef(settings.gitPath);
@@ -260,6 +271,7 @@ export default function App() {
         ) : (
           tab.id === tabs.active && (
             <div key={tab.id} className="welcome">
+              <SpaceBackdrop animate={settings.animate} />
               <h1 className="wordmark">ddugit</h1>
               <p>{t("app.tagline")}</p>
               <ConnectActions primary {...connect} />
@@ -310,6 +322,7 @@ export default function App() {
           <div>{t("connect.drop")}</div>
         </div>
       )}
+      {birth && <PlanetBirth key={birth.n} path={birth.path} onDone={() => setBirth(null)} />}
       {settingsOpen && (
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
