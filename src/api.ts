@@ -12,6 +12,7 @@ import type {
   DiffScope,
   FileDiff,
   FileTouch,
+  PrReport,
   OpResult,
   PickOp,
   RebaseStep,
@@ -64,6 +65,10 @@ export interface Commands {
   git_restore_file: [{ path: string; source: string; file: string }, OpResult];
   git_bisect: [{ path: string; op: BisectOp }, OpResult];
   bisect_state: [{ path: string }, BisectState | null];
+  pull_requests: [{ path: string }, PrReport];
+  // `path` only routes the demo; the backend keys tokens by host.
+  set_forge_token: [{ path: string; host: string; token: string | null }, null];
+  open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
   git_discard: [{ path: string; paths: string[] }, OpResult];
@@ -144,6 +149,11 @@ export const api = {
   /** Start a bisect between a bad and a good commit, or judge the commit checked out now. Finish with `abort`. */
   bisect: (path: string, op: BisectOp) => call("git_bisect", { path, op }),
   bisectState: (path: string) => call("bisect_state", { path }),
+  /** Open pull / merge requests on the repository's forge remotes (GitHub, GitLab). */
+  pullRequests: (path: string) => call("pull_requests", { path }),
+  /** Keep a forge token in the keychain (`null` forgets it). */
+  setForgeToken: (path: string, host: string, token: string | null) => call("set_forge_token", { path, host, token }),
+  openUrl: (path: string, url: string) => call("open_url", { path, url }),
   /** Commits reachable from `rev` that changed `file` (following renames), newest first. */
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
   /** Who last changed each line of `file` as of `rev`. */

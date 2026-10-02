@@ -11,7 +11,8 @@ export interface CommitInfo {
   time: number;
 }
 
-export type RefKind = "local" | "remote" | "tag";
+/** `pr` refs exist only on the frontend: open pull requests drawn like labels (see `components/Pulls.tsx`). */
+export type RefKind = "local" | "remote" | "tag" | "pr";
 
 export interface RefInfo {
   name: string;
@@ -64,6 +65,39 @@ export interface BisectState {
   culprit: string | null;
   /** Commits that may still be the first bad one, newest first. */
   candidates: string[];
+}
+
+export type ForgeKind = "github" | "gitlab";
+
+/** An open pull request (GitHub) or merge request (GitLab). */
+export interface PullRequest {
+  remote: string;
+  number: number;
+  title: string;
+  url: string;
+  draft: boolean;
+  /** Source branch on the forge. */
+  branch: string;
+  /** Head commit. */
+  sha: string;
+  author: string;
+}
+
+export interface ForgeStatus {
+  remote: string;
+  kind: ForgeKind;
+  host: string;
+  slug: string;
+  /** Where the token came from: the forge CLI (`gh` / `glab`), the keychain, or nowhere yet. */
+  token: "cli" | "keychain" | "none";
+  /** The token was refused. */
+  unauthorized: boolean;
+  error: string | null;
+}
+
+export interface PrReport {
+  forges: ForgeStatus[];
+  prs: PullRequest[];
 }
 
 /** A commit that changed a file, and the file's path in it (renames are followed). */

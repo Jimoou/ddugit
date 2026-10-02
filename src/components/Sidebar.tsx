@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { stashTitle } from "../format";
 import type { RefInfo, StashInfo } from "../types";
 import { type Key, t } from "../i18n";
@@ -17,6 +17,8 @@ interface Props {
   onAddRemote(): void;
   /** Open branch housekeeping (merged, gone, stale). */
   onCleanup(): void;
+  /** Open pull requests (or how to connect the forge), shown after the refs. */
+  pulls?: ReactNode;
 }
 
 const GROUPS: { kind: RefInfo["kind"]; title: Key }[] = [
@@ -88,6 +90,7 @@ export function Sidebar(props: Props) {
           </section>
         );
       })}
+      {props.pulls}
       {stashes.length > 0 && (
         <section>
           <h3>
