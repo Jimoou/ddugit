@@ -614,6 +614,9 @@ export const en: Record<Key, string> = {
   "pr.token.forget": "Forget the saved token",
   "pr.token.saved": "Connected to {forge}",
   "pr.token.forgotten": "Forgot the saved token",
+  "pr.token.foreign":
+    "<b>{host}</b> is not github.com or gitlab.com: only the repository's remote URL says it is. Use a token issued by this server, and only if you trust it.",
+  "pr.token.trustCli": "Use my gh/glab login for {host}",
   "pr.checks.success": "Checks passed",
   "pr.checks.failure": "Checks failed",
   "pr.checks.pending": "Checks running",

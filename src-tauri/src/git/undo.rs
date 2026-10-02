@@ -20,6 +20,7 @@ pub enum ResetMode {
 
 /// Move the current branch (or detached HEAD) to `target`.
 pub fn reset(path: &str, target: &str, mode: ResetMode) -> Result<OpResult> {
+    super::operand(target)?;
     if in_progress(path) {
         return Err("Finish or cancel the operation in progress first".into());
     }

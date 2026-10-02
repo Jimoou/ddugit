@@ -875,6 +875,7 @@ const mockTable: Table = {
           host: "github.com",
           slug: "ddugit/ddugit-demo",
           token: token === "unauthorized" ? ("keychain" as const) : token,
+          public: true,
           unauthorized: token === "unauthorized",
           error: null,
         },

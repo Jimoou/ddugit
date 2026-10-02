@@ -612,6 +612,9 @@ export const ko = {
   "pr.token.forget": "저장된 토큰 지우기",
   "pr.token.saved": "{forge}에 연결했어요",
   "pr.token.forgotten": "저장된 토큰을 지웠어요",
+  "pr.token.foreign":
+    "<b>{host}</b>는 github.com·gitlab.com이 아니에요. 저장소의 원격 주소만 보고 판단한 것이니, 이 서버를 믿을 수 있을 때만 이 서버에서 발급한 토큰을 쓰세요.",
+  "pr.token.trustCli": "{host}에 gh/glab 로그인 사용",
   "pr.checks.success": "CI 통과",
   "pr.checks.failure": "CI 실패",
   "pr.checks.pending": "CI 진행 중",

@@ -62,6 +62,8 @@ pub struct BackportItem {
 /// backport state. Merge commits are left out: their changes arrive with their
 /// parents.
 pub fn compare(path: &str, source: &str, target: &str) -> Result<Vec<BackportItem>> {
+    super::operand(source)?;
+    super::operand(target)?;
     let dir = repo_dir(path)?;
     for r in [source, target] {
         git_ok(
@@ -191,6 +193,9 @@ pub fn summary(path: &str, source: &str, targets: &[String]) -> Result<Vec<Backp
 /// Cherry-pick `ids` (oldest first) onto `target` with `-x`, so later
 /// comparisons recognise them even when conflicts changed the patch.
 pub fn apply(path: &str, ids: &[String], target: &str) -> Result<OpResult> {
+    for id in ids {
+        super::operand(id)?;
+    }
     if ids.is_empty() {
         return Err("No commits selected".into());
     }
@@ -203,6 +208,10 @@ pub fn apply(path: &str, ids: &[String], target: &str) -> Result<OpResult> {
 /// Write `ids` (oldest first) as numbered `.patch` files into `out_dir`, for a
 /// fork that can't fetch from the original (e.g. a customer's closed network).
 pub fn export(path: &str, ids: &[String], out_dir: &str) -> Result<OpResult> {
+    for id in ids {
+        super::operand(id)?;
+    }
+    super::operand(out_dir)?;
     if ids.is_empty() {
         return Err("No commits selected".into());
     }

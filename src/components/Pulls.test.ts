@@ -8,6 +8,7 @@ const forge = (over: Partial<ForgeStatus> = {}): ForgeStatus => ({
   host: "github.com",
   slug: "o/r",
   token: "cli",
+  public: true,
   unauthorized: false,
   error: null,
   ...over,

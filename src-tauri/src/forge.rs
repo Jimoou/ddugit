@@ -81,6 +81,8 @@ pub struct ForgeStatus {
     pub host: String,
     pub slug: String,
     pub token: TokenSource,
+    /// Not github.com / gitlab.com: the UI says so before any token goes there.
+    pub public: bool,
     /// The token was refused: ask the user for a new one.
     pub unauthorized: bool,
     pub error: Option<String>,
@@ -188,9 +190,20 @@ fn cli_token(kind: ForgeKind, host: &str) -> Option<String> {
     None
 }
 
-/// The forge CLI's token first, then the keychain.
-fn token_for(kind: ForgeKind, host: &str) -> (Option<String>, TokenSource) {
-    if let Some(t) = cli_token(kind, host) {
+/// github.com and gitlab.com themselves; any other host is only "a GitHub" or
+/// "a GitLab" because its name says so, which a repository's remote URL controls.
+pub fn is_public_forge(host: &str) -> bool {
+    host == "github.com" || host == "gitlab.com"
+}
+
+/// The forge CLI's token first, then the keychain. A CLI login is used for a
+/// host other than github.com / gitlab.com only once the user trusted that host:
+/// `gh` hands out its enterprise token for any host, so a repository whose
+/// remote names `github.attacker.example` would otherwise receive it. A token
+/// in the keychain was saved by the user for exactly that host.
+fn token_for(kind: ForgeKind, host: &str, trusted: &[String]) -> (Option<String>, TokenSource) {
+    let cli_ok = is_public_forge(host) || trusted.iter().any(|t| t == host);
+    if let Some(t) = cli_ok.then(|| cli_token(kind, host)).flatten() {
         return (Some(t), TokenSource::Cli);
     }
     match keychain(host).and_then(|e| e.get_password().ok()) {
@@ -416,7 +429,9 @@ fn open_pulls(
 }
 
 /// Ask each forge remote (origin first, each project once) for its open pull requests.
-pub fn report(path: &str) -> Result<PrReport> {
+/// `trusted` are hosts (besides github.com / gitlab.com) whose `gh` / `glab`
+/// login the user agreed to use.
+pub fn report(path: &str, trusted: &[String]) -> Result<PrReport> {
     let repo = git2::Repository::discover(Path::new(path)).map_err(|e| e.message().to_string())?;
     let mut names: Vec<String> = repo
         .remotes()
@@ -440,13 +455,14 @@ pub fn report(path: &str) -> Result<PrReport> {
             continue;
         }
         seen.push(forge.clone());
-        let (token, source) = token_for(forge.kind, &forge.host);
+        let (token, source) = token_for(forge.kind, &forge.host, trusted);
         let mut status = ForgeStatus {
             remote: name.clone(),
             kind: forge.kind,
             host: forge.host.clone(),
             slug: forge.slug.clone(),
             token: source,
+            public: is_public_forge(&forge.host),
             unauthorized: false,
             error: None,
         };
@@ -499,6 +515,16 @@ mod tests {
         assert_eq!(parse_remote("https://example.com/a/b.git"), None);
         assert_eq!(parse_remote("/srv/git/project.git"), None);
         assert_eq!(parse_remote("https://github.com/only-owner"), None);
+    }
+
+    #[test]
+    fn only_the_public_forges_get_a_cli_token_unasked() {
+        assert!(is_public_forge("github.com") && is_public_forge("gitlab.com"));
+        assert!(!is_public_forge("github.attacker.example"));
+        assert!(!is_public_forge("gitlab.example.com"));
+        // An untrusted host never reaches `gh` / `glab`, and has no keychain entry here.
+        let (token, source) = token_for(ForgeKind::Github, "github.attacker.example", &[]);
+        assert!(token.is_none() && source != TokenSource::Cli);
     }
 
     #[test]

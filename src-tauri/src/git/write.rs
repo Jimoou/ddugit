@@ -6,7 +6,8 @@ use git2::{BranchType, Oid, RepositoryState};
 
 use super::read::read_head;
 use super::{
-    git, git_ok, in_progress, open, repo_dir, state_name, workdir, OpResult, OpStatus, Output, Result,
+    git, git_ok, in_progress, open, operand, repo_dir, state_name, workdir, OpResult, OpStatus, Output,
+    Result,
 };
 
 /// Commit the given paths (exactly those, regardless of what else is staged).
@@ -51,6 +52,7 @@ pub fn commit_index(path: &str, message: &str, amend: bool) -> Result<OpResult> 
 /// Refuse to start while another operation is half-done, then check out
 /// `target` if it isn't already HEAD. Shared by merge and cherry-pick.
 pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {
+    target.map(operand).transpose()?;
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     if repo.state() != RepositoryState::Clean {
@@ -70,6 +72,7 @@ pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {
 /// Merge `source` (branch name or commit id) into `target` branch.
 /// When `target` isn't the current branch it is checked out first.
 pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult> {
+    operand(source)?;
     let dir = prepare_on(path, target)?;
     let o = git(&dir, &["merge", "--no-ff", "--no-edit", source])?;
     Ok(conflict_aware(path, o))
@@ -114,11 +117,14 @@ pub fn continue_op(path: &str) -> Result<OpResult> {
 }
 
 pub fn checkout(path: &str, target: &str) -> Result<OpResult> {
+    operand(target)?;
     let dir = repo_dir(path)?;
     Ok(git(&dir, &["checkout", target])?.into())
 }
 
 pub fn create_branch(path: &str, name: &str, at: Option<&str>, switch: bool) -> Result<OpResult> {
+    operand(name)?;
+    at.map(operand).transpose()?;
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     if repo.find_branch(name, BranchType::Local).is_ok() {

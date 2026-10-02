@@ -123,6 +123,8 @@ export function TokenDialog(p: {
   busy: boolean;
   onSave(token: string | null): void;
   onOpenPage(url: string): void;
+  /** Use the `gh` / `glab` login for this (not github.com / gitlab.com) host. */
+  onTrustCli(): void;
   onCancel(): void;
 }) {
   const [token, setToken] = useState("");
@@ -138,9 +140,18 @@ export function TokenDialog(p: {
         onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
       >
         <div className="eyebrow">{t("pr.token.title", { forge: name })}</div>
+        {!p.forge.public && (
+          // Only the remote URL says this host is a GitHub / GitLab: make sure before a token goes there.
+          <p className="note warn">
+            <Rich k="pr.token.foreign" vars={{ host: p.forge.host }} />
+          </p>
+        )}
         <p>
           <Rich k={p.forge.kind === "github" ? "pr.token.cli.gh" : "pr.token.cli.glab"} vars={{ host: p.forge.host }} />
         </p>
+        {!p.forge.public && p.forge.token !== "cli" && (
+          <button onClick={p.onTrustCli}>{t("pr.token.trustCli", { host: p.forge.host })}</button>
+        )}
         <p className="muted">{t("pr.token.paste", { host: p.forge.host })}</p>
         <button className="token-page" onClick={() => p.onOpenPage(page)}>
           {t("pr.token.make")} <Icon name="external" size={12} />

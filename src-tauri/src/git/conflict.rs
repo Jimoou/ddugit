@@ -1,6 +1,7 @@
 //! Merge conflict inspection and resolution for a single file.
 
 use std::fs;
+use std::path::{Component, Path, PathBuf};
 
 use git2::Repository;
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,21 @@ fn blob_text(repo: &Repository, entry: Option<&git2::IndexEntry>) -> (Option<Str
     }
 }
 
+/// `file` as a path inside the work tree: relative, no `..`, not through a symlink.
+fn inside(dir: &Path, file: &str) -> Result<PathBuf> {
+    let rel = Path::new(file);
+    if file.is_empty() || rel.is_absolute() || rel.components().any(|c| !matches!(c, Component::Normal(_))) {
+        return Err(format!("'{file}' is not a path inside the repository"));
+    }
+    let full = dir.join(rel);
+    if full.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err(format!(
+            "'{file}' is a symbolic link; resolve it with Ours or Theirs"
+        ));
+    }
+    Ok(full)
+}
+
 pub fn conflict_file(path: &str, file: &str) -> Result<ConflictFile> {
     let repo = open(path)?;
     let index = repo.index().map_err(err)?;
@@ -59,7 +75,10 @@ pub fn conflict_file(path: &str, file: &str) -> Result<ConflictFile> {
     let (base, b1) = blob_text(&repo, conflict.ancestor.as_ref());
     let (ours, b2) = blob_text(&repo, conflict.our.as_ref());
     let (theirs, b3) = blob_text(&repo, conflict.their.as_ref());
-    let merged = fs::read(workdir(&repo)?.join(file))
+    // A symlink in the work tree is not followed: its target may be anywhere.
+    let merged = inside(&workdir(&repo)?, file)
+        .ok()
+        .and_then(|p| fs::read(p).ok())
         .map(|b| String::from_utf8_lossy(&b).into_owned())
         .unwrap_or_default();
     Ok(ConflictFile {
@@ -89,7 +108,9 @@ pub fn resolve(path: &str, file: &str, how: &Resolution) -> Result<OpResult> {
             git_ok(&dir, &["add", "--", file])?
         }
         (Resolution::Content { text }, None) => {
-            fs::write(dir.join(file), text).map_err(err)?;
+            // Only a file that is in conflict, and only inside the work tree.
+            conflict_file(path, file)?;
+            fs::write(inside(&dir, file)?, text).map_err(err)?;
             git_ok(&dir, &["add", "--", file])?
         }
         _ => unreachable!("sides only come from Ours / Theirs"),
@@ -131,6 +152,33 @@ mod tests {
         assert!(c.merged.contains("<<<<<<<") && c.merged.contains(">>>>>>>"));
         assert!(!c.binary);
         assert!(conflict_file(s(d.path()), "nope.txt").is_err());
+    }
+
+    #[test]
+    fn writes_only_conflicted_files_inside_the_work_tree() {
+        let d = conflicted();
+        let p = s(d.path());
+        let write = |file: &str| resolve(p, file, &Resolution::Content { text: "x".into() });
+        assert!(write("../outside.txt").is_err());
+        assert!(write("/tmp/outside.txt").is_err());
+        // In the repository but not in conflict.
+        std::fs::write(d.path().join("b.txt"), "b").unwrap();
+        assert!(write("b.txt").is_err());
+        assert!(!d.path().parent().unwrap().join("outside.txt").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn never_follows_a_conflicted_symlink() {
+        let d = conflicted();
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(outside.path(), "secret").unwrap();
+        std::fs::remove_file(d.path().join("a.txt")).unwrap();
+        std::os::unix::fs::symlink(outside.path(), d.path().join("a.txt")).unwrap();
+        let p = s(d.path());
+        assert_eq!(conflict_file(p, "a.txt").unwrap().merged, "");
+        assert!(resolve(p, "a.txt", &Resolution::Content { text: "x".into() }).is_err());
+        assert_eq!(std::fs::read_to_string(outside.path()).unwrap(), "secret");
     }
 
     #[test]

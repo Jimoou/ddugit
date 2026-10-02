@@ -116,6 +116,8 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
                 return Err(format!("'{branch}' has no upstream branch; push it first"));
             }
             let remote = default_remote(&repo).ok_or("No remote configured")?;
+            super::operand(&remote)?;
+            super::operand(&branch)?;
             args.extend(["-u".into(), remote, branch]);
         }
     }

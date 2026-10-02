@@ -17,6 +17,7 @@ pub enum PickOp {
 /// Apply `op` with commit `id` on `target` (checked out first when it isn't HEAD).
 /// Merge commits are taken relative to their first parent.
 pub fn pick(path: &str, op: PickOp, id: &str, target: Option<&str>) -> Result<OpResult> {
+    super::operand(id)?;
     let is_merge = {
         let repo = open(path)?;
         let c = repo

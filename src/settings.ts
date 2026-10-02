@@ -19,6 +19,8 @@ export interface Settings {
   sidebarCollapsed: boolean;
   /** Sidebar sections folded shut, by id ("local", "remote", "tag", "pulls", "stash"). */
   closedSections: string[];
+  /** Forge hosts (besides github.com / gitlab.com) whose `gh` / `glab` login the user agreed to use. */
+  trustedForgeHosts: string[];
 }
 
 export const HISTORY_PAGES = [1000, 3000, 10000] as const;
@@ -33,6 +35,7 @@ export function defaults(reducedMotion = false): Settings {
     rotation: 0,
     sidebarCollapsed: false,
     closedSections: [],
+    trustedForgeHosts: [],
   };
 }
 
@@ -60,6 +63,10 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
       Array.isArray(o.closedSections) && o.closedSections.every((x) => typeof x === "string")
         ? o.closedSections
         : base.closedSections,
+    trustedForgeHosts:
+      Array.isArray(o.trustedForgeHosts) && o.trustedForgeHosts.every((x) => typeof x === "string")
+        ? o.trustedForgeHosts
+        : base.trustedForgeHosts,
   };
 }
 
