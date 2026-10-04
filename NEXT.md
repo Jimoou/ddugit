@@ -3,12 +3,12 @@
 > **갱신형 문서입니다.** 작업 단위가 끝날 때마다 **덮어씁니다.** 이력은 [ROADMAP.md](ROADMAP.md)의 작업 기록에 남깁니다.
 > 컨텍스트가 압축되거나 새 세션을 시작하면 **이 파일부터 읽습니다.**
 
-_마지막 갱신: 2026-10-04_
+_마지막 갱신: 2026-10-05_
 
 ## 방금 끝난 것
 
-- v0.7.0 버전 올림(이 PR) → merge 후 main에서 Release 수동 실행(`release: true`). Free / Pro, 다듬기, M17 Pro 기능 넷
-- 사이트 가격표·첫 화면에 새 Pro 기능(ddugit-site#15)
+- v0.7.0 게시. 로그인 활성화(앱 설정 → '계정으로 활성화' → 브라우저 로그인 → 127.0.0.1 루프백으로 1회용 코드 → 라이선스), 사이트 `/activate`(ddugit-site#16). 가격은 달러 $5/월·$50/년
+- 사용자: Lemon Squeezy 상품 'ddugit Pro'(Monthly $5 / Yearly $50, 스토어 체험·라이선스 키 끔)
 
 ## 결정 (2026-10-04, 수익 모델)
 
@@ -18,7 +18,7 @@ _마지막 갱신: 2026-10-04_
 ## 다음 단계
 
 - 사용자: v0.6.1 → v0.7.0 자동 업데이트 확인(macOS), Windows 실기 점검
-- M15 마지막: Lemon Squeezy(사용자: 스토어·상품 월 ₩4,900 / 연 ₩49,000) → 웹훅 Edge Function(구독 생성·갱신·해지 → `licenses`, 첫 라이선스 발급 메일), 사이트 가격 페이지 구매 버튼, 앱 `BUY_URL`, 결제부터 앱 활성화까지 확인
+- M15 마지막: Lemon Squeezy 웹훅 Edge Function(구독 생성·갱신·해지 → `licenses` 행, 라이선스 서명은 `currentText`), 사이트 가격 페이지 구매 버튼(체크아웃 URL), 결제 → 앱에서 '계정으로 활성화'까지 확인. 라이선스 메일은 보내지 않는다(로그인 활성화)
 - 사용자: 라이선스 발급 키 → Supabase Edge Functions Secrets(`DDUGIT_LICENSE_PRIVATE_KEY`, `DDUGIT_LICENSE_PUBKEY`) + ddugit Variables `DDUGIT_LICENSE_PUBKEY`
 - 사용자: Windows 실기 점검, 세무(사업자등록·통신판매업), 오늘 끝나면 두 저장소 비공개로
 - M16: 첫 실행 안내, 영문 문구 점검, 문제 신고 경로, 큰 저장소 성능 → v1.0.0

@@ -23,6 +23,8 @@ import type {
 import { applyPlan } from "./rebasePlan";
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
+/** Bumped by cancelling, so a pending demo sign-in ends as "Cancelled". */
+const demoActivation = { n: 0 };
 const demoLicense = { current: null as import("./types").LicenseInfo | null };
 const demoLicenseExpired = () => {
   const e = demoLicense.current?.expires;
@@ -1273,6 +1275,28 @@ const mockTable: Table = {
       checkable: true,
       expired: demoLicenseExpired(),
     });
+  },
+  async license_activate() {
+    const ticket = ++demoActivation.n;
+    await delay(null, 900);
+    if (ticket !== demoActivation.n) return Promise.reject("Cancelled");
+    demoLicense.current = {
+      id: "lic_demo_sub",
+      name: "Demo User",
+      email: "me@demo.example",
+      kind: "commercial",
+      seats: 1,
+      issued: "2026-10-04",
+      updatesUntil: "2026-11-11",
+      expires: "2026-11-11",
+      plan: "monthly",
+    };
+    demoControls.pro = { pro: true, source: "license", trialDaysLeft: null };
+    return { license: demoLicense.current, newerThanLicense: false, checkable: true, expired: false };
+  },
+  license_activate_cancel() {
+    demoActivation.n++;
+    return delay(undefined, 0);
   },
   license_refresh() {
     const lic = demoLicense.current;
