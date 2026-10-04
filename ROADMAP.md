@@ -204,6 +204,47 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 ---
 
+## 출시까지 — 2026-10-04 사용자 결정
+
+결정:
+
+- Windows는 서명 없이 배포한다(다운로드 페이지에 SmartScreen 안내).
+- 다운로드 사이트는 직접 만든다: 저장소 `ddugit-site`, 도메인 `ddugit.com`, 호스팅 Netlify, 로그인은 GitHub·Google(Supabase Auth), Supabase 연동.
+- 다운로드와 앱 사용에는 로그인이 필요 없다. 로그인은 구매·라이선스 관리에만 쓴다.
+- 가격은 5천원 미만 구독제(Lemon Squeezy). 사업자등록·통신판매업 등 세무는 사용자가 확인한다.
+- 설치 파일 저장소는 Cloudflare R2(트래픽 요금 없음)를 쓴다. `dl.ddugit.com` 연결을 위해 ddugit.com DNS를 Cloudflare로 옮긴다(사이트는 Netlify 그대로).
+
+### M12 · v0.6.0 정리 릴리스
+
+- [ ] 버전 0.6.0, CI · Rust all_os, Release(서명된 macOS + 미서명 Windows)
+- [ ] 실제 기기 점검(사용자): macOS 서명 경고 없음·신호등 위치·창 끌기·더블클릭 최대화, Windows 창 버튼·가장자리 크기 조절·SmartScreen 흐름
+
+### M13 · 배포 인프라 (R2 + 자동 업데이트)
+
+- [ ] R2 버킷과 `dl.ddugit.com`(사용자: Cloudflare 계정·DNS 이전·R2 API 토큰 → Secrets)
+- [ ] `release.yml`이 dmg·exe와 업데이트 정보(`latest.json`)를 R2에 올림. GitHub Release 초안은 내부 보관용
+- [ ] 앱 자동 업데이트(`tauri-plugin-updater`): 시작할 때 확인, 알림, 설치 후 재시작. 업데이트 서명 키는 사용자가 만든다(개인키는 Secrets에만)
+
+### M14 · 다운로드 사이트 `ddugit-site`
+
+- [ ] Netlify에 올라가는 사이트 골격(첫 화면·다운로드·변경 내역·가격·약관·개인정보처리방침)
+- [ ] 다운로드: OS 자동 감지, 최신 버전은 R2의 `latest.json`, Windows SmartScreen 넘기는 법 안내
+- [ ] Supabase Auth(GitHub·Google), 로그인 후 '내 계정'(구독·라이선스)
+
+### M15 · 구독과 라이선스
+
+- [ ] 라이선스 형식을 구독에 맞게: 만료일(결제 기간 끝 + 유예 7일). 앱은 로그인 없이 라이선스 키로 `ddugit.com`에서 갱신받는다(구독이 살아 있으면 새 만료일). 폐쇄망은 연 단위 사이트 라이선스를 수동 발급. 구독이 끝나면 기능은 막지 않고 갱신 안내만(신뢰 기반, 사용자 확인 필요)
+- [ ] Lemon Squeezy 상품(월·연 구독, 사이트 라이선스), 결제 웹훅 → Supabase Edge Function이 서명·저장·메일 발송
+- [ ] 앱 구매 버튼(`BUY_URL`)을 사이트 가격 페이지로, 결제부터 앱 활성화까지 끝까지 확인
+
+### M16 · v1.0 출시
+
+- [ ] 첫 실행 안내·영문 문구 점검, 큰 저장소 성능 확인, 문제 신고 경로
+- [ ] v1.0.0 출시
+- [ ] (출시 뒤) Windows 서명(Microsoft Store 또는 Certum)
+
+---
+
 ## 작업 기록 (append-only)
 
 | 날짜       | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
