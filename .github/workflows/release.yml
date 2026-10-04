@@ -29,7 +29,8 @@ jobs:
         include:
           - name: macOS dmg
             os: macos-latest
-            args: --target universal-apple-darwin --bundles dmg
+            # `app` too: the update file is the .app packed up (bundle/macos/ddugit.app.tar.gz).
+            args: --target universal-apple-darwin --bundles app,dmg
             rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
           - name: Windows exe
             os: windows-latest
@@ -45,6 +46,8 @@ jobs:
       HAS_WINDOWS_SIGN: ${{ secrets.WINDOWS_SIGN_COMMAND != '' }}
       # Installers go to the download storage (Supabase Storage, S3 API) on releases, once it is set up.
       HAS_STORAGE: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID != '' && vars.SUPABASE_PROJECT_REF != '' }}
+      # Signed update files (and the app looking for updates) once the updater key exists.
+      HAS_UPDATER: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -66,6 +69,17 @@ jobs:
         run: |
           echo "DDUGIT_BUILD_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
           echo "DDUGIT_LICENSE_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
+      # Updates: sign update files with the updater key (its public half is in tauri.conf.json)
+      # and build in where the app looks for them (latest.json in the download storage).
+      - name: Updater
+        if: env.HAS_UPDATER == 'true' && env.HAS_STORAGE == 'true'
+        shell: bash
+        env:
+          REF: ${{ vars.SUPABASE_PROJECT_REF }}
+        run: |
+          echo '{"bundle":{"createUpdaterArtifacts":true}}' > src-tauri/tauri.updater.json
+          echo "UPDATER_ARGS=--config src-tauri/tauri.updater.json" >> "$GITHUB_ENV"
+          echo "DDUGIT_UPDATE_URL=https://$REF.supabase.co/storage/v1/object/public/releases/latest.json" >> "$GITHUB_ENV"
       - name: macOS signing and notarization
         if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
         shell: bash
@@ -126,8 +140,11 @@ jobs:
           echo "SIGN_ARGS=--config src-tauri/tauri.sign.json" >> "$GITHUB_ENV"
       # Without a tag name tauri-action only builds; it makes no GitHub Release.
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.UPDATER_ARGS && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.UPDATER_ARGS && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         with:
-          args: ${{ matrix.args }} ${{ env.SIGN_ARGS }}
+          args: ${{ matrix.args }} ${{ env.SIGN_ARGS }} ${{ env.UPDATER_ARGS }}
       # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
       - name: Verify macOS signature
         if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
@@ -143,7 +160,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
-      # The installer, to `releases/v<version>/` in the download storage (the site lists it).
+      # The installer and the signed update file, to `releases/v<version>/` in the download storage.
       - name: Upload to the download storage
         if: env.HAS_STORAGE == 'true' && (github.ref_type == 'tag' || inputs.release)
         shell: bash
@@ -154,7 +171,10 @@ jobs:
           ENDPOINT: https://${{ vars.SUPABASE_PROJECT_REF }}.storage.supabase.co/storage/v1/s3
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          for f in src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg src-tauri/target/release/bundle/nsis/*.exe; do
+          shopt -s nullglob
+          mac=src-tauri/target/universal-apple-darwin/release/bundle
+          win=src-tauri/target/release/bundle/nsis
+          for f in "$mac"/dmg/*.dmg "$mac"/macos/*.app.tar.gz* "$win"/*.exe "$win"/*.exe.sig; do
             [ -f "$f" ] || continue
             aws s3 cp "$f" "s3://releases/v$version/$(basename "$f")" --endpoint-url "$ENDPOINT" \
               --cache-control "public, max-age=31536000, immutable"
@@ -185,12 +205,17 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: env.HAS_STORAGE == 'true'
-      - name: Write downloads.json
+      # latest.json too when the release carries signed update files: installed apps update from it.
+      - name: Write downloads.json and latest.json
         if: env.HAS_STORAGE == 'true'
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           aws s3api list-objects-v2 --bucket releases --prefix "v$version/" --endpoint-url "$ENDPOINT" > objects.json
-          node scripts/downloads.mjs "$version" "$PUBLIC" objects.json > downloads.json
-          cat downloads.json
-          aws s3 cp downloads.json s3://releases/downloads.json --endpoint-url "$ENDPOINT" \
-            --content-type application/json --cache-control "no-cache"
+          mkdir -p sigs out
+          aws s3 cp "s3://releases/v$version/" sigs/ --recursive --exclude "*" --include "*.sig" --endpoint-url "$ENDPOINT"
+          node scripts/downloads.mjs "$version" "$PUBLIC" objects.json sigs out
+          for f in out/*.json; do
+            cat "$f"
+            aws s3 cp "$f" "s3://releases/$(basename "$f")" --endpoint-url "$ENDPOINT" \
+              --content-type application/json --cache-control "no-cache"
+          done

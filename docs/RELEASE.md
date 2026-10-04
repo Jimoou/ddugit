@@ -72,6 +72,15 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 
 S3 접근 키는 Storage 전체를 쓸 수 있다(DB는 아님). service_role 키는 쓰지 않는다.
 
+## 자동 업데이트
+
+앱은 시작할 때와 6시간마다 버킷의 `latest.json`을 읽는다. 새 버전이 있으면 탭 줄 아래에 알림이 뜬다. "업데이트하고 다시 시작"을 누르면 받아서 서명을 확인하고 설치한 뒤 다시 시작한다(Windows는 설치 프로그램이 앱을 닫는다).
+
+- 서명 키는 사용자가 만든다: `npx tauri signer generate -w ~/.tauri/ddugit.key`. 개인키와 암호는 **ddugit 저장소** Secrets `TAURI_SIGNING_PRIVATE_KEY`(키 파일 내용 전체), `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`에만 둔다. 공개키는 `src-tauri/tauri.conf.json`의 `plugins.updater.pubkey`에 있다. **개인키를 잃으면 이미 설치된 앱은 더 이상 업데이트를 받지 못한다.** 키 파일을 따로 백업한다
+- 키와 Supabase 설정이 모두 있으면 릴리스가 업데이트 파일(macOS `ddugit.app.tar.gz`, Windows 설치 파일)과 서명(`.sig`)을 버킷에 올리고 `latest.json`을 쓴다. 앱에 확인 주소(`DDUGIT_UPDATE_URL`)도 그때만 넣는다
+- `requireSignedVersion`: `latest.json`이 알리는 버전과 서명에 들어 있는 버전이 다르면 받지 않는다. `latest.json`이 위조돼도 예전 버전으로 되돌릴 수 없다
+- 업데이트 기능이 처음 들어간 버전부터 다음 버전으로 업데이트할 수 있다. 그 전 버전 사용자는 사이트에서 한 번 새로 받아야 한다
+
 무료 플랜은 월 다운로드 트래픽이 제한된다. 설치 파일이 약 8MB라 다운로드가 수백 회를 넘기면 Pro 플랜으로 올린다.
 
 ## 2. 코드 서명 (개인 이름)

@@ -456,6 +456,9 @@ export const demoControls = {
   emptyNext: false,
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
+  /** A newer version the demo announces (the update notice). Set `window.__ddugitDemoUpdate` before load to see it at startup. */
+  update: ((typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoUpdate) ??
+    null) as import("./types").UpdateInfo | null,
   /** Current demo state, read synchronously (e2e assertions). */
   snapshot: () => repo.snapshot(),
   /** Append `n` commits to the current branch (long straight runs for the graph). */
@@ -1141,6 +1144,11 @@ const mockTable: Table = {
   license_remove() {
     demoLicense.current = null;
     return Promise.resolve({ license: null, newerThanLicense: false, checkable: true });
+  },
+  update_check: () => delay(demoControls.update),
+  update_install() {
+    demoControls.update = null;
+    return delay(null);
   },
   ssh_status() {
     return Promise.resolve({ available: true, keys: demoSsh.keys.slice() });

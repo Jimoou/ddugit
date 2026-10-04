@@ -8,6 +8,7 @@ import { Galaxy } from "./components/Galaxy";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
+import { UpdateNotice } from "./components/Update";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import { repoName } from "./recent";
@@ -351,6 +352,7 @@ export default function App() {
       {settingsOpen && (
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
+      <UpdateNotice onError={(text) => toast("err", text)} />
       <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
         {toasts.map((item) => (
           <div key={item.id} className={`toast ${item.kind}`}>

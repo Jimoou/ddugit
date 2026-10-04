@@ -223,8 +223,8 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 - [ ] Supabase Storage 버킷 `releases`(공개). 사용자: S3 접근 키 → Secrets, 프로젝트 ref·리전 → Variables (`docs/RELEASE.md`)
 - [x] `release.yml`이 릴리스 때 dmg·exe를 `releases/v<버전>/`에, 다운로드 페이지용 `downloads.json`을 버킷 맨 위에 올림(`scripts/downloads.mjs`). ~~GitHub Release 초안은 내부 보관용~~ → GitHub Release는 만들지 않고 artifact로만 남긴다(2026-10-04, 초안 만들기 403 뒤 사용자 결정)
-- [ ] 업데이트 정보(`latest.json`)와 업데이트 파일(서명 포함)도 같은 버킷에
-- [ ] 앱 자동 업데이트(`tauri-plugin-updater`): 시작할 때 확인, 알림, 설치 후 재시작. 업데이트 서명 키는 사용자가 만든다(개인키는 Secrets에만)
+- [x] 업데이트 정보(`latest.json`)와 업데이트 파일(서명 포함)도 같은 버킷에(`scripts/downloads.mjs`의 `latest`). 실제 업데이트는 업데이트 기능이 든 두 번째 릴리스에서 확인
+- [x] 앱 자동 업데이트(`tauri-plugin-updater`): 시작할 때와 6시간마다 확인, 알림, 설치 후 재시작. 업데이트 서명 키는 사용자가 만든다(개인키는 Secrets에만, 공개키는 `tauri.conf.json`)
 
 ### M14 · 다운로드 사이트 `ddugit-site`
 
@@ -340,3 +340,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-04 | PR #84(우주 배경·빛 번짐 설정), #85(닫힌·병합된 PR) merge. `--rebase-merges` 정리(cargo test 113, vitest 93, e2e 47). M4 끝                                                                                                                                                                                                                                                                                                                                                                        |
 | 2026-10-04 | PR #86(병합 섞인 rebase), #87(v0.6.0, 출시 계획 M12~M16), #88(Supabase Storage 업로드) merge. v0.6.0 Release run 37188669909: 빌드는 됐지만 GitHub Release 초안 만들기가 403(Resource not accessible by integration)으로 실패                                                                                                                                                                                                                                                                      |
 | 2026-10-04 | 사용자 결정: 원인은 파지 않고 GitHub Release를 쓰지 않는다. `release.yml`은 빌드 + artifact + Supabase 업로드만(`contents: read`). ddugit-site#1: 사이트 골격(홈·다운로드·가격·변경 내역·약관·개인정보 초안·계정 자리)                                                                                                                                                                                                                                                                             |
+| 2026-10-04 | 자동 업데이트: `update.rs`(`DDUGIT_UPDATE_URL`, `requireSignedVersion`), `UpdateNotice`, `release.yml`이 키가 있으면 업데이트 파일·서명 업로드와 `latest.json`(vitest 97, cargo test 113, e2e 48)                                                                                                                                                                                                                                                                                                  |

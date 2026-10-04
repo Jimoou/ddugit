@@ -368,6 +368,11 @@ export interface LicenseInfo {
   issued: string;
   updatesUntil: string;
 }
+/** A newer app version than the one running (`update.rs`). */
+export interface UpdateInfo {
+  version: string;
+  notes: string | null;
+}
 export interface LicenseStatus {
   license: LicenseInfo | null;
   newerThanLicense: boolean;

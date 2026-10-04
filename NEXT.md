@@ -12,12 +12,13 @@ _마지막 갱신: 2026-10-04_
 
 ## 지금 하는 일
 
-이 PR merge → `main`에서 Release(`release: true`) 다시 실행 → v0.6.0 artifact 확인(Supabase Secrets가 있으면 버킷 업로드까지) → 사용자 실제 기기 점검.
+- v0.6.0 Release(GitHub Release 없이) 실행 중 → artifact 확인 → 사용자 실제 기기 점검.
+- M13 자동 업데이트 PR: `update.rs` + `UpdateNotice` + `release.yml`(키가 있으면 업데이트 파일·`latest.json`). CI · Rust all_os 필요(플러그인 추가).
 
 ## 다음 단계
 
-- M13 자동 업데이트: 사용자가 준 업데이트 공개키(minisign, `tauri.conf.json`의 `plugins.updater.pubkey`에 넣는다): `dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ5MDQ2N0E2QkQzMzZGMDUKUldRRmJ6TzlwbWNFU1FOWEZua29GZ3hIaFpoczh5ZW5qVk1mZHliN1RnZGNGbmRMajYrYUN0ZEYK`. 개인키·암호는 사용자가 ddugit 저장소 Secrets `TAURI_SIGNING_PRIVATE_KEY`/`_PASSWORD`에. `createUpdaterArtifacts`, 버킷에 `latest.json`, 앱 업데이트 알림
-- Supabase: 버킷 `releases` 만듦(사용자). S3 키(Secrets)·ref·리전(Variables)은 **ddugit 저장소**에. 사이트(Netlify)에는 `NEXT_PUBLIC_DOWNLOADS_URL`만
+- 사용자 준비물(ddugit 저장소): Secrets `SUPABASE_S3_ACCESS_KEY_ID`·`SUPABASE_S3_SECRET_ACCESS_KEY`·`TAURI_SIGNING_PRIVATE_KEY`·`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Variables `SUPABASE_PROJECT_REF`·`SUPABASE_REGION`. 사이트(Netlify)에는 `NEXT_PUBLIC_DOWNLOADS_URL`만
+- 자동 업데이트 실제 확인: 업데이트 기능이 든 첫 릴리스(v0.6.1 등)를 설치하고, 그다음 릴리스에서 알림·설치·재시작
 - M14: Supabase Auth(GitHub·Google) + 내 계정. 사용자 준비물: Supabase URL·anon key(Netlify 환경 변수), OAuth 앱
 - M15: 구독 라이선스, Lemon Squeezy(월 4,900원 + 연 49,000원). 구독이 끝나면 안내만(확인 필요)
 - 사용자: v0.6.0 실제 기기 점검, 세무(사업자등록·통신판매업)
