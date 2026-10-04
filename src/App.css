@@ -85,6 +85,11 @@ body {
     radial-gradient(ellipse 40% 30% at 60% 35%, rgba(190, 70, 170, 0.1), transparent 70%), var(--space);
   color: var(--text);
   font: 13px/1.45 var(--sans);
+  /* Korean wraps between words, not inside them; long tokens (paths, hashes) still break. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  /* No one-word last lines in paragraphs. */
+  text-wrap: pretty;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
@@ -1193,6 +1198,35 @@ button.link {
     0 0 0 3.5px var(--c, currentColor),
     0 0 10px var(--c, currentColor);
 }
+/* Folding and unfolding slide the width; the content fades in after it (Sidebar `slide`). */
+.sidebar.slide {
+  overflow: hidden;
+  animation: side-open 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sidebar.slide > * {
+  animation: side-content 0.22s ease-out;
+}
+.sidebar.rail.slide {
+  animation-name: side-close;
+}
+@keyframes side-open {
+  from {
+    width: 48px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+@keyframes side-close {
+  from {
+    width: 220px;
+  }
+}
+@keyframes side-content {
+  0%,
+  40% {
+    opacity: 0;
+  }
+}
 /* Folded to a rail: one icon per section with its count. */
 .sidebar.rail {
   width: 48px;
@@ -1686,6 +1720,58 @@ button.link {
   background: rgba(3, 2, 8, 0.6);
   backdrop-filter: blur(4px);
   z-index: 10;
+  animation: scrim-in 0.16s ease-out;
+}
+.scrim > * {
+  animation: popup-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* A closed popup's copy playing out (leaving.ts). */
+.scrim.leaving {
+  pointer-events: none;
+  animation: scrim-out 0.16s ease-in forwards;
+}
+.scrim.leaving > * {
+  animation: popup-out 0.16s ease-in forwards;
+}
+.context-menu.leaving {
+  pointer-events: none;
+  animation: menu-out 0.1s ease-in forwards;
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+@keyframes popup-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .scrim > *,
+  .sidebar.slide,
+  .sidebar.slide > * {
+    animation: none;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 .dialog {
   width: min(460px, calc(100vw - 32px));
