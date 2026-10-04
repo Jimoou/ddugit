@@ -4130,3 +4130,41 @@ button.demo-pill {
 .pr-locked .pro-badge {
   margin-left: 6px;
 }
+
+/* ------------------------------------------------------------- air-gapped transfer */
+.dialog.transfer {
+  width: min(560px, calc(100vw - 32px));
+}
+.tr-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+}
+.tr-branches .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tr-branches .check .muted {
+  margin-left: auto;
+}
+.tr-file {
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+.tr-heads {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+}
+.tr-history summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.tr-history ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

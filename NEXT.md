@@ -7,8 +7,8 @@ _마지막 갱신: 2026-10-04_
 
 ## 방금 끝난 것
 
-- v0.6.1 게시, 자동 업데이트 실제 확인(v0.6.0 → v0.6.1). M13 끝
-- 사이트: 영문 고정, 앱과 같은 스타일, 앱 화면 캡처(`public/screens`), 변경 내역 페이지 삭제(나중에 "문서" 메뉴와 함께), GitHub·Google 로그인(가이드 준수 버튼), 라이선스 테이블·`license-refresh` 함수 배포
+- M17 폐쇄망 반출입(`git/transfer.rs`, `components/Transfer.tsx`): 받는 곳별 증분 번들 + `.sha256`, 반출 기록, 반입 전 검사, 원격 브랜치처럼 가져오기. 반출·반입은 Pro, 기록 보기·번들 검사는 Free
+- 그 전: Free / Pro 잠금(#97), 사이트 가격 비교표·약관(ddugit-site#12)
 
 ## 결정 (2026-10-04, 수익 모델)
 
@@ -17,6 +17,7 @@ _마지막 갱신: 2026-10-04_
 
 ## 다음 단계
 
+- M17 나머지: 스택 브랜치 → 릴리스 노트 생성 → 여러 저장소 일괄 작업, 그다음 v0.7.0(Free/Pro·다듬기·반출입)
 - M15 마지막: Lemon Squeezy(사용자: 스토어·상품 월 ₩4,900 / 연 ₩49,000) → 웹훅 Edge Function(구독 생성·갱신·해지 → `licenses`, 첫 라이선스 발급 메일), 사이트 가격 페이지 구매 버튼, 앱 `BUY_URL`, 결제부터 앱 활성화까지 확인
 - 사용자: 라이선스 발급 키 → Supabase Edge Functions Secrets(`DDUGIT_LICENSE_PRIVATE_KEY`, `DDUGIT_LICENSE_PUBKEY`) + ddugit Variables `DDUGIT_LICENSE_PUBKEY`
 - 사용자: Windows 실기 점검, 세무(사업자등록·통신판매업), 오늘 끝나면 두 저장소 비공개로

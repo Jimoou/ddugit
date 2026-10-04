@@ -500,6 +500,9 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__ddugitDemo = demoControls;
 }
 
+/** What the demo has sent to each destination (`transfer_history`). */
+const demoTransfers: import("./types").TransferSent[] = [];
+
 /** What Pro-only commands answer without Pro (`pro::LOCKED`). */
 const PRO_LOCKED = "This is a ddugit Pro feature";
 
@@ -1237,6 +1240,35 @@ const mockTable: Table = {
     );
   },
   pro_status: () => delay(demoControls.pro),
+  transfer_history: () => delay([...demoTransfers]),
+  transfer_export({ req }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
+    if (!req.branches.length) return Promise.reject("Pick at least one branch");
+    const fresh = req.branches.filter(
+      (b) => req.full || demoTransfers.find((s) => s.dest === req.dest && s.branch === b)?.tip !== repo.branches.get(b),
+    );
+    if (!fresh.length) return Promise.reject(`Nothing new for ${req.dest} since the last transfer`);
+    const time = Math.floor(Date.now() / 1000);
+    for (const b of fresh) {
+      const i = demoTransfers.findIndex((s) => s.dest === req.dest && s.branch === b);
+      const s = { dest: req.dest, branch: b, tip: repo.branches.get(b)!, time };
+      if (i >= 0) demoTransfers[i] = s;
+      else demoTransfers.push(s);
+    }
+    return delay(res("ok", `${req.outDir}/demo-${req.dest.replace(/\W+/g, "-")}-2026-10-04-120000.bundle`));
+  },
+  transfer_check: () =>
+    delay({
+      ok: true,
+      checksum: "match" as const,
+      heads: ["main", "feature/theme"].map((b) => ({ name: `refs/heads/${b}`, id: repo.branches.get(b)! })),
+      missing: [],
+    }),
+  transfer_import({ name }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
+    for (const b of ["main", "feature/theme"]) repo.remotes.set(`${name}/${b}`, repo.branches.get(b)!);
+    return delay(res("ok"));
+  },
   pull_requests() {
     const token = demoControls.forgeToken;
     // The demo repository counts as private: without Pro its pull requests stay closed.

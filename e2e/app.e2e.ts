@@ -1325,3 +1325,43 @@ test("on Free, private pull requests and backport actions offer Pro instead", as
   await offer.getByRole("button", { name: "라이선스 입력" }).click();
   await expect(page.locator(".license-plan")).toContainText("Free");
 });
+
+test("air-gapped transfer writes only what a destination lacks, and imports a bundle as remote branches", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await page.locator(".sidebar button[title='폐쇄망 반출입']").click();
+  const dialog = page.locator(".dialog.transfer");
+  await dialog.getByPlaceholder("예: 고객사 이름").fill("acme");
+  await expect(dialog.locator(".tr-branches")).toContainText("처음부터 전부");
+  await dialog.getByRole("button", { name: /폴더 고르고 반출/ }).click();
+  await demo.toast("acme에 보낼 번들을 만들었어요");
+
+  // The second time, the branch goes from the last transfer; with nothing new, it says so.
+  await expect(dialog.locator(".tr-branches")).toContainText("지난 반출");
+  await expect(dialog.locator(".tr-history")).toContainText("acme");
+  await dialog.getByRole("button", { name: /폴더 고르고 반출/ }).click();
+  await demo.toast(/Nothing new for acme/);
+
+  await dialog.getByRole("tab", { name: "반입(안으로)" }).click();
+  await dialog.getByRole("button", { name: "번들 파일 고르기…" }).click();
+  await expect(dialog.locator(".tr-heads")).toContainText("feature/theme");
+  await expect(dialog.locator("input.text")).toHaveValue("acme");
+  await dialog.getByRole("button", { name: /^반입/ }).click();
+  await demo.toast("번들을 acme(으)로 반입했어요");
+  await expect(dialog).toHaveCount(0);
+  expect((await demo.snapshot()).refs.some((r) => r.name === "acme/main")).toBe(true);
+});
+
+test("on Free, air-gapped transfer offers Pro", async ({ demo }) => {
+  const { page } = demo;
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+  });
+  await page.reload();
+  await page.locator(".sidebar button[title='폐쇄망 반출입']").click();
+  const dialog = page.locator(".dialog.transfer");
+  await dialog.getByPlaceholder("예: 고객사 이름").fill("acme");
+  await dialog.getByRole("button", { name: /폴더 고르고 반출/ }).click();
+  await expect(page.locator(".dialog.pro-offer")).toContainText("폐쇄망");
+});

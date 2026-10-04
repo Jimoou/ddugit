@@ -70,6 +70,39 @@ async fn backport_ignore(
 }
 command!(backport_summary(path: String, source: String, targets: Vec<String>) -> Vec<BackportTally>
     => git::backport::summary(&path, &source, &targets));
+// Air-gapped transfer: looking at a bundle and the history are Free, writing and importing are Pro.
+#[tauri::command]
+async fn transfer_export(
+    app: tauri::AppHandle,
+    path: String,
+    req: git::transfer::ExportRequest,
+) -> Result<OpResult, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        pro::require(&dir)?;
+        git::transfer::export(&path, &req)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn transfer_import(
+    app: tauri::AppHandle,
+    path: String,
+    file: String,
+    name: String,
+) -> Result<OpResult, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        pro::require(&dir)?;
+        git::transfer::import(&path, &file, &name)
+    })
+    .await
+}
+
+command!(transfer_check(path: String, file: String) -> git::transfer::BundleCheck => git::transfer::check(&path, &file));
+command!(transfer_history(path: String) -> Vec<git::transfer::Sent> => git::transfer::history(&path));
+
 #[tauri::command]
 async fn backport_apply(
     app: tauri::AppHandle,
@@ -311,6 +344,10 @@ pub fn run() {
             license_remove,
             license_refresh,
             pro_status,
+            transfer_export,
+            transfer_import,
+            transfer_check,
+            transfer_history,
             update_check,
             update_install,
             ssh_status,

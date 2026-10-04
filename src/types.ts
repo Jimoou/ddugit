@@ -375,6 +375,26 @@ export interface LicenseInfo {
 }
 /** What asking ddugit.com for a renewed license came to (`license::Refresh`). */
 export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown";
+/** Mirrors `git/transfer.rs`. */
+export interface TransferExport {
+  dest: string;
+  branches: string[];
+  /** Everything, not just what came after the last transfer to `dest`. */
+  full: boolean;
+  outDir: string;
+}
+export interface TransferSent {
+  dest: string;
+  branch: string;
+  tip: string;
+  time: number;
+}
+export interface BundleCheck {
+  ok: boolean;
+  checksum: "match" | "mismatch" | "absent";
+  heads: { name: string; id: string }[];
+  missing: string[];
+}
 /** Free or Pro, and why (`pro.rs`). */
 export interface ProStatus {
   pro: boolean;
