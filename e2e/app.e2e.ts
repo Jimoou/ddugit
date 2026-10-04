@@ -128,8 +128,8 @@ test("adds the original project as a remote and lists its fixes to backport", as
   await expect(page.locator(".job-card")).toHaveCount(0);
 
   // Two remotes now: a fold per remote, branches without the prefix.
-  const upstream = page.locator(".sidebar section.sub").filter({ hasText: "upstream" });
-  await expect(page.locator(".sidebar section.sub")).toHaveCount(2);
+  const upstream = page.locator(".sidebar section.remote-sub").filter({ hasText: "upstream" });
+  await expect(page.locator(".sidebar section.remote-sub")).toHaveCount(2);
   await expect(upstream.locator("li")).toHaveText(["main"]);
   await upstream.locator("li").click({ button: "right" });
   await page.click(".context-menu >> text=에 없는 커밋 보기");
@@ -1000,7 +1000,7 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   await page.getByRole("button", { name: /Fetch/ }).click();
   await demo.toast("원격 커밋을 가져왔어요");
   await page
-    .locator(".app:not([hidden]) .sidebar section.sub")
+    .locator(".app:not([hidden]) .sidebar section.remote-sub")
     .filter({ hasText: "origin" })
     .locator("li")
     .filter({ hasText: /^main$/ })
@@ -1151,7 +1151,7 @@ test("the original project added as a remote is fetch-only: a push offers origin
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
   await demo.toast("upstream은(는) 가져오기 전용으로 추가했어요. 그쪽으로는 보내지 않아요");
-  const upstream = page.locator(".sidebar section.sub").filter({ hasText: "upstream" });
+  const upstream = page.locator(".sidebar section.remote-sub").filter({ hasText: "upstream" });
   await expect(upstream.locator(".fetch-only")).toBeVisible();
 
   // A branch that follows upstream/main.
@@ -1174,12 +1174,12 @@ test("the original project added as a remote is fetch-only: a push offers origin
 
 test("a remote can be disconnected from its menu, even the only one", async ({ demo }) => {
   const { page } = demo;
-  const origin = page.locator(".sidebar section.sub").filter({ hasText: "origin" });
+  const origin = page.locator(".sidebar section.remote-sub").filter({ hasText: "origin" });
   await origin.getByRole("button", { name: "origin 메뉴" }).click();
   await page.getByRole("menuitem", { name: "origin 연결 끊기 (원격 삭제)…" }).click();
   await page.locator(".dialog").getByRole("button", { name: "삭제" }).click();
   await demo.toast("origin 연결을 끊었어요");
-  await expect(page.locator(".sidebar section.sub")).toHaveCount(0);
+  await expect(page.locator(".sidebar section.remote-sub")).toHaveCount(0);
   expect((await demo.snapshot()).remotes).toEqual([]);
 });
 

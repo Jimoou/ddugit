@@ -278,7 +278,7 @@ export function Sidebar(props: Props) {
                     <SideSection
                       key={rm.name}
                       id={`remote:${rm.name}`}
-                      className="sub"
+                      className="sub remote-sub"
                       title={
                         <span className="remote-name" title={rm.url}>
                           <Icon name="cloud" size={12} />
