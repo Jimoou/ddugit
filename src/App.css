@@ -3,6 +3,9 @@
      surface tokens only; the neon colours below are for the graph and data
      (branches, diff signs, file status), never for buttons or chrome. */
   --space: #05040e;
+  /* Brand colours (design/brand/README.md): wordmark letters and its star. */
+  --brand-ink: #f3f1ff;
+  --brand-star: #ffc56b;
   --bg: #07061a;
   --bg-2: #0c0b20;
   --glass: rgba(18, 16, 42, 0.66);
@@ -207,21 +210,18 @@ textarea:focus {
 }
 
 /* ---------------------------------------------------------------- wordmark */
-.wordmark {
-  font: 800 52px/1.2 var(--sans);
-  letter-spacing: -0.03em;
+.brand {
   margin: 0;
-  /* background-clip: text paints only inside the box: room for the descender of "g". */
-  padding: 0 0.04em 0.06em;
-  background: linear-gradient(90deg, var(--cyan), #9b7bff, var(--magenta));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 12px rgba(34, 232, 255, 0.45));
+  line-height: 0;
 }
-.wordmark.small {
-  font-size: 19px;
-  filter: drop-shadow(0 0 6px rgba(34, 232, 255, 0.5));
+/* The wordmark as drawn (design/brand): never under 20px tall, clear space of a star around it. */
+.brand .wordmark {
+  display: block;
+  height: 64px;
+  width: auto;
+}
+.brand.small .wordmark {
+  height: 20px;
 }
 
 /* ----------------------------------------------------------------- welcome */
@@ -593,7 +593,7 @@ textarea:focus {
   background: var(--chrome);
   border-bottom: 1px solid var(--line);
 }
-.tabrow > .wordmark {
+.tabrow > .brand {
   align-self: center;
   padding: 0 10px 0 14px;
 }

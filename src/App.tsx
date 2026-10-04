@@ -9,6 +9,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
 import { UpdateNotice } from "./components/Update";
+import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import { repoName } from "./recent";
@@ -291,7 +292,9 @@ export default function App() {
       {welcome && (
         <div className="welcome">
           <SpaceBackdrop animate={settings.animate} space={settings.space} />
-          <h1 className="wordmark">ddugit</h1>
+          <h1 className="brand">
+            <Wordmark />
+          </h1>
           <p>{t("app.tagline")}</p>
           <ConnectActions primary {...connect} />
           {recent.list.some((r) => r.path !== DEMO_PATH) ? (
