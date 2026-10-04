@@ -18,6 +18,9 @@ import type {
   LicenseRefresh,
   LicenseStatus,
   ProStatus,
+  BundleCheck,
+  TransferExport,
+  TransferSent,
   UpdateInfo,
   OpResult,
   PickOp,
@@ -94,6 +97,10 @@ export interface Commands {
   license_remove: [Record<string, never>, LicenseStatus];
   license_refresh: [Record<string, never>, LicenseRefresh];
   pro_status: [Record<string, never>, ProStatus];
+  transfer_export: [{ path: string; req: TransferExport }, OpResult];
+  transfer_import: [{ path: string; file: string; name: string }, OpResult];
+  transfer_check: [{ path: string; file: string }, BundleCheck];
+  transfer_history: [{ path: string }, TransferSent[]];
   update_check: [Record<string, never>, UpdateInfo | null];
   update_install: [Record<string, never>, null];
   ssh_keygen: [{ comment: string }, SshKey];
@@ -214,6 +221,12 @@ export const api = {
   licenseRefresh: () => call("license_refresh", {}),
   /** Free or Pro (license, site license or the 14-day trial). */
   proStatus: () => call("pro_status", {}),
+  /** Write a bundle of what `req.dest` doesn't have yet (and its .sha256); the output is its path. */
+  transferExport: (path: string, req: TransferExport) => call("transfer_export", { path, req }),
+  /** Fetch a bundle's branches into `refs/remotes/<name>/`. */
+  transferImport: (path: string, file: string, name: string) => call("transfer_import", { path, file, name }),
+  transferCheck: (path: string, file: string) => call("transfer_check", { path, file }),
+  transferHistory: (path: string) => call("transfer_history", { path }),
   /** A newer version in the download storage (release builds only; otherwise `null`). */
   updateCheck: () => call("update_check", {}),
   /** Download, verify and install the newest version, then restart into it. */
@@ -268,6 +281,13 @@ export const api = {
     const unlisten = await listen("repo-changed", onChange);
     await invoke("watch_repo", { path });
     return unlisten;
+  },
+  /** A bundle file to import (the demo answers with a made-up one). */
+  async pickBundle(title: string): Promise<string | null> {
+    if (!isTauri) return "/demo/out/demo-acme-2026-10-04-120000.bundle";
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const r = await open({ multiple: false, title, filters: [{ name: "Git bundle", extensions: ["bundle"] }] });
+    return typeof r === "string" ? r : null;
   },
   async pickFolder(title = t("app.open")): Promise<string | null> {
     if (!isTauri) {

@@ -38,6 +38,8 @@ interface Props {
   onCleanup(): void;
   /** Open the backport sheet (commits another branch has that this one doesn't). */
   onBackport(): void;
+  /** Open air-gapped transfer (bundles out and in). */
+  onTransfer(): void;
   /** Local branches checked out in another worktree → that worktree's folder. */
   elsewhere: Record<string, string>;
   /** More sections after the refs (pull requests, worktrees). */
@@ -267,6 +269,16 @@ export function Sidebar(props: Props) {
                       onClick={props.onBackport}
                     >
                       <Icon name="backport" size={12} />
+                    </button>
+                  )}
+                  {g.kind === "local" && (
+                    <button
+                      className="h3-add"
+                      title={t("tr.title")}
+                      aria-label={t("tr.title")}
+                      onClick={props.onTransfer}
+                    >
+                      <Icon name="bundle" size={12} />
                     </button>
                   )}
                   {g.kind === "local" && (

@@ -43,6 +43,7 @@ import { isKey, type Key, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import type { Drag, NodeBadge, Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
+import { TransferDialog } from "./components/Transfer";
 import type {
   BisectState,
   CommitEdit,
@@ -203,6 +204,7 @@ export function RepoView({
     initial?: ResetMode;
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   /** Git LFS, read apart from the snapshot (it runs `git lfs`). */
   const [lfs, setLfs] = useState<LfsStatus | null>(null);
   const [lfsTick, setLfsTick] = useState(0);
@@ -1670,6 +1672,7 @@ export function RepoView({
           onRemoteMenu={(name, x, y) => setMenu({ x, y, title: name, items: remoteMenu(name) })}
           onNewBranch={askNewBranch}
           onBackport={openBackport}
+          onTransfer={() => setTransferOpen(true)}
           onCleanup={() => {
             setDiff(null);
             setBackport(null);
@@ -2229,6 +2232,16 @@ export function RepoView({
       )}
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
 
+      {transferOpen && (
+        <TransferDialog
+          path={path}
+          branches={snap.refs.filter((r) => r.kind === "local").map((r) => r.name)}
+          head={snap.head.branch}
+          busy={busy}
+          run={run}
+          onClose={() => setTransferOpen(false)}
+        />
+      )}
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
 
       {editReq && commitById.get(editReq.id) && (

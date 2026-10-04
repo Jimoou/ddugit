@@ -26,6 +26,7 @@ export function ProOffer({ onLicense }: { onLicense(): void }) {
           <li>{t("pro.list.pulls")}</li>
           <li>{t("pro.list.backport")}</li>
           <li>{t("pro.list.dashboard")}</li>
+          <li>{t("pro.list.transfer")}</li>
         </ul>
         {status?.source === "free" && <p className="note">{t("pro.trialOver")}</p>}
         <div className="dialog-actions">

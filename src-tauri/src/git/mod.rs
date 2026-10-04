@@ -22,6 +22,7 @@ pub mod setup;
 pub mod stage;
 pub mod stash;
 pub mod submodule;
+pub mod transfer;
 pub mod undo;
 pub mod watch;
 pub mod worktree;
