@@ -169,12 +169,118 @@ pub fn create_branch(path: &str, name: &str, at: Option<&str>, switch: bool) -> 
     Ok(git(&dir, &args)?.into())
 }
 
+/// How `switch_or_create` got onto the branch.
+#[derive(Debug, serde::Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Switched {
+    /// It already was the current branch.
+    Already,
+    /// An existing local branch.
+    Local,
+    /// A new local branch following a remote one (`origin` first).
+    Tracked,
+    /// A new branch at the current commit.
+    Created,
+}
+
+#[derive(Debug, serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SwitchResult {
+    pub result: OpResult,
+    /// Set when it worked.
+    pub how: Option<Switched>,
+}
+
+/// Get onto branch `name` the same way in every repository of a batch: the local
+/// branch if there is one, else a remote's branch of that name, else a new branch
+/// here. Refuses mid-operation; git itself refuses when local changes would be lost.
+pub fn switch_or_create(path: &str, name: &str) -> Result<SwitchResult> {
+    let name = operand(name.trim())?;
+    let repo = open(path)?;
+    let dir = workdir(&repo)?;
+    if repo.state() != RepositoryState::Clean {
+        return Err(format!(
+            "Repository is in the middle of a {}; finish or abort it first",
+            state_name(repo.state())
+        ));
+    }
+    let done = |o: Output, how: Switched| {
+        let ok = o.ok;
+        SwitchResult {
+            result: o.into(),
+            how: ok.then_some(how),
+        }
+    };
+    if repo.find_branch(name, BranchType::Local).is_ok() {
+        if read_head(&repo).branch.as_deref() == Some(name) {
+            let o = Output {
+                ok: true,
+                text: format!("Already on '{name}'"),
+            };
+            return Ok(done(o, Switched::Already));
+        }
+        return Ok(done(git(&dir, &["checkout", name])?, Switched::Local));
+    }
+    let mut remotes: Vec<String> = repo
+        .remotes()
+        .map_err(super::err)?
+        .iter()
+        .flatten()
+        .map(String::from)
+        .collect();
+    remotes.sort_by_key(|r| r != "origin");
+    let tracked = remotes
+        .iter()
+        .map(|r| format!("{r}/{name}"))
+        .find(|r| repo.find_branch(r, BranchType::Remote).is_ok());
+    Ok(match tracked {
+        Some(r) => done(
+            git(&dir, &["checkout", "-b", name, "--track", &r])?,
+            Switched::Tracked,
+        ),
+        None => done(git(&dir, &["checkout", "-b", name])?, Switched::Created),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::read::{snapshot, RefKind};
     use super::super::testutil::{commit_file, repo, s};
     use super::*;
     use std::fs;
+
+    #[test]
+    fn switch_or_create_takes_local_then_remote_then_makes_one() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        let how = |name: &str| {
+            let r = switch_or_create(p, name).unwrap();
+            assert_eq!(r.result.status, OpStatus::Ok, "{}", r.result.output);
+            r.how.unwrap()
+        };
+        assert_eq!(how("main"), Switched::Already);
+        assert_eq!(how("release"), Switched::Created);
+        assert_eq!(how("main"), Switched::Local);
+
+        // A branch that only exists on the remote is followed, not created afresh.
+        let bare = tempfile::tempdir().unwrap();
+        git_ok(bare.path(), &["init", "-q", "--bare"]).unwrap();
+        git_ok(d.path(), &["remote", "add", "origin", s(bare.path())]).unwrap();
+        git_ok(d.path(), &["push", "-q", "origin", "release:hotfix"]).unwrap();
+        git_ok(d.path(), &["fetch", "-q", "origin"]).unwrap();
+        assert_eq!(how("hotfix"), Switched::Tracked);
+        let upstream = git_ok(d.path(), &["rev-parse", "--abbrev-ref", "hotfix@{upstream}"]).unwrap();
+        assert_eq!(upstream.trim(), "origin/hotfix");
+
+        // Local changes that a switch would overwrite: git refuses, nothing is lost.
+        commit_file(d.path(), "a.txt", "b", "on hotfix");
+        fs::write(d.path().join("a.txt"), "dirty").unwrap();
+        let r = switch_or_create(p, "main").unwrap();
+        assert_eq!(r.result.status, OpStatus::Failed);
+        assert_eq!(r.how, None);
+        assert!(switch_or_create(p, "--orphan").is_err());
+    }
 
     #[test]
     fn commit_only_selected_paths() {

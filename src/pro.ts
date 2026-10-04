@@ -7,7 +7,7 @@ import { api } from "./api";
 import type { ProStatus } from "./types";
 
 /** What a locked control was for, so the offer can say it. */
-export type ProFeature = "pulls" | "backport" | "dashboard" | "transfer" | "stack" | "notes";
+export type ProFeature = "pulls" | "backport" | "dashboard" | "transfer" | "stack" | "notes" | "batch";
 
 /** Repositories the dashboard shows on Free (starred first, then most recent). */
 export const FREE_DASHBOARD = 3;

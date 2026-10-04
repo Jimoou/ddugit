@@ -53,7 +53,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `worktree.rs`: worktree 목록(스냅샷의 `worktrees`, libgit2)과 추가·제거·정리(`WorktreeOp`). 화면은 `components/Worktrees.tsx`(사이드바 섹션·추가 창), 다른 worktree 폴더는 `onOpenPath`로 탭에 연다
   - `submodule.rs`: 서브모듈 상태(스냅샷의 `submodules`, libgit2)와 update(`--init --recursive`)·sync(`SubmoduleOp`). 화면은 `components/Submodules.tsx`
   - `lfs.rs`: Git LFS 상태(`git lfs` CLI: 설치·패턴·필터·받지 않은 파일)와 install/pull/track/untrack(`LfsOp`). 스냅샷과 따로 읽는다(셸 실행). 화면은 `components/Lfs.tsx`(사이드바 섹션, 포인터 diff), 순수 로직 `lfs.ts`
-  - `glance.rs`: 여러 저장소를 이력 없이 한 번에 훑기(브랜치·upstream 거리·변경·멈춘 작업·보관함·마지막 커밋). 새 탭의 은하 대시보드(`components/Galaxy.tsx`, 순수 로직 `galaxy.ts`)가 쓴다
+  - `glance.rs`: 여러 저장소를 이력 없이 한 번에 훑기(브랜치·upstream 거리·변경·멈춘 작업·보관함·마지막 커밋). 새 탭의 은하 대시보드(`components/Galaxy.tsx`, 순수 로직 `galaxy.ts`)가 쓴다. 대시보드 일괄 작업(Pro): 고른 카드·그룹을 한 번에 Pull(`--ff-only`)·같은 이름 브랜치로(`write::switch_or_create`), 대상 고르기는 `galaxy.ts`의 `pullable`·`switchable`
   - `backport.rs`: 두 브랜치(예: `upstream/main` ↔ 고객사 `main`) 사이 미반영 커밋 비교(`--cherry-mark` + `-x` 트레일러), 제외 표시(받는 쪽별 로컬 config), 대상별 요약, 일괄 cherry-pick, 패치 내보내기
   - `transfer.rs`: 폐쇄망 반출입(Pro). 받는 곳별로 지난 반출 이후만 담은 `git bundle` + `.sha256`, 반출 기록은 로컬 config `ddugit-transfer.<받는 곳>.sent`. 반입은 검사(체크섬·빠진 선행 커밋) 후 `refs/remotes/<이름>/`으로 가져온다. 화면은 `components/Transfer.tsx`(사이드바 로컬 브랜치 머리의 버튼), 순수 로직 `transfer.ts`
   - `stack.rs`: 스택 브랜치(Pro). 부모와 base(마지막으로 쌓은 부모 끝)를 로컬 config `branch.<이름>.ddugit-parent`·`ddugit-base`에 두고, 다시 쌓기는 스택 맨 아래부터 `rebase --onto <부모> <base> <브랜치>`(amend·squash된 부모의 옛 커밋을 다시 얹지 않는다). 화면은 `components/Stacks.tsx`(사이드바 섹션)와 브랜치 메뉴(`RepoView`의 `stackItems`), 순수 로직 `stack.ts`
@@ -61,7 +61,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). 토큰은 webview로 넘기지 않는다
 - `src-tauri/src/ssh.rs`: SSH 준비(키 목록·생성, 호스트 키 지문을 GitHub·GitLab 공개 지문과 비교해 known_hosts에 추가, 연결 확인). 시스템 OpenSSH, 프롬프트 없음
 - `src-tauri/src/update.rs`: 앱 자동 업데이트(tauri-plugin-updater). 확인 주소는 빌드 때 `DDUGIT_UPDATE_URL`(Supabase의 `latest.json`, 없으면 업데이트 안 함), 서명 공개키는 `tauri.conf.json`. 화면은 `components/Update.tsx`(시작할 때와 6시간마다 확인)
-- `src-tauri/src/pro.rs`: Free / Pro 판정(유효한 라이선스·사이트 라이선스·처음 설치 후 14일 체험, 체험 시작일은 설정 폴더와 OS 키체인 중 이른 날). Pro 경계: 비공개·회사 서버 저장소의 PR 연동(`forge::report`의 `locked`), 백포트 실행(`pro::require`), 대시보드 3개 초과(화면). 화면 쪽은 `src/pro.ts`(상태 공유, `offerPro`)와 `components/ProOffer.tsx`
+- `src-tauri/src/pro.rs`: Free / Pro 판정(유효한 라이선스·사이트 라이선스·처음 설치 후 14일 체험, 체험 시작일은 설정 폴더와 OS 키체인 중 이른 날). Pro 경계: 비공개·회사 서버 저장소의 PR 연동(`forge::report`의 `locked`), 백포트 실행·폐쇄망 반출입·스택 쌓기·대시보드 일괄 브랜치 전환(`pro::require`), 대시보드 3개 초과·릴리스 노트·일괄 Pull(화면). 화면 쪽은 `src/pro.ts`(상태 공유, `offerPro`)와 `components/ProOffer.tsx`
 - `src-tauri/src/license.rs`: 상업용 라이선스를 오프라인 검증(Ed25519, 공개키는 빌드 때 `DDUGIT_LICENSE_PUBKEY`). 발급은 `scripts/license.mjs`, 절차·서명은 `docs/RELEASE.md`
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.

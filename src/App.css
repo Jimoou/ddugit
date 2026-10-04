@@ -552,6 +552,14 @@ textarea:focus {
 .world-fetch.failed {
   color: var(--red);
 }
+.world-fetch.diverged {
+  color: var(--amber);
+}
+.pick-bar .pick-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+}
 .welcome p {
   color: var(--muted);
   margin: 0;

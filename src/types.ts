@@ -395,6 +395,11 @@ export interface BundleCheck {
   heads: { name: string; id: string }[];
   missing: string[];
 }
+/** `switch_or_create` (git/write.rs): how a batch switch got onto the branch. */
+export interface SwitchResult {
+  result: OpResult;
+  how: "already" | "local" | "tracked" | "created" | null;
+}
 /** A commit on a release's first-parent line (`git/changelog.rs`). */
 export interface NoteCommit {
   id: string;

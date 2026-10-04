@@ -23,6 +23,7 @@ import type {
   TransferSent,
   StackBranch,
   NoteRange,
+  SwitchResult,
   StackOp,
   UpdateInfo,
   OpResult,
@@ -105,6 +106,7 @@ export interface Commands {
   transfer_check: [{ path: string; file: string }, BundleCheck];
   transfer_history: [{ path: string }, TransferSent[]];
   stack_list: [{ path: string }, StackBranch[]];
+  batch_switch: [{ path: string; branch: string }, SwitchResult];
   release_range: [{ path: string; from: string | null; to: string }, NoteRange];
   stack_op: [{ path: string; op: StackOp }, OpResult];
   update_check: [Record<string, never>, UpdateInfo | null];
@@ -234,6 +236,8 @@ export const api = {
   transferCheck: (path: string, file: string) => call("transfer_check", { path, file }),
   transferHistory: (path: string) => call("transfer_history", { path }),
   stackList: (path: string) => call("stack_list", { path }),
+  /** Dashboard batch (Pro): onto `branch` in one repository: local, else a remote's, else new. */
+  batchSwitch: (path: string, branch: string) => call("batch_switch", { path, branch }),
   /** First-parent commits from `from` (null: the latest tag before `to`; "": the first commit) to `to`, for release notes. */
   releaseRange: (path: string, from: string | null, to: string) => call("release_range", { path, from, to }),
   /** Build a stack, move a branch in it, take one out, or restack (all but taking out are Pro). */
