@@ -221,9 +221,9 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 ### M13 · 배포 인프라 (Supabase Storage + 자동 업데이트)
 
-- [ ] Supabase Storage 버킷 `releases`(공개). 사용자: S3 접근 키 → Secrets, 프로젝트 ref·리전 → Variables (`docs/RELEASE.md`)
+- [x] Supabase Storage 버킷 `releases`(공개). 사용자: S3 접근 키 → Secrets, 프로젝트 ref·리전 → Variables (`docs/RELEASE.md`)
 - [x] `release.yml`이 릴리스 때 dmg·exe를 `releases/v<버전>/`에, 다운로드 페이지용 `downloads.json`을 버킷 맨 위에 올림(`scripts/downloads.mjs`). ~~GitHub Release 초안은 내부 보관용~~ → GitHub Release는 만들지 않고 artifact로만 남긴다(2026-10-04, 초안 만들기 403 뒤 사용자 결정)
-- [x] 업데이트 정보(`latest.json`)와 업데이트 파일(서명 포함)도 같은 버킷에(`scripts/downloads.mjs`의 `latest`). 실제 업데이트는 업데이트 기능이 든 두 번째 릴리스에서 확인
+- [x] 업데이트 정보(`latest.json`)와 업데이트 파일(서명 포함)도 같은 버킷에(`scripts/downloads.mjs`의 `latest`). 실제 업데이트 확인 끝(2026-10-04, 사용자: 설치한 v0.6.0이 알림 → 설치 → 재시작으로 v0.6.1)
 - [x] 앱 자동 업데이트(`tauri-plugin-updater`): 시작할 때와 6시간마다 확인, 알림, 설치 후 재시작. 업데이트 서명 키는 사용자가 만든다(개인키는 Secrets에만, 공개키는 `tauri.conf.json`)
 
 ### M14 · 다운로드 사이트 `ddugit-site`
@@ -345,3 +345,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-04 | 공개 저장소로 잠시 전환(사용자, Actions 분량), v0.6.0 `downloads.json`·`latest.json` 게시 끝. PR #92 새 브랜드 아이콘·워드마크(`design/brand`, `Wordmark.tsx`), 사이트도(ddugit-site#4). 라이트 모드는 하지 않기로(사용자)                                                                                                                                                                                                                                                                         |
 | 2026-10-04 | M15 구독 라이선스: 사이트 ddugit-site#3(GitHub 로그인)·#5(`licenses` 테이블, `license-refresh` 함수, `/api/license/refresh`, 내 계정 목록), 앱 `license.rs` `expires`·`plan`·`refresh_in`(cargo test +4), 설정 '갱신 확인'·시작할 때 자동 갱신(e2e 49)                                                                                                                                                                                                                                             |
 | 2026-10-04 | 사이트: Google 로그인(ddugit-site#6), 환경 변수 이름(#7)·`/api/status`(#8), 가이드에 맞춘 로그인 버튼(#9), Supabase 배포(마이그레이션·`license-refresh`). v0.6.1 버전 올림(새 아이콘·구독 라이선스, 자동 업데이트 첫 실제 확인용)                                                                                                                                                                                                                                                                  |
+| 2026-10-04 | PR #94 merge(`fe4bdb9`), Release run 37198044413 → v0.6.1 게시(Supabase). 사용자 확인: v0.6.0에서 자동 업데이트로 v0.6.1. 사이트 영문 고정·앱 스타일·앱 화면·변경 내역 삭제(ddugit-site#10). M13 끝                                                                                                                                                                                                                                                                                                |

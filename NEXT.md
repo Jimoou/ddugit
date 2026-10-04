@@ -7,27 +7,16 @@ _마지막 갱신: 2026-10-04_
 
 ## 방금 끝난 것
 
-- v0.6.0 Supabase 게시(설치 파일·업데이트 파일·`downloads.json`·`latest.json`), macOS 실기 확인
-- 새 브랜드(앱 #92, 사이트 ddugit-site#4). 라이트 모드는 하지 않음(사용자 결정)
-- 사이트: GitHub 로그인(ddugit-site#3), 라이선스 테이블·갱신 함수·내 계정 목록(ddugit-site#5)
-
-## 지금 하는 일
-
-v0.6.1 릴리스: 버전 올림 PR → CI · Rust all_os → merge → Release(`release: true`). 사용자는 사이트의 v0.6.0(업데이트 기능 포함 빌드)을 설치해 두고, 0.6.1 게시 후 앱에서 업데이트 알림·설치·재시작을 확인한다.
+- v0.6.1 게시, 자동 업데이트 실제 확인(v0.6.0 → v0.6.1). M13 끝
+- 사이트: 영문 고정, 앱과 같은 스타일, 앱 화면 캡처(`public/screens`), 변경 내역 페이지 삭제(나중에 "문서" 메뉴와 함께), GitHub·Google 로그인(가이드 준수 버튼), 라이선스 테이블·`license-refresh` 함수 배포
 
 ## 다음 단계
 
-- 사용자 준비물
-  - ddugit-site 저장소 Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF` → Actions "Supabase" 실행(마이그레이션·함수 배포)
-  - Supabase Edge Functions Secrets: `DDUGIT_LICENSE_PRIVATE_KEY`(라이선스 발급 키 PEM), `DDUGIT_LICENSE_PUBKEY`
-  - 라이선스 발급 키를 아직 안 만들었다면 `node scripts/license.mjs keygen` (docs/RELEASE.md), 공개키는 ddugit Variables `DDUGIT_LICENSE_PUBKEY`
-  - Google OAuth(진행 중) → 사이트 `LOGIN_PROVIDERS`에 `"google"` 추가
-  - Netlify `NEXT_PUBLIC_DOWNLOADS_URL` = `https://<ref>.supabase.co/storage/v1/object/public/releases/downloads.json` (S3 주소 아님)
-  - Lemon Squeezy 스토어
-- M15 남은 것: Lemon Squeezy 웹훅 함수(구독 생성·갱신·해지 → `licenses`, 첫 발급 메일), 가격 페이지 구매 버튼, 앱 `BUY_URL`
-- 자동 업데이트 실제 확인: 다음 릴리스(v0.6.1, 새 아이콘·구독 라이선스 포함)
-- 오늘 작업이 끝나면 ddugit 저장소를 다시 비공개로(사용자)
-- M16: 첫 실행 안내·영문 점검·문제 신고 경로 → v1.0.0
+- M15 마지막: Lemon Squeezy(사용자: 스토어·상품 월 ₩4,900 / 연 ₩49,000) → 웹훅 Edge Function(구독 생성·갱신·해지 → `licenses`, 첫 라이선스 발급 메일), 사이트 가격 페이지 구매 버튼, 앱 `BUY_URL`, 결제부터 앱 활성화까지 확인
+- 사용자: 라이선스 발급 키 → Supabase Edge Functions Secrets(`DDUGIT_LICENSE_PRIVATE_KEY`, `DDUGIT_LICENSE_PUBKEY`) + ddugit Variables `DDUGIT_LICENSE_PUBKEY`
+- 사용자: Windows 실기 점검, 세무(사업자등록·통신판매업), 오늘 끝나면 두 저장소 비공개로
+- M16: 첫 실행 안내, 영문 문구 점검, 문제 신고 경로, 큰 저장소 성능 → v1.0.0
+- 나중: 사이트 "문서" 메뉴(사용법·변경 내역)
 
 ## 결정 (2026-10-04)
 
