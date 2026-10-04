@@ -216,8 +216,8 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 ### M12 · v0.6.0 정리 릴리스
 
-- [ ] 버전 0.6.0, CI · Rust all_os, Release(서명된 macOS + 미서명 Windows)
-- [ ] 실제 기기 점검(사용자): macOS 서명 경고 없음·신호등 위치·창 끌기·더블클릭 최대화, Windows 창 버튼·가장자리 크기 조절·SmartScreen 흐름
+- [x] 버전 0.6.0, CI · Rust all_os, Release(서명된 macOS + 미서명 Windows) — run 37189827264(GitHub Release 없이 artifact), 업데이트 기능을 넣고 run 37191046378로 다시
+- [ ] 실제 기기 점검(사용자): ~~macOS 서명 경고 없음·신호등 위치·창 끌기·더블클릭 최대화~~(2026-10-04 확인), Windows 창 버튼·가장자리 크기 조절·SmartScreen 흐름
 
 ### M13 · 배포 인프라 (Supabase Storage + 자동 업데이트)
 
@@ -234,7 +234,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 ### M15 · 구독과 라이선스
 
-- [ ] 라이선스 형식을 구독에 맞게: 만료일(결제 기간 끝 + 유예 7일). 앱은 로그인 없이 라이선스 키로 `ddugit.com`에서 갱신받는다(구독이 살아 있으면 새 만료일). 폐쇄망은 연 단위 사이트 라이선스를 수동 발급. 구독이 끝나면 기능은 막지 않고 갱신 안내만(신뢰 기반, 사용자 확인 필요)
+- [ ] 라이선스 형식을 구독에 맞게: 만료일(결제 기간 끝 + 유예 7일). 앱은 로그인 없이 라이선스 키로 `ddugit.com`에서 갱신받는다(구독이 살아 있으면 새 만료일). 폐쇄망은 연 단위 사이트 라이선스를 수동 발급. 구독이 끝나면 기능은 막지 않고 갱신 안내만(신뢰 기반, 2026-10-04 사용자 확정)
 - [ ] Lemon Squeezy 상품(월·연 구독, 사이트 라이선스), 결제 웹훅 → Supabase Edge Function이 서명·저장·메일 발송
 - [ ] 앱 구매 버튼(`BUY_URL`)을 사이트 가격 페이지로, 결제부터 앱 활성화까지 끝까지 확인
 
@@ -341,3 +341,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-04 | PR #86(병합 섞인 rebase), #87(v0.6.0, 출시 계획 M12~M16), #88(Supabase Storage 업로드) merge. v0.6.0 Release run 37188669909: 빌드는 됐지만 GitHub Release 초안 만들기가 403(Resource not accessible by integration)으로 실패                                                                                                                                                                                                                                                                      |
 | 2026-10-04 | 사용자 결정: 원인은 파지 않고 GitHub Release를 쓰지 않는다. `release.yml`은 빌드 + artifact + Supabase 업로드만(`contents: read`). ddugit-site#1: 사이트 골격(홈·다운로드·가격·변경 내역·약관·개인정보 초안·계정 자리)                                                                                                                                                                                                                                                                             |
 | 2026-10-04 | 자동 업데이트: `update.rs`(`DDUGIT_UPDATE_URL`, `requireSignedVersion`), `UpdateNotice`, `release.yml`이 키가 있으면 업데이트 파일·서명 업로드와 `latest.json`(vitest 97, cargo test 113, e2e 48)                                                                                                                                                                                                                                                                                                  |
+| 2026-10-04 | PR #90 merge(`83b19a7`), Release run 37191046378 성공(macOS 서명·검증)이지만 Supabase 업로드·업데이터가 설정을 못 읽어 건너뜀 → `Release settings` 진단 단계, ref·리전은 Variables·Secrets 어느 쪽이든. macOS 실제 기기 확인 끝. 구독 만료는 안내만(확정)                                                                                                                                                                                                                                          |

@@ -12,8 +12,8 @@ _마지막 갱신: 2026-10-04_
 
 ## 지금 하는 일
 
-- v0.6.0 Release(GitHub Release 없이) 실행 중 → artifact 확인 → 사용자 실제 기기 점검.
-- M13 자동 업데이트 PR: `update.rs` + `UpdateNotice` + `release.yml`(키가 있으면 업데이트 파일·`latest.json`). CI · Rust all_os 필요(플러그인 추가).
+- v0.6.0 빌드는 성공(macOS 서명·공증·실기 확인 끝). 하지만 run 37191046378에서 Supabase 업로드·업데이터 단계가 설정(`SUPABASE_S3_ACCESS_KEY_ID` Secret 또는 `SUPABASE_PROJECT_REF`)을 못 읽어 건너뜀. 이 PR: 진단 단계 + ref·리전을 Secrets에서도 읽기. merge 후 Release 다시 실행해 "Release settings" 로그로 확인
+- 사용자: GitHub·Google OAuth → Supabase Providers, Netlify 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`·`_ANON_KEY`), 사이트 404(ddugit-site#2로 Next.js 런타임 지정, 재배포 확인 필요)
 
 ## 다음 단계
 

@@ -68,7 +68,8 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 2. Project Settings → Storage → **S3 Connection**: 엔드포인트의 리전 확인(예: `ap-northeast-2`), **New access key**로 S3 접근 키 발급
 3. GitHub 저장소 Settings → Secrets and variables → Actions
    - Secrets: `SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY`
-   - Variables: `SUPABASE_PROJECT_REF`(대시보드 주소의 `…/project/<ref>`), `SUPABASE_REGION`
+   - Variables: `SUPABASE_PROJECT_REF`(대시보드 주소의 `…/project/<ref>`), `SUPABASE_REGION`. Secrets에 넣어도 읽는다
+   - 릴리스 실행의 "Release settings" 단계가 다섯 값(S3 키 둘, ref, 리전, 업데이트 키)이 보이는지 `true`/`false`로 찍는다(값은 찍지 않는다)
 
 S3 접근 키는 Storage 전체를 쓸 수 있다(DB는 아님). service_role 키는 쓰지 않는다.
 
