@@ -506,6 +506,8 @@ export const en: Record<Key, string> = {
   // rebase sheet, sync dialog, rebase plans
   "plan.notOnBranch": "The base commit isn't in the current branch's history",
   "plan.hasMerge": "There's a merge commit in between, so it can't be tidied here",
+  "plan.runSquash":
+    "The first commit of a line (between merges) can't be squashed: nothing comes before it on that line",
   "plan.dropAll": "That drops every commit. Keep at least one",
   "plan.firstSquash": "The top (oldest) commit has nothing above to meld into",
   "plan.action.pick": "Keep",
@@ -521,6 +523,7 @@ export const en: Record<Key, string> = {
   "rb.downOf": "Move {summary} down",
   "rb.actionOf": "Action for {summary}",
   "rb.pushed": "Pushed commits change too. You'll need a force push afterwards.",
+  "rb.line": "merged line",
   "rb.safe": "Conflicts open the conflict sheet, and you can cancel any time.",
   "rb.apply": "Apply (rebase)",
   "sync.fork": "{ahead} of my commits, {behind} remote commits",

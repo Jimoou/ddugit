@@ -50,24 +50,25 @@ import type {
   FileDiff,
   FileTouch,
   ForgeStatus,
-  PrReport,
-  PullRequest,
-  OpResult,
-  OpStatus,
-  Progress,
-  RebaseStep,
-  ReflogEntry,
-  ResetMode,
-  RefInfo,
-  RefOp,
-  RemoteOp,
-  RepoSnapshot,
-  WorktreeInfo,
-  WorktreeOp,
-  SubmoduleInfo,
-  SubmoduleOp,
   LfsOp,
   LfsStatus,
+  OpResult,
+  OpStatus,
+  PrReport,
+  Progress,
+  PullRequest,
+  RebaseStep,
+  RefInfo,
+  RefOp,
+  ReflogEntry,
+  RemoteOp,
+  RepoSnapshot,
+  ResetMode,
+  SubmoduleInfo,
+  SubmoduleOp,
+  TodoItem,
+  WorktreeInfo,
+  WorktreeOp,
 } from "./types";
 
 type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
@@ -191,6 +192,8 @@ export function RepoView({
   const [rebaseFrom, setRebaseFrom] = useState<string | null>(null);
   /** Starting plan for the sheet (from a Shift-drag); null starts with every commit picked in order. */
   const [rebaseInit, setRebaseInit] = useState<RebaseStep[] | null>(null);
+  /** git's plan when merges are in the range (`--rebase-merges`); null for a straight range or while it loads. */
+  const [rebaseTodo, setRebaseTodo] = useState<TodoItem[] | null>(null);
   /** "Go back to this commit": the target and what the dialog needs to explain it. */
   const [resetReq, setResetReq] = useState<{
     target: string;
@@ -429,12 +432,47 @@ export function RepoView({
     () => (snap?.refs ?? []).filter((r) => r.kind === "local").map((r) => r.name),
     [snap],
   );
-  // Commits the planned rebase rewrites; null when there is nothing valid to plan.
+  // A range with merges (or off the first-parent line) is planned over git's own todo.
+  const rebaseNeedsTodo =
+    !!rebaseFrom && !!snap?.head.target && typeof rebaseRange(commitById, snap.head.target, rebaseFrom) === "string";
+  useEffect(() => {
+    if (!rebaseNeedsTodo || !rebaseFrom) return;
+    let live = true;
+    api.rebaseTodo(path, rebaseFrom).then(
+      (todo) => live && setRebaseTodo(todo),
+      (e) => {
+        if (!live) return;
+        toast("err", String(e));
+        setRebaseFrom(null);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [rebaseNeedsTodo, rebaseFrom, path, toast]);
+  // Commits the planned rebase rewrites (and git's todo when merges are in it); null when there is nothing to plan.
   const rebase = useMemo(() => {
     if (!rebaseFrom || !snap?.head.target) return null;
     const r = rebaseRange(commitById, snap.head.target, rebaseFrom);
-    return typeof r === "string" || r.length === 0 ? null : r;
-  }, [rebaseFrom, snap, commitById]);
+    if (typeof r !== "string") return r.length ? { commits: r, todo: null } : null;
+    if (!rebaseTodo) return null;
+    const commits = rebaseTodo.flatMap((x): CommitInfo[] =>
+      x.kind === "pick"
+        ? [
+            commitById.get(x.id) ?? {
+              id: x.id,
+              parents: [],
+              summary: x.summary,
+              message: x.summary,
+              author: "",
+              email: "",
+              time: 0,
+            },
+          ]
+        : [],
+    );
+    return commits.length ? { commits, todo: rebaseTodo } : null;
+  }, [rebaseFrom, rebaseTodo, snap, commitById]);
   const matches = useMemo(
     () => (snap && search ? searchCommits(snap.commits, snap.refs, search.query) : []),
     [snap, search?.query], // eslint-disable-line react-hooks/exhaustive-deps
@@ -1376,11 +1414,12 @@ export function RepoView({
       {
         label: t("menu.rebase"),
         hint: typeof range === "string" ? t("menu.rebase.hasMerge") : undefined,
-        disabled: !clean || !snap.head.branch || !onHead || isHead || typeof range === "string",
+        disabled: !clean || !snap.head.branch || !onHead || isHead,
         onSelect: () => {
           setDiff(null);
           setBackport(null);
           setRebaseInit(null);
+          setRebaseTodo(null);
           setRebaseFrom(id);
         },
       },
@@ -1833,10 +1872,11 @@ export function RepoView({
           {rebase && !conflictSheet && (
             <RebaseSheet
               // Fresh plan whenever the history under it changes.
-              key={`${rebaseFrom}:${snap.head.target}:${rebaseInit?.map((x) => x.id).join() ?? ""}`}
+              key={`${rebaseFrom}:${snap.head.target}:${rebaseInit?.map((x) => x.id).join() ?? ""}:${!!rebase.todo}`}
               branch={snap.head.branch ?? "HEAD"}
               base={commitById.get(rebaseFrom!)!}
-              commits={rebase}
+              commits={rebase.commits}
+              todo={rebase.todo}
               initial={rebaseInit}
               unpushed={snap.head.upstream ? snap.head.ahead : null}
               busy={busy}

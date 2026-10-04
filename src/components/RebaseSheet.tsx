@@ -1,15 +1,20 @@
 import { Icon } from "./Icon";
 import { useState } from "react";
 import { fmtTime } from "../format";
-import { ACTIONS, move, planProblem, resultCount } from "../rebasePlan";
-import type { CommitInfo, RebaseAction, RebaseStep } from "../types";
+import { ACTIONS, applyPlan, move, planProblem, resultCount, runsProblem, todoRuns } from "../rebasePlan";
+import type { CommitInfo, RebaseAction, RebaseStep, TodoItem } from "../types";
 import { t } from "../i18n";
 
 interface Props {
   branch: string;
   base: CommitInfo;
-  /** Commits after `base`, oldest first. */
+  /** Commits after `base`, oldest first (with merges: the todo's picks, in its order). */
   commits: CommitInfo[];
+  /**
+   * With merges in the range, git's `--rebase-merges` todo: merges stay as they
+   * are, and commits move only within their line (run of picks between merges).
+   */
+  todo?: TodoItem[] | null;
   /** Starting plan (e.g. from dragging a commit in the graph); defaults to all picked in order. */
   initial?: RebaseStep[] | null;
   /** How many of the newest commits are not on the upstream yet (null: no upstream). */
@@ -23,11 +28,22 @@ interface Props {
  * Interactive rebase as a list: drag rows (or use ↑↓) to reorder, pick an
  * action per commit, apply. Top is oldest, the order git replays them in.
  */
-export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, onApply, onClose }: Props) {
+export function RebaseSheet({ branch, base, commits, todo, initial, unpushed, busy, onApply, onClose }: Props) {
   const byId = new Map(commits.map((c) => [c.id, c]));
   const [steps, setSteps] = useState<RebaseStep[]>(() => initial ?? commits.map((c) => ({ id: c.id, action: "pick" })));
   const [dragging, setDragging] = useState<number | null>(null);
-  const problem = planProblem(steps);
+  const runOf = todo ? todoRuns(todo) : null;
+  const sameRun = (i: number, j: number) => !runOf || runOf.get(steps[i]?.id) === runOf.get(steps[j]?.id);
+  const problem = runOf
+    ? steps.every((x) => x.action === "drop")
+      ? planProblem(steps)
+      : runsProblem(steps, runOf)
+    : planProblem(steps);
+  // Labels a merge brings back in: the line built before them is a merged side.
+  const merged = new Set(todo?.flatMap((x) => (x.kind === "merge" ? [x.label] : [])) ?? []);
+  const rows = todo
+    ? applyPlan(todo, steps)
+    : steps.map((st) => ({ kind: "pick" as const, id: st.id, summary: "", action: st.action }));
   const changed = steps.some((s, i) => s.action !== "pick" || s.id !== commits[i].id);
   // Rewriting a commit the upstream already has means force-pushing afterwards.
   const rewritesPushed = unpushed !== null && commits.length > unpushed;
@@ -36,7 +52,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
     setSteps((ss) => ss.map((s, j) => (j === i ? { ...s, action } : s)));
   const shift = (i: number, d: number) => {
     const j = i + d;
-    if (j >= 0 && j < steps.length) setSteps((ss) => move(ss, i, j));
+    if (j >= 0 && j < steps.length && sameRun(i, j)) setSteps((ss) => move(ss, i, j));
   };
 
   return (
@@ -57,7 +73,29 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
       </header>
 
       <ol className="rb-list">
-        {steps.map((s, i) => {
+        {rows.map((row, k) => {
+          if (row.kind === "merge")
+            return (
+              <li key={`m${k}`} className="rb-merge">
+                <Icon name="branch" size={12} />
+                <span className="summary">{row.summary || row.label}</span>
+                {row.id && <code>{row.id.slice(0, 7)}</code>}
+              </li>
+            );
+          if (row.kind === "reset") {
+            // Where the next line starts: a side that a merge brings back, or back on the main line.
+            const next = rows.slice(k + 1).find((x) => x.kind === "label");
+            const side = next?.kind === "label" && merged.has(next.name);
+            if (k <= 1 && !side) return null;
+            return (
+              <li key={`r${k}`} className={`rb-line ${side ? "side" : ""}`} aria-hidden>
+                {side && next?.kind === "label" && `${t("rb.line")} · ${next.name}`}
+              </li>
+            );
+          }
+          if (row.kind === "label") return null;
+          const i = steps.findIndex((x) => x.id === row.id);
+          const s = steps[i];
           const c = byId.get(s.id)!;
           return (
             <li
@@ -70,7 +108,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
               }}
               onDragOver={(e) => {
                 e.preventDefault();
-                if (dragging !== null && dragging !== i) {
+                if (dragging !== null && dragging !== i && sameRun(dragging, i)) {
                   setSteps((ss) => move(ss, dragging, i));
                   setDragging(i);
                 }
@@ -84,7 +122,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
                 <button
                   title={t("rb.up")}
                   aria-label={t("rb.upOf", { summary: c.summary })}
-                  disabled={i === 0}
+                  disabled={i === 0 || !sameRun(i, i - 1)}
                   onClick={() => shift(i, -1)}
                 >
                   <Icon name="arrowUp" size={12} />
@@ -92,7 +130,7 @@ export function RebaseSheet({ branch, base, commits, initial, unpushed, busy, on
                 <button
                   title={t("rb.down")}
                   aria-label={t("rb.downOf", { summary: c.summary })}
-                  disabled={i === steps.length - 1}
+                  disabled={i === steps.length - 1 || !sameRun(i, i + 1)}
                   onClick={() => shift(i, 1)}
                 >
                   <Icon name="arrowDown" size={12} />
