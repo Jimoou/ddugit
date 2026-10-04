@@ -6,6 +6,7 @@ import type { Tabs } from "../tabs";
 import { PlanetDot } from "./Planet";
 import { WindowControls } from "./WindowControls";
 import { chromeOf } from "../chrome";
+import { Wordmark } from "./Wordmark";
 import { isTauri } from "../api";
 
 /** The frame this window draws (fixed for the session). */
@@ -38,8 +39,8 @@ export function TabBar(p: {
 }) {
   return (
     <header className={`tabrow chrome-${chrome}`} data-tauri-drag-region>
-      <h1 className="wordmark small" data-tauri-drag-region>
-        ddugit
+      <h1 className="brand small" data-tauri-drag-region>
+        <Wordmark />
       </h1>
       <nav className="tabbar" role="tablist" aria-label={t("tabs.label")} data-tauri-drag-region>
         <div
