@@ -2514,6 +2514,26 @@ b.bp-missing {
   text-decoration: line-through;
   opacity: 0.5;
 }
+/* With merges: merges stay as they are (locked), lines start under a divider. */
+.rb-list li.rb-merge {
+  cursor: default;
+  color: var(--text-2);
+  border-style: dotted;
+  background: none;
+}
+.rb-list li.rb-line {
+  cursor: default;
+  min-height: 0;
+  padding: 2px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rb-list li.rb-line.side {
+  color: #a371f7;
+}
 .warn-text {
   color: var(--amber);
   font-size: 12px;

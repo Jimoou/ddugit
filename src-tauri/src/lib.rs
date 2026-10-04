@@ -8,7 +8,7 @@ use git::conflict::{ConflictFile, Resolution};
 use git::diff::{DiffScope, FileDiff};
 use git::pick::PickOp;
 use git::read::RepoSnapshot;
-use git::rebase::RebaseStep;
+use git::rebase::{RebaseStep, TodoItem};
 use git::refs::RefOp;
 use git::remote::{Progress, RemoteOp};
 use git::stash::StashOp;
@@ -60,6 +60,7 @@ command!(backport_export(path: String, ids: Vec<String>, out_dir: String) -> OpR
     => git::backport::export(&path, &ids, &out_dir));
 command!(git_rebase(path: String, base: String, steps: Vec<RebaseStep>) -> OpResult
     => git::rebase::rebase(&path, &base, &steps));
+command!(git_rebase_todo(path: String, base: String) -> Vec<TodoItem> => git::rebase::todo(&path, &base));
 command!(set_git_path(git_path: Option<String>) -> String => git::set_program(git_path.as_deref()));
 command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
     => git::write::merge(&path, &source, target.as_deref()));
@@ -201,6 +202,7 @@ pub fn run() {
             git_stage_hunks,
             set_git_path,
             git_rebase,
+            git_rebase_todo,
             backport_compare,
             backport_ignore,
             backport_summary,

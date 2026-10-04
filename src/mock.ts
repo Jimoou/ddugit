@@ -18,7 +18,9 @@ import type {
   RepoGlance,
   RepoSnapshot,
   SubmoduleInfo,
+  TodoItem,
 } from "./types";
+import { applyPlan } from "./rebasePlan";
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
 const demoLicense = { current: null as import("./types").LicenseInfo | null };
@@ -361,6 +363,52 @@ export const LANE = 52;
 // --- command table ------------------------------------------------------------
 
 const repo = seed();
+
+/**
+ * git's `--rebase-merges` todo for `base..head`, in its shape: the first-parent
+ * line, and before each merge the side it brings in (rebuilt from where it
+ * left the line, or from outside the range), labelled for the merge.
+ */
+function todoFor(base: string, head: string): TodoItem[] {
+  const stop = repo.ancestors(base);
+  const at = (id: string) => repo.commits.get(id)!;
+  const chain: string[] = [];
+  for (let id = head; !stop.has(id); id = at(id).parents[0]) chain.unshift(id);
+  const onChain = new Set(chain);
+  const point = (id: string) => `branch-point-${id.slice(0, 7)}`;
+  const sides = new Map<string, { ids: string[]; from: string; out: string }>();
+  for (const id of chain) {
+    const [, other] = at(id).parents;
+    if (!other) continue;
+    const ids: string[] = [];
+    let cur = other;
+    while (!stop.has(cur) && !onChain.has(cur)) {
+      ids.unshift(cur);
+      cur = at(cur).parents[0];
+    }
+    sides.set(id, { ids, from: cur === base ? "onto" : onChain.has(cur) ? point(cur) : cur, out: other });
+  }
+  const starts = new Set([...sides.values()].map((x) => x.from));
+  const start = chain.length ? at(chain[0]).parents[0] : base;
+  const items: TodoItem[] = [
+    { kind: "label", name: "onto" },
+    { kind: "reset", to: start === base ? "onto" : start },
+  ];
+  let n = 0;
+  for (const id of chain) {
+    const side = sides.get(id);
+    if (side && side.ids.length) {
+      const [here, label] = [`main-${++n}`, `side-${n}`];
+      items.push({ kind: "label", name: here }, { kind: "reset", to: side.from });
+      for (const s of side.ids) items.push({ kind: "pick", id: s, summary: at(s).summary });
+      items.push({ kind: "label", name: label }, { kind: "reset", to: here });
+      items.push({ kind: "merge", id, label, summary: at(id).summary });
+    } else if (side) items.push({ kind: "merge", id, label: side.out, summary: at(id).summary });
+    else items.push({ kind: "pick", id, summary: at(id).summary });
+    if (starts.has(point(id))) items.push({ kind: "label", name: point(id) });
+  }
+  return items;
+}
 const res = (status: OpStatus, output = ""): OpResult => ({ status, output });
 const delay = <T>(v: T, ms = 120) => new Promise<T>((r) => setTimeout(() => r(v), ms));
 const fail = (msg: string) => Promise.reject(msg);
@@ -875,8 +923,40 @@ const mockTable: Table = {
     return delay("git version 2.47.0 (demo)");
   },
 
+  git_rebase_todo({ base }) {
+    const head = repo.branches.get(repo.head)!;
+    if (!repo.ancestors(head).has(base)) return fail(`${base} is not an ancestor of HEAD`);
+    return delay(todoFor(base, head));
+  },
+
   git_rebase({ base, steps }) {
     if (repo.state !== "clean") return fail("Repository is in the middle of an operation");
+    const head = repo.branches.get(repo.head)!;
+    const inBase = repo.ancestors(base);
+    if ([...repo.ancestors(head)].some((id) => !inBase.has(id) && repo.commits.get(id)!.parents.length > 1)) {
+      // Merges in the range: replay git's todo with the plan, like `rebase -i --rebase-merges`.
+      const todo = todoFor(base, head);
+      const picks = todo.flatMap((x) => (x.kind === "pick" ? [x.id] : [])).sort();
+      if (
+        picks.join() !==
+        steps
+          .map((s) => s.id)
+          .sort()
+          .join()
+      )
+        return fail("The plan must list every commit after the base exactly once");
+      const labels = new Map([["onto", base]]);
+      let tip = base;
+      for (const item of applyPlan(todo, steps)) {
+        if (item.kind === "label") labels.set(item.name, tip);
+        else if (item.kind === "reset") tip = labels.get(item.to) ?? item.to;
+        else if (item.kind === "merge") tip = repo.commit([tip, labels.get(item.label) ?? item.label], item.summary);
+        else if (item.action === "pick") tip = repo.commit([tip], item.summary, repo.commits.get(item.id)!.author);
+        else if (item.action === "squash") repo.commits.get(tip)!.message += `\n${repo.commits.get(item.id)!.message}`;
+      }
+      repo.branches.set(repo.head, tip);
+      return delay(res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`));
+    }
     // Rebuild the branch on `base`: squash / fixup fold into the previous commit.
     let tip = base;
     for (const s of steps) {

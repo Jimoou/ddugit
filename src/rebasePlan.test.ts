@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CommitInfo } from "./types";
-import { move, planMove, planProblem, rebaseRange, resultCount } from "./rebasePlan";
+import type { CommitInfo, TodoItem } from "./types";
+import { applyPlan, move, planMove, planProblem, rebaseRange, resultCount, runsProblem, todoRuns } from "./rebasePlan";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
   id,
@@ -71,5 +71,57 @@ describe("planMove", () => {
     expect(planMove(repo, "d", "root", "c")).toBeNull();
     const merged = byId(c("m", "x", "y"), c("x", "a"), c("y", "a"), c("a"));
     expect(planMove(merged, "m", "x", "a")).toBeNull();
+  });
+});
+
+describe("plans over merges (--rebase-merges)", () => {
+  // git's todo for base → a → (side: s1 → s2) → b → merge → d.
+  const todo: TodoItem[] = [
+    { kind: "label", name: "onto" },
+    { kind: "reset", to: "onto" },
+    { kind: "pick", id: "a", summary: "a" },
+    { kind: "label", name: "bp" },
+    { kind: "pick", id: "s1", summary: "s1" },
+    { kind: "pick", id: "s2", summary: "s2" },
+    { kind: "label", name: "side" },
+    { kind: "reset", to: "bp" },
+    { kind: "pick", id: "b", summary: "b" },
+    { kind: "merge", id: "m", label: "side", summary: "Merge side" },
+    { kind: "pick", id: "d", summary: "d" },
+  ];
+  it("groups picks into lines between merges, labels and resets", () => {
+    expect([...todoRuns(todo)]).toEqual([
+      ["a", 1],
+      ["s1", 2],
+      ["s2", 2],
+      ["b", 3],
+      ["d", 4],
+    ]);
+  });
+  it("reorders within a line, keeps the merges, and refuses a line that starts by melding", () => {
+    const steps = [
+      { id: "a", action: "pick" as const },
+      { id: "s2", action: "pick" as const },
+      { id: "s1", action: "fixup" as const },
+      { id: "b", action: "pick" as const },
+      { id: "d", action: "drop" as const },
+    ];
+    const out = applyPlan(todo, steps);
+    expect(out.map((x) => (x.kind === "pick" ? `${x.action} ${x.id}` : x.kind))).toEqual([
+      "label",
+      "reset",
+      "pick a",
+      "label",
+      "pick s2",
+      "fixup s1",
+      "label",
+      "reset",
+      "pick b",
+      "merge",
+      "drop d",
+    ]);
+    const runs = todoRuns(todo);
+    expect(runsProblem(steps, runs)).toBeNull();
+    expect(runsProblem([...steps.slice(0, 4), { id: "d", action: "squash" }], runs)).not.toBeNull();
   });
 });

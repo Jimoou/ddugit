@@ -12,28 +12,29 @@ import type {
   DiffScope,
   FileDiff,
   FileTouch,
-  PrReport,
+  HostKey,
+  LfsOp,
+  LfsStatus,
+  LicenseStatus,
   OpResult,
   PickOp,
-  RebaseStep,
-  ReflogEntry,
-  ResetMode,
+  PrReport,
   Progress,
+  RebaseStep,
   RefOp,
+  ReflogEntry,
   RemoteOp,
+  RepoGlance,
   RepoSnapshot,
+  ResetMode,
   Resolution,
-  StashOp,
-  HostKey,
   SshKey,
   SshStatus,
   SshTest,
-  LicenseStatus,
-  RepoGlance,
-  WorktreeOp,
+  StashOp,
   SubmoduleOp,
-  LfsOp,
-  LfsStatus,
+  TodoItem,
+  WorktreeOp,
 } from "./types";
 import { t } from "./i18n";
 
@@ -106,6 +107,7 @@ export interface Commands {
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
   git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
+  git_rebase_todo: [{ path: string; base: string }, TodoItem[]];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
   backport_ignore: [{ path: string; target: string; id: string; ignore: boolean }, null];
   backport_summary: [{ path: string; source: string; targets: string[] }, BackportTally[]];
@@ -234,6 +236,8 @@ export const api = {
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
   /** Rewrite the commits after `base` as `steps` (oldest first) say. */
   rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
+  /** git's own plan for a range with merges (`--rebase-merges`), without starting it. */
+  rebaseTodo: (path: string, base: string) => call("git_rebase_todo", { path, base }),
   backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),
   backportIgnore: (path: string, target: string, id: string, ignore: boolean) =>
     call("backport_ignore", { path, target, id, ignore }),

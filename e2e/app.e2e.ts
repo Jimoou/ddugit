@@ -359,6 +359,54 @@ test("turns the graph a quarter at a time and keeps commits, arrows and the sett
   await expect(page.locator(".hud button.turn")).toContainText("90°");
 });
 
+test("tidies a range with a merge in it: merges stay, commits move only within their line", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const find = (summary: string) => before.commits.find((c) => c.summary === summary)!;
+  const base = find("Bump dependencies");
+  // origin/feature/graph-zoom's label covers its node: walk there from HEAD by keyboard instead.
+  await page
+    .locator("canvas")
+    .first()
+    .click({ position: { x: 40, y: 40 } });
+  const live = page.locator(".graph .sr-only");
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowLeft"); // HEAD, then four first parents
+  await expect(live).toContainText("Bump dependencies");
+  await page.keyboard.press("Enter");
+  await page.click(".context-menu >> text=이 다음 커밋들 정리");
+
+  // The hotfix merge sits locked between its merged line and the branch's own commits.
+  const sheet = page.locator(".rebase-sheet");
+  await expect(sheet.locator(".rb-merge")).toContainText("Merge branch 'hotfix/crash'");
+  await expect(sheet.locator(".rb-line.side")).toContainText("병합한 갈래");
+  const row = (summary: string) => sheet.locator(".rb-list li").filter({ hasText: summary });
+  await expect(row("Fix crash on empty repo").getByRole("button", { name: /위로/ })).toBeDisabled();
+  await expect(row("Semantic zoom levels").getByRole("button", { name: /위로/ })).toBeDisabled();
+  // Folding the first commit after the merge into it is refused; dropping one is fine.
+  await row("Semantic zoom levels").locator("select").selectOption("fixup");
+  await expect(sheet.locator(".danger-text")).toBeVisible();
+  await row("Semantic zoom levels").locator("select").selectOption("pick");
+  await row("Minimap").locator("select").selectOption("drop");
+  await page.click(".rebase-sheet button.primary");
+  await demo.toast("커밋을 정리했어요");
+
+  const snap = await demo.snapshot();
+  const now = new Map(snap.commits.map((c) => [c.id, c]));
+  const chain = (id: string, n: number) => {
+    const out = [];
+    for (let c = now.get(id); c && out.length < n; c = now.get(c.parents[0])) out.push(c);
+    return out;
+  };
+  const [tip, zoom, merge] = chain(snap.head.target!, 3);
+  expect([tip.summary, zoom.summary, merge.summary]).toEqual([
+    "Zoom to cursor",
+    "Semantic zoom levels",
+    "Merge branch 'hotfix/crash' into main",
+  ]);
+  expect(merge.parents[0]).toBe(base.id);
+  expect(now.get(merge.parents[1])!.summary).toBe("Fix crash on empty repo");
+});
+
 test("shift-dragging a commit onto another opens the rebase plan with it moved", async ({ demo }) => {
   const { page } = demo;
   await demo.mutate((d) => d.grow(3));

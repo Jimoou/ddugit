@@ -11,13 +11,13 @@ _마지막 갱신: 2026-10-02_
 
 ## 지금 하는 일
 
-사용자 요청(2026-10-04): M4 마무리 + 설정 토글. PR 하나씩.
+M4 마지막 PR: 병합이 섞인 구간 정리(`--rebase-merges`). 이 PR이 merge되면 M4 끝.
 
-1. 설정: 우주 배경·빛 번짐 끄기 (#84 merge)
-2. M4: 닫힌·병합된 PR 보기 (이 PR)
-3. M4: 병합이 섞인 구간 정리(`--rebase-merges`)
+Windows 서명(사용자 결정 대기):
 
-Windows 서명: 사용자에게 Certum Code Signing in the Cloud(개인, 약 $139/년) 추천, 대안 SSL.com IV+eSigner(약 $310/년). Azure Artifact Signing은 개인이면 미국·캐나다만. 인증서를 받으면 SimplySign TOTP 시드로 CI 서명(비공식 도구: jay0lee/certum-cloud-code-sign 또는 ssign).
+- 무료: Microsoft Store(MSIX). 개인 개발자 등록 무료(2025-09~), MSIX는 Microsoft가 서명·호스팅·업데이트. Tauri는 MSIX를 직접 못 만들어 Microsoft `winapp` CLI로 패키징 필요. Store 밖 라이선스 판매(Lemon Squeezy) 정책은 확인 필요
+- 유료: Certum Code Signing in the Cloud(개인, 약 $139/년, TOTP 시드로 CI 서명, 비공식 도구) / SSL.com IV+eSigner(약 $310/년, 공식 자동화)
+- Azure Artifact Signing은 개인이면 미국·캐나다만
 
 ## 결정 (2026-10-04)
 

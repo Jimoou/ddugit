@@ -178,6 +178,15 @@ export interface RebaseStep {
   action: RebaseAction;
 }
 
+/** A line of git's `--rebase-merges` todo (mirrors `TodoItem` in git/rebase.rs). */
+export type TodoItem =
+  | { kind: "pick"; id: string; summary: string }
+  /** Recreates a merge of `label`, the other side rebuilt just before. */
+  | { kind: "merge"; id: string | null; label: string; summary: string }
+  | { kind: "label"; name: string }
+  /** Starts the next line of commits from `to` (a label, or `onto`: the base). */
+  | { kind: "reset"; to: string };
+
 /** Mirrors `BackportState` in git/backport.rs (`kind` tag). */
 export type BackportState =
   { kind: "missing" } | { kind: "applied" } | { kind: "picked"; by: string } | { kind: "ignored" };
