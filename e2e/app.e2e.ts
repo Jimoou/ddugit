@@ -1257,3 +1257,19 @@ test("several branches can be picked in the sidebar, lighting their histories to
   await side.getByRole("button", { name: "선택 해제" }).click();
   await expect(side.locator("li.focused")).toHaveCount(0);
 });
+
+test("a newer version shows an update notice that installs or waits", async ({ demo }) => {
+  const { page } = demo;
+  await expect(page.locator(".update-notice")).toHaveCount(0);
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoUpdate = { version: "9.9.9", notes: null };
+  });
+  await page.reload();
+  const notice = page.locator(".update-notice");
+  await expect(notice).toContainText("9.9.9");
+  await notice.locator("button.ghost").click();
+  await expect(notice).toHaveCount(0);
+  await page.reload();
+  await page.locator(".update-notice button.primary").click();
+  await expect(page.locator(".update-notice")).toHaveCount(0);
+});

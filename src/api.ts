@@ -16,6 +16,7 @@ import type {
   LfsOp,
   LfsStatus,
   LicenseStatus,
+  UpdateInfo,
   OpResult,
   PickOp,
   PrReport,
@@ -89,6 +90,8 @@ export interface Commands {
   license_status: [Record<string, never>, LicenseStatus];
   license_install: [{ text: string }, LicenseStatus];
   license_remove: [Record<string, never>, LicenseStatus];
+  update_check: [Record<string, never>, UpdateInfo | null];
+  update_install: [Record<string, never>, null];
   ssh_keygen: [{ comment: string }, SshKey];
   ssh_host_key: [{ url: string }, HostKey];
   ssh_trust_host: [{ url: string; fingerprints: string[] }, null];
@@ -203,6 +206,10 @@ export const api = {
   licenseStatus: () => call("license_status", {}),
   licenseInstall: (text: string) => call("license_install", { text }),
   licenseRemove: () => call("license_remove", {}),
+  /** A newer version in the download storage (release builds only; otherwise `null`). */
+  updateCheck: () => call("update_check", {}),
+  /** Download, verify and install the newest version, then restart into it. */
+  updateInstall: () => call("update_install", {}),
   sshKeygen: (comment: string) => call("ssh_keygen", { comment }),
   sshHostKey: (url: string) => call("ssh_host_key", { url }),
   /** Trust the server only if it still presents exactly `fingerprints` (what the user saw). */

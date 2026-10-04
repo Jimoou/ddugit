@@ -2,6 +2,7 @@ mod forge;
 mod git;
 mod license;
 mod ssh;
+mod update;
 
 use git::backport::{BackportItem, BackportTally};
 use git::conflict::{ConflictFile, Resolution};
@@ -125,6 +126,16 @@ async fn license_remove(app: tauri::AppHandle) -> Result<license::LicenseStatus,
     blocking(move || license::remove_in(&dir)).await
 }
 
+#[tauri::command]
+async fn update_check(app: tauri::AppHandle) -> Result<Option<update::UpdateInfo>, String> {
+    update::check(&app).await
+}
+
+#[tauri::command]
+async fn update_install(app: tauri::AppHandle) -> Result<(), String> {
+    update::install(&app).await
+}
+
 command!(ssh_status() -> ssh::SshStatus => ssh::status());
 command!(ssh_keygen(comment: String) -> ssh::SshKey => ssh::keygen(&comment));
 command!(ssh_host_key(url: String) -> ssh::HostKey => ssh::host_key(&url));
@@ -189,6 +200,7 @@ fn initial_repo() -> Option<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Watching::default())
         .invoke_handler(tauri::generate_handler![
             initial_repo,
@@ -236,6 +248,8 @@ pub fn run() {
             license_status,
             license_install,
             license_remove,
+            update_check,
+            update_install,
             ssh_status,
             ssh_keygen,
             ssh_host_key,
