@@ -888,7 +888,7 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
   await page.locator(".tab-home").click();
   await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(1);
   const galaxy = page.locator(".welcome .galaxy");
-  await expect(galaxy).toContainText("내 은하 · 저장소 3개");
+  await expect(galaxy).toContainText("내 저장소 · 3개");
   const worlds = galaxy.locator(".world");
   await expect(worlds).toHaveCount(3);
   await expect(worlds.filter({ hasText: "gone-project" })).toContainText("찾을 수 없음");

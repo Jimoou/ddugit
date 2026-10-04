@@ -156,10 +156,12 @@
 - [x] v0.5.2 릴리스(새 "ddu" 아이콘 #77 포함, 서명 없음)
 - [x] 은하 카드의 별이 뭉개져 안 보임(⋯용 굵은 선이 별에도 걸렸음) → 별은 보통 선·늘 보이게, ⋯ 점 굵기는 아이콘 자체에서(앱 전체 ⋯). 사이드바 원격 ⋯는 테두리 버튼
 - [x] (사용자 결정, 커뮤니티 플러그인 없이) 창 제목 표시줄을 탭 줄로: macOS는 신호등만 남기고 내용을 위로(`titleBarStyle: Overlay`, `tauri.macos.conf.json`), Windows는 시스템 제목 표시줄을 없애고 탭 줄 끝에 최소화·최대화·닫기(`decorations: false`, `tauri.windows.conf.json`, `WindowControls`). 탭 줄 빈 곳 끌기·더블클릭 최대화(`data-tauri-drag-region`). Windows 11 스냅 레이아웃 메뉴는 포기. Linux·데모는 시스템 제목 표시줄 그대로(`chrome.ts`)
+- [x] (사용자 결정) 첫 화면 이름 '내 은하' → '내 저장소'(탭·제목·단축키 표, 영어 'Repositories')
 
 ## M5 · 배포 품질
 
 - [ ] (나중에) macOS 서명 + 공증, Windows 코드 서명 — 2026-10-01 결정: 뒤로 미룸. Apple Developer 계정, Windows 인증서가 필요하다
+  - 2026-10-04: 사용자가 Apple Developer Program(1년) 가입. 인증서·시크릿 등록 대기(`docs/RELEASE.md`, Mac 없이 openssl로 만드는 법 추가)
 - [ ] (나중에) 자동 업데이트 (tauri-plugin-updater) — 2026-10-01 결정: 뒤로 미룸. 서명과 배포 위치를 정한 뒤에 한다
 - [x] 배포 파일: macOS `.dmg`, Windows `.exe`(NSIS 설치 파일). 2026-10-01 결정. Tauri 번들러가 둘 다 만든다. 태그를 push하면 Release에 올리는 워크플로를 만든다(서명 전에는 첫 실행 경고가 뜬다)
 - [x] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표 — 반짝임, 한 번에 불러올 커밋 수, git 실행 파일(`--version`으로 확인 후 적용), 단축키 표, `?`/⚙로 열기
@@ -286,3 +288,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-02 | PR #78 squash merge(`2583df3`). v0.5.2 버전 올림, CI · Rust all_os, Release 수동 실행                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 2026-10-02 | PR #79 squash merge(`6cc5533`), Release → `ddugit v0.5.2` 초안. 카드 별·사이드바 ⋯ 잘 보이게                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 2026-10-02 | PR #80 squash merge(`717cdba`). 창 제목 표시줄을 탭 줄로(macOS Overlay, Windows 자체 버튼, vitest 91, e2e 46)                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-10-04 | PR #81 squash merge(`3c8a3dc`). '내 은하' → '내 저장소', Apple 서명 준비 안내(Mac 없이 인증서 만들기)                                                                                                                                                                                                                                                                                                                                                                                              |
