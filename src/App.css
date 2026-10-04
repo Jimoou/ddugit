@@ -4216,3 +4216,35 @@ button.demo-pill {
 .sidebar .stacks .stack-flag.warn {
   color: var(--amber);
 }
+
+/* Release notes (components/ReleaseNotes.tsx). */
+.dialog.notes {
+  width: min(680px, calc(100vw - 32px));
+}
+.notes-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.notes-range .field {
+  flex: 0 1 220px;
+}
+.notes-range .notes-arrow {
+  padding-bottom: 9px;
+  color: var(--muted);
+}
+.notes-range .mono {
+  padding-bottom: 9px;
+}
+.notes-md {
+  width: 100%;
+  min-height: 260px;
+  margin-top: 10px;
+  padding: 10px;
+  resize: vertical;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+}

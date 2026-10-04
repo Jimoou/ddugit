@@ -504,6 +504,14 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__ddugitDemo = demoControls;
 }
 
+/** Demo commits read like a Conventional Commits history, so the release notes have sections. */
+function demoConventional(summary: string): string {
+  if (/^Merge /.test(summary)) return summary;
+  if (/^Fix /.test(summary)) return `fix: ${summary.slice(4)}`;
+  if (/^(Bump|Set up|Update|Initial)/.test(summary)) return `chore: ${summary[0].toLowerCase()}${summary.slice(1)}`;
+  return `feat: ${summary[0].toLowerCase()}${summary.slice(1)}`;
+}
+
 /** Stacked branches in the demo: branch → parent and the parent's tip it was last built on. */
 const demoStacks = new Map<string, { parent: string; base: string }>();
 
@@ -1302,6 +1310,38 @@ const mockTable: Table = {
     );
   },
   pro_status: () => delay(demoControls.pro),
+  release_range({ from, to }) {
+    const end = repo.resolve(to);
+    if (!end) return fail(`unknown revision '${to}'`);
+    const behind = repo.ancestors(end);
+    const time = (id: string) => repo.commits.get(id)?.time ?? 0;
+    const tags = [...repo.tags]
+      .filter(([, id]) => behind.has(id))
+      .sort((a, b) => time(b[1]) - time(a[1]))
+      .map(([name]) => name);
+    // Like `describe --tags <to>^`: the newest tag strictly behind the end.
+    const start = from === "" ? null : (from ?? tags.find((name) => repo.tags.get(name) !== end) ?? null);
+    const stop = start ? repo.ancestors(repo.resolve(start)!) : new Set<string>();
+    const commits: import("./types").NoteCommit[] = [];
+    for (let id: string | undefined = end; id && !stop.has(id); id = repo.commits.get(id)?.parents[0]) {
+      const c = repo.commits.get(id)!;
+      const note = (id: string) => {
+        const c = repo.commits.get(id)!;
+        return { id, author: c.author, time: c.time, summary: demoConventional(c.summary), body: "", inner: [] };
+      };
+      // A merge also carries what it brought in (the second parent's own commits).
+      const [first, second] = c.parents;
+      const mainline = second ? repo.ancestors(first) : new Set<string>();
+      const inner = second
+        ? [...repo.ancestors(second)]
+            .filter((x) => !mainline.has(x) && repo.commits.get(x)!.parents.length < 2)
+            .sort((a, b) => time(b) - time(a))
+            .map(note)
+        : [];
+      commits.push({ ...note(id), inner });
+    }
+    return delay({ from: start, commits, tags, truncated: false });
+  },
   stack_list: () => delay(demoStackList()),
   stack_op({ op }) {
     if (op.kind !== "remove" && !demoControls.pro.pro) return Promise.reject(PRO_LOCKED);

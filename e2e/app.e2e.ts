@@ -1408,3 +1408,41 @@ test("on Free, stacking a branch offers Pro", async ({ demo }) => {
   await page.click(".context-menu >> text=이 브랜치 위에 새 브랜치 쌓기");
   await expect(page.locator(".dialog.pro-offer")).toContainText("스택 브랜치");
 });
+
+test("release notes group the commits since the previous tag by kind, and copy as Markdown", async ({ demo }) => {
+  const { page } = demo;
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.click(".sidebar li >> text=v0.2.0", { button: "right" });
+  await page.click(".context-menu >> text=여기까지 릴리스 노트 만들기");
+  const dialog = page.locator(".dialog.notes");
+  const md = dialog.locator("textarea");
+  await expect(dialog.locator("select")).toHaveValue("v0.1.0");
+  await expect(md).toHaveValue(/^## v0\.2\.0 \(/);
+  // Plain branch merges give the commits they brought in, oldest first.
+  await expect(md).toHaveValue(/### 새 기능\n\n- login form UI .*\n- hook up auth API .*\n- remember-me checkbox/);
+  await expect(md).toHaveValue(/### 버그 수정\n\n- typo in README .*\n- crash on empty repo/);
+
+  // Leave out the chores; then start from the first commit.
+  await expect(md).toHaveValue(/### 기타/);
+  await dialog.getByLabel("기타(chore·ci·test 등)도 넣기").uncheck();
+  await expect(md).not.toHaveValue(/### 기타/);
+  await dialog.locator("select").selectOption("");
+  await expect(md).toHaveValue(/- add project skeleton/);
+
+  // Edits by hand are what gets copied.
+  await md.fill("## v0.2.0\n\nHand-written.\n");
+  await dialog.getByRole("button", { name: "Markdown 복사" }).click();
+  await demo.toast("릴리스 노트를 복사했어요");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("## v0.2.0\n\nHand-written.\n");
+});
+
+test("on Free, release notes offer Pro", async ({ demo }) => {
+  const { page } = demo;
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+  });
+  await page.reload();
+  await page.click(".sidebar li >> text=v0.2.0", { button: "right" });
+  await page.click(".context-menu >> text=여기까지 릴리스 노트 만들기");
+  await expect(page.locator(".dialog.pro-offer")).toContainText("릴리스 노트");
+});

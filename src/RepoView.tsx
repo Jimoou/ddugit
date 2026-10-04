@@ -45,6 +45,7 @@ import type { Drag, NodeBadge, Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
 import { TransferDialog } from "./components/Transfer";
 import { StackSection } from "./components/Stacks";
+import { ReleaseNotesDialog } from "./components/ReleaseNotes";
 import { offerPro, proOpen, usePro } from "./pro";
 import type {
   StackBranch,
@@ -214,6 +215,8 @@ export function RepoView({
   } | null>(null);
   const [reflogOpen, setReflogOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  /** Release notes up to this ref, when open. */
+  const [notesTo, setNotesTo] = useState<string | null>(null);
   /** Git LFS, read apart from the snapshot (it runs `git lfs`). */
   const [lfs, setLfs] = useState<LfsStatus | null>(null);
   const [lfsTick, setLfsTick] = useState(0);
@@ -916,6 +919,11 @@ export function RepoView({
     setStackTick((n) => n + 1);
   };
 
+  const notesItem = (to: string): MenuItem => ({
+    label: t("menu.notes"),
+    onSelect: () => (pro ? setNotesTo(to) : offerPro("notes")),
+  });
+
   /** Branch menu entries for stacks: build on this one, move it, take it out. */
   const stackItems = (name: string): MenuItem[] => {
     const stacked = stacks.find((s) => s.name === name);
@@ -1346,6 +1354,7 @@ export function RepoView({
     if (r.kind === "tag")
       return [
         { label: t("menu.tag.goto"), onSelect: () => graph.current?.centerOn(r.target) },
+        notesItem(r.name),
         "separator",
         {
           label: t("tag.delete.title"),
@@ -1394,6 +1403,7 @@ export function RepoView({
       compare,
       "separator",
       ...stackItems(r.name),
+      notesItem(r.name),
       "separator",
       {
         label: t("menu.rename"),
@@ -2341,6 +2351,15 @@ export function RepoView({
       )}
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
 
+      {notesTo && (
+        <ReleaseNotesDialog
+          path={path}
+          to={notesTo}
+          remoteUrl={(snap.remotes.find((r) => r.name === "origin") ?? snap.remotes[0])?.url ?? null}
+          onCopied={() => toast("ok", t("notes.copied"))}
+          onClose={() => setNotesTo(null)}
+        />
+      )}
       {transferOpen && (
         <TransferDialog
           path={path}
