@@ -211,18 +211,19 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 - Windows는 서명 없이 배포한다(다운로드 페이지에 SmartScreen 안내).
 - 다운로드 사이트는 직접 만든다: 저장소 `ddugit-site`, 도메인 `ddugit.com`, 호스팅 Netlify, 로그인은 GitHub·Google(Supabase Auth), Supabase 연동.
 - 다운로드와 앱 사용에는 로그인이 필요 없다. 로그인은 구매·라이선스 관리에만 쓴다.
-- 가격은 5천원 미만 구독제(Lemon Squeezy). 사업자등록·통신판매업 등 세무는 사용자가 확인한다.
-- 설치 파일 저장소는 Cloudflare R2(트래픽 요금 없음)를 쓴다. `dl.ddugit.com` 연결을 위해 ddugit.com DNS를 Cloudflare로 옮긴다(사이트는 Netlify 그대로).
+- 가격은 구독제 월 4,900원 + 연 49,000원(Lemon Squeezy, 월 결제는 수수료 5%+$0.50 비중이 커서 연 결제를 함께 둔다). 사업자등록·통신판매업 등 세무는 사용자가 확인한다.
+- ~~설치 파일 저장소는 Cloudflare R2(트래픽 요금 없음)를 쓴다. `dl.ddugit.com` 연결을 위해 ddugit.com DNS를 Cloudflare로 옮긴다(사이트는 Netlify 그대로).~~ → 같은 날 변경: Cloudflare까지 관리하지 않고 **Supabase Storage**(공개 버킷 `releases`, S3 API로 업로드)를 쓴다. 무료 플랜은 다운로드 트래픽이 제한되니 늘면 Pro로. 저장소를 바꿔도 사이트는 `downloads.json` 주소만 바꾸면 된다
 
 ### M12 · v0.6.0 정리 릴리스
 
 - [ ] 버전 0.6.0, CI · Rust all_os, Release(서명된 macOS + 미서명 Windows)
 - [ ] 실제 기기 점검(사용자): macOS 서명 경고 없음·신호등 위치·창 끌기·더블클릭 최대화, Windows 창 버튼·가장자리 크기 조절·SmartScreen 흐름
 
-### M13 · 배포 인프라 (R2 + 자동 업데이트)
+### M13 · 배포 인프라 (Supabase Storage + 자동 업데이트)
 
-- [ ] R2 버킷과 `dl.ddugit.com`(사용자: Cloudflare 계정·DNS 이전·R2 API 토큰 → Secrets)
-- [ ] `release.yml`이 dmg·exe와 업데이트 정보(`latest.json`)를 R2에 올림. GitHub Release 초안은 내부 보관용
+- [ ] Supabase Storage 버킷 `releases`(공개). 사용자: S3 접근 키 → Secrets, 프로젝트 ref·리전 → Variables (`docs/RELEASE.md`)
+- [ ] `release.yml`이 릴리스 때 dmg·exe를 `releases/v<버전>/`에, 다운로드 페이지용 `downloads.json`을 버킷 맨 위에 올림(`scripts/downloads.mjs`). GitHub Release 초안은 내부 보관용
+- [ ] 업데이트 정보(`latest.json`)와 업데이트 파일(서명 포함)도 같은 버킷에
 - [ ] 앱 자동 업데이트(`tauri-plugin-updater`): 시작할 때 확인, 알림, 설치 후 재시작. 업데이트 서명 키는 사용자가 만든다(개인키는 Secrets에만)
 
 ### M14 · 다운로드 사이트 `ddugit-site`
