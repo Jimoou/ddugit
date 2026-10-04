@@ -51,12 +51,12 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 
 - 오픈소스가 아니다(LICENSE 없음, 모든 권리 보유). 저장소는 비공개로 돌린다.
 - 무료·유료 모두 **GitHub Release로 배포하지 않는다.** 별도 사이트와 별도 파일 저장소(dmg·exe)를 쓴다.
-- `release.yml`이 만드는 Release 초안은 내부 보관용이다(비공개 저장소라 본인만 받을 수 있다). 사이트를 정하면 파일 저장소(예: R2·S3)에 올리는 단계를 추가하고, 자동 업데이트(`tauri-plugin-updater`)는 그 사이트 주소를 읽게 한다.
+- ~~`release.yml`이 만드는 Release 초안은 내부 보관용이다.~~ → `release.yml`은 GitHub Release를 만들지 않는다(2026-10-04, v0.6.0 초안 만들기가 403으로 실패한 뒤 결정). 설치 파일은 Supabase Storage에 올리고, 모든 실행에서 Actions artifact로도 남긴다. 그래서 버전 태그도 생기지 않는다(필요하면 태그를 직접 push한다).
 - 비공개 저장소의 Actions는 월 무료 분량 안에서 돈다(macOS ×10, Windows ×2). Billing의 지출 한도를 0으로 두면 넘어도 청구되지 않고 멈춘다.
 
 ## 설치 파일 저장소 (Supabase Storage)
 
-릴리스(태그 push 또는 `release` 체크한 수동 실행)마다 `release.yml`이 설치 파일을 올린다. 설정이 없으면 이 단계는 건너뛴다.
+릴리스(태그 push 또는 `main`에서 `release` 체크한 수동 실행)마다 `release.yml`이 설치 파일을 올린다. 설정이 없으면 이 단계는 건너뛴다. 설치 파일은 실행마다 Actions artifact(`ddugit-macos-latest`, `ddugit-windows-latest`)로도 남는다.
 
 - `releases/v<버전>/ddugit_<버전>_universal.dmg`, `releases/v<버전>/ddugit_<버전>_x64-setup.exe`
 - `releases/downloads.json`: 지금 버전과 파일 주소·크기. 다운로드 페이지가 읽는다(`scripts/downloads.mjs`가 만든다)

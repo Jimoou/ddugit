@@ -3,27 +3,28 @@
 > **갱신형 문서입니다.** 작업 단위가 끝날 때마다 **덮어씁니다.** 이력은 [ROADMAP.md](ROADMAP.md)의 작업 기록에 남깁니다.
 > 컨텍스트가 압축되거나 새 세션을 시작하면 **이 파일부터 읽습니다.**
 
-_마지막 갱신: 2026-10-02_
+_마지막 갱신: 2026-10-04_
 
 ## 방금 끝난 것
 
-- M4 끝(#84 설정 토글, #85 닫힌·병합된 PR, #86 `--rebase-merges`). v0.5.3 초안(첫 서명 macOS).
-- 출시 계획 결정(2026-10-04): ROADMAP '출시까지' M12~M16.
+- v0.6.0 Release run(37188669909): 빌드는 됐지만 GitHub Release 초안 만들기가 403. 사용자 결정: 원인 조사 없이 **GitHub Release를 쓰지 않는다**. 이 PR에서 `release.yml`은 빌드 + artifact + Supabase 업로드만.
+- 사이트 골격 ddugit-site#1(홈·다운로드·가격·변경 내역·약관·개인정보 초안·계정 자리). 사용자가 Netlify 연결·도메인을 맡음.
 
 ## 지금 하는 일
 
-M12 · v0.6.0 정리 릴리스: 버전 올림 PR → CI · Rust all_os → merge → Release(`release: true`) → `ddugit v0.6.0` 초안.
+이 PR merge → `main`에서 Release(`release: true`) 다시 실행 → v0.6.0 artifact 확인(Supabase Secrets가 있으면 버킷 업로드까지) → 사용자 실제 기기 점검.
 
 ## 다음 단계
 
-- M13: Supabase Storage(2026-10-04 R2에서 변경) + 자동 업데이트. 업로드 단계는 이 PR. 사용자 준비물: 버킷 `releases`(공개)·S3 접근 키(Secrets)·프로젝트 ref와 리전(Variables) — `docs/RELEASE.md`. 업데이트 서명 키(`npx tauri signer generate`, 개인키는 Secrets에만, 공개키는 Claude에게)
-- M14: `ddugit-site`(빈 저장소, 세션에 연결됨 `/home/user/ddugit-site`). Netlify 연결됨. Supabase 프로젝트·GitHub/Google OAuth 앱은 사용자가 만든다
-- M15: 구독 라이선스(만료일 + 앱이 키로 갱신). 가격 결정: 월 4,900원 + 연 49,000원. 구독이 끝나면 막지 않고 안내만(확인 필요)
-- 사용자: v0.6.0 실제 기기 점검, 세무(사업자등록·통신판매업) 확인
+- M13 자동 업데이트: 사용자가 준 업데이트 공개키(minisign, `tauri.conf.json`의 `plugins.updater.pubkey`에 넣는다): `dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ5MDQ2N0E2QkQzMzZGMDUKUldRRmJ6TzlwbWNFU1FOWEZua29GZ3hIaFpoczh5ZW5qVk1mZHliN1RnZGNGbmRMajYrYUN0ZEYK`. 개인키·암호는 사용자가 ddugit 저장소 Secrets `TAURI_SIGNING_PRIVATE_KEY`/`_PASSWORD`에. `createUpdaterArtifacts`, 버킷에 `latest.json`, 앱 업데이트 알림
+- Supabase: 버킷 `releases` 만듦(사용자). S3 키(Secrets)·ref·리전(Variables)은 **ddugit 저장소**에. 사이트(Netlify)에는 `NEXT_PUBLIC_DOWNLOADS_URL`만
+- M14: Supabase Auth(GitHub·Google) + 내 계정. 사용자 준비물: Supabase URL·anon key(Netlify 환경 변수), OAuth 앱
+- M15: 구독 라이선스, Lemon Squeezy(월 4,900원 + 연 49,000원). 구독이 끝나면 안내만(확인 필요)
+- 사용자: v0.6.0 실제 기기 점검, 세무(사업자등록·통신판매업)
 
 ## 결정 (2026-10-04)
 
-- 오픈소스 아님, 저장소 비공개. GitHub Release로 배포하지 않는다(초안은 내부 보관용). Windows는 서명 없이. 다운로드·앱 사용에 로그인 없음, 구매·라이선스에만 로그인.
+- 오픈소스 아님, 저장소 비공개. GitHub Release를 만들지 않는다(배포는 ddugit.com, 파일은 Supabase Storage). Windows는 서명 없이. 다운로드·앱 사용에 로그인 없음, 구매·라이선스에만 로그인.
 
 ## 막힌 것 / 결정 필요
 
