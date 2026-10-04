@@ -111,8 +111,8 @@ export function Minimap({ scene, rotation, getView, getSize, onJump }: Props) {
       // The screen's corners, through the world, onto the strip.
       const a = to(toWorld(v, { x: 0, y: 0 })),
         b = to(toWorld(v, { x: size.w, y: size.h }));
-      ctx.fillStyle = "rgba(34,232,255,0.08)";
-      ctx.strokeStyle = "rgba(34,232,255,0.8)";
+      ctx.fillStyle = "rgba(180,171,242,0.08)";
+      ctx.strokeStyle = "rgba(180,171,242,0.8)";
       ctx.lineWidth = 1;
       const rx = Math.max(1, Math.min(a.x, b.x)),
         ry = Math.max(1, Math.min(a.y, b.y));
