@@ -1,10 +1,10 @@
 name: Release
 
-# Push a tag like v0.2.0 (or run it manually with "release" checked) to build
-# the installers and attach them to a draft GitHub Release: macOS .dmg
-# (universal: Apple silicon + Intel) and Windows .exe (NSIS). A manual release
-# names itself v<version from tauri.conf.json>; GitHub creates that tag on the
-# run's commit when the draft is published. macOS builds are signed and
+# Build the installers: macOS .dmg (universal: Apple silicon + Intel) and
+# Windows .exe (NSIS), kept as workflow artifacts. A release (a v* tag push, or
+# a manual run on main with "release" checked) also uploads them to the
+# download storage and points downloads.json at them. No GitHub Release is
+# made: ddugit is distributed from ddugit.com only. macOS builds are signed and
 # notarized once the APPLE_* secrets exist; Windows stays unsigned (SmartScreen
 # warns) until WINDOWS_SIGN_COMMAND is set (docs/RELEASE.md).
 on:
@@ -13,12 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: "Create a draft release v<version> (otherwise keep the installers as artifacts)"
+        description: "Publish v<version> to the download storage (otherwise only keep the installers as artifacts)"
         type: boolean
         default: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -35,7 +35,7 @@ jobs:
             os: windows-latest
             args: --bundles nsis
             rust-targets: ""
-    # A draft release is made from main only (a tag push is already a deliberate release).
+    # A release is published from main only (a tag push is already a deliberate release).
     # A manual run without "release" only keeps artifacts, so it may test any branch.
     if: github.ref_type == 'tag' || github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && !inputs.release)
     runs-on: ${{ matrix.os }}
@@ -124,18 +124,9 @@ jobs:
         run: |
           node -e "require('fs').writeFileSync('src-tauri/tauri.sign.json', JSON.stringify({bundle:{windows:{signCommand:process.env.WINDOWS_SIGN_COMMAND}}}))"
           echo "SIGN_ARGS=--config src-tauri/tauri.sign.json" >> "$GITHUB_ENV"
+      # Without a tag name tauri-action only builds; it makes no GitHub Release.
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || (inputs.release && 'v__VERSION__' || '') }}
-          releaseName: ${{ github.ref_type == 'tag' && format('ddugit {0}', github.ref_name) || 'ddugit v__VERSION__' }}
-          releaseCommitish: ${{ github.sha }}
-          releaseBody: |
-            macOS: ddugit_*_universal.dmg · Windows: ddugit_*_x64-setup.exe
-
-            macOS: signed and notarized (Developer ID). Windows: not signed yet, so SmartScreen may warn; choose "More info → Run anyway".
-          releaseDraft: true
           args: ${{ matrix.args }} ${{ env.SIGN_ARGS }}
       # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
       - name: Verify macOS signature
@@ -168,9 +159,8 @@ jobs:
             aws s3 cp "$f" "s3://releases/v$version/$(basename "$f")" --endpoint-url "$ENDPOINT" \
               --cache-control "public, max-age=31536000, immutable"
           done
-      # Other manual runs keep the installers as workflow artifacts instead.
-      - if: github.ref_type != 'tag' && !inputs.release
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      # Every run keeps the installers as workflow artifacts too.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ddugit-${{ matrix.os }}
           path: |
