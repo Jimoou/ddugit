@@ -13,6 +13,10 @@ _마지막 갱신: 2026-10-02_
 
 macOS 서명·공증 확인. 사용자가 Apple Secrets 6개를 넣었다(2026-10-04). main에서 Release를 `release: false`로 돌려 서명 테스트 중(run 37180693297). 통과하면 이 브랜치의 v0.5.3 버전 올림 + `release.yml`의 "Verify macOS signature" 단계로 PR → all_os → merge → Release(`release: true`). 실패하면 macOS 잡 로그로 원인(.p12 암호, 서명 이름, 앱 암호)을 찾는다.
 
+## 결정 (2026-10-04)
+
+- 오픈소스 아님, 저장소 비공개로 전환(사용자가 설정에서). GitHub Release로 배포하지 않고 별도 사이트·파일 저장소를 쓴다. Release 초안은 내부 보관용.
+
 ## 남은 것 (후보)
 
 - 기능: `--rebase-merges`(병합이 섞인 구간 정리), 닫힌·병합된 PR 보기
