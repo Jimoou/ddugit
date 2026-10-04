@@ -14,11 +14,11 @@ export function prLabel(pr: PullRequest, report: PrReport): string {
   return report.forges.length > 1 ? `${pr.remote} ${tag}` : tag;
 }
 
-/** Pull requests as graph labels on their head commits (only those in the loaded history). */
+/** Open pull requests as graph labels on their head commits (only those in the loaded history). */
 export function prRefs(report: PrReport | null, has: (id: string) => boolean): RefInfo[] {
   if (!report) return [];
   return report.prs
-    .filter((p) => has(p.sha))
+    .filter((p) => p.state === "open" && has(p.sha))
     .map((p) => ({
       name: prLabel(p, report),
       kind: "pr",
@@ -45,7 +45,7 @@ export function tokenPage(f: Pick<ForgeStatus, "kind" | "host">): string {
     : `https://${f.host}/-/user_settings/personal_access_tokens?name=ddugit&scopes=read_api`;
 }
 
-/** Sidebar section: open pull requests, or a way to connect the forge. */
+/** Sidebar section: open pull requests (the merged and closed ones in a fold below), or a way to connect the forge. */
 export function PullSection(p: {
   report: PrReport | null;
   onShow(pr: PullRequest): void;
@@ -58,12 +58,40 @@ export function PullSection(p: {
   const blocked = needsToken(report);
   const failed = report.forges.find((f) => f.error);
   const saved = report.forges.find((f) => f.token === "keychain");
+  const open = report.prs.filter((pr) => pr.state === "open");
+  const done = report.prs.filter((pr) => pr.state !== "open");
+  const row = (pr: PullRequest) => (
+    <li
+      key={`${pr.remote}:${pr.number}`}
+      className={pr.state}
+      title={`${pr.title}\n${pr.branch} · ${pr.author}`}
+      onClick={() => p.onShow(pr)}
+      onDoubleClick={() => p.onOpen(pr)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        p.onMenu(pr, e.clientX, e.clientY);
+      }}
+    >
+      {pr.state === "open" ? (
+        <span className={`pr-ci ${pr.checks ?? "none"}`} title={t(`pr.checks.${pr.checks ?? "none"}`)} />
+      ) : (
+        <span className={`pr-ci ${pr.state}`} />
+      )}
+      <span className="pr-num">{prLabel(pr, report)}</span>
+      <span className="name">{pr.title}</span>
+      {pr.state !== "open" && <span className={`chip pr-state ${pr.state}`}>{t(`pr.state.${pr.state}`)}</span>}
+      {pr.state === "open" && pr.review && pr.review !== "required" && (
+        <span className={`chip review ${pr.review}`}>{t(`pr.review.${pr.review}`)}</span>
+      )}
+      {pr.state === "open" && pr.draft && <span className="chip">{t("pr.draft")}</span>}
+    </li>
+  );
   return (
     <SideSection
       id="pulls"
       className="pulls"
       title={t("pr.section")}
-      count={report.prs.length}
+      count={open.length}
       actions={
         // A saved token can be replaced or forgotten; a CLI login is managed by `gh` / `glab` itself.
         saved &&
@@ -90,29 +118,13 @@ export function PullSection(p: {
         </div>
       )}
       {failed && <p className="muted pr-error">{t("pr.failed", { error: failed.error ?? "" })}</p>}
-      {!blocked && !failed && report.prs.length === 0 && <p className="muted pr-empty">{t("pr.none")}</p>}
-      <ul>
-        {report.prs.map((pr) => (
-          <li
-            key={`${pr.remote}:${pr.number}`}
-            title={`${pr.title}\n${pr.branch} · ${pr.author}`}
-            onClick={() => p.onShow(pr)}
-            onDoubleClick={() => p.onOpen(pr)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              p.onMenu(pr, e.clientX, e.clientY);
-            }}
-          >
-            <span className={`pr-ci ${pr.checks ?? "none"}`} title={t(`pr.checks.${pr.checks ?? "none"}`)} />
-            <span className="pr-num">{prLabel(pr, report)}</span>
-            <span className="name">{pr.title}</span>
-            {pr.review && pr.review !== "required" && (
-              <span className={`chip review ${pr.review}`}>{t(`pr.review.${pr.review}`)}</span>
-            )}
-            {pr.draft && <span className="chip">{t("pr.draft")}</span>}
-          </li>
-        ))}
-      </ul>
+      {!blocked && !failed && open.length === 0 && <p className="muted pr-empty">{t("pr.none")}</p>}
+      <ul>{open.map(row)}</ul>
+      {done.length > 0 && (
+        <SideSection id="pulls-done" className="sub" title={t("pr.done")} count={done.length}>
+          <ul>{done.map(row)}</ul>
+        </SideSection>
+      )}
     </SideSection>
   );
 }

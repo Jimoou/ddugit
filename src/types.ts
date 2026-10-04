@@ -73,7 +73,7 @@ export interface BisectState {
 
 export type ForgeKind = "github" | "gitlab";
 
-/** An open pull request (GitHub) or merge request (GitLab). */
+/** A pull request (GitHub) or merge request (GitLab): every open one, and the latest merged or closed. */
 export interface PullRequest {
   remote: string;
   number: number;
@@ -85,11 +85,13 @@ export interface PullRequest {
   /** Head commit. */
   sha: string;
   author: string;
+  state: PrState;
   /** CI on the head commit, if any runs. */
   checks: Checks | null;
   review: Review | null;
 }
 
+export type PrState = "open" | "merged" | "closed";
 export type Checks = "success" | "failure" | "pending";
 /** `changes`: changes requested; `required`: waiting for a required review. */
 export type Review = "approved" | "changes" | "required";

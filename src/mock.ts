@@ -1120,12 +1120,29 @@ const mockTable: Table = {
           },
         ]
           .filter((p) => repo.branches.has(p.branch))
-          .map((p) => ({
+          .map((p): PullRequest => ({
             ...p,
             remote: "origin",
             sha: tip(p.branch),
+            state: "open" as const,
             url: `https://github.com/ddugit/ddugit-demo/pull/${p.number}`,
           }))
+          .concat(
+            // Done ones: one merged into main (its head is main's tip), one closed whose head is gone.
+            [
+              { number: 9, title: "Minimap", state: "merged" as const, sha: tip("main") },
+              { number: 4, title: "Try WebGL lanes", state: "closed" as const, sha: "0".repeat(40) },
+            ].map((p): PullRequest => ({
+              ...p,
+              remote: "origin",
+              branch: `feature/${p.number}`,
+              draft: false,
+              author: "jimin",
+              checks: null,
+              review: null,
+              url: `https://github.com/ddugit/ddugit-demo/pull/${p.number}`,
+            })),
+          )
       : [];
     return delay({
       forges: [

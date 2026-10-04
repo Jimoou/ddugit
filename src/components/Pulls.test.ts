@@ -22,6 +22,7 @@ const pr = (number: number, sha: string, remote = "origin"): PullRequest => ({
   branch: `b${number}`,
   sha,
   author: "a",
+  state: "open",
   checks: null,
   review: null,
 });
@@ -43,6 +44,9 @@ describe("pull request labels", () => {
     expect(refs).toEqual([{ name: "#1", kind: "pr", target: "in", checks: null, review: null }]);
     expect(prOf(report, refs[0])?.number).toBe(1);
     expect(prRefs(null, () => true)).toEqual([]);
+    // Merged and closed ones stay in the sidebar only: no graph label.
+    const done: PrReport = { forges: [forge()], prs: [{ ...pr(2, "in"), state: "merged" }] };
+    expect(prRefs(done, () => true)).toEqual([]);
   });
 });
 
