@@ -7,21 +7,27 @@ _마지막 갱신: 2026-10-04_
 
 ## 방금 끝난 것
 
-- v0.6.0 Release run(37188669909): 빌드는 됐지만 GitHub Release 초안 만들기가 403. 사용자 결정: 원인 조사 없이 **GitHub Release를 쓰지 않는다**. 이 PR에서 `release.yml`은 빌드 + artifact + Supabase 업로드만.
-- 사이트 골격 ddugit-site#1(홈·다운로드·가격·변경 내역·약관·개인정보 초안·계정 자리). 사용자가 Netlify 연결·도메인을 맡음.
+- v0.6.0 Supabase 게시(설치 파일·업데이트 파일·`downloads.json`·`latest.json`), macOS 실기 확인
+- 새 브랜드(앱 #92, 사이트 ddugit-site#4). 라이트 모드는 하지 않음(사용자 결정)
+- 사이트: GitHub 로그인(ddugit-site#3), 라이선스 테이블·갱신 함수·내 계정 목록(ddugit-site#5)
 
 ## 지금 하는 일
 
-- v0.6.0 빌드는 성공(macOS 서명·공증·실기 확인 끝). 하지만 run 37191046378에서 Supabase 업로드·업데이터 단계가 설정(`SUPABASE_S3_ACCESS_KEY_ID` Secret 또는 `SUPABASE_PROJECT_REF`)을 못 읽어 건너뜀. 이 PR: 진단 단계 + ref·리전을 Secrets에서도 읽기. merge 후 Release 다시 실행해 "Release settings" 로그로 확인
-- 사용자: GitHub·Google OAuth → Supabase Providers, Netlify 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`·`_ANON_KEY`), 사이트 404(ddugit-site#2로 Next.js 런타임 지정, 재배포 확인 필요)
+M15 앱 쪽 PR: 라이선스 `expires`·`plan`, `license_refresh`(ddugit.com/api/license/refresh), 설정 '갱신 확인', 시작할 때 자동 갱신과 만료 안내(막지 않음).
 
 ## 다음 단계
 
-- 사용자 준비물(ddugit 저장소): Secrets `SUPABASE_S3_ACCESS_KEY_ID`·`SUPABASE_S3_SECRET_ACCESS_KEY`·`TAURI_SIGNING_PRIVATE_KEY`·`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, Variables `SUPABASE_PROJECT_REF`·`SUPABASE_REGION`. 사이트(Netlify)에는 `NEXT_PUBLIC_DOWNLOADS_URL`만
-- 자동 업데이트 실제 확인: 업데이트 기능이 든 첫 릴리스(v0.6.1 등)를 설치하고, 그다음 릴리스에서 알림·설치·재시작
-- M14: Supabase Auth(GitHub·Google) + 내 계정. 사용자 준비물: Supabase URL·anon key(Netlify 환경 변수), OAuth 앱
-- M15: 구독 라이선스, Lemon Squeezy(월 4,900원 + 연 49,000원). 구독이 끝나면 안내만(확인 필요)
-- 사용자: v0.6.0 실제 기기 점검, 세무(사업자등록·통신판매업)
+- 사용자 준비물
+  - ddugit-site 저장소 Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `SUPABASE_PROJECT_REF` → Actions "Supabase" 실행(마이그레이션·함수 배포)
+  - Supabase Edge Functions Secrets: `DDUGIT_LICENSE_PRIVATE_KEY`(라이선스 발급 키 PEM), `DDUGIT_LICENSE_PUBKEY`
+  - 라이선스 발급 키를 아직 안 만들었다면 `node scripts/license.mjs keygen` (docs/RELEASE.md), 공개키는 ddugit Variables `DDUGIT_LICENSE_PUBKEY`
+  - Google OAuth(진행 중) → 사이트 `LOGIN_PROVIDERS`에 `"google"` 추가
+  - Netlify `NEXT_PUBLIC_DOWNLOADS_URL` = `https://<ref>.supabase.co/storage/v1/object/public/releases/downloads.json` (S3 주소 아님)
+  - Lemon Squeezy 스토어
+- M15 남은 것: Lemon Squeezy 웹훅 함수(구독 생성·갱신·해지 → `licenses`, 첫 발급 메일), 가격 페이지 구매 버튼, 앱 `BUY_URL`
+- 자동 업데이트 실제 확인: 다음 릴리스(v0.6.1, 새 아이콘·구독 라이선스 포함)
+- 오늘 작업이 끝나면 ddugit 저장소를 다시 비공개로(사용자)
+- M16: 첫 실행 안내·영문 점검·문제 신고 경로 → v1.0.0
 
 ## 결정 (2026-10-04)
 

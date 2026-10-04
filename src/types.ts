@@ -367,7 +367,12 @@ export interface LicenseInfo {
   seats: number;
   issued: string;
   updatesUntil: string;
+  /** Subscriptions: paid through + grace; after it the app only reminds. */
+  expires?: string;
+  plan?: "monthly" | "yearly" | string;
 }
+/** What asking ddugit.com for a renewed license came to (`license::Refresh`). */
+export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown";
 /** A newer app version than the one running (`update.rs`). */
 export interface UpdateInfo {
   version: string;
@@ -377,6 +382,7 @@ export interface LicenseStatus {
   license: LicenseInfo | null;
   newerThanLicense: boolean;
   checkable: boolean;
+  expired: boolean;
 }
 
 /** Where one repository stands, read without its history (the galaxy dashboard, `git/glance.rs`). */

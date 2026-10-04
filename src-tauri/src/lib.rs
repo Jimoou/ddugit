@@ -136,6 +136,12 @@ async fn update_install(app: tauri::AppHandle) -> Result<(), String> {
     update::install(&app).await
 }
 
+#[tauri::command]
+async fn license_refresh(app: tauri::AppHandle) -> Result<license::Refresh, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || license::refresh_in(&dir)).await
+}
+
 command!(ssh_status() -> ssh::SshStatus => ssh::status());
 command!(ssh_keygen(comment: String) -> ssh::SshKey => ssh::keygen(&comment));
 command!(ssh_host_key(url: String) -> ssh::HostKey => ssh::host_key(&url));
@@ -248,6 +254,7 @@ pub fn run() {
             license_status,
             license_install,
             license_remove,
+            license_refresh,
             update_check,
             update_install,
             ssh_status,
