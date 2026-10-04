@@ -9,6 +9,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
 import { UpdateNotice } from "./components/Update";
+import { useLicenseRenewal } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
@@ -95,6 +96,9 @@ export default function App() {
     setToasts((l) => [...l.slice(-3), { id, kind, text }]);
     setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" ? 7000 : 3200);
   }, []);
+
+  const remindLicense = useCallback((text: string) => toast("ok", text), [toast]);
+  useLicenseRenewal(remindLicense);
 
   const updateSettings = (patch: Partial<Settings>) => {
     const next = { ...settings, ...patch };

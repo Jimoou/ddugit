@@ -1,17 +1,21 @@
 # 출시 준비: 라이선스와 코드 서명
 
-ddugit은 **개인·오픈소스 무료, 회사 업무용 유료**(영구 라이선스, 1년 업데이트)다. 로그인 없이 쓰고, 라이선스는 앱이 **오프라인으로** 확인한다(폐쇄망 가능). 판매는 Lemon Squeezy, 코드 서명은 개인 이름으로 한다(2026-10-02 결정).
+ddugit은 **개인·오픈소스 무료, 회사 업무용 유료**다. ~~영구 라이선스, 1년 업데이트~~ → 구독(월 4,900원 / 연 49,000원, 2026-10-04 결정). 폐쇄망은 기간 없는 사이트 라이선스. 로그인 없이 쓰고, 라이선스는 앱이 **오프라인으로** 확인한다(폐쇄망 가능). 판매는 Lemon Squeezy, 코드 서명은 개인 이름으로 한다(2026-10-02 결정).
 
 ## 1. 라이선스
 
 ### 구조
 
 - 라이선스 텍스트: `DDUGIT1.<payload>.<signature>` (base64url)
-  - payload: `{ id, name, email, kind: "commercial" | "site", seats, issued, updatesUntil }`
+  - payload: `{ id, name, email, kind: "commercial" | "site", seats, issued, updatesUntil, expires?, plan? }`
+  - 구독(`plan: "monthly" | "yearly"`)은 `expires` = 결제 기간 끝 + 7일. 사이트 라이선스는 `expires`가 없다
   - signature: payload 바이트에 대한 Ed25519 서명
 - 앱에는 **공개키만** 들어간다(`src-tauri/src/license.rs`, 빌드할 때 `DDUGIT_LICENSE_PUBKEY`). 그래서 서버·계정 없이 확인되고, 폐쇄망에서도 똑같이 동작한다.
 - `updatesUntil`까지 나온 버전은 계속 쓸 수 있다. 그 뒤에 나온 버전이면 설정에 갱신 안내만 띄운다. 기능은 막지 않는다(신뢰 기반).
 - 라이선스는 앱 설정 폴더의 `license.txt`에 저장한다(webview 저장소가 아님).
+- 구독 갱신: 만료 3일 전부터(또는 지난 뒤) 앱이 시작할 때 `https://ddugit.com/api/license/refresh`에 지금 라이선스를 보낸다. 로그인은 없고, 우리가 서명한 라이선스를 갖고 있다는 것이 증명이다. 결제가 이어졌으면 사이트(ddugit-site의 `license-refresh` Supabase 함수)가 새 만료일로 다시 서명해 돌려주고, 앱은 같은 id인지 확인하고 바꾼다. 설정의 "갱신 확인"으로 직접 할 수도 있다
+- 구독이 끝나도 기능은 막지 않는다. 설정에 안내를 띄우고, 시작할 때 한 번 알려 준다(2026-10-04 결정)
+- 서명 키는 두 곳에 있다: 내 컴퓨터(수동 발급), Supabase Edge Functions Secrets `DDUGIT_LICENSE_PRIVATE_KEY`(자동 갱신). 공개키는 GitHub Variables `DDUGIT_LICENSE_PUBKEY`와 Supabase Secrets `DDUGIT_LICENSE_PUBKEY`
 
 ### 발급 키 만들기 (한 번, 내 컴퓨터에서)
 
@@ -29,13 +33,16 @@ node scripts/license.mjs keygen ~/secure/ddugit-license-private.pem
 
 ```bash
 node scripts/license.mjs sign --key ~/secure/ddugit-license-private.pem \
-  --name "Acme Corp" --email it@acme.example --kind commercial --seats 5 --until 2027-10-02
+  --name "Acme Corp" --email it@acme.example --kind commercial --seats 5 --plan yearly --expires 2027-10-11
+# 폐쇄망 사이트 라이선스(기간 없음): --kind site --seats 50 --until 2027-10-02
 node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   # 앱과 같은 방식으로 확인
 ```
 
 출력된 텍스트를 메일로 보내면 된다. 고객은 앱 **설정 → 라이선스**에 붙여 넣는다.
 
 ### Lemon Squeezy 자동 발급 (주문이 늘면)
+
+> 2026-10-04 변경: 서명·저장은 Cloudflare Worker 대신 **Supabase Edge Function**(ddugit-site의 `supabase/functions`)이 맡는다. `licenses` 테이블에 구독 상태(`paid_through`)를 두고, 웹훅이 결제마다 갱신한다. 아래는 처음 계획이다.
 
 1. 상품
    - "ddugit 상업용"(좌석 수 = 수량)

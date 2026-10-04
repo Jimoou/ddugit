@@ -456,6 +456,28 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   await expect(lic).toContainText("개인·오픈소스 사용은 무료");
 });
 
+test("settings: a lapsed subscription only reminds, and renews once paid", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutateQuietly((d) => {
+    d.setLicense("lapsedMonthly");
+    d.subscription = "lapsed";
+  });
+  await page.keyboard.press("?");
+  const lic = page.getByRole("dialog", { name: "설정" }).locator("section.license");
+  await expect(lic).toContainText("월간 구독");
+  await expect(lic.locator(".license-lapsed")).toContainText("기능은 그대로 쓸 수 있어요");
+  await lic.getByRole("button", { name: "갱신 확인" }).click();
+  await expect(lic.locator(".license-renewal")).toContainText("구독이 끝난 상태");
+  await expect(lic.locator(".license-lapsed")).toBeVisible();
+  await demo.mutateQuietly((d) => {
+    d.subscription = "paid";
+  });
+  await lic.getByRole("button", { name: "갱신 확인" }).click();
+  await expect(lic.locator(".license-renewal")).toContainText("새 기간으로 갱신");
+  await expect(lic).toContainText("2099-12-31까지");
+  await expect(lic.locator(".license-lapsed")).toHaveCount(0);
+});
+
 test("settings: switching to English relabels the app and is remembered", async ({ demo }) => {
   const { page } = demo;
   await page.keyboard.press("?");

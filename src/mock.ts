@@ -24,6 +24,10 @@ import { applyPlan } from "./rebasePlan";
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
 const demoLicense = { current: null as import("./types").LicenseInfo | null };
+const demoLicenseExpired = () => {
+  const e = demoLicense.current?.expires;
+  return !!e && new Date().toISOString().slice(0, 10) > e;
+};
 /** The demo's LFS: two patterns, three files whose content isn't downloaded yet. */
 const demoLfs = {
   patterns: ["*.psd", "assets/**/*.png"],
@@ -456,6 +460,25 @@ export const demoControls = {
   emptyNext: false,
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
+  /** What the demo's license service answers for a subscription license. */
+  subscription: "paid" as "paid" | "lapsed",
+  /** Install a demo license (e2e): a monthly subscription that ended yesterday, or a site license. */
+  setLicense(kind: "lapsedMonthly" | "site" | null) {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    demoLicense.current =
+      kind === null
+        ? null
+        : {
+            id: "lic_demo",
+            name: "Demo Corp",
+            email: "it@demo.example",
+            kind: kind === "site" ? "site" : "commercial",
+            seats: kind === "site" ? 50 : 1,
+            issued: "2026-10-02",
+            updatesUntil: kind === "site" ? "2027-10-02" : yesterday,
+            ...(kind === "lapsedMonthly" ? { expires: yesterday, plan: "monthly" } : {}),
+          };
+  },
   /** A newer version the demo announces (the update notice). Set `window.__ddugitDemoUpdate` before load to see it at startup. */
   update: ((typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoUpdate) ??
     null) as import("./types").UpdateInfo | null,
@@ -1126,7 +1149,12 @@ const mockTable: Table = {
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
   license_status() {
-    return Promise.resolve({ license: demoLicense.current, newerThanLicense: false, checkable: true });
+    return Promise.resolve({
+      license: demoLicense.current,
+      newerThanLicense: false,
+      checkable: true,
+      expired: demoLicenseExpired(),
+    });
   },
   license_install({ text }) {
     if (!text.trim().startsWith("DDUGIT1.")) return Promise.reject("This is not a ddugit license");
@@ -1139,11 +1167,24 @@ const mockTable: Table = {
       issued: "2026-10-02",
       updatesUntil: "2027-10-02",
     };
-    return Promise.resolve({ license: demoLicense.current, newerThanLicense: false, checkable: true });
+    return Promise.resolve({
+      license: demoLicense.current,
+      newerThanLicense: false,
+      checkable: true,
+      expired: demoLicenseExpired(),
+    });
+  },
+  license_refresh() {
+    const lic = demoLicense.current;
+    if (!lic) return Promise.reject("No license on this computer");
+    if (!lic.expires) return delay("current" as const);
+    if (demoControls.subscription === "lapsed") return delay("lapsed" as const);
+    lic.expires = lic.updatesUntil = "2099-12-31";
+    return delay("renewed" as const);
   },
   license_remove() {
     demoLicense.current = null;
-    return Promise.resolve({ license: null, newerThanLicense: false, checkable: true });
+    return Promise.resolve({ license: null, newerThanLicense: false, checkable: true, expired: demoLicenseExpired() });
   },
   update_check: () => delay(demoControls.update),
   update_install() {

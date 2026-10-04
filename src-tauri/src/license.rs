@@ -7,6 +7,12 @@
 //! license checks the same with no network at all (air-gapped sites too) and
 //! there is no account or login. Nothing is ever locked: an unlicensed copy
 //! simply says so in settings.
+//!
+//! Subscriptions (monthly / yearly) carry an expiry: the end of the paid period
+//! plus a grace week. While the subscription is paid the app swaps in a renewed
+//! license from ddugit.com (`refresh_in`, with the license itself as the only
+//! credential). When it lapses nothing is locked either: settings says so and
+//! points to renewing. Site licenses for closed networks have no expiry.
 
 use std::path::{Path, PathBuf};
 
@@ -40,6 +46,12 @@ pub struct LicenseInfo {
     pub issued: String,
     /// Versions released up to this date (`YYYY-MM-DD`) are covered, for good.
     pub updates_until: String,
+    /// Subscriptions: paid through + grace (`YYYY-MM-DD`); after it the app only reminds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires: Option<String>,
+    /// `monthly` / `yearly` for a subscription; absent for a site license.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -51,6 +63,22 @@ pub struct LicenseStatus {
     pub newer_than_license: bool,
     /// This build can check licenses (it carries the public key).
     pub checkable: bool,
+    /// The subscription's expiry has passed (renew to clear it; nothing is locked).
+    pub expired: bool,
+}
+
+/// What asking ddugit.com for a renewed license came to.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum Refresh {
+    /// A license with a later expiry is installed.
+    Renewed,
+    /// The subscription is paid and the license on this computer is already current.
+    Current,
+    /// The subscription has ended.
+    Lapsed,
+    /// The store doesn't know this license.
+    Unknown,
 }
 
 fn parse_key(b64: &str) -> Result<VerifyingKey> {
@@ -87,6 +115,33 @@ fn newer_than(info: &LicenseInfo, build: Option<&str>) -> bool {
     build.is_some_and(|b| b > info.updates_until.as_str())
 }
 
+/// Today in UTC as `YYYY-MM-DD` (civil-from-days, so no date crate is needed).
+fn today() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    civil((secs / 86_400) as i64)
+}
+
+/// Days since 1970-01-01 → `YYYY-MM-DD` (Howard Hinnant's algorithm).
+fn civil(days: i64) -> String {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+fn expired(info: &LicenseInfo, today: &str) -> bool {
+    info.expires.as_deref().is_some_and(|e| today > e)
+}
+
 fn file(dir: &Path) -> PathBuf {
     dir.join("license.txt")
 }
@@ -98,6 +153,7 @@ pub fn status_in(dir: &Path) -> LicenseStatus {
         .and_then(|t| key().and_then(|k| verify_with(&t, &k)).ok());
     LicenseStatus {
         newer_than_license: license.as_ref().is_some_and(|l| newer_than(l, BUILD_DATE)),
+        expired: license.as_ref().is_some_and(|l| expired(l, &today())),
         license,
         checkable,
     }
@@ -109,6 +165,50 @@ pub fn install_in(dir: &Path, text: &str) -> Result<LicenseStatus> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     std::fs::write(file(dir), text.trim()).map_err(|e| e.to_string())?;
     Ok(status_in(dir))
+}
+
+/// Where the app asks for a renewed license. The site forwards it to the
+/// license service, so this address never has to change in shipped apps.
+const REFRESH_URL: &str = "https://ddugit.com/api/license/refresh";
+
+#[derive(Deserialize)]
+struct RefreshReply {
+    license: Option<String>,
+    status: Option<String>,
+}
+
+/// Ask ddugit.com for this computer's license renewed (a subscription paid for
+/// another period). Network failures are errors; the license on disk stays.
+pub fn refresh_in(dir: &Path) -> Result<Refresh> {
+    let text = std::fs::read_to_string(file(dir)).map_err(|_| "No license on this computer".to_string())?;
+    let reply: RefreshReply = ureq::post(REFRESH_URL)
+        .send_json(serde_json::json!({ "license": text.trim() }))
+        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?
+        .body_mut()
+        .read_json()
+        .map_err(|e| e.to_string())?;
+    apply_refresh(dir, &text, reply, &key()?)
+}
+
+/// Install what the service answered, if it is a valid license for the same id.
+fn apply_refresh(dir: &Path, held: &str, reply: RefreshReply, key: &VerifyingKey) -> Result<Refresh> {
+    match (reply.license, reply.status.as_deref()) {
+        (Some(new), _) => {
+            let old = verify_with(held, key)?;
+            let renewed = verify_with(&new, key)?;
+            if renewed.id != old.id {
+                return Err("The renewed license is for another license".into());
+            }
+            if new.trim() == held.trim() {
+                return Ok(Refresh::Current);
+            }
+            std::fs::write(file(dir), new.trim()).map_err(|e| e.to_string())?;
+            Ok(Refresh::Renewed)
+        }
+        (None, Some("expired")) => Ok(Refresh::Lapsed),
+        (None, Some("unknown")) => Ok(Refresh::Unknown),
+        _ => Err("The license service gave no answer".into()),
+    }
 }
 
 pub fn remove_in(dir: &Path) -> Result<LicenseStatus> {
@@ -137,6 +237,20 @@ mod tests {
             seats: 50,
             issued: "2026-10-02".into(),
             updates_until: "2027-10-02".into(),
+            expires: None,
+            plan: None,
+        }
+    }
+
+    fn monthly(expires: &str) -> LicenseInfo {
+        LicenseInfo {
+            id: "lic_m".into(),
+            kind: "commercial".into(),
+            seats: 1,
+            updates_until: expires.into(),
+            expires: Some(expires.into()),
+            plan: Some("monthly".into()),
+            ..info()
         }
     }
 
@@ -197,6 +311,88 @@ mod tests {
         let status = install_in(dir.path(), &text).unwrap();
         assert_eq!(status.license.unwrap().name, "Acme Corp");
         assert!(remove_in(dir.path()).unwrap().license.is_none());
+    }
+
+    #[test]
+    fn dates_come_out_as_calendar_days() {
+        assert_eq!(civil(0), "1970-01-01");
+        assert_eq!(civil(20_730), "2026-10-04");
+        assert_eq!(civil(11_016), "2000-02-29");
+        assert_eq!(civil(-1), "1969-12-31");
+        assert_eq!(today().len(), 10);
+    }
+
+    #[test]
+    fn a_subscription_lapses_after_its_expiry_and_a_site_license_never_does() {
+        assert!(!expired(&monthly("2026-11-11"), "2026-11-11"));
+        assert!(expired(&monthly("2026-11-11"), "2026-11-12"));
+        assert!(!expired(&info(), "2099-01-01"));
+    }
+
+    #[test]
+    fn licenses_signed_before_subscriptions_still_read() {
+        // The first format had no expiry or plan.
+        let key = issuer();
+        let old = serde_json::json!({
+            "id": "lic_0", "name": "A", "email": "a@b.c", "kind": "commercial", "seats": 1,
+            "issued": "2026-10-02", "updatesUntil": "2027-10-02"
+        });
+        let payload = serde_json::to_vec(&old).unwrap();
+        let text = format!(
+            "{PREFIX}{}.{}",
+            B64.encode(&payload),
+            B64.encode(key.sign(&payload).to_bytes())
+        );
+        let read = verify_with(&text, &key.verifying_key()).unwrap();
+        assert_eq!((read.expires, read.plan), (None, None));
+    }
+
+    #[test]
+    fn a_renewal_replaces_the_license_only_when_valid_and_the_same_one() {
+        let key = issuer();
+        let dir = tempfile::tempdir().unwrap();
+        let held = sign(&key, &monthly("2026-11-11"));
+        std::fs::write(file(dir.path()), &held).unwrap();
+        let reply = |license: Option<String>, status: Option<&str>| RefreshReply {
+            license,
+            status: status.map(Into::into),
+        };
+        let vk = key.verifying_key();
+
+        // Same text back: already current.
+        assert_eq!(
+            apply_refresh(dir.path(), &held, reply(Some(held.clone()), None), &vk).unwrap(),
+            Refresh::Current
+        );
+        // Another license's renewal, or one signed by someone else: refused, file untouched.
+        let other = sign(
+            &key,
+            &LicenseInfo {
+                id: "lic_x".into(),
+                ..monthly("2026-12-11")
+            },
+        );
+        assert!(apply_refresh(dir.path(), &held, reply(Some(other), None), &vk).is_err());
+        let foreign = sign(&SigningKey::from_bytes(&[9u8; 32]), &monthly("2026-12-11"));
+        assert!(apply_refresh(dir.path(), &held, reply(Some(foreign), None), &vk).is_err());
+        assert_eq!(std::fs::read_to_string(file(dir.path())).unwrap(), held);
+        // A later expiry: installed.
+        let next = sign(&key, &monthly("2026-12-11"));
+        assert_eq!(
+            apply_refresh(dir.path(), &held, reply(Some(next.clone()), None), &vk).unwrap(),
+            Refresh::Renewed
+        );
+        assert_eq!(std::fs::read_to_string(file(dir.path())).unwrap(), next);
+        // Lapsed or unknown: nothing changes.
+        assert_eq!(
+            apply_refresh(dir.path(), &next, reply(None, Some("expired")), &vk).unwrap(),
+            Refresh::Lapsed
+        );
+        assert_eq!(
+            apply_refresh(dir.path(), &next, reply(None, Some("unknown")), &vk).unwrap(),
+            Refresh::Unknown
+        );
+        assert!(apply_refresh(dir.path(), &next, reply(None, None), &vk).is_err());
     }
 
     #[test]
