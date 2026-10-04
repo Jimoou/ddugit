@@ -141,7 +141,12 @@ export function Sidebar(props: Props) {
     );
   };
 
-  const fold = () => onLayout({ sidebarCollapsed: !collapsed });
+  /** Slide only when the user folds or unfolds, not when the view first appears. */
+  const [slide, setSlide] = useState(false);
+  const fold = () => {
+    setSlide(true);
+    onLayout({ sidebarCollapsed: !collapsed });
+  };
   const toggle = (id: string) =>
     onLayout({ closedSections: closed.includes(id) ? closed.filter((x) => x !== id) : [...closed, id] });
 
@@ -160,7 +165,10 @@ export function Sidebar(props: Props) {
 
   if (collapsed) {
     // The rail: a button to unfold, and each section as an icon with its count that opens it.
-    const open = (id: string) => onLayout({ sidebarCollapsed: false, closedSections: closed.filter((x) => x !== id) });
+    const open = (id: string) => {
+      setSlide(true);
+      onLayout({ sidebarCollapsed: false, closedSections: closed.filter((x) => x !== id) });
+    };
     const rail: { id: string; icon: IconName; title: string; n: number }[] = [
       ...GROUPS.map((g) => ({
         id: g.kind,
@@ -171,7 +179,10 @@ export function Sidebar(props: Props) {
       ...(stashes.length ? [{ id: "stash", icon: "stash" as const, title: t("side.stash"), n: stashes.length }] : []),
     ];
     return (
-      <nav className="sidebar rail">
+      <nav
+        className={`sidebar rail ${slide ? "slide" : ""}`}
+        onAnimationEnd={(e) => e.target === e.currentTarget && setSlide(false)}
+      >
         <button className="rail-btn" onClick={fold} title={t("side.unfold")} aria-label={t("side.unfold")}>
           <Icon name="sidebar" />
         </button>
@@ -193,7 +204,10 @@ export function Sidebar(props: Props) {
 
   return (
     <Sections.Provider value={{ closed: searching ? [] : closed, toggle }}>
-      <nav className="sidebar">
+      <nav
+        className={`sidebar ${slide ? "slide" : ""}`}
+        onAnimationEnd={(e) => e.target === e.currentTarget && setSlide(false)}
+      >
         {focused.length > 1 && (
           <div className="side-picked" role="status">
             <span>{t("side.picked", { n: focused.length })}</span>
