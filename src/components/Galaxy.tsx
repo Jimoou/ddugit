@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, DEMO_PATH } from "../api";
 import { fmtAgo } from "../format";
-import { fetchable, signals, tally } from "../galaxy";
+import { fetchable, pullable, signals, switchable, tally } from "../galaxy";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { bands, nextHue, type RepoGroup, suggestGroup } from "../groups";
@@ -27,10 +27,16 @@ const HINTS = "ddugit.groupHints";
 /** Drag data type: the paths of the cards being moved. */
 const DRAG = "application/x-ddugit-repos";
 
-/** Fetches running side by side in "fetch all". */
-const FETCH_LANES = 3;
+/** Repositories worked on side by side in a batch (fetch, pull, branch switch). */
+const LANES = 3;
 
-type Fetched = { status: "run" | "ok" | "auth" | "failed"; output?: string };
+/** One repository's part in a batch, shown on its card. */
+type Job = {
+  kind: "fetch" | "pull" | "switch";
+  status: "run" | "ok" | "auth" | "diverged" | "failed";
+  output?: string;
+};
+const RUNNING = { fetch: "galaxy.fetching", pull: "galaxy.pulling", switch: "galaxy.switching" } as const;
 
 interface Props {
   recent: Recent;
@@ -49,7 +55,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const lockedPaths = pro ? [] : paths.slice(FREE_DASHBOARD);
   const key = paths.filter((p) => !lockedPaths.includes(p)).join("\n");
   const [loaded, setLoaded] = useState<{ key: string; byPath: Map<string, RepoGlance> } | null>(null);
-  const [fetched, setFetched] = useState<Record<string, Fetched>>({});
+  const [jobs, setJobs] = useState<Record<string, Job>>({});
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; title: string; items: MenuItem[] } | null>(null);
   const [nameReq, setNameReq] = useState<NameRequest | null>(null);
@@ -91,30 +97,91 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const glances = byPath ? paths.flatMap((p) => byPath.get(p) ?? []) : [];
   const glancesOf = (ps: string[]) => (byPath ? ps.flatMap((p) => byPath.get(p) ?? []) : []);
 
-  const fetchPaths = async (targets: string[]) => {
-    setConfirm(null);
+  /** Run `work` over `targets`, a few at a time, showing each card's progress; how many went well. */
+  const runAll = async (kind: Job["kind"], targets: string[], work: (path: string) => Promise<Omit<Job, "kind">>) => {
     const queue = [...targets];
     let ok = 0;
     const lane = async () => {
       for (let p = queue.shift(); p; p = queue.shift()) {
         const path = p;
-        setFetched((f) => ({ ...f, [path]: { status: "run" } }));
-        let done: Fetched;
+        setJobs((j) => ({ ...j, [path]: { kind, status: "run" } }));
+        let done: Omit<Job, "kind">;
         try {
-          const r = await api.remote(path, "fetch");
-          done = { status: r.status === "ok" ? "ok" : r.status === "auth" ? "auth" : "failed", output: r.output };
+          done = await work(path);
         } catch (e) {
           done = { status: "failed", output: String(e) };
         }
         if (done.status === "ok") ok++;
-        setFetched((f) => ({ ...f, [path]: done }));
+        setJobs((j) => ({ ...j, [path]: { kind, ...done } }));
         await reread(path).catch(() => {});
       }
     };
-    await Promise.all(Array.from({ length: FETCH_LANES }, lane));
+    await Promise.all(Array.from({ length: LANES }, lane));
+    return ok;
+  };
+
+  const fetchPaths = async (targets: string[]) => {
+    setConfirm(null);
+    const ok = await runAll("fetch", targets, async (path) => {
+      const r = await api.remote(path, "fetch");
+      return { status: r.status === "ok" ? "ok" : r.status === "auth" ? "auth" : "failed", output: r.output };
+    });
     const failed = targets.length - ok;
     if (failed) toast("err", t("galaxy.fetchedSome", { ok, failed }));
     else toast("ok", t("galaxy.fetched", { n: ok }));
+  };
+
+  /** Fast-forward each to its upstream (Pro); a diverged one is left alone and marked. */
+  const pullPaths = async (targets: string[]) => {
+    if (!pro) return offerPro("batch");
+    const ok = await runAll("pull", targets, async (path) => {
+      const r = await api.remote(path, "pull");
+      const status = r.status === "ok" || r.status === "auth" || r.status === "diverged" ? r.status : "failed";
+      return { status, output: r.output };
+    });
+    const failed = targets.length - ok;
+    if (failed) toast("err", t("galaxy.pulledSome", { ok, failed }));
+    else toast("ok", t("galaxy.pulled", { n: ok }));
+  };
+
+  /** Ask for a branch, then get every one of `targets` onto it (Pro). */
+  const askSwitch = (targets: string[]) => {
+    if (!pro) return offerPro("batch");
+    setNameReq({
+      title: t("galaxy.switch.title", { n: targets.length }),
+      hint: t("galaxy.switch.hint"),
+      placeholder: "release/2.1",
+      confirmLabel: t("galaxy.switch.go"),
+      onSubmit: (branch) => {
+        setNameReq(null);
+        void (async () => {
+          const ok = await runAll("switch", targets, async (path) => {
+            const r = await api.batchSwitch(path, branch);
+            return { status: r.result.status === "ok" ? "ok" : "failed", output: r.result.output };
+          });
+          const failed = targets.length - ok;
+          if (failed) toast("err", t("galaxy.switchedSome", { ok, failed, branch }));
+          else toast("ok", t("galaxy.switched", { n: ok, branch }));
+        })();
+      },
+    });
+  };
+
+  /** Pull / branch buttons for a set of repositories (a group, or the picked cards). */
+  const batchButtons = (ps: string[]) => {
+    const list = glancesOf(ps);
+    // On Free they stay clickable, to say what they are.
+    const off = (targets: string[]) => pro && (running || !targets.length);
+    return (
+      <>
+        <button disabled={off(pullable(list))} onClick={() => void pullPaths(pullable(list))}>
+          <Icon name="arrowDown" size={12} /> {t("galaxy.pull")} {!pro && <ProBadge />}
+        </button>
+        <button disabled={off(switchable(list))} onClick={() => askSwitch(switchable(list))}>
+          <Icon name="branch" size={12} /> {t("galaxy.switch")} {!pro && <ProBadge />}
+        </button>
+      </>
+    );
   };
 
   const askFetch = (targets: string[]) => {
@@ -130,7 +197,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
       onConfirm: () => void fetchPaths(targets),
     });
   };
-  const running = Object.values(fetched).some((f) => f.status === "run");
+  const running = Object.values(jobs).some((j) => j.status === "run");
   const everything = fetchable(glances);
 
   /** Ask for a group name (new, or renaming `group`). */
@@ -191,7 +258,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const card = (path: string) => {
     if (lockedPaths.includes(path)) return lockedCard(path);
     const g = byPath?.get(path);
-    const f = fetched[path];
+    const f = jobs[path];
     const starred = recent.list.find((r) => r.path === path)?.starred ?? false;
     const lit = g ? signals(g) : [];
     return (
@@ -257,11 +324,15 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
         {f && (
           <span className={`world-fetch ${f.status}`} title={f.output}>
             {f.status === "run" ? (
-              t("galaxy.fetching")
+              t(RUNNING[f.kind])
             ) : f.status === "ok" ? (
               <Icon name="check" size={12} />
+            ) : f.status === "auth" ? (
+              t("galaxy.fetchAuth")
+            ) : f.status === "diverged" ? (
+              t("galaxy.diverged")
             ) : (
-              t(f.status === "auth" ? "galaxy.fetchAuth" : "galaxy.fetchFailed")
+              t(f.kind === "fetch" ? "galaxy.fetchFailed" : "galaxy.failed")
             )}
           </span>
         )}
@@ -369,6 +440,14 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
       {picked.length > 0 && (
         <div className="pick-bar" role="toolbar" aria-label={t("group.picked", { n: picked.length })}>
           <b>{t("group.picked", { n: picked.length })}</b>
+          <button
+            disabled={running || !fetchable(glancesOf(picked)).length}
+            onClick={() => askFetch(fetchable(glancesOf(picked)))}
+          >
+            <Icon name="fetch" size={12} /> Fetch
+          </button>
+          {batchButtons(picked)}
+          <span className="pick-sep" aria-hidden />
           <button onClick={() => askName(null, (name) => (recent.addGroup(name, picked), setPicked([])))}>
             <Icon name="plus" size={12} /> {t("group.pickNew")}
           </button>
@@ -419,6 +498,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
                     <button disabled={running || !mine.length} onClick={() => askFetch(mine)}>
                       <Icon name="fetch" size={12} /> Fetch
                     </button>
+                    {batchButtons(ps)}
                     <button disabled={!ps.length} onClick={() => onOpenMany(ps)}>
                       {t("group.openAll")}
                     </button>

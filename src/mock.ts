@@ -620,7 +620,14 @@ const GLANCE_SUMMARIES = ["Tune lane spacing", "Fix login redirect", "Bump depen
  * shows nothing; each path gets its own steady, made-up state instead. Paths
  * named like a missing folder (`gone`) can't be read.
  */
+/** What batch work changed in the dashboard's demo repositories (branch switched, pulled). */
+const demoWorlds = new Map<string, Partial<RepoGlance>>();
+
 function demoGlance(path: string): RepoGlance {
+  return { ...demoGlanceBase(path), ...demoWorlds.get(path) };
+}
+
+function demoGlanceBase(path: string): RepoGlance {
   let h = 2166136261;
   for (const ch of path) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
   const pick = (shift: number, n: number) => (h >>> shift) % n;
@@ -920,7 +927,14 @@ const mockTable: Table = {
     return delay(res("ok"));
   },
 
-  async git_remote({ op, onProgress }) {
+  async git_remote({ path, op, onProgress }) {
+    // A dashboard world (not the demo tab, api.ts's DEMO_PATH): pull fast-forwards, or reports it can't.
+    if (path !== "demo" && op === "pull") {
+      const g = demoGlance(path);
+      if (g.ahead && g.behind) return delay(res("diverged", "fatal: Not possible to fast-forward, aborting."));
+      demoWorlds.set(path, { ...demoWorlds.get(path), behind: 0 });
+      return delay(res("ok", g.behind ? "Fast-forward" : "Already up to date."));
+    }
     const fake = demoControls.failNextRemote;
     if (fake) {
       demoControls.failNextRemote = null;
@@ -1310,6 +1324,16 @@ const mockTable: Table = {
     );
   },
   pro_status: () => delay(demoControls.pro),
+  batch_switch({ path, branch }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
+    const g = demoGlance(path);
+    if (g.error) return fail(g.error);
+    if (g.state !== "clean") return fail(`Repository is in the middle of a ${g.state}; finish or abort it first`);
+    const how = g.branch === branch ? "already" : GLANCE_BRANCHES.includes(branch) ? "tracked" : "created";
+    const upstream = how === "created" ? null : `origin/${branch}`;
+    demoWorlds.set(path, { ...demoWorlds.get(path), branch, upstream, ahead: 0, behind: 0 });
+    return delay({ result: res("ok", `Switched to branch '${branch}'`), how } as const);
+  },
   release_range({ from, to }) {
     const end = repo.resolve(to);
     if (!end) return fail(`unknown revision '${to}'`);

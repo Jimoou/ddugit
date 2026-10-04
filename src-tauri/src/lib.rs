@@ -100,6 +100,20 @@ async fn transfer_import(
     .await
 }
 
+// Batch work across repositories (dashboard) is Pro: one repository per call.
+#[tauri::command]
+async fn batch_switch(
+    app: tauri::AppHandle,
+    path: String,
+    branch: String,
+) -> Result<git::write::SwitchResult, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        pro::require(&dir)?;
+        git::write::switch_or_create(&path, &branch)
+    })
+    .await
+}
 // Release notes: reading the commits is plain `git log`; the screen holds the Pro line.
 command!(release_range(path: String, from: Option<String>, to: String) -> git::changelog::NoteRange
     => git::changelog::range(&path, from.as_deref(), &to));
@@ -366,6 +380,7 @@ pub fn run() {
             transfer_history,
             stack_list,
             release_range,
+            batch_switch,
             stack_op,
             update_check,
             update_install,

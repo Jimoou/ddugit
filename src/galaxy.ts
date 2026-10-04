@@ -33,5 +33,13 @@ export function tally(list: RepoGlance[]): Lit[] {
   return SIGNALS.filter((s) => count.has(s)).map((signal) => ({ signal, n: count.get(signal)! }));
 }
 
+/** Repositories a batch pull goes to: readable, on a branch with an upstream, not stopped mid-operation. */
+export const pullable = (list: RepoGlance[]) =>
+  list.filter((g) => !g.error && g.branch && g.upstream && g.state === "clean").map((g) => g.path);
+
+/** Repositories a batch branch switch goes to: readable and not stopped mid-operation. */
+export const switchable = (list: RepoGlance[]) =>
+  list.filter((g) => !g.error && g.state === "clean").map((g) => g.path);
+
 /** Repositories a "fetch all" goes to: readable ones with somewhere to fetch from. */
 export const fetchable = (list: RepoGlance[]) => list.filter((g) => !g.error && g.remotes > 0).map((g) => g.path);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchable, signals, tally } from "./galaxy";
+import { fetchable, pullable, signals, switchable, tally } from "./galaxy";
 import type { RepoGlance } from "./types";
 
 const g = (path: string, o: Partial<RepoGlance> = {}): RepoGlance => ({
@@ -46,5 +46,17 @@ describe("galaxy", () => {
       { signal: "behind", n: 1 },
     ]);
     expect(fetchable(list)).toEqual(["/a", "/b"]);
+  });
+
+  it("pulls only branches with an upstream, and switches none stopped mid-operation", () => {
+    const list = [
+      g("/ok"),
+      g("/detached", { branch: null }),
+      g("/local", { upstream: null }),
+      g("/merging", { state: "merge" }),
+      g("/gone", { error: "missing" }),
+    ];
+    expect(pullable(list)).toEqual(["/ok"]);
+    expect(switchable(list)).toEqual(["/ok", "/detached", "/local"]);
   });
 });

@@ -1446,3 +1446,53 @@ test("on Free, release notes offer Pro", async ({ demo }) => {
   await page.click(".context-menu >> text=여기까지 릴리스 노트 만들기");
   await expect(page.locator(".dialog.pro-offer")).toContainText("릴리스 노트");
 });
+
+test("the dashboard pulls picked repositories and puts them all on the same branch", async ({ demo }) => {
+  const { page } = demo;
+  // nova is behind its upstream, comet has diverged, rocket is stopped mid-merge.
+  const names = ["nova", "comet", "rocket"];
+  await page.evaluate((names) => {
+    const recent = names.map((n, i) => ({ path: `/work/${n}`, starred: false, at: i }));
+    localStorage.setItem("ddugit.recent", JSON.stringify(recent));
+  }, names);
+  await page.reload();
+  await page.locator(".tab-home").click();
+  const galaxy = page.locator(".welcome .galaxy");
+  const world = (name: string) => galaxy.locator(".world").filter({ hasText: `/work/${name}` });
+  for (const name of names)
+    await world(name)
+      .locator(".world-open")
+      .click({ modifiers: ["ControlOrMeta"] });
+  const bar = galaxy.locator(".pick-bar");
+  await expect(bar).toContainText("3개");
+
+  // Pull fast-forwards what it can; the diverged one is marked, the stopped one left out.
+  await bar.getByRole("button", { name: /Pull/ }).click();
+  await demo.toast("1개는 Pull했고 1개는 못 했어요. 카드에 표시했어요");
+  await expect(world("nova").locator(".world-fetch")).toHaveClass(/ok/);
+  await expect(world("comet").locator(".world-fetch")).toContainText("갈라짐");
+  await expect(world("rocket").locator(".world-fetch")).toHaveCount(0);
+
+  await bar.getByRole("button", { name: /브랜치…/ }).click();
+  await page.locator(".dialog input.text").fill("release/3.0");
+  await page.keyboard.press("Enter");
+  await demo.toast("저장소 2개를 release/3.0(으)로 옮겼어요");
+  for (const name of ["nova", "comet"]) await expect(world(name).locator(".world-branch")).toContainText("release/3.0");
+  await expect(world("rocket").locator(".world-branch")).not.toContainText("release/3.0");
+});
+
+test("on Free, batch pull and branch switching offer Pro", async ({ demo }) => {
+  const { page } = demo;
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    localStorage.setItem("ddugit.recent", JSON.stringify([{ path: "/work/nova", starred: false, at: 0 }]));
+  });
+  await page.reload();
+  await page.locator(".tab-home").click();
+  await page.locator(".welcome .galaxy .world .world-open").click({ modifiers: ["ControlOrMeta"] });
+  await page
+    .locator(".pick-bar")
+    .getByRole("button", { name: /브랜치…/ })
+    .click();
+  await expect(page.locator(".dialog.pro-offer")).toContainText("여러 저장소");
+});
