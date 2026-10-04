@@ -43,6 +43,8 @@ jobs:
       # Code signing turns on by itself once its secrets exist (docs/RELEASE.md).
       HAS_APPLE: ${{ secrets.APPLE_CERTIFICATE != '' }}
       HAS_WINDOWS_SIGN: ${{ secrets.WINDOWS_SIGN_COMMAND != '' }}
+      # Installers go to the download storage (Supabase Storage, S3 API) on releases, once it is set up.
+      HAS_STORAGE: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID != '' && vars.SUPABASE_PROJECT_REF != '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -150,6 +152,22 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
+      # The installer, to `releases/v<version>/` in the download storage (the site lists it).
+      - name: Upload to the download storage
+        if: env.HAS_STORAGE == 'true' && (github.ref_type == 'tag' || inputs.release)
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.SUPABASE_REGION }}
+          ENDPOINT: https://${{ vars.SUPABASE_PROJECT_REF }}.storage.supabase.co/storage/v1/s3
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          for f in src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg src-tauri/target/release/bundle/nsis/*.exe; do
+            [ -f "$f" ] || continue
+            aws s3 cp "$f" "s3://releases/v$version/$(basename "$f")" --endpoint-url "$ENDPOINT" \
+              --cache-control "public, max-age=31536000, immutable"
+          done
       # Other manual runs keep the installers as workflow artifacts instead.
       - if: github.ref_type != 'tag' && !inputs.release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -159,3 +177,30 @@ jobs:
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+  # Once both installers are up: `downloads.json` at the storage root says which
+  # version is current and where its files are (the download page reads it).
+  publish:
+    name: Publish downloads.json
+    needs: build
+    if: github.ref_type == 'tag' || inputs.release
+    runs-on: ubuntu-latest
+    env:
+      HAS_STORAGE: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID != '' && vars.SUPABASE_PROJECT_REF != '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.SUPABASE_REGION }}
+      ENDPOINT: https://${{ vars.SUPABASE_PROJECT_REF }}.storage.supabase.co/storage/v1/s3
+      PUBLIC: https://${{ vars.SUPABASE_PROJECT_REF }}.supabase.co/storage/v1/object/public/releases
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: env.HAS_STORAGE == 'true'
+      - name: Write downloads.json
+        if: env.HAS_STORAGE == 'true'
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          aws s3api list-objects-v2 --bucket releases --prefix "v$version/" --endpoint-url "$ENDPOINT" > objects.json
+          node scripts/downloads.mjs "$version" "$PUBLIC" objects.json > downloads.json
+          cat downloads.json
+          aws s3 cp downloads.json s3://releases/downloads.json --endpoint-url "$ENDPOINT" \
+            --content-type application/json --cache-control "no-cache"

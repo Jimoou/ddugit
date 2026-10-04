@@ -16,9 +16,9 @@ M12 · v0.6.0 정리 릴리스: 버전 올림 PR → CI · Rust all_os → merge
 
 ## 다음 단계
 
-- M13: R2 + `dl.ddugit.com` + 자동 업데이트. 사용자 준비물: Cloudflare 계정, ddugit.com DNS를 Cloudflare로(사이트는 Netlify로 CNAME), R2 버킷·API 토큰(Secrets), 업데이트 서명 키(`npx tauri signer generate`, 개인키는 Secrets에만)
+- M13: Supabase Storage(2026-10-04 R2에서 변경) + 자동 업데이트. 업로드 단계는 이 PR. 사용자 준비물: 버킷 `releases`(공개)·S3 접근 키(Secrets)·프로젝트 ref와 리전(Variables) — `docs/RELEASE.md`. 업데이트 서명 키(`npx tauri signer generate`, 개인키는 Secrets에만, 공개키는 Claude에게)
 - M14: `ddugit-site`(빈 저장소, 세션에 연결됨 `/home/user/ddugit-site`). Netlify 연결됨. Supabase 프로젝트·GitHub/Google OAuth 앱은 사용자가 만든다
-- M15: 구독 라이선스(만료일 + 앱이 키로 갱신). 가격 제안: 월 4,900원 + 연 49,000원(Lemon Squeezy 수수료 5%+$0.50이 월 결제에선 약 19%). 구독이 끝나면 막지 않고 안내만(확인 필요)
+- M15: 구독 라이선스(만료일 + 앱이 키로 갱신). 가격 결정: 월 4,900원 + 연 49,000원. 구독이 끝나면 막지 않고 안내만(확인 필요)
 - 사용자: v0.6.0 실제 기기 점검, 세무(사업자등록·통신판매업) 확인
 
 ## 결정 (2026-10-04)

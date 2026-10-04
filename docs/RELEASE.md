@@ -54,6 +54,26 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 - `release.yml`이 만드는 Release 초안은 내부 보관용이다(비공개 저장소라 본인만 받을 수 있다). 사이트를 정하면 파일 저장소(예: R2·S3)에 올리는 단계를 추가하고, 자동 업데이트(`tauri-plugin-updater`)는 그 사이트 주소를 읽게 한다.
 - 비공개 저장소의 Actions는 월 무료 분량 안에서 돈다(macOS ×10, Windows ×2). Billing의 지출 한도를 0으로 두면 넘어도 청구되지 않고 멈춘다.
 
+## 설치 파일 저장소 (Supabase Storage)
+
+릴리스(태그 push 또는 `release` 체크한 수동 실행)마다 `release.yml`이 설치 파일을 올린다. 설정이 없으면 이 단계는 건너뛴다.
+
+- `releases/v<버전>/ddugit_<버전>_universal.dmg`, `releases/v<버전>/ddugit_<버전>_x64-setup.exe`
+- `releases/downloads.json`: 지금 버전과 파일 주소·크기. 다운로드 페이지가 읽는다(`scripts/downloads.mjs`가 만든다)
+- 공개 주소: `https://<프로젝트 ref>.supabase.co/storage/v1/object/public/releases/...`
+
+### 설정 (한 번)
+
+1. Supabase 대시보드 → Storage → **New bucket** `releases`, **Public bucket** 켜기. 파일 크기 제한은 50MB 이상
+2. Project Settings → Storage → **S3 Connection**: 엔드포인트의 리전 확인(예: `ap-northeast-2`), **New access key**로 S3 접근 키 발급
+3. GitHub 저장소 Settings → Secrets and variables → Actions
+   - Secrets: `SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY`
+   - Variables: `SUPABASE_PROJECT_REF`(대시보드 주소의 `…/project/<ref>`), `SUPABASE_REGION`
+
+S3 접근 키는 Storage 전체를 쓸 수 있다(DB는 아님). service_role 키는 쓰지 않는다.
+
+무료 플랜은 월 다운로드 트래픽이 제한된다. 설치 파일이 약 8MB라 다운로드가 수백 회를 넘기면 Pro 플랜으로 올린다.
+
 ## 2. 코드 서명 (개인 이름)
 
 서명용 시크릿이 저장소에 있으면 `release.yml`이 **알아서 서명**한다. 없으면 지금처럼 서명 없이 빌드한다.
