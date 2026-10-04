@@ -4,8 +4,9 @@ name: Release
 # the installers and attach them to a draft GitHub Release: macOS .dmg
 # (universal: Apple silicon + Intel) and Windows .exe (NSIS). A manual release
 # names itself v<version from tauri.conf.json>; GitHub creates that tag on the
-# run's commit when the draft is published. Unsigned for now, so first launch
-# shows Gatekeeper / SmartScreen warnings; signing is on the roadmap for later.
+# run's commit when the draft is published. macOS builds are signed and
+# notarized once the APPLE_* secrets exist; Windows stays unsigned (SmartScreen
+# warns) until WINDOWS_SIGN_COMMAND is set (docs/RELEASE.md).
 on:
   push:
     tags: ["v*"]
@@ -95,9 +96,18 @@ jobs:
           releaseBody: |
             macOS: ddugit_*_universal.dmg · Windows: ddugit_*_x64-setup.exe
 
-            Unsigned build: on macOS right-click → Open the first time; on Windows choose "More info → Run anyway".
+            macOS: signed and notarized (Developer ID). Windows: not signed yet, so SmartScreen may warn; choose "More info → Run anyway".
           releaseDraft: true
           args: ${{ matrix.args }} ${{ env.SIGN_ARGS }}
+      # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
+      - name: Verify macOS signature
+        if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
+        shell: bash
+        run: |
+          app=$(ls -d src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+          xcrun stapler validate "$app"
       # Other manual runs keep the installers as workflow artifacts instead.
       - if: github.ref_type != 'tag' && !inputs.release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

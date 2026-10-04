@@ -11,7 +11,7 @@ _마지막 갱신: 2026-10-02_
 
 ## 지금 하는 일
 
-macOS 서명·공증 준비. 사용자가 Apple Developer Program에 가입했다. 사용자가 Developer ID Application 인증서(.p12)와 앱 암호를 만들어 GitHub Secrets 6개(`APPLE_*`)를 넣으면, Release를 수동 실행해 서명·공증을 확인하고 `releaseBody`의 macOS 미서명 안내를 지운다. 개인키·인증서는 세션에서 만들지 않는다.
+macOS 서명·공증 확인. 사용자가 Apple Secrets 6개를 넣었다(2026-10-04). main에서 Release를 `release: false`로 돌려 서명 테스트 중(run 37180693297). 통과하면 이 브랜치의 v0.5.3 버전 올림 + `release.yml`의 "Verify macOS signature" 단계로 PR → all_os → merge → Release(`release: true`). 실패하면 macOS 잡 로그로 원인(.p12 암호, 서명 이름, 앱 암호)을 찾는다.
 
 ## 남은 것 (후보)
 
