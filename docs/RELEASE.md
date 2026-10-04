@@ -69,6 +69,31 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 
 Tauri가 서명과 공증(notarytool)을 함께 한다. 그러면 첫 실행 때 Gatekeeper 경고가 사라진다.
 
+#### Mac 없이 인증서 만들기 (openssl)
+
+Xcode·키체인 없이도 된다. 개인키는 내 컴퓨터에서만 만들고 저장소·채팅에 올리지 않는다.
+
+```bash
+# 1) 개인키와 인증서 요청(CSR)
+openssl genrsa -out devid.key 2048
+openssl req -new -key devid.key -out devid.csr -subj "/emailAddress=<Apple 계정 메일>/CN=<이름>/C=KR"
+# 2) developer.apple.com → Certificates → + → "Developer ID Application" (G2 Sub-CA) → devid.csr 올리기 → developerID_application.cer 받기
+# 3) .p12로 묶기 (암호를 정한다. 이 암호가 APPLE_CERTIFICATE_PASSWORD)
+openssl x509 -inform DER -in developerID_application.cer -out devid.pem
+openssl pkcs12 -export -legacy -inkey devid.key -in devid.pem -out devid.p12
+# 4) GitHub Secret 값
+base64 -i devid.p12 | tr -d '\n'      # → APPLE_CERTIFICATE (Linux: base64 -w0 devid.p12)
+openssl x509 -in devid.pem -noout -subject   # CN이 APPLE_SIGNING_IDENTITY ("Developer ID Application: 이름 (TEAMID)")
+```
+
+- `-legacy`: OpenSSL 3의 기본 암호화는 macOS `security`가 못 읽는 경우가 있어 예전 방식으로 묶는다(OpenSSL 1.x면 빼도 된다).
+- 팀 ID는 developer.apple.com → Membership details에 있다.
+- `devid.key`·`devid.p12`는 비밀번호 관리자에 보관하고 지운다. Developer ID 인증서는 5년 유효, 개인 계정은 동시에 몇 개까지만 만들 수 있다.
+
+#### 확인
+
+시크릿을 넣은 뒤 Release를 수동 실행하면 macOS 잡에 "macOS signing and notarization" 단계가 돈다. 받은 `.dmg`를 다른 Mac에서 열었을 때 "확인되지 않은 개발자" 경고 없이 열리면 된다. 터미널로는 `spctl -a -vv -t install ddugit.app`(source=Notarized Developer ID)와 `xcrun stapler validate ddugit_x.y.z_universal.dmg`.
+
 ### Windows
 
 2023년 6월부터 코드 서명 키는 하드웨어 보안 모듈(HSM)이나 클라우드 서명에만 둘 수 있다. 개인 이름으로 받을 수 있는 경로는 이렇다(발급 조건과 가격은 신청 전에 각 회사에 확인한다).
