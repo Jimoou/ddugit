@@ -107,6 +107,8 @@ export interface ForgeStatus {
   public: boolean;
   /** The token was refused. */
   unauthorized: boolean;
+  /** A private or self-hosted repository without Pro: no pull requests are read. */
+  locked: boolean;
   error: string | null;
 }
 
@@ -373,6 +375,13 @@ export interface LicenseInfo {
 }
 /** What asking ddugit.com for a renewed license came to (`license::Refresh`). */
 export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown";
+/** Free or Pro, and why (`pro.rs`). */
+export interface ProStatus {
+  pro: boolean;
+  source: "license" | "site" | "trial" | "free";
+  /** Days of the 14-day trial left (0 once over); null while a license covers Pro. */
+  trialDaysLeft: number | null;
+}
 /** A newer app version than the one running (`update.rs`). */
 export interface UpdateInfo {
   version: string;

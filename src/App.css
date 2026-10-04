@@ -4096,3 +4096,37 @@ button.demo-pill {
   background: #c42b1c;
   color: #fff;
 }
+
+/* ------------------------------------------------------------------ Free / Pro */
+.pro-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 197, 107, 0.6);
+  color: var(--brand-star);
+  font: 700 9px/15px var(--mono);
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+.dialog.pro-offer .pro-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+.dialog.pro-offer .pro-list li {
+  margin: 3px 0;
+}
+.license-plan {
+  margin: 0 0 6px;
+  color: var(--ui-text);
+}
+.world.locked .world-open {
+  opacity: 0.6;
+}
+.world.locked .world-unlock {
+  margin: 0 10px 10px;
+  align-self: flex-start;
+}
+.pr-locked .pro-badge {
+  margin-left: 6px;
+}

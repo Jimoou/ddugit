@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
+import { refreshPro, usePro } from "../pro";
 import type { LicenseRefresh, LicenseStatus } from "../types";
 
-/** The store page (Lemon Squeezy). Empty until the store opens: then no buy button shows. */
-export const BUY_URL = "";
+/** Where to buy Pro: the pricing page (it links to the store once it opens). */
+export const BUY_URL = "https://ddugit.com/pricing";
 
 /** The account page, where subscriptions are bought and renewed. */
 const ACCOUNT_URL = "https://ddugit.com/account";
@@ -39,6 +40,7 @@ export function useLicenseRenewal(remind: (text: string) => void) {
  * ever locked without one.
  */
 export function LicenseSection() {
+  const pro = usePro();
   const [status, setStatus] = useState<LicenseStatus | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +63,7 @@ export function LicenseSection() {
     setError(null);
     try {
       setStatus(await f());
+      refreshPro();
       setText("");
     } catch (e) {
       setError(String(e));
@@ -74,6 +77,7 @@ export function LicenseSection() {
     setError(null);
     try {
       setRenewal(await api.licenseRefresh());
+      refreshPro();
       setStatus(await api.licenseStatus());
     } catch (e) {
       setError(String(e));
@@ -85,6 +89,15 @@ export function LicenseSection() {
   return (
     <section className="license">
       <h4>{t("license.title")}</h4>
+      {pro && (
+        <p className="license-plan">
+          {pro.source === "trial"
+            ? t("pro.plan.trial", { n: pro.trialDaysLeft ?? 0 })
+            : pro.pro
+              ? t("pro.plan.pro")
+              : t("pro.plan.free")}
+        </p>
+      )}
       {lic ? (
         <>
           <p>

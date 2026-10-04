@@ -10,6 +10,7 @@ const forge = (over: Partial<ForgeStatus> = {}): ForgeStatus => ({
   token: "cli",
   public: true,
   unauthorized: false,
+  locked: false,
   error: null,
   ...over,
 });

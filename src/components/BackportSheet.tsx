@@ -5,6 +5,8 @@ import { fmtTime } from "../format";
 import type { BackportItem, BackportState, BackportTally } from "../types";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
+import { offerPro, proOpen, usePro } from "../pro";
+import { ProBadge } from "./ProOffer";
 
 interface Props {
   path: string;
@@ -142,11 +144,15 @@ export function BackportSheet(p: Props) {
       if (!n.delete(id)) n.add(id);
       return n;
     });
+  // Comparing is Free; acting on it (cherry-pick, export, ignore) is Pro.
+  const pro = proOpen(usePro());
   const ignore = (id: string, on: boolean) =>
-    api.backportIgnore(path, target, id, on).then(
-      () => setReload((r) => r + 1),
-      (e) => setError(String(e)),
-    );
+    !pro
+      ? offerPro("backport")
+      : api.backportIgnore(path, target, id, on).then(
+          () => setReload((r) => r + 1),
+          (e) => setError(String(e)),
+        );
 
   const select = (name: string, value: string, onChange: (v: string) => void) => (
     <select aria-label={name} value={value} onChange={(e) => onChange(e.target.value)}>
@@ -290,11 +296,18 @@ export function BackportSheet(p: Props) {
           <span className="muted">
             {picked.size ? t("bp.picked", { n: picked.size }) : t("bp.ignoreHint", { target })}
           </span>
-          <button disabled={p.busy || picked.size === 0} onClick={() => p.onExport(chosen())}>
-            {t("bp.export")}
+          <button
+            disabled={p.busy || picked.size === 0}
+            onClick={() => (pro ? p.onExport(chosen()) : offerPro("backport"))}
+          >
+            {t("bp.export")} {!pro && <ProBadge />}
           </button>
-          <button className="primary" disabled={p.busy || picked.size === 0} onClick={() => p.onApply(chosen())}>
-            {t("bp.apply", { target })}
+          <button
+            className="primary"
+            disabled={p.busy || picked.size === 0}
+            onClick={() => (pro ? p.onApply(chosen()) : offerPro("backport"))}
+          >
+            {t("bp.apply", { target })} {!pro && <ProBadge />}
           </button>
         </footer>
       )}

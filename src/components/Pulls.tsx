@@ -3,6 +3,8 @@ import { SideSection } from "./Sidebar";
 import { useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
+import { offerPro } from "../pro";
+import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../types";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
@@ -57,6 +59,8 @@ export function PullSection(p: {
   if (!report?.forges.length) return null;
   const blocked = needsToken(report);
   const failed = report.forges.find((f) => f.error);
+  // A private or self-hosted repository without Pro.
+  const locked = report.forges.find((f) => f.locked);
   const saved = report.forges.find((f) => f.token === "keychain");
   const open = report.prs.filter((pr) => pr.state === "open");
   const done = report.prs.filter((pr) => pr.state !== "open");
@@ -117,8 +121,16 @@ export function PullSection(p: {
           <button onClick={() => p.onConnect(blocked)}>{t("pr.connect", { forge: FORGE_NAME[blocked.kind] })}</button>
         </div>
       )}
+      {locked && !blocked && (
+        <div className="pr-connect pr-locked">
+          <p className="muted">{t("pr.locked", { forge: FORGE_NAME[locked.kind] })}</p>
+          <button onClick={() => offerPro("pulls")}>
+            {t("pro.unlock")} <ProBadge />
+          </button>
+        </div>
+      )}
       {failed && <p className="muted pr-error">{t("pr.failed", { error: failed.error ?? "" })}</p>}
-      {!blocked && !failed && open.length === 0 && <p className="muted pr-empty">{t("pr.none")}</p>}
+      {!blocked && !failed && !locked && open.length === 0 && <p className="muted pr-empty">{t("pr.none")}</p>}
       <ul>{open.map(row)}</ul>
       {done.length > 0 && (
         <SideSection id="pulls-done" className="sub" title={t("pr.done")} count={done.length}>

@@ -17,6 +17,7 @@ import type {
   LfsStatus,
   LicenseRefresh,
   LicenseStatus,
+  ProStatus,
   UpdateInfo,
   OpResult,
   PickOp,
@@ -92,6 +93,7 @@ export interface Commands {
   license_install: [{ text: string }, LicenseStatus];
   license_remove: [Record<string, never>, LicenseStatus];
   license_refresh: [Record<string, never>, LicenseRefresh];
+  pro_status: [Record<string, never>, ProStatus];
   update_check: [Record<string, never>, UpdateInfo | null];
   update_install: [Record<string, never>, null];
   ssh_keygen: [{ comment: string }, SshKey];
@@ -210,6 +212,8 @@ export const api = {
   licenseRemove: () => call("license_remove", {}),
   /** Swap in a renewed subscription license from ddugit.com (the license is the only credential). */
   licenseRefresh: () => call("license_refresh", {}),
+  /** Free or Pro (license, site license or the 14-day trial). */
+  proStatus: () => call("pro_status", {}),
   /** A newer version in the download storage (release builds only; otherwise `null`). */
   updateCheck: () => call("update_check", {}),
   /** Download, verify and install the newest version, then restart into it. */
