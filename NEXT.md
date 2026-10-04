@@ -7,33 +7,23 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- v0.5.3 초안(첫 서명 macOS 빌드, #83). Release run 37183507428 통과: 인증서 확인 → 서명 → 공증 Accepted → 스테이플 → dmg 안 앱 검증. #80·#81·#82 포함. Windows는 미서명.
+- M4 끝(#84 설정 토글, #85 닫힌·병합된 PR, #86 `--rebase-merges`). v0.5.3 초안(첫 서명 macOS).
+- 출시 계획 결정(2026-10-04): ROADMAP '출시까지' M12~M16.
 
 ## 지금 하는 일
 
-M4 마지막 PR: 병합이 섞인 구간 정리(`--rebase-merges`). 이 PR이 merge되면 M4 끝.
-
-Windows 서명(사용자 결정 대기):
-
-- 무료: Microsoft Store(MSIX). 개인 개발자 등록 무료(2025-09~), MSIX는 Microsoft가 서명·호스팅·업데이트. Tauri는 MSIX를 직접 못 만들어 Microsoft `winapp` CLI로 패키징 필요. Store 밖 라이선스 판매(Lemon Squeezy) 정책은 확인 필요
-- 유료: Certum Code Signing in the Cloud(개인, 약 $139/년, TOTP 시드로 CI 서명, 비공식 도구) / SSL.com IV+eSigner(약 $310/년, 공식 자동화)
-- Azure Artifact Signing은 개인이면 미국·캐나다만
-
-## 결정 (2026-10-04)
-
-- 오픈소스 아님, 저장소 비공개로 전환(사용자가 설정에서). GitHub Release로 배포하지 않고 별도 사이트·파일 저장소를 쓴다. Release 초안은 내부 보관용.
-
-## 남은 것 (후보)
-
-- 기능: `--rebase-merges`(병합이 섞인 구간 정리), 닫힌·병합된 PR 보기
-- 성능(보류, 측정상 아직 불필요): 레이아웃 Web Worker·WebGL, diff 가상 스크롤
-- 배포(사용자 준비물 필요): macOS 서명·공증, Windows 코드 서명 → 그다음 자동 업데이트(tauri-plugin-updater)
-- 판매: 라이선스 공개키(`DDUGIT_LICENSE_PUBKEY`), Lemon Squeezy 상품·`BUY_URL`, 발급 웹훅
+M12 · v0.6.0 정리 릴리스: 버전 올림 PR → CI · Rust all_os → merge → Release(`release: true`) → `ddugit v0.6.0` 초안.
 
 ## 다음 단계
 
-- 사용자가 할 일: v0.5.2 초안(.dmg·.exe 붙었는지) 확인 후 Publish(이전 초안 정리). 이미 추가한 upstream 원격은 ⋯ 메뉴에서 '보내기 막기'
-- 다음 릴리스(v0.5.3 또는 v0.6.0)에 #80과 창 제목 표시줄이 들어간다
+- M13: R2 + `dl.ddugit.com` + 자동 업데이트. 사용자 준비물: Cloudflare 계정, ddugit.com DNS를 Cloudflare로(사이트는 Netlify로 CNAME), R2 버킷·API 토큰(Secrets), 업데이트 서명 키(`npx tauri signer generate`, 개인키는 Secrets에만)
+- M14: `ddugit-site`(빈 저장소, 세션에 연결됨 `/home/user/ddugit-site`). Netlify 연결됨. Supabase 프로젝트·GitHub/Google OAuth 앱은 사용자가 만든다
+- M15: 구독 라이선스(만료일 + 앱이 키로 갱신). 가격 제안: 월 4,900원 + 연 49,000원(Lemon Squeezy 수수료 5%+$0.50이 월 결제에선 약 19%). 구독이 끝나면 막지 않고 안내만(확인 필요)
+- 사용자: v0.6.0 실제 기기 점검, 세무(사업자등록·통신판매업) 확인
+
+## 결정 (2026-10-04)
+
+- 오픈소스 아님, 저장소 비공개. GitHub Release로 배포하지 않는다(초안은 내부 보관용). Windows는 서명 없이. 다운로드·앱 사용에 로그인 없음, 구매·라이선스에만 로그인.
 
 ## 막힌 것 / 결정 필요
 
