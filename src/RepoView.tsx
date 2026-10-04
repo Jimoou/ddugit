@@ -1740,6 +1740,8 @@ export function RepoView({
               badges={badges}
               trail={trailIds}
               animate={animate}
+              space={settings.space}
+              glow={settings.glow}
               onSelect={(id) => (id || !composer ? show({ commit: id }) : undefined)}
               onPlus={() => show({ composer: true })}
               stashes={snap.stashes}

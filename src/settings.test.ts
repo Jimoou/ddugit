@@ -15,6 +15,8 @@ describe("parseSettings", () => {
     );
     expect(s).toEqual({
       animate: false,
+      space: true,
+      glow: true,
       historyPage: 3000,
       gitPath: "/opt/git",
       language: "system",
@@ -35,6 +37,10 @@ describe("parseSettings", () => {
     ]);
     expect(parseSettings(JSON.stringify({ closedSections: [1] }), base).closedSections).toEqual([]);
     expect(parseSettings(JSON.stringify({ rotation: 3 }), base).rotation).toBe(3);
+    expect(parseSettings(JSON.stringify({ space: false, glow: "no" }), base)).toMatchObject({
+      space: false,
+      glow: true,
+    });
     expect(parseSettings(JSON.stringify({ rotation: 4 }), base).rotation).toBe(0);
     expect(parseSettings(JSON.stringify({ language: "en" }), base).language).toBe("en");
     expect(parseSettings(JSON.stringify({ historyPage: 10000 }), base).historyPage).toBe(10000);

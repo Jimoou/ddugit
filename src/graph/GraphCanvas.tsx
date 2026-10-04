@@ -55,6 +55,9 @@ interface Props {
   /** Commits that touched one file, newest first (file history). */
   trail?: string[];
   animate: boolean;
+  /** Galaxy behind the graph, and glow around lines and commits (settings). */
+  space: boolean;
+  glow: boolean;
   onSelect(id: string | null): void;
   onPlus(): void;
   stashes: StashInfo[];
@@ -376,6 +379,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         dpr: window.devicePixelRatio || 1,
         time: now(),
         animate: p.animate,
+        space: p.space,
+        glow: p.glow,
         headId: p.headId,
         headBranch: p.headBranch,
         plus: plusPosition(sceneRef.current, p.headId),

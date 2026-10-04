@@ -289,7 +289,7 @@ export default function App() {
       )}
       {welcome && (
         <div className="welcome">
-          <SpaceBackdrop animate={settings.animate} />
+          <SpaceBackdrop animate={settings.animate} space={settings.space} />
           <h1 className="wordmark">ddugit</h1>
           <p>{t("app.tagline")}</p>
           <ConnectActions primary {...connect} />

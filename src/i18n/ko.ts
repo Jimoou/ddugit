@@ -85,6 +85,8 @@ export const ko = {
   "settings.language": "언어",
   "settings.language.system": "시스템 설정 따르기",
   "settings.sparkle": "반짝임 효과 (선을 따라 흐르는 빛, 새 커밋 터짐)",
+  "settings.space": "우주 배경 (그래프와 첫 화면 뒤의 성운·별, 끄면 단색)",
+  "settings.glow": "빛 번짐 (선·커밋·[+] 주변의 네온 글로우)",
   "settings.confirmRemote": "실행 전에 확인",
   "license.title": "라이선스",
   "license.free":

@@ -7,6 +7,10 @@ import type { Key, LanguagePref } from "./i18n";
 export interface Settings {
   /** Sparkles flowing along edges and node birth bursts. */
   animate: boolean;
+  /** The galaxy (nebulae, stars) behind the graph and the home screen; off is a plain dark backdrop. */
+  space: boolean;
+  /** Neon glow around lines, commits and the [+] node. */
+  glow: boolean;
   /** Commits loaded at once (and per "load more"). */
   historyPage: number;
   /** git executable; empty means `git` on PATH. */
@@ -31,6 +35,8 @@ export const LANGUAGES: readonly LanguagePref[] = ["system", "ko", "en"];
 export function defaults(reducedMotion = false): Settings {
   return {
     animate: !reducedMotion,
+    space: true,
+    glow: true,
     historyPage: 3000,
     gitPath: "",
     language: "system",
@@ -61,6 +67,8 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
   const o = v as Record<string, unknown>;
   return {
     animate: typeof o.animate === "boolean" ? o.animate : base.animate,
+    space: typeof o.space === "boolean" ? o.space : base.space,
+    glow: typeof o.glow === "boolean" ? o.glow : base.glow,
     historyPage:
       typeof o.historyPage === "number" && (HISTORY_PAGES as readonly number[]).includes(o.historyPage)
         ? o.historyPage
