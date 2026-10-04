@@ -139,8 +139,14 @@ jobs:
       - name: Verify macOS signature
         if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
         shell: bash
+        # The bundler removes the .app once it is in the dmg, so check the app inside the dmg.
         run: |
-          app=$(ls -d src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app)
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          codesign --verify --verbose=2 "$dmg"
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" >/dev/null
+          trap 'hdiutil detach "$mnt" >/dev/null' EXIT
+          app=$(ls -d "$mnt"/*.app)
           codesign --verify --deep --strict --verbose=2 "$app"
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
