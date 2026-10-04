@@ -395,6 +395,24 @@ export interface BundleCheck {
   heads: { name: string; id: string }[];
   missing: string[];
 }
+/** A commit on a release's first-parent line (`git/changelog.rs`). */
+export interface NoteCommit {
+  id: string;
+  author: string;
+  time: number;
+  summary: string;
+  body: string;
+  /** For a merge: the commits it brought in, used when it names no pull request. */
+  inner: NoteCommit[];
+}
+export interface NoteRange {
+  /** Where the notes start (the latest tag before the end, unless picked); null = from the start. */
+  from: string | null;
+  commits: NoteCommit[];
+  /** Tags reachable from the end, newest first. */
+  tags: string[];
+  truncated: boolean;
+}
 /** A stacked branch (`git/stack.rs`): built on `parent`, restacked when it moves. */
 export interface StackBranch {
   name: string;

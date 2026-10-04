@@ -22,6 +22,7 @@ import type {
   TransferExport,
   TransferSent,
   StackBranch,
+  NoteRange,
   StackOp,
   UpdateInfo,
   OpResult,
@@ -104,6 +105,7 @@ export interface Commands {
   transfer_check: [{ path: string; file: string }, BundleCheck];
   transfer_history: [{ path: string }, TransferSent[]];
   stack_list: [{ path: string }, StackBranch[]];
+  release_range: [{ path: string; from: string | null; to: string }, NoteRange];
   stack_op: [{ path: string; op: StackOp }, OpResult];
   update_check: [Record<string, never>, UpdateInfo | null];
   update_install: [Record<string, never>, null];
@@ -232,6 +234,8 @@ export const api = {
   transferCheck: (path: string, file: string) => call("transfer_check", { path, file }),
   transferHistory: (path: string) => call("transfer_history", { path }),
   stackList: (path: string) => call("stack_list", { path }),
+  /** First-parent commits from `from` (null: the latest tag before `to`; "": the first commit) to `to`, for release notes. */
+  releaseRange: (path: string, from: string | null, to: string) => call("release_range", { path, from, to }),
   /** Build a stack, move a branch in it, take one out, or restack (all but taking out are Pro). */
   stackOp: (path: string, op: StackOp) => call("stack_op", { path, op }),
   /** A newer version in the download storage (release builds only; otherwise `null`). */

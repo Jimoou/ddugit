@@ -6,6 +6,7 @@
 
 pub mod backport;
 pub mod bisect;
+pub mod changelog;
 pub mod cleanup;
 pub mod conflict;
 pub mod diff;

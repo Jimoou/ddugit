@@ -100,6 +100,9 @@ async fn transfer_import(
     .await
 }
 
+// Release notes: reading the commits is plain `git log`; the screen holds the Pro line.
+command!(release_range(path: String, from: Option<String>, to: String) -> git::changelog::NoteRange
+    => git::changelog::range(&path, from.as_deref(), &to));
 // Stacked branches: seeing them and taking a branch out are Free, building and restacking are Pro.
 command!(stack_list(path: String) -> Vec<git::stack::StackBranch> => git::stack::list(&path));
 #[tauri::command]
@@ -362,6 +365,7 @@ pub fn run() {
             transfer_check,
             transfer_history,
             stack_list,
+            release_range,
             stack_op,
             update_check,
             update_install,

@@ -251,7 +251,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 - [x] 폐쇄망 반출입: git bundle 내보내기·가져오기, 무결성 확인, 고객사에 어디까지 반영됐는지 추적
 - [x] 스택 브랜치: 쌓인 브랜치 줄을 그래프에서 관리, 아래가 바뀌면 위를 한 번에 rebase
-- [ ] 릴리스 노트 생성: 두 태그 사이 커밋을 종류별로 묶어 Markdown(PR 번호·작성자)
+- [x] 릴리스 노트 생성: 두 태그 사이 커밋을 종류별로 묶어 Markdown(PR 번호·작성자)
 - [ ] 여러 저장소 일괄 작업: 대시보드에서 고른 저장소 fetch/pull, 같은 이름 브랜치로 전환·생성
 
 ### M16 · v1.0 출시
@@ -367,3 +367,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-04 | M17 폐쇄망 반출입: `git/transfer.rs`(받는 곳별 증분 번들, `.sha256`, 반출 기록은 로컬 config `ddugit-transfer.<받는 곳>.sent`, 반입 전 검사·`refs/remotes/<이름>/`로 가져오기, cargo test +3), `components/Transfer.tsx`(반출·반입 창, 반출·반입은 Pro), e2e 52                                                                                                                                                                                                                                    |
 | 2026-10-04 | 화면 강조색 Teal → 브랜드 Orbit 라벤더(`#b4abf2`), 앱(#99)·사이트(ddugit-site#13, 앱 화면 다시 캡처). M17 스택 브랜치: `git/stack.rs`(부모·base를 `branch.<이름>.ddugit-*`에, 아래부터 `rebase --onto <부모> <base>`, 병합·삭제된 부모는 base 유지하고 새 부모로, 이름 바꾸기 따라감, cargo test +3), 사이드바 '스택' 섹션·브랜치 메뉴(`components/Stacks.tsx`, `stack.ts`), 쌓기·다시 쌓기는 Pro, e2e 54                                                                                          |
 | 2026-10-04 | 사용자 요청으로 강조색 변경 되돌림(Teal 복귀): 앱 #99 revert, 사이트 CSS 되돌리고 앱 화면은 Teal·지금 문구로 다시 캡처                                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-10-04 | M17 릴리스 노트: `git/changelog.rs`(첫 번째 부모 줄 + 병합마다 들여온 커밋, 시작은 직전 태그, cargo test +1), `notes.ts`(Conventional Commits 종류·PR 번호 `(#N)`/`Merge pull request #N`/`!N`·작성자, GitHub·GitLab 링크, Markdown), `components/ReleaseNotes.tsx`(태그·브랜치 메뉴, 시작 태그 고르기, 고쳐서 복사). Pro. e2e 56                                                                                                                                                                  |

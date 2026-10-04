@@ -7,9 +7,9 @@ _마지막 갱신: 2026-10-04_
 
 ## 방금 끝난 것
 
-- M17 스택 브랜치(`git/stack.rs`, `components/Stacks.tsx`): 브랜치 메뉴로 쌓기·아래 브랜치 바꾸기·빼기, 사이드바 '스택' 섹션(다시 쌓기 필요·아래 브랜치 없음 표시)과 스택 단위 다시 쌓기. 쌓기·다시 쌓기는 Pro, 보기·빼기는 Free
-- 화면 강조색 Teal → Orbit 라벤더(앱 #99, 사이트 ddugit-site#13)
-- 그 전: M17 폐쇄망 반출입(#98)
+- M17 릴리스 노트(`git/changelog.rs`, `notes.ts`, `components/ReleaseNotes.tsx`): 태그·브랜치 메뉴 → 직전 태그부터 종류별 Markdown(PR 번호·작성자·링크), 고쳐서 복사. Pro
+- 강조색 변경 되돌림(Teal 복귀): 앱 #101, 사이트 ddugit-site#14
+- 그 전: M17 스택 브랜치(#100), 폐쇄망 반출입(#98)
 
 ## 결정 (2026-10-04, 수익 모델)
 
@@ -18,7 +18,7 @@ _마지막 갱신: 2026-10-04_
 
 ## 다음 단계
 
-- M17 나머지: 릴리스 노트 생성 → 여러 저장소 일괄 작업, 그다음 v0.7.0(Free/Pro·다듬기·반출입)
+- M17 나머지: 여러 저장소 일괄 작업, 그다음 v0.7.0(Free/Pro·다듬기·반출입)
 - M15 마지막: Lemon Squeezy(사용자: 스토어·상품 월 ₩4,900 / 연 ₩49,000) → 웹훅 Edge Function(구독 생성·갱신·해지 → `licenses`, 첫 라이선스 발급 메일), 사이트 가격 페이지 구매 버튼, 앱 `BUY_URL`, 결제부터 앱 활성화까지 확인
 - 사용자: 라이선스 발급 키 → Supabase Edge Functions Secrets(`DDUGIT_LICENSE_PRIVATE_KEY`, `DDUGIT_LICENSE_PUBKEY`) + ddugit Variables `DDUGIT_LICENSE_PUBKEY`
 - 사용자: Windows 실기 점검, 세무(사업자등록·통신판매업), 오늘 끝나면 두 저장소 비공개로
