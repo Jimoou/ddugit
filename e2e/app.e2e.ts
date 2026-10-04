@@ -5,7 +5,7 @@ test("adds a checkpoint from the + composer", async ({ demo }) => {
   await page.locator(".topbar button", { hasText: "커밋" }).click();
   await page.fill("textarea.message", "Wire up minimap jump");
   await page.keyboard.press("Control+Enter");
-  await demo.toast("체크포인트를 추가했어요");
+  await demo.toast("커밋했어요");
   const snap = await demo.snapshot();
   const head = snap.commits.find((c) => c.id === snap.head.target)!;
   expect(head.summary).toBe("Wire up minimap jump");
@@ -123,8 +123,8 @@ test("adds the original project as a remote and lists its fixes to backport", as
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
   // The fetch of the new remote shows on the progress card, then says what came.
-  await expect(page.locator(".job-card")).toContainText("upstream에서 받아오는 중");
-  await demo.toast("upstream에서 브랜치 1개를 받아왔어요");
+  await expect(page.locator(".job-card")).toContainText("upstream에서 가져오는 중");
+  await demo.toast("upstream에서 브랜치 1개를 가져왔어요");
   await expect(page.locator(".job-card")).toHaveCount(0);
 
   // Two remotes now: a fold per remote, branches without the prefix.
@@ -150,7 +150,7 @@ test("reorders and folds commits with the interactive rebase sheet", async ({ de
   await expect.poll(async () => (await demo.screenOf(before.head.target!)) !== null).toBe(true);
   const at = (await demo.screenOf(base))!;
   await page.mouse.click(at.x, at.y, { button: "right" });
-  await page.click(".context-menu >> text=이 다음 커밋들 정리");
+  await page.click(".context-menu >> text=이후 커밋 정리");
 
   const rows = page.locator(".rb-list li");
   await expect(rows).toHaveCount(3);
@@ -373,7 +373,7 @@ test("tidies a range with a merge in it: merges stay, commits move only within t
   for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowLeft"); // HEAD, then four first parents
   await expect(live).toContainText("Bump dependencies");
   await page.keyboard.press("Enter");
-  await page.click(".context-menu >> text=이 다음 커밋들 정리");
+  await page.click(".context-menu >> text=이후 커밋 정리");
 
   // The hotfix merge sits locked between its merged line and the branch's own commits.
   const sheet = page.locator(".rebase-sheet");
@@ -488,7 +488,7 @@ test("settings: switching to English relabels the app and is remembered", async 
   await expect(page.locator(".topbar")).toContainText("Commit");
   await expect(page.locator(".hint")).toContainText("Drag to pan");
   await page.locator(".topbar").getByText("Commit").click();
-  await expect(page.locator(".composer")).toContainText("Add checkpoint");
+  await expect(page.locator(".composer")).toContainText("New commit");
   await page.keyboard.press("Escape");
 
   await page.reload();
@@ -526,14 +526,14 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
-    .getByRole("button", { name: /URL로 가져오기/ })
+    .getByRole("button", { name: /URL로 복제/ })
     .click();
   const dialog = page.locator(".dialog.clone");
   await dialog.getByPlaceholder("https://github.com/owner/repo.git").fill("https://github.com/acme/rocket.git");
   await dialog.getByRole("button", { name: "고르기…" }).click();
   await expect(dialog).toContainText("→ /work/rocket");
-  await dialog.getByRole("button", { name: "가져오기" }).click();
-  await demo.toast("rocket을(를) 가져왔어요");
+  await dialog.getByRole("button", { name: "복제" }).click();
+  await demo.toast("rocket을(를) 복제했어요");
 
   await page.locator(".tab.on .tab-menu").click();
   const row = page.locator(".repo-menu .recent-list li").filter({ hasText: "/work/rocket" });
@@ -549,7 +549,7 @@ test("sets up SSH for a clone inside the app: key, host trust, test", async ({ d
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
-    .getByRole("button", { name: /URL로 가져오기/ })
+    .getByRole("button", { name: /URL로 복제/ })
     .click();
   const dialog = page.locator(".dialog.clone");
   const url = dialog.getByPlaceholder("https://github.com/owner/repo.git");
@@ -563,7 +563,7 @@ test("sets up SSH for a clone inside the app: key, host trust, test", async ({ d
   await expect(ssh).toContainText("~/.ssh/id_ed25519");
   await expect(ssh.getByRole("button", { name: /공개키 복사/ })).toBeVisible();
   await ssh.getByRole("button", { name: "서버 확인" }).click();
-  await expect(ssh).toContainText("github.com가 공개한 지문과 일치해요");
+  await expect(ssh).toContainText("github.com에서 공개한 지문과 일치해요");
   await ssh.getByRole("button", { name: "이 서버 신뢰" }).click();
   await expect(ssh).toContainText("이미 신뢰한 서버예요");
   await ssh.getByRole("button", { name: "연결 확인" }).click();
@@ -980,7 +980,7 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
 
   // Fetch reaches the two readable ones.
   await galaxy.getByRole("button", { name: /모두 Fetch/ }).click();
-  await demo.toast("저장소 2개에서 새 커밋을 받아왔어요");
+  await demo.toast("저장소 2개에서 새 커밋을 가져왔어요");
   await expect(galaxy.locator(".world-fetch.ok")).toHaveCount(2);
 
   // Forget the missing one, then open a world: it gets its own tab beside the demo.
@@ -1040,7 +1040,7 @@ test("LFS: downloads files left as pointers and tracks a new file type", async (
   await expect(section).toContainText("*.psd");
   await expect(section).toContainText("받지 않은 파일 3개");
   await section.getByRole("button", { name: "받기" }).click();
-  await demo.toast("LFS 파일을 받아왔어요");
+  await demo.toast("LFS 파일을 받았어요");
   await expect(section).not.toContainText("받지 않은 파일");
 
   await section.getByRole("button", { name: "LFS로 관리할 파일 형식 추가" }).click();
@@ -1220,7 +1220,7 @@ test("the original project added as a remote is fetch-only: a push offers origin
   await page.fill(".dialog input >> nth=0", "upstream");
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
-  await demo.toast("upstream은(는) 가져오기 전용으로 추가했어요. 그쪽으로는 보내지 않아요");
+  await demo.toast("upstream은(는) 가져오기 전용으로 추가했어요. 그쪽으로는 올리지 않아요");
   const upstream = page.locator(".sidebar section.remote-sub").filter({ hasText: "upstream" });
   await expect(upstream.locator(".fetch-only")).toBeVisible();
 
@@ -1235,10 +1235,10 @@ test("the original project added as a remote is fetch-only: a push offers origin
 
   await page.locator(".topbar").getByRole("button", { name: /Push/ }).click();
   const ask = page.locator(".dialog.sync-confirm");
-  await expect(ask).toContainText("가져오기 전용 원격이라 보내지 않아요");
+  await expect(ask).toContainText("가져오기 전용 원격이라 올리지 않아요");
   await expect(ask.getByRole("button", { name: /^Push/ })).toBeDisabled();
-  await ask.getByRole("button", { name: "origin(으)로 보내기" }).click();
-  await demo.toast(/origin으로 보냈어요/);
+  await ask.getByRole("button", { name: "origin에 올리기" }).click();
+  await demo.toast(/origin에 올렸어요/);
   expect((await demo.snapshot()).head.upstream).toBe("origin/upstream-main");
 });
 
