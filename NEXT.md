@@ -11,7 +11,11 @@ _마지막 갱신: 2026-10-02_
 
 ## 지금 하는 일
 
-macOS 서명·공증 준비. 사용자가 Apple Developer Program에 가입했다. 사용자가 Developer ID Application 인증서(.p12)와 앱 암호를 만들어 GitHub Secrets 6개(`APPLE_*`)를 넣으면, Release를 수동 실행해 서명·공증을 확인하고 `releaseBody`의 macOS 미서명 안내를 지운다. 개인키·인증서는 세션에서 만들지 않는다.
+v0.5.3 PR(첫 서명 릴리스: #80·#81·#82 + 서명 단계) → all_os → merge → Release(`release: true`) → `ddugit v0.5.3` 초안. macOS 서명·공증은 브랜치 테스트에서 이미 확인(공증 Accepted, 스테이플, dmg 안 앱 검증 통과).
+
+## 결정 (2026-10-04)
+
+- 오픈소스 아님, 저장소 비공개로 전환(사용자가 설정에서). GitHub Release로 배포하지 않고 별도 사이트·파일 저장소를 쓴다. Release 초안은 내부 보관용.
 
 ## 남은 것 (후보)
 

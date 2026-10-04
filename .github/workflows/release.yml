@@ -4,8 +4,9 @@ name: Release
 # the installers and attach them to a draft GitHub Release: macOS .dmg
 # (universal: Apple silicon + Intel) and Windows .exe (NSIS). A manual release
 # names itself v<version from tauri.conf.json>; GitHub creates that tag on the
-# run's commit when the draft is published. Unsigned for now, so first launch
-# shows Gatekeeper / SmartScreen warnings; signing is on the roadmap for later.
+# run's commit when the draft is published. macOS builds are signed and
+# notarized once the APPLE_* secrets exist; Windows stays unsigned (SmartScreen
+# warns) until WINDOWS_SIGN_COMMAND is set (docs/RELEASE.md).
 on:
   push:
     tags: ["v*"]
@@ -35,7 +36,8 @@ jobs:
             args: --bundles nsis
             rust-targets: ""
     # A draft release is made from main only (a tag push is already a deliberate release).
-    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+    # A manual run without "release" only keeps artifacts, so it may test any branch.
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && !inputs.release)
     runs-on: ${{ matrix.os }}
     env:
       # Code signing turns on by itself once its secrets exist (docs/RELEASE.md).
@@ -72,8 +74,43 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # Check the certificate before the long build, saying which secret is wrong, and
+        # repack it in the PKCS#12 flavour macOS `security import` reads (SHA-1 MAC,
+        # 3DES): OpenSSL 3's default (AES + SHA-256 MAC) fails there as "MAC
+        # verification failed (wrong password?)" even with the right password.
         run: |
-          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+          set -euo pipefail
+          dir=$(mktemp -d)
+          trap 'rm -rf "$dir"' EXIT
+          # Homebrew's OpenSSL 3 reads both flavours; macOS's own LibreSSL may not read OpenSSL 3's.
+          ossl="$(brew --prefix openssl@3 2>/dev/null || true)/bin/openssl"
+          [ -x "$ossl" ] || ossl=openssl
+          v3=false; "$ossl" version | grep -q '^OpenSSL 3' && v3=true
+          echo "$("$ossl" version)"
+          if ! printf '%s' "$APPLE_CERTIFICATE" | tr -d ' \r\n' | base64 --decode > "$dir/in.p12" 2>/dev/null || [ ! -s "$dir/in.p12" ]; then
+            echo "::error::APPLE_CERTIFICATE is not the base64 of a .p12 file (cut off when pasted?)"; exit 1
+          fi
+          unpack() { "$ossl" pkcs12 -in "$dir/in.p12" -passin env:APPLE_CERTIFICATE_PASSWORD -nodes -out "$dir/all.pem" "$@" 2>"$dir/err"; }
+          if ! unpack && ! { $v3 && unpack -legacy; }; then
+            echo "::error::The .p12 does not open with APPLE_CERTIFICATE_PASSWORD: the password differs from the one set when exporting, or APPLE_CERTIFICATE is damaged"
+            sed 's/^/  /' "$dir/err"; exit 1
+          fi
+          grep -q 'PRIVATE KEY' "$dir/all.pem" || { echo "::error::The .p12 holds no private key: export the certificate together with its key"; exit 1; }
+          cn=$("$ossl" x509 -in "$dir/all.pem" -noout -subject -nameopt multiline | sed -n 's/^ *commonName *= *//p')
+          case "$cn" in "Developer ID Application:"*) ;; *) echo "::error::The certificate is \"$cn\", not a Developer ID Application certificate"; exit 1 ;; esac
+          if [ "$cn" != "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "::error::APPLE_SIGNING_IDENTITY must be exactly the certificate's name: $cn"; exit 1
+          fi
+          if $v3; then
+            "$ossl" pkcs12 -export -in "$dir/all.pem" -passout env:APPLE_CERTIFICATE_PASSWORD -out "$dir/out.p12" \
+              -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+          else
+            "$ossl" pkcs12 -export -in "$dir/all.pem" -passout env:APPLE_CERTIFICATE_PASSWORD -out "$dir/out.p12"
+          fi
+          cert=$(base64 < "$dir/out.p12" | tr -d '\n')
+          echo "::add-mask::$cert"
+          echo "APPLE_CERTIFICATE=$cert" >> "$GITHUB_ENV"
+          for v in APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             echo "$v=${!v}" >> "$GITHUB_ENV"
           done
       # The sign command comes from the certificate provider (cloud HSM tools), with %1 for the file.
@@ -95,9 +132,24 @@ jobs:
           releaseBody: |
             macOS: ddugit_*_universal.dmg · Windows: ddugit_*_x64-setup.exe
 
-            Unsigned build: on macOS right-click → Open the first time; on Windows choose "More info → Run anyway".
+            macOS: signed and notarized (Developer ID). Windows: not signed yet, so SmartScreen may warn; choose "More info → Run anyway".
           releaseDraft: true
           args: ${{ matrix.args }} ${{ env.SIGN_ARGS }}
+      # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
+      - name: Verify macOS signature
+        if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
+        shell: bash
+        # The bundler removes the .app once it is in the dmg, so check the app inside the dmg.
+        run: |
+          dmg=$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg)
+          codesign --verify --verbose=2 "$dmg"
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg" >/dev/null
+          trap 'hdiutil detach "$mnt" >/dev/null' EXIT
+          app=$(ls -d "$mnt"/*.app)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=4 "$app"
+          xcrun stapler validate "$app"
       # Other manual runs keep the installers as workflow artifacts instead.
       - if: github.ref_type != 'tag' && !inputs.release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

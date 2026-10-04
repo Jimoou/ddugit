@@ -162,7 +162,9 @@
 
 - [ ] (나중에) macOS 서명 + 공증, Windows 코드 서명 — 2026-10-01 결정: 뒤로 미룸. Apple Developer 계정, Windows 인증서가 필요하다
   - 2026-10-04: 사용자가 Apple Developer Program(1년) 가입. 인증서·시크릿 등록 대기(`docs/RELEASE.md`, Mac 없이 openssl로 만드는 법 추가)
-- [ ] (나중에) 자동 업데이트 (tauri-plugin-updater) — 2026-10-01 결정: 뒤로 미룸. 서명과 배포 위치를 정한 뒤에 한다
+  - 2026-10-04 결정: 오픈소스 아님, 저장소 비공개. 배포는 GitHub Release가 아니라 별도 사이트·파일 저장소(dmg·exe). Release 초안은 내부 보관용(`docs/RELEASE.md` 배포 위치)
+  - [x] macOS 서명·공증(2026-10-04): Secrets 6개, 서명 테스트 빌드에서 공증 Accepted·스테이플, 빌드 뒤 dmg 안 앱을 codesign·spctl·stapler로 확인. `.p12`는 빌드 전에 OpenSSL로 열어 틀린 Secret을 알려 주고 macOS `security`가 읽는 형식(SHA-1 MAC·3DES)으로 다시 묶는다
+- [ ] (나중에) 자동 업데이트 (tauri-plugin-updater) — 2026-10-01 결정: 뒤로 미룸. 서명과 배포 위치를 정한 뒤에 한다(배포는 별도 사이트로 결정, 사이트 주소가 정해지면)
 - [x] 배포 파일: macOS `.dmg`, Windows `.exe`(NSIS 설치 파일). 2026-10-01 결정. Tauri 번들러가 둘 다 만든다. 태그를 push하면 Release에 올리는 워크플로를 만든다(서명 전에는 첫 실행 경고가 뜬다)
 - [x] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표 — 반짝임, 한 번에 불러올 커밋 수, git 실행 파일(`--version`으로 확인 후 적용), 단축키 표, `?`/⚙로 열기
   - [ ] 테마 (지금은 네온 다크 하나) — 2026-10-01 결정: 밝은 테마는 만들지 않는다
@@ -289,3 +291,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-02 | PR #79 squash merge(`6cc5533`), Release → `ddugit v0.5.2` 초안. 카드 별·사이드바 ⋯ 잘 보이게                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 2026-10-02 | PR #80 squash merge(`717cdba`). 창 제목 표시줄을 탭 줄로(macOS Overlay, Windows 자체 버튼, vitest 91, e2e 46)                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-10-04 | PR #81 squash merge(`3c8a3dc`). '내 은하' → '내 저장소', Apple 서명 준비 안내(Mac 없이 인증서 만들기)                                                                                                                                                                                                                                                                                                                                                                                              |
+| 2026-10-04 | macOS 서명·공증 성공(테스트 run 37182544034, 공증 Accepted). `.p12` 형식 문제(OpenSSL 3) 자동 처리, dmg 안 앱 검증 단계. v0.5.3 버전 올림                                                                                                                                                                                                                                                                                                                                                          |

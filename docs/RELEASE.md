@@ -47,6 +47,13 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
    - 고객에게 메일로 보낸다(예: Resend). 또는 구매 완료 페이지에서 주문 번호로 조회하게 한다
 3. 앱의 구매 버튼은 `src/components/License.tsx`의 `BUY_URL`에 스토어 주소를 넣으면 나타난다.
 
+## 배포 위치 (2026-10-04 결정)
+
+- 오픈소스가 아니다(LICENSE 없음, 모든 권리 보유). 저장소는 비공개로 돌린다.
+- 무료·유료 모두 **GitHub Release로 배포하지 않는다.** 별도 사이트와 별도 파일 저장소(dmg·exe)를 쓴다.
+- `release.yml`이 만드는 Release 초안은 내부 보관용이다(비공개 저장소라 본인만 받을 수 있다). 사이트를 정하면 파일 저장소(예: R2·S3)에 올리는 단계를 추가하고, 자동 업데이트(`tauri-plugin-updater`)는 그 사이트 주소를 읽게 한다.
+- 비공개 저장소의 Actions는 월 무료 분량 안에서 돈다(macOS ×10, Windows ×2). Billing의 지출 한도를 0으로 두면 넘어도 청구되지 않고 멈춘다.
+
 ## 2. 코드 서명 (개인 이름)
 
 서명용 시크릿이 저장소에 있으면 `release.yml`이 **알아서 서명**한다. 없으면 지금처럼 서명 없이 빌드한다.
@@ -68,6 +75,8 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 | `APPLE_TEAM_ID`              | 팀 ID(10자)                               |
 
 Tauri가 서명과 공증(notarytool)을 함께 한다. 그러면 첫 실행 때 Gatekeeper 경고가 사라진다.
+
+`release.yml`은 빌드 전에 `.p12`를 OpenSSL로 열어 본다. 암호가 틀렸거나 값이 잘렸거나, 서명 이름이 인증서 이름과 다르면 어느 Secret인지 오류로 알려 준다. 그다음 macOS `security`가 읽는 형식(SHA-1 MAC·3DES)으로 다시 묶는다. OpenSSL 3 기본 형식은 암호가 맞아도 `MAC verification failed (wrong password?)`로 실패하기 때문이다(2026-10-04 첫 서명 빌드에서 겪음). 빌드가 끝나면 dmg를 열어 안의 앱을 `codesign`·`spctl`·`stapler`로 확인한다.
 
 #### Mac 없이 인증서 만들기 (openssl)
 
