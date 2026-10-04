@@ -1295,3 +1295,33 @@ test("a newer version shows an update notice that installs or waits", async ({ d
   await page.locator(".update-notice button.primary").click();
   await expect(page.locator(".update-notice")).toHaveCount(0);
 });
+
+test("on Free, private pull requests and backport actions offer Pro instead", async ({ demo }) => {
+  const { page } = demo;
+  await page.keyboard.press("?");
+  await expect(page.locator(".license-plan")).toContainText("Pro 체험 중 · 12일 남음");
+  await page.keyboard.press("Escape");
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+  });
+  await page.reload();
+
+  // The demo repository is private: its pull requests stay closed on Free.
+  const pulls = page.locator(".sidebar section.pulls");
+  await expect(pulls.locator(".pr-locked")).toContainText("Pro 기능");
+  await pulls.locator(".pr-locked button").click();
+  const offer = page.locator(".dialog.pro-offer");
+  await expect(offer).toContainText("비공개 저장소와 회사 서버의 PR");
+  await offer.getByRole("button", { name: "닫기" }).click();
+  await expect(offer).toHaveCount(0);
+
+  // Comparing is free; cherry-picking is Pro.
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  await sheet.locator("tbody tr").first().locator("input[type=checkbox]").check();
+  await sheet.getByRole("button", { name: /cherry-pick/ }).click();
+  await expect(offer).toContainText("백포트 실행");
+  await offer.getByRole("button", { name: "라이선스 입력" }).click();
+  await expect(page.locator(".license-plan")).toContainText("Free");
+});

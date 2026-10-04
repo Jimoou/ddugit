@@ -115,13 +115,18 @@ fn newer_than(info: &LicenseInfo, build: Option<&str>) -> bool {
     build.is_some_and(|b| b > info.updates_until.as_str())
 }
 
-/// Today in UTC as `YYYY-MM-DD` (civil-from-days, so no date crate is needed).
-fn today() -> String {
+/// Days since 1970-01-01, today in UTC.
+pub(crate) fn today_days() -> i64 {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    civil((secs / 86_400) as i64)
+    (secs / 86_400) as i64
+}
+
+/// Today in UTC as `YYYY-MM-DD` (civil-from-days, so no date crate is needed).
+fn today() -> String {
+    civil(today_days())
 }
 
 /// Days since 1970-01-01 → `YYYY-MM-DD` (Howard Hinnant's algorithm).
@@ -136,6 +141,11 @@ fn civil(days: i64) -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = yoe + era * 400 + i64::from(m <= 2);
     format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// A license that opens Pro now: valid, and not past a subscription's expiry.
+pub fn active(status: &LicenseStatus) -> Option<&LicenseInfo> {
+    status.license.as_ref().filter(|_| !status.expired)
 }
 
 fn expired(info: &LicenseInfo, today: &str) -> bool {

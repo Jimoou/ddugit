@@ -10,6 +10,7 @@ import { fetchable, signals, tally } from "../galaxy";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { bands, nextHue, type RepoGroup, suggestGroup } from "../groups";
+import { FREE_DASHBOARD, offerPro, proOpen, usePro } from "../pro";
 import { repoName } from "../recent";
 import type { RepoGlance } from "../types";
 import type { Recent } from "./Connect";
@@ -18,6 +19,7 @@ import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { NameDialog, type NameRequest } from "./NameDialog";
 import { Icon } from "./Icon";
 import { PlanetDot } from "./Planet";
+import { ProBadge } from "./ProOffer";
 
 /** Grouping suggestions the user said no to. */
 const HINTS = "ddugit.groupHints";
@@ -42,7 +44,10 @@ interface Props {
 
 export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Props) {
   const paths = recent.list.map((r) => r.path).filter((p) => p !== DEMO_PATH);
-  const key = paths.join("\n");
+  // Free reads the first few (starred first, then most recent); Pro reads them all.
+  const pro = proOpen(usePro());
+  const lockedPaths = pro ? [] : paths.slice(FREE_DASHBOARD);
+  const key = paths.filter((p) => !lockedPaths.includes(p)).join("\n");
   const [loaded, setLoaded] = useState<{ key: string; byPath: Map<string, RepoGlance> } | null>(null);
   const [fetched, setFetched] = useState<Record<string, Fetched>>({});
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -168,7 +173,23 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
     ];
   };
 
+  /** A repository beyond Free's dashboard: its name, opening still works, the rest is Pro. */
+  const lockedCard = (path: string) => (
+    <li key={path} className="world locked">
+      <button className="world-open" title={path} onClick={() => onOpen(path)}>
+        <span className="world-name">
+          <PlanetDot path={path} big /> <b>{repoName(path)}</b>
+        </span>
+        <span className="world-path">{path}</span>
+      </button>
+      <button className="world-unlock" onClick={() => offerPro("dashboard")}>
+        {t("pro.dashboardMore")} <ProBadge />
+      </button>
+    </li>
+  );
+
   const card = (path: string) => {
+    if (lockedPaths.includes(path)) return lockedCard(path);
     const g = byPath?.get(path);
     const f = fetched[path];
     const starred = recent.list.find((r) => r.path === path)?.starred ?? false;

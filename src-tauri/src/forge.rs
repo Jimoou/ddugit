@@ -105,6 +105,8 @@ pub struct ForgeStatus {
     pub public: bool,
     /// The token was refused: ask the user for a new one.
     pub unauthorized: bool,
+    /// A private or self-hosted repository without Pro: its pull requests stay closed.
+    pub locked: bool,
     pub error: Option<String>,
 }
 
@@ -234,14 +236,14 @@ fn token_for(kind: ForgeKind, host: &str, trusted: &[String]) -> (Option<String>
 
 /// Every open pull request, and the 30 most recently merged or closed ones.
 const GITHUB_QUERY: &str =
-    "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { \
+    "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { isPrivate \
     open: pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { ...pr } } \
     done: pullRequests(states: [MERGED, CLOSED], first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { ...pr } } } } \
     fragment pr on PullRequest { number title url isDraft state headRefName headRefOid author { login } reviewDecision \
     commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }";
 
 /// GitLab takes one state per connection: open, then the latest merged (20) and closed (10).
-const GITLAB_QUERY: &str = "query($path: ID!) { project(fullPath: $path) { \
+const GITLAB_QUERY: &str = "query($path: ID!) { project(fullPath: $path) { visibility \
     open: mergeRequests(state: opened, first: 100) { nodes { ...mr } } \
     merged: mergeRequests(state: merged, first: 20, sort: UPDATED_DESC) { nodes { ...mr } } \
     closed: mergeRequests(state: closed, first: 10, sort: UPDATED_DESC) { nodes { ...mr } } } } \
@@ -280,6 +282,8 @@ struct GhData {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GhRepo {
+    #[serde(default)]
+    is_private: bool,
     open: Nodes<GhPull>,
     #[serde(default)]
     done: Nodes<GhPull>,
@@ -321,6 +325,9 @@ struct GlData {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GlProject {
+    /// `public`, `internal` (any signed-in user of the instance) or `private`.
+    #[serde(default)]
+    visibility: Option<String>,
     open: Nodes<GlMerge>,
     #[serde(default)]
     merged: Nodes<GlMerge>,
@@ -413,7 +420,7 @@ fn pulls(
     forge: &Forge,
     remote: &str,
     token: &str,
-) -> std::result::Result<Vec<PullRequest>, FetchError> {
+) -> std::result::Result<(Vec<PullRequest>, bool), FetchError> {
     let not_found = || FetchError::Other(format!("{} not found on {}", forge.slug, forge.host));
     Ok(match forge.kind {
         ForgeKind::Github => {
@@ -421,7 +428,9 @@ fn pulls(
             let vars = serde_json::json!({ "owner": owner, "name": name });
             let data: GhData = graphql(endpoint, token, GITHUB_QUERY, vars)?;
             let repo = data.repository.ok_or_else(not_found)?;
-            repo.open
+            let private = repo.is_private;
+            let prs = repo
+                .open
                 .nodes
                 .into_iter()
                 .chain(repo.done.nodes)
@@ -443,13 +452,15 @@ fn pulls(
                         .and_then(|r| checks_of(&r.state)),
                     review: p.review_decision.as_deref().and_then(review_of),
                 })
-                .collect()
+                .collect();
+            (prs, private)
         }
         ForgeKind::Gitlab => {
             let vars = serde_json::json!({ "path": forge.slug });
             let data: GlData = graphql(endpoint, token, GITLAB_QUERY, vars)?;
             let project = data.project.ok_or_else(not_found)?;
-            project
+            let private = project.visibility.as_deref() != Some("public");
+            let prs = project
                 .open
                 .nodes
                 .into_iter()
@@ -468,7 +479,8 @@ fn pulls(
                     checks: m.head_pipeline.and_then(|p| checks_of(&p.state)),
                     review: m.approved.then_some(Review::Approved),
                 })
-                .collect()
+                .collect();
+            (prs, private)
         }
     })
 }
@@ -476,8 +488,9 @@ fn pulls(
 /// Ask each forge remote (origin first, each project once) for its open pull requests
 /// and the recently merged or closed ones.
 /// `trusted` are hosts (besides github.com / gitlab.com) whose `gh` / `glab`
-/// login the user agreed to use.
-pub fn report(path: &str, trusted: &[String]) -> Result<PrReport> {
+/// login the user agreed to use. Without `pro`, only public repositories on
+/// github.com / gitlab.com are read (Free); a private or self-hosted one is `locked`.
+pub fn report(path: &str, trusted: &[String], pro: bool) -> Result<PrReport> {
     let repo = git2::Repository::discover(Path::new(path)).map_err(|e| e.message().to_string())?;
     let mut names: Vec<String> = repo
         .remotes()
@@ -510,11 +523,14 @@ pub fn report(path: &str, trusted: &[String]) -> Result<PrReport> {
             token: source,
             public: is_public_forge(&forge.host),
             unauthorized: false,
+            locked: false,
             error: None,
         };
         if let Some(token) = token {
             match pulls(&graphql_url(forge.kind, &forge.host), &forge, &name, &token) {
-                Ok(prs) => report.prs.extend(prs),
+                // Self-hosted forges are company servers: Pro whatever the repository says.
+                Ok((_, private)) if !pro && (private || !status.public) => status.locked = true,
+                Ok((prs, _)) => report.prs.extend(prs),
                 Err(FetchError::Unauthorized) => status.unauthorized = true,
                 Err(FetchError::Other(e)) => status.error = Some(e),
             }
@@ -651,8 +667,12 @@ mod tests {
              "state":"MERGED","headRefName":"old","headRefOid":"0ld","author":null,"reviewDecision":null,
              "commits":{"nodes":[]}}]}}}}"#;
         let (url, server) = serve_once("200 OK", body);
+        // No `isPrivate` in the reply reads as public.
         let prs = match pulls(&url, &gh("o/r").unwrap(), "origin", "t0ken") {
-            Ok(p) => p,
+            Ok((p, private)) => {
+                assert!(!private);
+                p
+            }
             Err(_) => panic!("fetch failed"),
         };
         let request = server.join().unwrap();
@@ -668,6 +688,7 @@ mod tests {
             compact.contains(r#""owner":"o""#) && compact.contains(r#""name":"r""#),
             "{request}"
         );
+        assert!(compact.contains("isPrivate"), "{request}");
         assert_eq!(
             prs[0],
             PullRequest {
@@ -708,7 +729,9 @@ mod tests {
             "closed":{"nodes":[{"iid":"2","title":"Nope","webUrl":"u","draft":false,"state":"closed",
             "sourceBranch":"nope","diffHeadSha":null,"author":null,"headPipeline":null}]}}}}"#;
         let (url, server) = serve_once("200 OK", body);
-        let prs = pulls(&url, &forge, "origin", "glpat").ok().unwrap();
+        // GitLab says nothing about visibility here: anything not plainly public is Pro.
+        let (prs, private) = pulls(&url, &forge, "origin", "glpat").ok().unwrap();
+        assert!(private);
         let request = server.join().unwrap();
         assert!(
             request

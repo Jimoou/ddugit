@@ -1,6 +1,7 @@
 mod forge;
 mod git;
 mod license;
+mod pro;
 mod ssh;
 mod update;
 
@@ -51,14 +52,53 @@ command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, lines: O
     => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
 command!(backport_compare(path: String, source: String, target: String) -> Vec<BackportItem>
     => git::backport::compare(&path, &source, &target));
-command!(backport_ignore(path: String, target: String, id: String, ignore: bool) -> ()
-    => git::backport::set_ignored(&path, &target, &id, ignore));
+// Backport actions are Pro; comparing branches stays Free.
+#[tauri::command]
+async fn backport_ignore(
+    app: tauri::AppHandle,
+    path: String,
+    target: String,
+    id: String,
+    ignore: bool,
+) -> Result<(), String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        pro::require(&dir)?;
+        git::backport::set_ignored(&path, &target, &id, ignore)
+    })
+    .await
+}
 command!(backport_summary(path: String, source: String, targets: Vec<String>) -> Vec<BackportTally>
     => git::backport::summary(&path, &source, &targets));
-command!(backport_apply(path: String, ids: Vec<String>, target: String) -> OpResult
-    => git::backport::apply(&path, &ids, &target));
-command!(backport_export(path: String, ids: Vec<String>, out_dir: String) -> OpResult
-    => git::backport::export(&path, &ids, &out_dir));
+#[tauri::command]
+async fn backport_apply(
+    app: tauri::AppHandle,
+    path: String,
+    ids: Vec<String>,
+    target: String,
+) -> Result<OpResult, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        pro::require(&dir)?;
+        git::backport::apply(&path, &ids, &target)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn backport_export(
+    app: tauri::AppHandle,
+    path: String,
+    ids: Vec<String>,
+    out_dir: String,
+) -> Result<OpResult, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        pro::require(&dir)?;
+        git::backport::export(&path, &ids, &out_dir)
+    })
+    .await
+}
 command!(git_rebase(path: String, base: String, steps: Vec<RebaseStep>) -> OpResult
     => git::rebase::rebase(&path, &base, &steps));
 command!(git_rebase_todo(path: String, base: String) -> Vec<TodoItem> => git::rebase::todo(&path, &base));
@@ -147,7 +187,22 @@ command!(ssh_keygen(comment: String) -> ssh::SshKey => ssh::keygen(&comment));
 command!(ssh_host_key(url: String) -> ssh::HostKey => ssh::host_key(&url));
 command!(ssh_trust_host(url: String, fingerprints: Vec<String>) -> () => ssh::trust_host(&url, &fingerprints));
 command!(ssh_test(url: String) -> ssh::SshTest => ssh::test(&url));
-command!(pull_requests(path: String, trusted: Vec<String>) -> forge::PrReport => forge::report(&path, &trusted));
+/// Pull requests: Free for public repositories, Pro for private or self-hosted ones.
+#[tauri::command]
+async fn pull_requests(
+    app: tauri::AppHandle,
+    path: String,
+    trusted: Vec<String>,
+) -> Result<forge::PrReport, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || forge::report(&path, &trusted, pro::status_in(&dir).pro)).await
+}
+
+#[tauri::command]
+async fn pro_status(app: tauri::AppHandle) -> Result<pro::ProStatus, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || Ok(pro::status_in(&dir))).await
+}
 command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
 // Open a pull request page in the browser (web links only).
 command!(open_url(url: String) -> () => {
@@ -255,6 +310,7 @@ pub fn run() {
             license_install,
             license_remove,
             license_refresh,
+            pro_status,
             update_check,
             update_install,
             ssh_status,

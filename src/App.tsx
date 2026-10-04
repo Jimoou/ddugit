@@ -9,6 +9,8 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
 import { UpdateNotice } from "./components/Update";
+import { ProOffer } from "./components/ProOffer";
+import { refreshPro } from "./pro";
 import { useLicenseRenewal } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
@@ -97,6 +99,7 @@ export default function App() {
     setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" ? 7000 : 3200);
   }, []);
 
+  useEffect(refreshPro, []);
   const remindLicense = useCallback((text: string) => toast("ok", text), [toast]);
   useLicenseRenewal(remindLicense);
 
@@ -360,6 +363,7 @@ export default function App() {
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
       <UpdateNotice onError={(text) => toast("err", text)} />
+      <ProOffer onLicense={() => setSettingsOpen(true)} />
       <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
         {toasts.map((item) => (
           <div key={item.id} className={`toast ${item.kind}`}>

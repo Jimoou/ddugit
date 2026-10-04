@@ -460,6 +460,13 @@ export const demoControls = {
   emptyNext: false,
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
+  /** Free or Pro in the demo (Pro by default, like the trial). Set `window.__ddugitDemoPro` before load to change it. */
+  pro: (((typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoPro) as
+    import("./types").ProStatus | undefined) ?? {
+    pro: true,
+    source: "trial",
+    trialDaysLeft: 12,
+  }) as import("./types").ProStatus,
   /** What the demo's license service answers for a subscription license. */
   subscription: "paid" as "paid" | "lapsed",
   /** Install a demo license (e2e): a monthly subscription that ended yesterday, or a site license. */
@@ -492,6 +499,9 @@ export const demoControls = {
 if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__ddugitDemo = demoControls;
 }
+
+/** What Pro-only commands answer without Pro (`pro::LOCKED`). */
+const PRO_LOCKED = "This is a ddugit Pro feature";
 
 const AUTH_OUTPUT = {
   https: "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
@@ -1024,6 +1034,7 @@ const mockTable: Table = {
   },
 
   backport_ignore({ target, id, ignore }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
     const set = repo.backportIgnored.get(target) ?? new Set<string>();
     if (ignore) set.add(id);
     else set.delete(id);
@@ -1042,6 +1053,7 @@ const mockTable: Table = {
   },
 
   backport_apply({ ids, target }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
     if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
     repo.head = target;
     if (demoControls.emptyNext) {
@@ -1056,6 +1068,7 @@ const mockTable: Table = {
   },
 
   backport_export({ ids, outDir }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
     const name = (id: string, i: number) =>
       `${outDir}/${String(i + 1).padStart(4, "0")}-${(repo.commits.get(id)?.summary ?? id).replace(/\W+/g, "-")}.patch`;
     return delay(res("ok", ids.map(name).join("\n")));
@@ -1223,9 +1236,12 @@ const mockTable: Table = {
         : { ok: false, user: null, output: "git@github.com: Permission denied (publickey)." },
     );
   },
+  pro_status: () => delay(demoControls.pro),
   pull_requests() {
     const token = demoControls.forgeToken;
-    const ok = token === "cli" || token === "keychain";
+    // The demo repository counts as private: without Pro its pull requests stay closed.
+    const locked = !demoControls.pro.pro;
+    const ok = !locked && (token === "cli" || token === "keychain");
     const tip = (b: string) => repo.branches.get(b)!;
     const prs: PullRequest[] = ok
       ? [
@@ -1283,6 +1299,7 @@ const mockTable: Table = {
           token: token === "unauthorized" ? ("keychain" as const) : token,
           public: true,
           unauthorized: token === "unauthorized",
+          locked,
           error: null,
         },
       ],
