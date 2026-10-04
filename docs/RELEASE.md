@@ -76,6 +76,8 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 
 Tauri가 서명과 공증(notarytool)을 함께 한다. 그러면 첫 실행 때 Gatekeeper 경고가 사라진다.
 
+`release.yml`은 빌드 전에 `.p12`를 OpenSSL로 열어 본다. 암호가 틀렸거나 값이 잘렸거나, 서명 이름이 인증서 이름과 다르면 어느 Secret인지 오류로 알려 준다. 그다음 macOS `security`가 읽는 형식(SHA-1 MAC·3DES)으로 다시 묶는다. OpenSSL 3 기본 형식은 암호가 맞아도 `MAC verification failed (wrong password?)`로 실패하기 때문이다(2026-10-04 첫 서명 빌드에서 겪음). 빌드가 끝나면 dmg를 열어 안의 앱을 `codesign`·`spctl`·`stapler`로 확인한다.
+
 #### Mac 없이 인증서 만들기 (openssl)
 
 Xcode·키체인 없이도 된다. 개인키는 내 컴퓨터에서만 만들고 저장소·채팅에 올리지 않는다.

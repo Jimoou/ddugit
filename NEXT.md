@@ -11,7 +11,7 @@ _마지막 갱신: 2026-10-02_
 
 ## 지금 하는 일
 
-macOS 서명·공증 확인. 사용자가 Apple Secrets 6개를 넣었다(2026-10-04). main에서 Release를 `release: false`로 돌려 서명 테스트 중(run 37180693297). 통과하면 이 브랜치의 v0.5.3 버전 올림 + `release.yml`의 "Verify macOS signature" 단계로 PR → all_os → merge → Release(`release: true`). 실패하면 macOS 잡 로그로 원인(.p12 암호, 서명 이름, 앱 암호)을 찾는다.
+v0.5.3 PR(첫 서명 릴리스: #80·#81·#82 + 서명 단계) → all_os → merge → Release(`release: true`) → `ddugit v0.5.3` 초안. macOS 서명·공증은 브랜치 테스트에서 이미 확인(공증 Accepted, 스테이플, dmg 안 앱 검증 통과).
 
 ## 결정 (2026-10-04)
 
