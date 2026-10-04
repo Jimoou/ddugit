@@ -86,6 +86,8 @@ export const en: Record<Key, string> = {
   "settings.language": "Language",
   "settings.language.system": "Follow system",
   "settings.sparkle": "Sparkle effects (light flowing along lines, bursts on new commits)",
+  "settings.space": "Space backdrop (nebulae and stars behind the graph and home screen; off is plain)",
+  "settings.glow": "Glow (neon halo around lines, commits and [+])",
   "settings.confirmRemote": "Ask before",
   "license.title": "License",
   "license.free":

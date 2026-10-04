@@ -1,6 +1,6 @@
 import { stashTitle } from "../format";
 import { inlineBadges, placeBadges, type PlacedGroup } from "./labels";
-import { drawSpace } from "./space";
+import { drawSpace, PLAIN_SKY } from "./space";
 import type { Run } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
@@ -65,6 +65,10 @@ export interface DrawState {
   dpr: number;
   time: number;
   animate: boolean;
+  /** Galaxy behind the graph (off: a plain dark fill). */
+  space: boolean;
+  /** Glow around edges, commits and the [+] node (off: the lines alone). */
+  glow: boolean;
   headId: string | null;
   headBranch: string | null;
   plus: Pt;
@@ -253,7 +257,11 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   // --- background: galaxy ---------------------------------------------------
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawSpace(ctx, w, h, view, time, s.animate);
+  if (s.space) drawSpace(ctx, w, h, view, time, s.animate);
+  else {
+    ctx.fillStyle = PLAIN_SKY;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // Visible world rect (with margin).
   const m = 40 / k;
@@ -278,7 +286,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const visible = scene.edges.filter((e) => e.maxX >= vx0 && e.minX <= vx1 && e.maxY >= vy0 && e.minY <= vy1);
 
   ctx.globalCompositeOperation = "lighter";
-  for (const e of visible) {
+  for (const e of s.glow ? visible : []) {
     const c = NEON[e.edge.color];
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = alpha(c, d ? 0.03 : 0.16);
@@ -410,7 +418,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     }
     const rr = r * scale;
 
-    if (!d && k > ZOOM.dots) {
+    if (s.glow && !d && k > ZOOM.dots) {
       ctx.globalCompositeOperation = "lighter";
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rr * 3.2);
       g.addColorStop(0, alpha(c, 0.45));
@@ -509,13 +517,15 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.quadraticCurveTo(p.x, b.y, p.x, p.y);
     ctx.stroke();
     ctx.restore();
-    ctx.globalCompositeOperation = "lighter";
-    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sr * 3);
-    g.addColorStop(0, alpha(c, on ? 0.6 : 0.35));
-    g.addColorStop(1, alpha(c, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(p.x - sr * 3, p.y - sr * 3, sr * 6, sr * 6);
-    ctx.globalCompositeOperation = "source-over";
+    if (s.glow) {
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sr * 3);
+      g.addColorStop(0, alpha(c, on ? 0.6 : 0.35));
+      g.addColorStop(1, alpha(c, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - sr * 3, p.y - sr * 3, sr * 6, sr * 6);
+      ctx.globalCompositeOperation = "source-over";
+    }
     ctx.beginPath();
     ctx.moveTo(p.x, p.y - sr);
     ctx.lineTo(p.x + sr, p.y);
@@ -706,15 +716,17 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const pr = Math.max(9, Math.min(15, 12 * k));
     const c = inNode ? ALERT : headNode ? NEON[headNode.color] : NEON[0];
     const pulse = s.animate && s.changeCount ? (Math.sin(time * 4) + 1) / 2 : 0;
-    ctx.globalCompositeOperation = "lighter";
-    const g = ctx.createRadialGradient(plusS.x, plusS.y, 0, plusS.x, plusS.y, pr * (2.4 + pulse));
-    g.addColorStop(0, alpha(c, s.plusHover ? 0.55 : 0.3));
-    g.addColorStop(1, alpha(c, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(plusS.x, plusS.y, pr * (2.4 + pulse), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalCompositeOperation = "source-over";
+    if (s.glow) {
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(plusS.x, plusS.y, 0, plusS.x, plusS.y, pr * (2.4 + pulse));
+      g.addColorStop(0, alpha(c, s.plusHover ? 0.55 : 0.3));
+      g.addColorStop(1, alpha(c, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(plusS.x, plusS.y, pr * (2.4 + pulse), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+    }
 
     ctx.beginPath();
     ctx.arc(plusS.x, plusS.y, pr, 0, Math.PI * 2);

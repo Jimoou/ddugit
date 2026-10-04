@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { drawSpace } from "../graph/space";
+import { drawSpace, PLAIN_SKY } from "../graph/space";
 import { planetLook } from "../planet";
 
 /** Keep a canvas the size of its box (device pixels) and draw `paint` on it every frame. */
@@ -31,10 +31,15 @@ function useCanvasLoop(paint: (ctx: CanvasRenderingContext2D, w: number, h: numb
   return ref;
 }
 
-/** The same galaxy as the branch map, behind the new-tab screen, drifting slowly. */
-export function SpaceBackdrop({ animate }: { animate: boolean }) {
+/** The same galaxy as the branch map, behind the home screen, drifting slowly (plain when `space` is off). */
+export function SpaceBackdrop({ animate, space }: { animate: boolean; space: boolean }) {
   const t0 = useRef<number | null>(null);
   const ref = useCanvasLoop((ctx, w, h, time) => {
+    if (!space) {
+      ctx.fillStyle = PLAIN_SKY;
+      ctx.fillRect(0, 0, w, h);
+      return;
+    }
     t0.current ??= time;
     const drift = animate ? (time - t0.current) * 6 : 0;
     drawSpace(ctx, w, h, { k: 1, tx: -drift, ty: 0, r: 0 }, time, animate);

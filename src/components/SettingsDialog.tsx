@@ -77,6 +77,14 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
             />
             {t("settings.sparkle")}
           </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.space} onChange={(e) => onChange({ space: e.target.checked })} />
+            {t("settings.space")}
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.glow} onChange={(e) => onChange({ glow: e.target.checked })} />
+            {t("settings.glow")}
+          </label>
           <div className="field confirm-remote">
             {t("settings.confirmRemote")}
             {(["fetch", "pull", "push"] as const).map((op) => (

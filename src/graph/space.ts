@@ -171,6 +171,9 @@ export function skyAngle(time: number, animate: boolean): number {
 }
 
 /** Paint the sky in CSS pixels (the caller has set the device-pixel transform). */
+/** The backdrop with the galaxy turned off: the space gradient's dark end, flat. */
+export const PLAIN_SKY = "#05040e";
+
 export function drawSpace(
   ctx: CanvasRenderingContext2D,
   w: number,

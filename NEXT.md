@@ -7,11 +7,17 @@ _마지막 갱신: 2026-10-02_
 
 ## 방금 끝난 것
 
-- 창 제목 표시줄을 탭 줄로(#81). 첫 화면 이름 '내 저장소'.
+- v0.5.3 초안(첫 서명 macOS 빌드, #83). Release run 37183507428 통과: 인증서 확인 → 서명 → 공증 Accepted → 스테이플 → dmg 안 앱 검증. #80·#81·#82 포함. Windows는 미서명.
 
 ## 지금 하는 일
 
-v0.5.3 PR(첫 서명 릴리스: #80·#81·#82 + 서명 단계) → all_os → merge → Release(`release: true`) → `ddugit v0.5.3` 초안. macOS 서명·공증은 브랜치 테스트에서 이미 확인(공증 Accepted, 스테이플, dmg 안 앱 검증 통과).
+사용자 요청(2026-10-04): M4 마무리 + 설정 토글. PR 하나씩.
+
+1. 설정: 우주 배경·빛 번짐 끄기 (이 PR)
+2. M4: 닫힌·병합된 PR 보기
+3. M4: 병합이 섞인 구간 정리(`--rebase-merges`)
+
+Windows 서명: 사용자에게 Certum Code Signing in the Cloud(개인, 약 $139/년) 추천, 대안 SSL.com IV+eSigner(약 $310/년). Azure Artifact Signing은 개인이면 미국·캐나다만. 인증서를 받으면 SimplySign TOTP 시드로 CI 서명(비공식 도구: jay0lee/certum-cloud-code-sign 또는 ssign).
 
 ## 결정 (2026-10-04)
 

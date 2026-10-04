@@ -283,6 +283,13 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
 
   await dialog.getByLabel(/반짝임 효과/).uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).animate)).toBe(false);
+  // The space backdrop and the glow switch off on their own (the graph keeps drawing).
+  await dialog.getByLabel(/우주 배경/).uncheck();
+  await dialog.getByLabel(/빛 번짐/).uncheck();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!))).toMatchObject({
+    space: false,
+    glow: false,
+  });
 
   const git = dialog.getByPlaceholder("비워 두면 PATH의 git");
   await git.fill("/usr/bin/nope");
