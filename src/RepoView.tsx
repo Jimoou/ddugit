@@ -44,7 +44,11 @@ import { Rich } from "./i18n/Rich";
 import type { Drag, NodeBadge, Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
 import { TransferDialog } from "./components/Transfer";
+import { StackSection } from "./components/Stacks";
+import { offerPro, proOpen, usePro } from "./pro";
 import type {
+  StackBranch,
+  StackOp,
   BisectState,
   CommitEdit,
   CommitInfo,
@@ -177,6 +181,11 @@ export function RepoView({
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
   const [composer, setComposer] = useState<false | { amend: boolean }>(false);
   const [menu, setMenu] = useState<{ x: number; y: number; title?: string; items: MenuItem[] } | null>(null);
+  // Where the last menu opened, for a follow-up menu in the same spot (picking a stack parent).
+  const menuAt = useRef({ x: 0, y: 0 });
+  useEffect(() => {
+    if (menu) menuAt.current = { x: menu.x, y: menu.y };
+  }, [menu]);
   const [nameReq, setNameReq] = useState<NameRequest | null>(null);
   const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
   const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
@@ -208,6 +217,8 @@ export function RepoView({
   /** Git LFS, read apart from the snapshot (it runs `git lfs`). */
   const [lfs, setLfs] = useState<LfsStatus | null>(null);
   const [lfsTick, setLfsTick] = useState(0);
+  const [stacks, setStacks] = useState<StackBranch[]>([]);
+  const pro = proOpen(usePro());
   /** Adding a worktree, maybe for a branch picked from its menu. */
   const [worktreeReq, setWorktreeReq] = useState<{ branch?: string } | null>(null);
   /** Preview card: the commit the pointer has rested on, where its star was then. */
@@ -882,6 +893,88 @@ export function RepoView({
     };
   }, [path, active, lfsKey]);
 
+  // Re-read stacks whenever a local branch moves (commits, amends, restacks, renames).
+  const stackKey = (snap?.refs ?? [])
+    .filter((r) => r.kind === "local")
+    .map((r) => `${r.name}@${r.target}`)
+    .join(" ");
+  const [stackTick, setStackTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    api.stackList(path).then(
+      (list) => live && setStacks(list),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [path, active, stackKey, stackTick]);
+
+  const stackRun = async (label: string, op: StackOp) => {
+    await run(label, () => api.stackOp(path, op));
+    setStackTick((n) => n + 1);
+  };
+
+  /** Branch menu entries for stacks: build on this one, move it, take it out. */
+  const stackItems = (name: string): MenuItem[] => {
+    const stacked = stacks.find((s) => s.name === name);
+    const locked = (go: () => void) => () => (pro ? go() : offerPro("stack"));
+    const others = (snap?.refs ?? []).filter(
+      (r) => r.kind === "local" && r.name !== name && r.name !== stacked?.parent,
+    );
+    return [
+      {
+        label: t("menu.stackOn"),
+        icon: "stack",
+        onSelect: locked(() =>
+          setNameReq({
+            title: t("stack.new.title", { parent: name }),
+            placeholder: `${name}-2`,
+            confirmLabel: t("stack.new.go"),
+            onSubmit: (child) => {
+              setNameReq(null);
+              void stackRun(t("stack.created", { name: child, parent: name }), {
+                kind: "create",
+                name: child,
+                parent: name,
+              });
+            },
+          }),
+        ),
+      },
+      {
+        label: t("menu.stackParent"),
+        disabled: !others.length,
+        onSelect: locked(() =>
+          setMenu({
+            x: menuAt.current.x,
+            y: menuAt.current.y,
+            title: t("stack.pickParent", { name }),
+            items: others.map((r) => ({
+              label: r.name,
+              icon: "branch" as const,
+              onSelect: () =>
+                void stackRun(t("stack.parentSet", { name, parent: r.name }), {
+                  kind: "setParent",
+                  branch: name,
+                  parent: r.name,
+                }),
+            })),
+          }),
+        ),
+      },
+      ...(stacked
+        ? [
+            {
+              label: t("menu.stackRemove"),
+              onSelect: () => void stackRun(t("stack.removed", { name }), { kind: "remove", branch: name }),
+            },
+          ]
+        : []),
+    ];
+  };
+
   const lfsRun = async (label: string, op: LfsOp) => {
     const r = await run(label, () => api.lfs(path, op));
     if (r.status === "auth") toast("err", t("lfs.auth"));
@@ -1300,6 +1393,8 @@ export function RepoView({
       merge,
       compare,
       "separator",
+      ...stackItems(r.name),
+      "separator",
       {
         label: t("menu.rename"),
         onSelect: () =>
@@ -1691,6 +1786,20 @@ export function RepoView({
           elsewhere={elsewhere}
           extra={
             <>
+              <StackSection
+                stacks={stacks}
+                head={snap.head.branch}
+                busy={busy}
+                onRestack={(branch) => void stackRun(t("stack.restacked"), { kind: "restack", branch })}
+                onShow={(name) => {
+                  const tip = snap.refs.find((r) => r.kind === "local" && r.name === name)?.target;
+                  if (tip) graph.current?.centerOn(tip);
+                }}
+                onMenu={(name, x, y) => {
+                  const r = snap.refs.find((x) => x.kind === "local" && x.name === name);
+                  if (r) setMenu({ x, y, title: name, items: refMenu(r) });
+                }}
+              />
               <PullSection
                 report={pulls}
                 onShow={showPr}

@@ -395,6 +395,23 @@ export interface BundleCheck {
   heads: { name: string; id: string }[];
   missing: string[];
 }
+/** A stacked branch (`git/stack.rs`): built on `parent`, restacked when it moves. */
+export interface StackBranch {
+  name: string;
+  parent: string;
+  /** The parent branch is gone (merged and deleted). */
+  parentMissing: boolean;
+  /** The parent moved on: its tip isn't in this branch's history. */
+  behind: boolean;
+  /** Commits of its own, on top of the parent. */
+  own: number;
+}
+/** Mirrors `StackOp` in git/stack.rs. */
+export type StackOp =
+  | { kind: "create"; name: string; parent: string }
+  | { kind: "setParent"; branch: string; parent: string }
+  | { kind: "remove"; branch: string }
+  | { kind: "restack"; branch: string };
 /** Free or Pro, and why (`pro.rs`). */
 export interface ProStatus {
   pro: boolean;

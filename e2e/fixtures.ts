@@ -8,6 +8,7 @@ interface DemoWindow {
     forgeToken: "cli" | "keychain" | "none" | "unauthorized";
     snapshot(): RepoSnapshot;
     grow(n: number): void;
+    commitOn(branch: string, summary: string): void;
     subscription: "paid" | "lapsed";
     setLicense(kind: "lapsedMonthly" | "site" | null): void;
   };

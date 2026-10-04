@@ -495,9 +495,67 @@ export const demoControls = {
   grow(n: number) {
     for (let i = 0; i < n; i++) repo.add(repo.head, `Step ${i + 1} of ${n}`);
   },
+  /** A new commit on `branch` (e.g. the bottom of a stack moving on). */
+  commitOn(branch: string, summary: string) {
+    repo.add(branch, summary);
+  },
 };
 if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__ddugitDemo = demoControls;
+}
+
+/** Stacked branches in the demo: branch → parent and the parent's tip it was last built on. */
+const demoStacks = new Map<string, { parent: string; base: string }>();
+
+function demoStackList(): import("./types").StackBranch[] {
+  return [...demoStacks]
+    .filter(([name]) => repo.branches.has(name))
+    .map(([name, s]) => {
+      const parentTip = repo.branches.get(s.parent);
+      const mine = repo.ancestors(repo.branches.get(name)!);
+      const below = repo.ancestors(parentTip ?? s.base);
+      return {
+        name,
+        parent: s.parent,
+        parentMissing: !parentTip,
+        behind: !!parentTip && !mine.has(parentTip),
+        own: [...mine].filter((id) => !below.has(id)).length,
+      };
+    });
+}
+
+/** Rebuild the stack `branch` is in, bottom up: each branch's own commits replayed onto its parent. */
+function demoRestack(branch: string): OpResult | string {
+  let root = branch;
+  const seen = new Set([root]);
+  for (let p = demoStacks.get(root)?.parent; p && demoStacks.has(p) && !seen.has(p); p = demoStacks.get(p)?.parent) {
+    root = p;
+    seen.add(p);
+  }
+  const order = [root];
+  for (let i = 0; i < order.length; i++)
+    for (const [b, s] of demoStacks) if (s.parent === order[i] && !order.includes(b)) order.push(b);
+  let moved = 0;
+  for (const b of order) {
+    const s = demoStacks.get(b)!;
+    const parentTip = repo.branches.get(s.parent);
+    if (!parentTip) return `'${b}' sits on '${s.parent}', which no longer exists: pick a new parent`;
+    const tip = repo.branches.get(b)!;
+    if (!repo.ancestors(tip).has(parentTip)) {
+      const below = repo.ancestors(s.base);
+      const own: string[] = [];
+      for (let c: string | undefined = tip; c && !below.has(c); c = repo.commits.get(c)?.parents[0]) own.unshift(c);
+      let at = parentTip;
+      for (const id of own) {
+        const c = repo.commits.get(id)!;
+        at = repo.commit([at], c.summary, c.author);
+      }
+      repo.branches.set(b, at);
+      moved++;
+    }
+    s.base = parentTip;
+  }
+  return res("ok", moved ? "" : "Already up to date");
 }
 
 /** What the demo has sent to each destination (`transfer_history`). */
@@ -702,6 +760,10 @@ const mockTable: Table = {
         repo.branches.delete(op.from);
         repo.branches.set(op.to, id);
         if (repo.head === op.from) repo.head = op.to;
+        const stacked = demoStacks.get(op.from);
+        demoStacks.delete(op.from);
+        if (stacked) demoStacks.set(op.to, stacked);
+        for (const s of demoStacks.values()) if (s.parent === op.from) s.parent = op.to;
         return delay(res("ok"));
       }
       case "deleteBranch": {
@@ -1240,6 +1302,39 @@ const mockTable: Table = {
     );
   },
   pro_status: () => delay(demoControls.pro),
+  stack_list: () => delay(demoStackList()),
+  stack_op({ op }) {
+    if (op.kind !== "remove" && !demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
+    switch (op.kind) {
+      case "create": {
+        const at = repo.branches.get(op.parent);
+        if (!at) return fail(`No local branch '${op.parent}'`);
+        if (repo.branches.has(op.name)) return fail(`Branch '${op.name}' already exists`);
+        repo.branches.set(op.name, at);
+        repo.head = op.name;
+        demoStacks.set(op.name, { parent: op.parent, base: at });
+        return delay(res("ok"));
+      }
+      case "setParent": {
+        for (let p: string | undefined = op.parent; p; p = demoStacks.get(p)?.parent)
+          if (p === op.branch) return fail(`'${op.parent}' is stacked on '${op.branch}'`);
+        const mine = repo.ancestors(repo.branches.get(op.branch)!);
+        const below = repo.ancestors(repo.branches.get(op.parent)!);
+        const old = demoStacks.get(op.branch)?.base;
+        // Off a vanished parent: keep the old base; otherwise the fork point.
+        const base = old && mine.has(old) ? old : repo.order.find((id) => mine.has(id) && below.has(id))!;
+        demoStacks.set(op.branch, { parent: op.parent, base });
+        return delay(res("ok"));
+      }
+      case "remove":
+        demoStacks.delete(op.branch);
+        return delay(res("ok"));
+      case "restack": {
+        const r = demoRestack(op.branch);
+        return typeof r === "string" ? fail(r) : delay(r);
+      }
+    }
+  },
   transfer_history: () => delay([...demoTransfers]),
   transfer_export({ req }) {
     if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
