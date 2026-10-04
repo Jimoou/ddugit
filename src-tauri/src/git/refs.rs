@@ -145,6 +145,9 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
     };
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     let o = git(&dir, &argv)?;
+    if let (RefOp::RenameBranch { from, to }, true) = (op, o.ok) {
+        super::stack::renamed(&dir, from, to);
+    }
     if let RefOp::AddRemote {
         name,
         fetch_only: true,

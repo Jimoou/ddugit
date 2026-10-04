@@ -1365,3 +1365,46 @@ test("on Free, air-gapped transfer offers Pro", async ({ demo }) => {
   await dialog.getByRole("button", { name: /폴더 고르고 반출/ }).click();
   await expect(page.locator(".dialog.pro-offer")).toContainText("폐쇄망");
 });
+
+test("a stacked branch falls behind when the branch below moves, and restacking puts it back on top", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=이 브랜치 위에 새 브랜치 쌓기");
+  await page.locator(".dialog input.text").fill("feature/theme-ui");
+  await page.keyboard.press("Enter");
+  await demo.toast("feature/theme-ui을(를) feature/theme 위에 쌓았어요");
+
+  const stacks = page.locator(".sidebar section.stacks");
+  const row = stacks.locator("li", { hasText: "feature/theme-ui" });
+  await expect(stacks.locator(".stack-base")).toContainText("feature/theme");
+  await demo.mutate((d) => d.grow(1));
+  await expect(row).toContainText("커밋 1개");
+
+  // The branch below gets a new commit: the one on top no longer has it.
+  await demo.mutate((d) => d.commitOn("feature/theme", "Theme fix"));
+  await expect(row).toContainText("다시 쌓기 필요");
+  await stacks.getByRole("button", { name: "다시 쌓기" }).click();
+  await demo.toast("스택을 다시 쌓았어요");
+  await expect(row).toContainText("커밋 1개");
+  const s = await demo.snapshot();
+  const tip = (name: string) => s.refs.find((r) => r.kind === "local" && r.name === name)!.target;
+  expect(s.commits.find((c) => c.id === tip("feature/theme-ui"))!.parents).toEqual([tip("feature/theme")]);
+
+  // Taking it out of the stack leaves the branch alone.
+  await row.click({ button: "right" });
+  await page.click(".context-menu >> text=스택에서 빼기");
+  await expect(stacks).toHaveCount(0);
+});
+
+test("on Free, stacking a branch offers Pro", async ({ demo }) => {
+  const { page } = demo;
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+  });
+  await page.reload();
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=이 브랜치 위에 새 브랜치 쌓기");
+  await expect(page.locator(".dialog.pro-offer")).toContainText("스택 브랜치");
+});

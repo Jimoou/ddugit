@@ -50,6 +50,7 @@ export const ICONS = {
   more: "M5 12h.01M12 12h.01M19 12h.01",
   /** A sealed package: a transfer bundle for an air-gapped network. */
   bundle: "M3 7.5 12 3l9 4.5v9L12 21l-9-4.5zM3 7.5 12 12l9-4.5M12 12v9",
+  stack: "M12 3 3 7.5l9 4.5 9-4.5zM3 12l9 4.5 9-4.5M3 16.5 12 21l9-4.5",
   backport: "M6 3v18M18 3v8a4 4 0 0 1-4 4H6M10 11l-4 4 4 4",
 } as const;
 

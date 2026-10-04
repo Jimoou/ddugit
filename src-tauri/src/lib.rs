@@ -100,6 +100,19 @@ async fn transfer_import(
     .await
 }
 
+// Stacked branches: seeing them and taking a branch out are Free, building and restacking are Pro.
+command!(stack_list(path: String) -> Vec<git::stack::StackBranch> => git::stack::list(&path));
+#[tauri::command]
+async fn stack_op(app: tauri::AppHandle, path: String, op: git::stack::StackOp) -> Result<OpResult, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        if !matches!(op, git::stack::StackOp::Remove { .. }) {
+            pro::require(&dir)?;
+        }
+        git::stack::apply(&path, &op)
+    })
+    .await
+}
 command!(transfer_check(path: String, file: String) -> git::transfer::BundleCheck => git::transfer::check(&path, &file));
 command!(transfer_history(path: String) -> Vec<git::transfer::Sent> => git::transfer::history(&path));
 
@@ -348,6 +361,8 @@ pub fn run() {
             transfer_import,
             transfer_check,
             transfer_history,
+            stack_list,
+            stack_op,
             update_check,
             update_install,
             ssh_status,

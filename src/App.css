@@ -4169,3 +4169,51 @@ button.demo-pill {
   margin: 6px 0 0;
   padding-left: 18px;
 }
+
+/* Stacked branches (components/Stacks.tsx). */
+.sidebar .stacks .stack-base {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 24px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sidebar .stacks .stack-restack {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 11px;
+}
+.sidebar .stacks .stack-restack.lit {
+  border-color: rgba(var(--signal), 0.6);
+  color: rgb(var(--signal));
+}
+.sidebar .stacks li {
+  gap: 6px;
+  color: var(--text-2);
+}
+.sidebar .stacks li.head .name {
+  color: var(--text);
+  font-weight: 600;
+}
+.sidebar .stacks .stack-tick {
+  color: var(--muted);
+  opacity: 0.6;
+}
+.sidebar .stacks .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar .stacks .stack-flag,
+.sidebar .stacks li .small {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+}
+.sidebar .stacks .stack-flag {
+  color: rgb(var(--signal));
+}
+.sidebar .stacks .stack-flag.warn {
+  color: var(--amber);
+}

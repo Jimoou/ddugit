@@ -21,6 +21,8 @@ import type {
   BundleCheck,
   TransferExport,
   TransferSent,
+  StackBranch,
+  StackOp,
   UpdateInfo,
   OpResult,
   PickOp,
@@ -101,6 +103,8 @@ export interface Commands {
   transfer_import: [{ path: string; file: string; name: string }, OpResult];
   transfer_check: [{ path: string; file: string }, BundleCheck];
   transfer_history: [{ path: string }, TransferSent[]];
+  stack_list: [{ path: string }, StackBranch[]];
+  stack_op: [{ path: string; op: StackOp }, OpResult];
   update_check: [Record<string, never>, UpdateInfo | null];
   update_install: [Record<string, never>, null];
   ssh_keygen: [{ comment: string }, SshKey];
@@ -227,6 +231,9 @@ export const api = {
   transferImport: (path: string, file: string, name: string) => call("transfer_import", { path, file, name }),
   transferCheck: (path: string, file: string) => call("transfer_check", { path, file }),
   transferHistory: (path: string) => call("transfer_history", { path }),
+  stackList: (path: string) => call("stack_list", { path }),
+  /** Build a stack, move a branch in it, take one out, or restack (all but taking out are Pro). */
+  stackOp: (path: string, op: StackOp) => call("stack_op", { path, op }),
   /** A newer version in the download storage (release builds only; otherwise `null`). */
   updateCheck: () => call("update_check", {}),
   /** Download, verify and install the newest version, then restart into it. */
