@@ -3534,6 +3534,25 @@ kbd {
 .pulls .chip.review.changes {
   color: var(--amber);
 }
+/* Merged (violet, like GitHub) and closed (grey) pull requests, dimmed beside the open ones. */
+.pulls .pr-ci.merged {
+  background: #a371f7;
+  opacity: 1;
+}
+.pulls .pr-ci.closed {
+  background: var(--muted);
+  opacity: 0.8;
+}
+.pulls li.merged .name,
+.pulls li.closed .name {
+  color: var(--text-2);
+}
+.pulls .chip.pr-state.merged {
+  color: #a371f7;
+}
+.pulls .chip.pr-state.closed {
+  color: var(--muted);
+}
 
 /* ------------------------------------------------- tutorial: the voyage log */
 .voyage {

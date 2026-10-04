@@ -13,8 +13,8 @@ _마지막 갱신: 2026-10-02_
 
 사용자 요청(2026-10-04): M4 마무리 + 설정 토글. PR 하나씩.
 
-1. 설정: 우주 배경·빛 번짐 끄기 (이 PR)
-2. M4: 닫힌·병합된 PR 보기
+1. 설정: 우주 배경·빛 번짐 끄기 (#84 merge)
+2. M4: 닫힌·병합된 PR 보기 (이 PR)
 3. M4: 병합이 섞인 구간 정리(`--rebase-merges`)
 
 Windows 서명: 사용자에게 Certum Code Signing in the Cloud(개인, 약 $139/년) 추천, 대안 SSL.com IV+eSigner(약 $310/년). Azure Artifact Signing은 개인이면 미국·캐나다만. 인증서를 받으면 SimplySign TOTP 시드로 CI 서명(비공식 도구: jay0lee/certum-cloud-code-sign 또는 ssign).

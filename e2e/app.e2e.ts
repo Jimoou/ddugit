@@ -128,8 +128,8 @@ test("adds the original project as a remote and lists its fixes to backport", as
   await expect(page.locator(".job-card")).toHaveCount(0);
 
   // Two remotes now: a fold per remote, branches without the prefix.
-  const upstream = page.locator(".sidebar section.sub").filter({ hasText: "upstream" });
-  await expect(page.locator(".sidebar section.sub")).toHaveCount(2);
+  const upstream = page.locator(".sidebar section.remote-sub").filter({ hasText: "upstream" });
+  await expect(page.locator(".sidebar section.remote-sub")).toHaveCount(2);
   await expect(upstream.locator("li")).toHaveText(["main"]);
   await upstream.locator("li").click({ button: "right" });
   await page.click(".context-menu >> text=에 없는 커밋 보기");
@@ -801,17 +801,24 @@ test("cherry-picks a commit from its menu and a comet carries the copy over", as
 test("lists open pull requests, checks one out, and connects or forgets a forge token", async ({ demo }) => {
   const { page } = demo;
   const section = page.locator(".sidebar .pulls");
+  const open = section.locator(":scope > ul > li");
   // `gh` is logged in (demo): open PRs show without asking, and there is no token to manage.
-  await expect(section.locator("li")).toHaveCount(2);
-  await expect(section.locator("li").nth(0)).toContainText("#12");
-  await expect(section.locator("li").nth(1)).toContainText("초안");
+  await expect(open).toHaveCount(2);
+  await expect(open.nth(0)).toContainText("#12");
+  await expect(open.nth(1)).toContainText("초안");
   // CI and review state ride along: #12 passed and is approved, #15 failed.
-  await expect(section.locator("li").nth(0).locator(".pr-ci")).toHaveClass(/success/);
-  await expect(section.locator("li").nth(0)).toContainText("승인");
-  await expect(section.locator("li").nth(1).locator(".pr-ci")).toHaveClass(/failure/);
+  await expect(open.nth(0).locator(".pr-ci")).toHaveClass(/success/);
+  await expect(open.nth(0)).toContainText("승인");
+  await expect(open.nth(1).locator(".pr-ci")).toHaveClass(/failure/);
   await expect(section.getByRole("button", { name: "토큰 관리" })).toHaveCount(0);
+  // Merged and closed ones sit in their own fold, with no label on the graph.
+  const done = section.locator("section.sub");
+  await expect(done).toContainText("닫힘·병합");
+  await expect(done.locator("li")).toHaveCount(2);
+  await expect(done.locator("li").nth(0)).toContainText("병합됨");
+  await expect(done.locator("li").nth(1)).toContainText("닫힘");
 
-  await section.locator("li").nth(0).click({ button: "right" });
+  await open.nth(0).click({ button: "right" });
   await page.click(".context-menu >> text=feature/theme 브랜치 체크아웃");
   await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
 
@@ -819,13 +826,13 @@ test("lists open pull requests, checks one out, and connects or forgets a forge 
   await demo.mutate((d) => (d.forgeToken = "none"));
   await page.getByRole("button", { name: /Fetch/ }).click(); // remote work re-reads pull requests
   await expect(section).toContainText("GitHub에 연결하면");
-  await expect(section.locator("li")).toHaveCount(0);
+  await expect(open).toHaveCount(0);
   await section.getByRole("button", { name: "GitHub 연결" }).click();
   const dialog = page.getByRole("dialog", { name: "GitHub 연결" });
   await dialog.getByLabel("토큰").fill("ghp_demo");
   await dialog.getByLabel("토큰").press("Enter");
   await demo.toast("GitHub에 연결했어요");
-  await expect(section.locator("li")).toHaveCount(2);
+  await expect(open).toHaveCount(2);
 
   await section.getByRole("button", { name: "토큰 관리" }).click();
   await dialog.getByRole("button", { name: "저장된 토큰 지우기" }).click();
@@ -993,7 +1000,7 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   await page.getByRole("button", { name: /Fetch/ }).click();
   await demo.toast("원격 커밋을 가져왔어요");
   await page
-    .locator(".app:not([hidden]) .sidebar section.sub")
+    .locator(".app:not([hidden]) .sidebar section.remote-sub")
     .filter({ hasText: "origin" })
     .locator("li")
     .filter({ hasText: /^main$/ })
@@ -1144,7 +1151,7 @@ test("the original project added as a remote is fetch-only: a push offers origin
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
   await demo.toast("upstream은(는) 가져오기 전용으로 추가했어요. 그쪽으로는 보내지 않아요");
-  const upstream = page.locator(".sidebar section.sub").filter({ hasText: "upstream" });
+  const upstream = page.locator(".sidebar section.remote-sub").filter({ hasText: "upstream" });
   await expect(upstream.locator(".fetch-only")).toBeVisible();
 
   // A branch that follows upstream/main.
@@ -1167,12 +1174,12 @@ test("the original project added as a remote is fetch-only: a push offers origin
 
 test("a remote can be disconnected from its menu, even the only one", async ({ demo }) => {
   const { page } = demo;
-  const origin = page.locator(".sidebar section.sub").filter({ hasText: "origin" });
+  const origin = page.locator(".sidebar section.remote-sub").filter({ hasText: "origin" });
   await origin.getByRole("button", { name: "origin 메뉴" }).click();
   await page.getByRole("menuitem", { name: "origin 연결 끊기 (원격 삭제)…" }).click();
   await page.locator(".dialog").getByRole("button", { name: "삭제" }).click();
   await demo.toast("origin 연결을 끊었어요");
-  await expect(page.locator(".sidebar section.sub")).toHaveCount(0);
+  await expect(page.locator(".sidebar section.remote-sub")).toHaveCount(0);
   expect((await demo.snapshot()).remotes).toEqual([]);
 });
 

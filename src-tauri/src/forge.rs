@@ -50,9 +50,29 @@ pub struct PullRequest {
     /// Head commit of the pull request.
     pub sha: String,
     pub author: String,
+    pub state: PrState,
     /// CI on the head commit, if any runs.
     pub checks: Option<Checks>,
     pub review: Option<Review>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PrState {
+    Open,
+    Merged,
+    Closed,
+}
+
+impl PrState {
+    /// GitHub `OPEN` / `MERGED` / `CLOSED`, GitLab `opened` / `merged` / `closed` / `locked`.
+    fn parse(s: &str) -> Self {
+        match s.to_ascii_lowercase().as_str() {
+            "merged" => PrState::Merged,
+            "closed" | "locked" => PrState::Closed,
+            _ => PrState::Open,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
@@ -212,15 +232,21 @@ fn token_for(kind: ForgeKind, host: &str, trusted: &[String]) -> (Option<String>
     }
 }
 
+/// Every open pull request, and the 30 most recently merged or closed ones.
 const GITHUB_QUERY: &str =
     "query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { \
-    pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { \
-    number title url isDraft headRefName headRefOid author { login } reviewDecision \
-    commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
+    open: pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { ...pr } } \
+    done: pullRequests(states: [MERGED, CLOSED], first: 30, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes { ...pr } } } } \
+    fragment pr on PullRequest { number title url isDraft state headRefName headRefOid author { login } reviewDecision \
+    commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }";
 
+/// GitLab takes one state per connection: open, then the latest merged (20) and closed (10).
 const GITLAB_QUERY: &str = "query($path: ID!) { project(fullPath: $path) { \
-    mergeRequests(state: opened, first: 100) { nodes { \
-    iid title webUrl draft sourceBranch diffHeadSha author { username } headPipeline { status } approved } } } }";
+    open: mergeRequests(state: opened, first: 100) { nodes { ...mr } } \
+    merged: mergeRequests(state: merged, first: 20, sort: UPDATED_DESC) { nodes { ...mr } } \
+    closed: mergeRequests(state: closed, first: 10, sort: UPDATED_DESC) { nodes { ...mr } } } } \
+    fragment mr on MergeRequest { iid title webUrl draft state sourceBranch diffHeadSha author { username } \
+    headPipeline { status } approved }";
 
 #[derive(Deserialize)]
 struct Gql<T> {
@@ -236,6 +262,11 @@ struct GqlError {
 struct Nodes<T> {
     nodes: Vec<T>,
 }
+impl<T> Default for Nodes<T> {
+    fn default() -> Self {
+        Nodes { nodes: Vec::new() }
+    }
+}
 #[derive(Deserialize)]
 struct Login {
     #[serde(alias = "username")]
@@ -249,7 +280,9 @@ struct GhData {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GhRepo {
-    pull_requests: Nodes<GhPull>,
+    open: Nodes<GhPull>,
+    #[serde(default)]
+    done: Nodes<GhPull>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -258,6 +291,8 @@ struct GhPull {
     title: String,
     url: String,
     is_draft: bool,
+    #[serde(default)]
+    state: String,
     head_ref_name: String,
     head_ref_oid: String,
     author: Option<Login>,
@@ -286,7 +321,11 @@ struct GlData {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GlProject {
-    merge_requests: Nodes<GlMerge>,
+    open: Nodes<GlMerge>,
+    #[serde(default)]
+    merged: Nodes<GlMerge>,
+    #[serde(default)]
+    closed: Nodes<GlMerge>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -295,6 +334,8 @@ struct GlMerge {
     title: String,
     web_url: String,
     draft: bool,
+    #[serde(default)]
+    state: String,
     source_branch: String,
     diff_head_sha: Option<String>,
     author: Option<Login>,
@@ -367,7 +408,7 @@ fn graphql<T: serde::de::DeserializeOwned>(
     }
 }
 
-fn open_pulls(
+fn pulls(
     endpoint: &str,
     forge: &Forge,
     remote: &str,
@@ -379,11 +420,11 @@ fn open_pulls(
             let (owner, name) = forge.slug.split_once('/').unwrap_or((&forge.slug, ""));
             let vars = serde_json::json!({ "owner": owner, "name": name });
             let data: GhData = graphql(endpoint, token, GITHUB_QUERY, vars)?;
-            data.repository
-                .ok_or_else(not_found)?
-                .pull_requests
+            let repo = data.repository.ok_or_else(not_found)?;
+            repo.open
                 .nodes
                 .into_iter()
+                .chain(repo.done.nodes)
                 .map(|p| PullRequest {
                     remote: remote.to_string(),
                     number: p.number,
@@ -393,6 +434,7 @@ fn open_pulls(
                     branch: p.head_ref_name,
                     sha: p.head_ref_oid,
                     author: p.author.map(|a| a.login).unwrap_or_default(),
+                    state: PrState::parse(&p.state),
                     checks: p
                         .commits
                         .nodes
@@ -406,11 +448,13 @@ fn open_pulls(
         ForgeKind::Gitlab => {
             let vars = serde_json::json!({ "path": forge.slug });
             let data: GlData = graphql(endpoint, token, GITLAB_QUERY, vars)?;
-            data.project
-                .ok_or_else(not_found)?
-                .merge_requests
+            let project = data.project.ok_or_else(not_found)?;
+            project
+                .open
                 .nodes
                 .into_iter()
+                .chain(project.merged.nodes)
+                .chain(project.closed.nodes)
                 .map(|m| PullRequest {
                     remote: remote.to_string(),
                     number: m.iid.parse().unwrap_or(0),
@@ -420,6 +464,7 @@ fn open_pulls(
                     branch: m.source_branch,
                     sha: m.diff_head_sha.unwrap_or_default(),
                     author: m.author.map(|a| a.login).unwrap_or_default(),
+                    state: PrState::parse(&m.state),
                     checks: m.head_pipeline.and_then(|p| checks_of(&p.state)),
                     review: m.approved.then_some(Review::Approved),
                 })
@@ -428,7 +473,8 @@ fn open_pulls(
     })
 }
 
-/// Ask each forge remote (origin first, each project once) for its open pull requests.
+/// Ask each forge remote (origin first, each project once) for its open pull requests
+/// and the recently merged or closed ones.
 /// `trusted` are hosts (besides github.com / gitlab.com) whose `gh` / `glab`
 /// login the user agreed to use.
 pub fn report(path: &str, trusted: &[String]) -> Result<PrReport> {
@@ -467,7 +513,7 @@ pub fn report(path: &str, trusted: &[String]) -> Result<PrReport> {
             error: None,
         };
         if let Some(token) = token {
-            match open_pulls(&graphql_url(forge.kind, &forge.host), &forge, &name, &token) {
+            match pulls(&graphql_url(forge.kind, &forge.host), &forge, &name, &token) {
                 Ok(prs) => report.prs.extend(prs),
                 Err(FetchError::Unauthorized) => status.unauthorized = true,
                 Err(FetchError::Other(e)) => status.error = Some(e),
@@ -594,15 +640,18 @@ mod tests {
 
     #[test]
     fn reads_github_pulls_with_their_checks_and_review() {
-        let body = r#"{"data":{"repository":{"pullRequests":{"nodes":[
-            {"number":7,"title":"Graph zoom","url":"https://github.com/o/r/pull/7","isDraft":true,
+        let body = r#"{"data":{"repository":{"open":{"nodes":[
+            {"number":7,"title":"Graph zoom","url":"https://github.com/o/r/pull/7","isDraft":true,"state":"OPEN",
              "headRefName":"feature/zoom","headRefOid":"abc123","author":{"login":"jimin"},
              "reviewDecision":"APPROVED","commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"FAILURE"}}}]}},
             {"number":8,"title":"Docs","url":"https://github.com/o/r/pull/8","isDraft":false,
              "headRefName":"docs","headRefOid":"def","author":null,"reviewDecision":null,
-             "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}]}}}}"#;
+             "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}]},
+            "done":{"nodes":[{"number":5,"title":"Old","url":"https://github.com/o/r/pull/5","isDraft":false,
+             "state":"MERGED","headRefName":"old","headRefOid":"0ld","author":null,"reviewDecision":null,
+             "commits":{"nodes":[]}}]}}}}"#;
         let (url, server) = serve_once("200 OK", body);
-        let prs = match open_pulls(&url, &gh("o/r").unwrap(), "origin", "t0ken") {
+        let prs = match pulls(&url, &gh("o/r").unwrap(), "origin", "t0ken") {
             Ok(p) => p,
             Err(_) => panic!("fetch failed"),
         };
@@ -630,6 +679,7 @@ mod tests {
                 branch: "feature/zoom".into(),
                 sha: "abc123".into(),
                 author: "jimin".into(),
+                state: PrState::Open,
                 checks: Some(Checks::Failure),
                 review: Some(Review::Approved),
             }
@@ -637,6 +687,10 @@ mod tests {
         assert_eq!(
             (prs[1].checks, prs[1].review, prs[1].author.as_str()),
             (None, None, "")
+        );
+        assert_eq!(
+            (prs.len(), prs[2].number, prs[2].state, prs[2].checks),
+            (3, 5, PrState::Merged, None)
         );
     }
 
@@ -647,11 +701,14 @@ mod tests {
             host: "gitlab.com".into(),
             slug: "group/sub/project".into(),
         };
-        let body = r#"{"data":{"project":{"mergeRequests":{"nodes":[{"iid":"3","title":"Fix",
-            "webUrl":"https://gitlab.com/x/-/merge_requests/3","draft":false,"sourceBranch":"fix/x",
-            "diffHeadSha":"def456","author":{"username":"minji"},"headPipeline":{"status":"RUNNING"},"approved":true}]}}}}"#;
+        let body = r#"{"data":{"project":{"open":{"nodes":[{"iid":"3","title":"Fix",
+            "webUrl":"https://gitlab.com/x/-/merge_requests/3","draft":false,"state":"opened","sourceBranch":"fix/x",
+            "diffHeadSha":"def456","author":{"username":"minji"},"headPipeline":{"status":"RUNNING"},"approved":true}]},
+            "merged":{"nodes":[]},
+            "closed":{"nodes":[{"iid":"2","title":"Nope","webUrl":"u","draft":false,"state":"closed",
+            "sourceBranch":"nope","diffHeadSha":null,"author":null,"headPipeline":null}]}}}}"#;
         let (url, server) = serve_once("200 OK", body);
-        let prs = open_pulls(&url, &forge, "origin", "glpat").ok().unwrap();
+        let prs = pulls(&url, &forge, "origin", "glpat").ok().unwrap();
         let request = server.join().unwrap();
         assert!(
             request
@@ -675,18 +732,20 @@ mod tests {
                 Some(Review::Approved)
             )
         );
+        assert_eq!(
+            (prs.len(), prs[0].state, prs[1].number, prs[1].state),
+            (2, PrState::Open, 2, PrState::Closed)
+        );
 
         let (url, server) = serve_once("401 Unauthorized", r#"{"message":"Bad credentials"}"#);
         assert!(matches!(
-            open_pulls(&url, &forge, "origin", "old"),
+            pulls(&url, &forge, "origin", "old"),
             Err(FetchError::Unauthorized)
         ));
         server.join().unwrap();
 
         let (url, server) = serve_once("200 OK", r#"{"data":null,"errors":[{"message":"no access"}]}"#);
-        assert!(
-            matches!(open_pulls(&url, &forge, "origin", "t"), Err(FetchError::Other(m)) if m == "no access")
-        );
+        assert!(matches!(pulls(&url, &forge, "origin", "t"), Err(FetchError::Other(m)) if m == "no access"));
         server.join().unwrap();
     }
 }
