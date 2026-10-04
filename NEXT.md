@@ -13,7 +13,7 @@ _마지막 갱신: 2026-10-04_
 
 ## 지금 하는 일
 
-M15 앱 쪽 PR: 라이선스 `expires`·`plan`, `license_refresh`(ddugit.com/api/license/refresh), 설정 '갱신 확인', 시작할 때 자동 갱신과 만료 안내(막지 않음).
+v0.6.1 릴리스: 버전 올림 PR → CI · Rust all_os → merge → Release(`release: true`). 사용자는 사이트의 v0.6.0(업데이트 기능 포함 빌드)을 설치해 두고, 0.6.1 게시 후 앱에서 업데이트 알림·설치·재시작을 확인한다.
 
 ## 다음 단계
 
