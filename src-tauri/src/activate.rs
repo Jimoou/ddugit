@@ -25,7 +25,8 @@ use crate::license::{self, LicenseStatus};
 
 type Result<T> = std::result::Result<T, String>;
 
-const SITE: &str = "https://ddugit.com";
+/// The website: activation here, problem reports in `report.rs`.
+pub(crate) const SITE: &str = "https://ddugit.com";
 /// How long the browser has to come back.
 const WAIT: Duration = Duration::from_secs(300);
 
@@ -152,16 +153,18 @@ fn redirect(mut stream: TcpStream, to: &str) {
     );
 }
 
-#[derive(Deserialize)]
-struct Reply {
-    license: Option<String>,
+#[derive(Deserialize, Default)]
+pub(crate) struct Reply {
+    pub license: Option<String>,
     #[serde(default)]
-    ok: bool,
-    error: Option<String>,
+    pub ok: bool,
+    pub error: Option<String>,
+    /// A stored problem report's id.
+    pub id: Option<String>,
 }
 
 /// POST `body` to the site; an error status still brings `{ error }` (a short English sentence).
-fn post(path: &str, body: serde_json::Value) -> Result<Reply> {
+pub(crate) fn post(path: &str, body: serde_json::Value) -> Result<Reply> {
     ureq::post(&format!("{SITE}{path}"))
         .config()
         .http_status_as_error(false)

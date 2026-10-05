@@ -1,6 +1,9 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { demoControls, mock } from "./mock";
+import { logError } from "./report";
 import type {
+  AppInfo,
+  NewReport,
   BackportItem,
   BackportTally,
   BisectOp,
@@ -149,6 +152,10 @@ export interface Commands {
   commit_diff: [{ path: string; id: string }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
+  /** `git --version` of the git in use; rejects when it can't run (not installed, not on PATH). */
+  git_version: [Record<string, never>, string];
+  app_info: [Record<string, never>, AppInfo];
+  report_send: [{ report: NewReport }, string];
   git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
   git_rebase_todo: [{ path: string; base: string }, TodoItem[]];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
@@ -161,10 +168,14 @@ export type Command = keyof Commands;
 export type Args<C extends Command> = Commands[C][0];
 export type Ret<C extends Command> = Commands[C][1];
 
+/** Every command; a failure is kept in the session log (problem reports) and passed on. */
 function call<C extends Command>(cmd: C, args: Args<C>): Promise<Ret<C>> {
   const path = (args as { path?: string }).path;
-  if (!isTauri || path === DEMO_PATH) return mock[cmd](args as never) as Promise<Ret<C>>;
-  return invoke(cmd, args);
+  const p = !isTauri || path === DEMO_PATH ? (mock[cmd](args as never) as Promise<Ret<C>>) : invoke<Ret<C>>(cmd, args);
+  return p.catch((e: unknown) => {
+    logError(`cmd:${cmd}`, e);
+    throw e;
+  });
 }
 
 /** A Tauri channel for real repositories, a plain callback object for the demo. */
@@ -319,6 +330,11 @@ export const api = {
   },
   /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
+  gitVersion: () => call("git_version", {}),
+  /** App version, OS and architecture (problem reports). */
+  appInfo: () => call("app_info", {}),
+  /** Send a problem report or question to ddugit.com; resolves with its id, rejects with the reason. */
+  sendReport: (report: NewReport) => call("report_send", { report }),
   /** Rewrite the commits after `base` as `steps` (oldest first) say. */
   rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
   /** git's own plan for a range with merges (`--rebase-merges`), without starting it. */

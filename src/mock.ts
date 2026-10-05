@@ -24,6 +24,7 @@ import type {
   TodoItem,
 } from "./types";
 import { applyPlan } from "./rebasePlan";
+import { version as appVersion } from "../package.json";
 
 /** The demo's SSH state: keys made and hosts trusted in this session. */
 /** Bumped by cancelling, so a pending demo sign-in ends as "Cancelled". */
@@ -589,6 +590,16 @@ export const demoControls = {
   /** A newer version the demo announces (the update notice). Set `window.__ddugitDemoUpdate` before load to see it at startup. */
   update: ((typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoUpdate) ??
     null) as import("./types").UpdateInfo | null,
+  /** git can't be found (the first-run notice). Set `window.__ddugitDemoGitMissing` before load to see it at startup. */
+  gitMissing: !!(
+    typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoGitMissing
+  ),
+  /** Make the next checkout fail with this text, like an unexpected backend error (the toast's Report button). */
+  failNext: null as string | null,
+  /** How the next problem reports fail: the site's rate limit, or no network. */
+  reportFail: null as null | "limited" | "offline",
+  /** Problem reports and questions sent from the demo (e2e reads them). */
+  sent: [] as import("./types").NewReport[],
   /** Current demo state, read synchronously (e2e assertions). */
   snapshot: () => repo.snapshot(),
   /** Append `n` commits to the current branch (long straight runs for the graph). */
@@ -994,6 +1005,11 @@ const mockTable: Table = {
   },
 
   git_checkout({ target }) {
+    const crash = demoControls.failNext;
+    if (crash) {
+      demoControls.failNext = null;
+      return fail(crash);
+    }
     if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
     const elsewhere = repo.worktrees.find((w) => w.branch === target);
     if (elsewhere) return fail(`fatal: '${target}' is already used by worktree at '${elsewhere.path}'`);
@@ -1179,6 +1195,18 @@ const mockTable: Table = {
     if (gitPath && !/git(\.exe)?$/i.test(gitPath)) return fail(`'${gitPath}' is not a git executable`);
     return delay("git version 2.47.0 (demo)");
   },
+  git_version() {
+    if (demoControls.gitMissing) return fail("Can't run 'git': No such file or directory (os error 2)");
+    return delay("git version 2.47.0 (demo)");
+  },
+  report_send({ report }) {
+    demoControls.sent.push(report);
+    if (demoControls.reportFail === "limited") return fail("Too many reports. Try again later.");
+    if (demoControls.reportFail === "offline")
+      return fail("Couldn't reach ddugit.com: io: failed to lookup address information");
+    return delay(`demo-${demoControls.sent.length}`);
+  },
+  app_info: () => delay({ version: `${appVersion}-demo`, os: "demo", osVersion: navigator.platform, arch: "web" }),
 
   git_rebase_todo({ base }) {
     const head = repo.branches.get(repo.head)!;

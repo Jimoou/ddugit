@@ -5,12 +5,13 @@ import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
 import { Icon } from "./Icon";
 import { ProfilesSection } from "./Identity";
+import { AboutSection } from "./Report";
 import { LicenseSection } from "./License";
 import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
 
 /** The settings, one at a time beside a list of them. */
-const SETTINGS_SECTIONS = ["screen", "profiles", "license", "git", "shortcuts"] as const;
+const SETTINGS_SECTIONS = ["screen", "profiles", "license", "git", "shortcuts", "about"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 const SECTION_LABEL: Record<SettingsSection, () => string> = {
@@ -19,6 +20,7 @@ const SECTION_LABEL: Record<SettingsSection, () => string> = {
   license: () => t("license.title"),
   git: () => "Git",
   shortcuts: () => t("settings.shortcuts"),
+  about: () => t("about.title"),
 };
 
 interface Props {
@@ -27,6 +29,8 @@ interface Props {
   /** The section to open at ("?" opens the shortcuts). */
   at: SettingsSection;
   onClose(): void;
+  /** Open the problem report (About). */
+  onReport(): void;
 }
 
 /** Language names are shown in their own language so anyone can find theirs. */
@@ -35,7 +39,7 @@ const LANGUAGE_NAMES = { ko: "한국어", en: "English" } as const;
 const label = (text: string) => (isKey(text) ? t(text) : text);
 
 /** Settings plus the shortcut table (opened with ? or the ⚙ button). */
-export function SettingsDialog({ settings, at, onChange, onClose }: Props) {
+export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Props) {
   const [section, setSection] = useState(at);
   const dialog = useDialog(onClose);
   // Opened at a section on purpose ("?"): its content takes focus, so reading starts there.
@@ -75,6 +79,7 @@ export function SettingsDialog({ settings, at, onChange, onClose }: Props) {
             {section === "license" && <LicenseSection />}
             {section === "git" && <GitSection settings={settings} onChange={onChange} />}
             {section === "shortcuts" && <ShortcutsSection />}
+            {section === "about" && <AboutSection onReport={onReport} />}
           </div>
         </div>
       </div>

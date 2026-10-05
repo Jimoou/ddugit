@@ -606,3 +606,20 @@ export interface Signature {
   signer: string;
   key: string;
 }
+
+/** This build and computer, for problem reports (`about.rs`). */
+export interface AppInfo {
+  version: string;
+  os: string;
+  osVersion: string;
+  arch: string;
+}
+
+export type ReportKind = "bug" | "question";
+/** A problem report or question for ddugit.com (`report.rs`); `diagnostics` is already redacted. */
+export interface NewReport {
+  kind: ReportKind;
+  message: string;
+  email: string | null;
+  diagnostics: string | null;
+}
