@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use super::{err, open, Result};
 
-/// Per-file line cap; beyond it the file is marked `truncated`.
-const MAX_FILE_LINES: usize = 3000;
+/// Per-file line cap; beyond it the file is marked `truncated`. The diff
+/// sheet draws only the rows on screen, so this bounds the payload, not the page.
+const MAX_FILE_LINES: usize = 50_000;
 /// Whole-diff line cap; later files get headers and stats only.
-const MAX_TOTAL_LINES: usize = 20_000;
+const MAX_TOTAL_LINES: usize = 100_000;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -285,5 +286,34 @@ mod tests {
         assert_eq!(f.additions, MAX_FILE_LINES + 50);
         let shown: usize = f.hunks.iter().map(|h| h.lines.len()).sum();
         assert_eq!(shown, MAX_FILE_LINES);
+    }
+
+    /// Timing of big commit diffs (see docs/PERF.md): `DDUGIT_BENCH_REPO=<repo>
+    /// DDUGIT_BENCH_DIFFS=<rev>,<rev> cargo test --release --lib diff_bench -- --ignored --nocapture`.
+    /// With `DDUGIT_BENCH_OUT=<dir>` it also writes each diff as JSON for the web benchmarks.
+    #[test]
+    #[ignore]
+    fn diff_bench() {
+        let (Ok(path), Ok(revs)) = (
+            std::env::var("DDUGIT_BENCH_REPO"),
+            std::env::var("DDUGIT_BENCH_DIFFS"),
+        ) else {
+            return;
+        };
+        for (i, rev) in revs.split(',').enumerate() {
+            let t = std::time::Instant::now();
+            let files = commit_diff(&path, rev).unwrap();
+            let ms = t.elapsed().as_secs_f64() * 1000.0;
+            let lines: usize = files.iter().flat_map(|f| &f.hunks).map(|h| h.lines.len()).sum();
+            let json = serde_json::to_string(&files).unwrap();
+            println!(
+                "{rev}: {} files, {lines} lines sent, {ms:.1} ms, json {:.1} MB",
+                files.len(),
+                json.len() as f64 / 1e6
+            );
+            if let Ok(dir) = std::env::var("DDUGIT_BENCH_OUT") {
+                std::fs::write(format!("{dir}/diff-{i}.json"), json).unwrap();
+            }
+        }
     }
 }

@@ -94,8 +94,18 @@ export function computeLayout(
   refs: RefInfo[],
   head: Pick<HeadInfo, "branch" | "target">,
 ): Layout {
-  const index = new Map<string, number>();
-  commits.forEach((c, i) => index.set(c.id, i));
+  // Commits are worked on by row: one string-keyed map (`byId`), then plain
+  // numbers. 100k commits lay out in tens of milliseconds.
+  const n = commits.length;
+  const nodes: LayoutNode[] = new Array(n);
+  const byId = new Map<string, LayoutNode>();
+  for (let row = 0; row < n; row++) {
+    const c = commits[row];
+    const node: LayoutNode = { id: c.id, row, lane: -1, color: 0, isMerge: c.parents.length > 1 };
+    nodes[row] = node;
+    byId.set(c.id, node);
+  }
+  const rowOf = (id: string | null | undefined) => (id ? (byId.get(id)?.row ?? -1) : -1);
 
   // Branch names pointing at each commit, to colour the lane a tip starts.
   const tipName = new Map<string, string>();
@@ -107,104 +117,98 @@ export function computeLayout(
   }
 
   // First-parent chain of the trunk.
-  const trunk = new Set<string>();
+  const trunk = new Uint8Array(n);
   const tn = trunkName(refs, head);
-  let cursor = (tn && refs.find((r) => r.kind === "local" && r.name === tn)?.target) || head.target || null;
-  while (cursor && index.has(cursor) && !trunk.has(cursor)) {
-    trunk.add(cursor);
-    cursor = commits[index.get(cursor)!].parents[0] ?? null;
+  let cursor = rowOf((tn && refs.find((r) => r.kind === "local" && r.name === tn)?.target) || head.target);
+  let trunkSize = 0;
+  while (cursor >= 0 && !trunk[cursor]) {
+    trunk[cursor] = 1;
+    trunkSize++;
+    cursor = rowOf(commits[cursor].parents[0]);
   }
-  const reserve = trunk.size > 0 ? 1 : 0;
+  const reserve = trunkSize > 0 ? 1 : 0;
 
-  // lanes[i] = commit id lane i is waiting for (null = free).
-  const lanes: (string | null)[] = [];
+  // lanes[i] = row lane i is waiting for (-1 = free).
+  const lanes: number[] = [];
   const laneColor: number[] = [];
   let nextColor = 1;
   let laneCount = reserve;
 
   const alloc = (color: number): number => {
     let i = reserve;
-    while (i < lanes.length && lanes[i] !== null) i++;
+    while (i < lanes.length && lanes[i] !== -1) i++;
     if (i >= lanes.length) lanes.length = i + 1;
     laneColor[i] = color;
     laneCount = Math.max(laneCount, i + 1);
     return i;
   };
   const colors = branchColors(refs);
-  const freshColor = (id: string): number => {
-    const name = tipName.get(id);
+  const freshColor = (row: number): number => {
+    const name = tipName.get(nodes[row].id);
     if (name) return colors.get(baseName(name)) ?? colorForBranch(name);
     const c = nextColor;
     nextColor = (nextColor % (PALETTE_SIZE - 1)) + 1;
     return c;
   };
   if (reserve) {
-    lanes[0] = null;
+    lanes[0] = -1;
     laneColor[0] = 0;
   }
 
-  const nodes: LayoutNode[] = [];
-  const byId = new Map<string, LayoutNode>();
-  // Edge "via" lanes are known when the child is placed; the parent end is filled in later.
-  const pending: { child: string; parent: string; via: number; color: number; merge: boolean }[] = [];
-
-  commits.forEach((c, row) => {
+  // Edge "via" lanes are known when the child is placed; the parent's lane once it is.
+  const edges: LayoutEdge[] = [];
+  for (let row = 0; row < n; row++) {
+    const c = commits[row];
     let lane = -1;
     for (let i = 0; i < lanes.length; i++) {
-      if (lanes[i] === c.id) {
+      if (lanes[i] === row) {
         if (lane === -1) lane = i;
-        lanes[i] = null; // converges here
+        lanes[i] = -1; // converges here
       }
     }
-    if (trunk.has(c.id)) {
+    if (trunk[row]) {
       lane = 0;
     } else if (lane === -1) {
-      lane = alloc(freshColor(c.id));
+      lane = alloc(freshColor(row));
     }
     const color = laneColor[lane];
-
-    const node: LayoutNode = { id: c.id, row, lane, color, isMerge: c.parents.length > 1 };
-    nodes.push(node);
-    byId.set(c.id, node);
+    const node = nodes[row];
+    node.lane = lane;
+    node.color = color;
 
     let continues = false;
-    c.parents.forEach((p, pi) => {
-      if (!index.has(p)) return; // parent beyond the loaded window
+    for (let pi = 0; pi < c.parents.length; pi++) {
+      const p = c.parents[pi];
+      // Most parents sit on the next row; comparing two ids beats hashing one.
+      const pr = commits[row + 1]?.id === p ? row + 1 : rowOf(p);
+      if (pr < 0) continue; // parent beyond the loaded window
+      let via = lane;
       if (pi === 0) {
         // First parent continues in this commit's lane (and converges into
         // the parent's lane at the parent's row if that differs).
-        lanes[lane] = p;
         continues = true;
-        pending.push({ child: c.id, parent: p, via: lane, color, merge: false });
-        return;
+      } else {
+        via = lanes.indexOf(pr);
+        if (via === -1) via = alloc(freshColor(pr));
       }
-      let via = lanes.indexOf(p);
-      if (via === -1) via = alloc(freshColor(p));
-      lanes[via] = p;
-      pending.push({ child: c.id, parent: p, via, color: laneColor[via], merge: true });
-    });
-    if (!continues) lanes[lane] = null;
-  });
-
-  const edges: LayoutEdge[] = [];
-  for (const e of pending) {
-    const ch = byId.get(e.child)!;
-    const pa = byId.get(e.parent);
-    if (!pa) continue;
-    edges.push({
-      child: e.child,
-      parent: e.parent,
-      childRow: ch.row,
-      childLane: ch.lane,
-      parentRow: pa.row,
-      parentLane: pa.lane,
-      via: e.via,
-      color: e.color,
-      isMergeEdge: e.merge,
-    });
+      lanes[via] = pr;
+      edges.push({
+        child: c.id,
+        parent: p,
+        childRow: row,
+        childLane: lane,
+        parentRow: pr,
+        parentLane: -1,
+        via,
+        color: pi === 0 ? color : laneColor[via],
+        isMergeEdge: pi > 0,
+      });
+    }
+    if (!continues) lanes[lane] = -1;
   }
+  for (const e of edges) e.parentLane = nodes[e.parentRow].lane;
 
-  return { nodes, byId, edges, laneCount: Math.max(laneCount, 1), rowCount: commits.length };
+  return { nodes, byId, edges, laneCount: Math.max(laneCount, 1), rowCount: n };
 }
 
 /** All ancestors of `id` (inclusive) within the loaded commits. */
@@ -230,5 +234,25 @@ export function ancestorsOf(commits: CommitInfo[], id: string): Set<string> {
   if (!byTip) ancestorSets.set(commits, (byTip = new Map()));
   let set = byTip.get(id);
   if (!set) byTip.set(id, (set = ancestors(commits, id)));
+  return set;
+}
+
+const descendantSets = new WeakMap<CommitInfo[], Map<string, Set<string>>>();
+/**
+ * All descendants of `id` (inclusive) within the loaded commits, remembered
+ * per commit list. One pass over the newer rows (children come before
+ * parents), where asking every branch tip for its ancestors would walk the
+ * history once per branch.
+ */
+export function descendantsOf(commits: CommitInfo[], id: string): Set<string> {
+  let byId = descendantSets.get(commits);
+  if (!byId) descendantSets.set(commits, (byId = new Map()));
+  let set = byId.get(id);
+  if (set) return set;
+  set = new Set<string>();
+  const at = commits.findIndex((c) => c.id === id);
+  if (at >= 0) set.add(id);
+  for (let i = at - 1; i >= 0; i--) if (commits[i].parents.some((p) => set.has(p))) set.add(commits[i].id);
+  byId.set(id, set);
   return set;
 }

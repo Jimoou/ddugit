@@ -44,7 +44,7 @@ import { SyncConfirm } from "./components/SyncConfirm";
 import { type SyncOp, syncPlan } from "./sync";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
-import { ancestors, ancestorsOf, computeLayout } from "./graph/layout";
+import { ancestors, ancestorsOf, computeLayout, descendantsOf } from "./graph/layout";
 import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
@@ -2303,7 +2303,9 @@ export function RepoView({
             commit={selectedCommit}
             refs={graphRefs.filter((r) => r.target === selectedCommit.id)}
             containedIn={snap.refs.filter(
-              (r) => (r.kind === "local" || r.kind === "remote") && isAncestor(selectedCommit.id, r.target),
+              (r) =>
+                (r.kind === "local" || r.kind === "remote") &&
+                descendantsOf(snap.commits, selectedCommit.id).has(r.target),
             )}
             files={panelFiles}
             color={colorOf(selectedCommit.id)}

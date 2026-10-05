@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CommitInfo, RefInfo } from "../types";
 import { computeLayout } from "./layout";
-import { runIndex, straightRuns } from "./runs";
+import { runIndex, runsInRows, straightRuns } from "./runs";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
   id,
@@ -62,5 +62,16 @@ describe("straightRuns", () => {
     // f1/f2 sit on rows interleaved with x3/x4, so they are not consecutive rows.
     expect(ids).not.toContain("f1");
     expect(runIndex(straightRuns(l, () => false, 2)).size).toBe(ids.length);
+  });
+});
+
+describe("runsInRows", () => {
+  const run = (first: number, last: number) => ({ lane: 0, color: 0, first, last, ids: [] });
+  const runs = [run(0, 4), run(6, 9), run(12, 30), run(40, 41)];
+  it("returns the runs reaching into a span of rows", () => {
+    expect(runsInRows(runs, 5, 5)).toEqual([]);
+    expect(runsInRows(runs, 4, 6)).toEqual([runs[0], runs[1]]);
+    expect(runsInRows(runs, 20, 100)).toEqual([runs[2], runs[3]]);
+    expect(runsInRows([], 0, 10)).toEqual([]);
   });
 });

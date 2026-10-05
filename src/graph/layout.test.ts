@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CommitInfo, RefInfo } from "../types";
-import { ancestors, colorForBranch, computeLayout } from "./layout";
+import { ancestors, colorForBranch, computeLayout, descendantsOf } from "./layout";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
   id,
@@ -90,5 +90,12 @@ describe("helpers", () => {
     const commits = [c("m", "x", "f"), c("f", "a"), c("x", "a"), c("a")];
     expect([...ancestors(commits, "f")].sort()).toEqual(["a", "f"]);
     expect(ancestors(commits, "m").size).toBe(4);
+  });
+
+  it("collects descendants within the loaded commits", () => {
+    const commits = [c("m", "x", "f"), c("f", "a"), c("x", "a"), c("a", "root")];
+    expect([...descendantsOf(commits, "f")].sort()).toEqual(["f", "m"]);
+    expect(descendantsOf(commits, "a").size).toBe(4);
+    expect(descendantsOf(commits, "root").size).toBe(0);
   });
 });

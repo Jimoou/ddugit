@@ -2101,7 +2101,17 @@ button.link {
   font: 11px var(--mono);
   letter-spacing: 0;
 }
+.changed li {
+  height: 24px;
+}
+/* Room kept for the rows of a long list that are not drawn (components/virtual.ts). */
+.changed li.gap,
+.file-list li.gap {
+  padding: 0;
+  pointer-events: none;
+}
 .changed li.dir {
+  height: 21px;
   padding: 6px 6px 2px;
   font: 11px var(--mono);
   color: var(--muted);
@@ -2236,6 +2246,9 @@ button.link {
   padding: 6px;
   border-right: 1px solid var(--line);
 }
+.diff-sheet .file-list li {
+  height: 24px;
+}
 .file-list li.on {
   background: var(--ui-soft);
   box-shadow: inset 2px 0 0 var(--ui-text);
@@ -2267,10 +2280,19 @@ button.link {
     display: none;
   }
 }
+/* Rows have fixed heights (DiffSheet's LINE_H, HEAD_H): a long diff draws only the rows on screen. */
 table.diff {
   width: 100%;
   border-collapse: collapse;
-  font: 12px/1.55 var(--mono);
+  font: 12px/19px var(--mono);
+}
+table.diff tr {
+  height: 19px;
+}
+table.diff tr.gap td,
+table.diff tr.gap {
+  padding: 0;
+  border: none;
 }
 table.diff td {
   padding: 0 8px;
@@ -2289,12 +2311,18 @@ table.diff .sign {
   padding: 0 4px;
   user-select: none;
 }
+table.diff tr.hunk {
+  height: 32px;
+}
 table.diff tr.hunk td {
-  padding: 6px 12px;
+  padding: 0 12px;
+  vertical-align: middle;
   color: #9b7bff;
   background: rgba(155, 123, 255, 0.07);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  /* Lines drawn inside the row, so no row height is shared with its neighbours. */
+  box-shadow:
+    inset 0 1px var(--line),
+    inset 0 -1px var(--line);
 }
 table.diff tr.ins {
   background: rgba(166, 255, 77, 0.08);

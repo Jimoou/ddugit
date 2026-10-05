@@ -20,19 +20,17 @@ export interface Run {
  * that `keep` does not mark (refs, HEAD, stash bases, …).
  */
 export function straightRuns(layout: Layout, keep: (id: string) => boolean, min = 4): Run[] {
-  const parentOf = new Map<string, string>();
-  const parents = new Map<string, number>();
-  const children = new Map<string, number>();
-  for (const e of layout.edges) {
-    parents.set(e.child, (parents.get(e.child) ?? 0) + 1);
-    children.set(e.parent, (children.get(e.parent) ?? 0) + 1);
-    parentOf.set(e.child, e.parent);
-  }
+  // Counted by row: string-keyed maps cost more than the rest on 100k commits.
   const nodes = layout.nodes;
-  const plain = (row: number) => {
-    const id = nodes[row].id;
-    return parents.get(id) === 1 && children.get(id) === 1 && !keep(id);
-  };
+  const parents = new Uint32Array(nodes.length);
+  const children = new Uint32Array(nodes.length);
+  const parentRow = new Int32Array(nodes.length).fill(-1);
+  for (const e of layout.edges) {
+    parents[e.childRow]++;
+    children[e.parentRow]++;
+    parentRow[e.childRow] = e.parentRow;
+  }
+  const plain = (row: number) => parents[row] === 1 && children[row] === 1 && !keep(nodes[row].id);
 
   const runs: Run[] = [];
   let start = -1;
@@ -50,10 +48,24 @@ export function straightRuns(layout: Layout, keep: (id: string) => boolean, min 
     }
     if (start < 0) start = row;
     const next = nodes[row + 1];
-    const linked = next && next.lane === nodes[row].lane && parentOf.get(nodes[row].id) === next.id && plain(row + 1);
+    const linked = next && next.lane === nodes[row].lane && parentRow[row] === row + 1 && plain(row + 1);
     if (!linked) close(row);
   }
   return runs;
+}
+
+/** Runs that reach into rows `first..last`; `runs` come ordered by row and never overlap. */
+export function runsInRows(runs: Run[], first: number, last: number): Run[] {
+  let lo = 0,
+    hi = runs.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (runs[mid].last < first) lo = mid + 1;
+    else hi = mid;
+  }
+  const out: Run[] = [];
+  for (let i = lo; i < runs.length && runs[i].first <= last; i++) out.push(runs[i]);
+  return out;
 }
 
 /** Run membership by commit id. */

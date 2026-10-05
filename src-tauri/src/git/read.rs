@@ -1,6 +1,6 @@
 //! Repository snapshot: history, refs, HEAD (with upstream tracking) and status.
 
-use git2::{BranchType, Repository, Sort, Status, StatusOptions};
+use git2::{BranchType, Repository, Status, StatusOptions};
 use serde::Serialize;
 
 use super::{err, open, state_name, workdir, Result};
@@ -221,30 +221,44 @@ fn read_remotes(repo: &Repository) -> Vec<RemoteInfo> {
         .collect()
 }
 
+/// The newest `limit` commits of every ref, children before parents.
+///
+/// libgit2's sorted revwalks read the whole history before they yield the
+/// first commit (over a second on 100k commits), so this walks newest first
+/// by commit time itself, stopping at `limit`, and `children_first` puts the
+/// few commits a skewed clock moved ahead of a child back after it.
 fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, bool)> {
-    let mut walk = repo.revwalk().map_err(err)?;
-    walk.set_sorting(Sort::TOPOLOGICAL | Sort::TIME).map_err(err)?;
-    let _ = walk.push_head();
-    for pattern in ["refs/heads", "refs/remotes", "refs/tags"] {
-        let _ = walk.push_glob(pattern);
+    let mut walk = TimeWalk::default();
+    let refs = repo.references().map_err(err)?.flatten().filter(|r| {
+        r.name().is_some_and(|n| {
+            ["refs/heads/", "refs/remotes/", "refs/tags/"]
+                .iter()
+                .any(|p| n.starts_with(p))
+        })
+    });
+    for r in repo.head().ok().into_iter().chain(refs) {
+        if let Ok(c) = r.peel_to_commit() {
+            walk.push(c);
+        }
     }
     // A merged-in SHA may not be on any ref; keep it visible while the merge is pending.
     for special in IN_PROGRESS_HEADS {
-        let _ = walk.push_ref(special);
+        if let Ok(c) = repo.revparse_single(special).and_then(|o| o.peel_to_commit()) {
+            walk.push(c);
+        }
     }
 
     let mut commits = Vec::new();
-    let mut truncated = false;
-    for oid in walk {
+    while let Some(c) = walk.pop() {
         if commits.len() >= limit {
-            truncated = true;
-            break;
+            return Ok((children_first(commits), true));
         }
-        let oid = oid.map_err(err)?;
-        let c = repo.find_commit(oid).map_err(err)?;
+        for p in c.parents() {
+            walk.push(p);
+        }
         let author = c.author();
         commits.push(CommitInfo {
-            id: oid.to_string(),
+            id: c.id().to_string(),
             parents: c.parent_ids().map(|p| p.to_string()).collect(),
             summary: c.summary().unwrap_or("").to_string(),
             message: c.message().unwrap_or("").to_string(),
@@ -253,7 +267,72 @@ fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, boo
             time: c.time().seconds(),
         });
     }
-    Ok((commits, truncated))
+    Ok((children_first(commits), false))
+}
+
+/// Commits newest first by commit time, each once; ties in the order found.
+#[derive(Default)]
+struct TimeWalk<'r> {
+    seen: std::collections::HashSet<git2::Oid>,
+    found: Vec<Option<git2::Commit<'r>>>,
+    queue: std::collections::BinaryHeap<(i64, std::cmp::Reverse<usize>)>,
+}
+
+impl<'r> TimeWalk<'r> {
+    fn push(&mut self, c: git2::Commit<'r>) {
+        if self.seen.insert(c.id()) {
+            self.queue
+                .push((c.time().seconds(), std::cmp::Reverse(self.found.len())));
+            self.found.push(Some(c));
+        }
+    }
+
+    fn pop(&mut self) -> Option<git2::Commit<'r>> {
+        let (_, std::cmp::Reverse(i)) = self.queue.pop()?;
+        self.found[i].take()
+    }
+}
+
+/// Stable topological order: every commit after all its children in the list,
+/// otherwise the order it came in (Kahn's algorithm, earliest ready first).
+fn children_first(commits: Vec<CommitInfo>) -> Vec<CommitInfo> {
+    use std::cmp::Reverse;
+    use std::collections::{BinaryHeap, HashMap};
+    let index: HashMap<&str, usize> = commits
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.id.as_str(), i))
+        .collect();
+    let mut waiting = vec![0usize; commits.len()];
+    for c in &commits {
+        for p in &c.parents {
+            if let Some(&i) = index.get(p.as_str()) {
+                waiting[i] += 1;
+            }
+        }
+    }
+    let mut ready: BinaryHeap<Reverse<usize>> = (0..commits.len())
+        .filter(|&i| waiting[i] == 0)
+        .map(Reverse)
+        .collect();
+    let mut order = Vec::with_capacity(commits.len());
+    while let Some(Reverse(i)) = ready.pop() {
+        order.push(i);
+        for p in &commits[i].parents {
+            if let Some(&j) = index.get(p.as_str()) {
+                waiting[j] -= 1;
+                if waiting[j] == 0 {
+                    ready.push(Reverse(j));
+                }
+            }
+        }
+    }
+    drop(index);
+    if order.iter().enumerate().all(|(at, &i)| at == i) {
+        return commits;
+    }
+    let mut slots: Vec<Option<CommitInfo>> = commits.into_iter().map(Some).collect();
+    order.into_iter().filter_map(|i| slots[i].take()).collect()
 }
 
 const IN_PROGRESS_HEADS: [&str; 3] = ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"];
@@ -342,6 +421,35 @@ mod tests {
         assert!(snap.truncated);
     }
 
+    fn info(id: &str, parents: &[&str]) -> CommitInfo {
+        CommitInfo {
+            id: id.into(),
+            parents: parents.iter().map(|p| p.to_string()).collect(),
+            summary: String::new(),
+            message: String::new(),
+            author: String::new(),
+            email: String::new(),
+            time: 0,
+        }
+    }
+
+    #[test]
+    fn children_first_moves_a_parent_after_its_skewed_child() {
+        // `b`'s clock ran behind: by time it comes after its parent `a`.
+        let list = vec![
+            info("m", &["a", "b"]),
+            info("a", &["root"]),
+            info("b", &["a"]),
+            info("root", &[]),
+        ];
+        let ids: Vec<_> = children_first(list).into_iter().map(|c| c.id).collect();
+        assert_eq!(ids, ["m", "b", "a", "root"]);
+        // Already in order: kept as is (parents outside the list are ignored).
+        let list = vec![info("c", &["b"]), info("x", &["gone"]), info("b", &[])];
+        let ids: Vec<_> = children_first(list).into_iter().map(|c| c.id).collect();
+        assert_eq!(ids, ["c", "x", "b"]);
+    }
+
     #[test]
     fn stopped_merge_reports_incoming_commit() {
         use super::super::write::{checkout, create_branch, merge};
@@ -358,6 +466,52 @@ mod tests {
         assert_eq!(
             snapshot(p, 5).unwrap().incoming.as_deref(),
             Some(feature.as_str())
+        );
+    }
+
+    /// Timing on a big repository (see docs/PERF.md):
+    /// `DDUGIT_BENCH_REPO=<repo> cargo test --release --lib snapshot_bench -- --ignored --nocapture`.
+    /// With `DDUGIT_BENCH_OUT=<dir>` it also writes the snapshot as JSON for the web benchmarks.
+    #[test]
+    #[ignore]
+    fn snapshot_bench() {
+        let Ok(path) = std::env::var("DDUGIT_BENCH_REPO") else {
+            return;
+        };
+        for limit in [1000, 3000, 10_000, 100_000] {
+            let mut best = f64::MAX;
+            let mut snap = None;
+            for _ in 0..3 {
+                let t = std::time::Instant::now();
+                let s = snapshot(&path, limit).unwrap();
+                best = best.min(t.elapsed().as_secs_f64() * 1000.0);
+                snap = Some(s);
+            }
+            let snap = snap.unwrap();
+            let json = serde_json::to_string(&snap).unwrap();
+            println!(
+                "limit {limit:>6}: {:>6} commits, {} refs, {best:>8.1} ms, json {:.1} MB",
+                snap.commits.len(),
+                snap.refs.len(),
+                json.len() as f64 / 1e6
+            );
+            if let Ok(dir) = std::env::var("DDUGIT_BENCH_OUT") {
+                std::fs::write(format!("{dir}/snapshot-{limit}.json"), json).unwrap();
+            }
+        }
+        let repo = open(&path).unwrap();
+        let ms = |f: &dyn Fn()| {
+            let t = std::time::Instant::now();
+            f();
+            t.elapsed().as_secs_f64() * 1000.0
+        };
+        println!(
+            "parts: commits(3000) {:.1} ms, refs {:.1} ms, head {:.1} ms, status {:.1} ms, stashes {:.1} ms",
+            ms(&|| drop(read_commits(&repo, 3000).unwrap())),
+            ms(&|| drop(read_refs(&repo).unwrap())),
+            ms(&|| drop(read_head(&repo))),
+            ms(&|| drop(read_changes(&repo).unwrap())),
+            ms(&|| drop(super::super::stash::read_stashes(&path).unwrap())),
         );
     }
 }

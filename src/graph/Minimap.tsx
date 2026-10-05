@@ -59,21 +59,28 @@ export function Minimap({ scene, rotation, getView, getSize, onJump }: Props) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const n = scene.layout.rowCount;
     ctx.lineWidth = 1;
+    // One path per colour instead of a stroke call per edge (100k on a big history).
+    const lines = NEON.map(() => new Path2D());
     for (const e of scene.edges) {
       const a = e.edge;
       const p = to({ x: xOf(a.parentRow, n), y: yOf(a.parentLane) });
       const q = to({ x: xOf(a.childRow, n), y: yOf(a.childLane) });
-      ctx.strokeStyle = NEON[a.color] + "99";
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(q.x, q.y);
-      ctx.stroke();
+      lines[a.color].moveTo(p.x, p.y);
+      lines[a.color].lineTo(q.x, q.y);
     }
+    lines.forEach((path, c) => {
+      ctx.strokeStyle = NEON[c] + "99";
+      ctx.stroke(path);
+    });
+    const dots = NEON.map(() => new Path2D());
     for (const node of scene.layout.nodes) {
       const p = to({ x: xOf(node.row, n), y: yOf(node.lane) });
-      ctx.fillStyle = NEON[node.color];
-      ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+      dots[node.color].rect(p.x - 1, p.y - 1, 2, 2);
     }
+    dots.forEach((path, c) => {
+      ctx.fillStyle = NEON[c];
+      ctx.fill(path);
+    });
     cache.current = off;
   };
 
