@@ -607,7 +607,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod testutil {
+pub(crate) mod testutil {
     use super::git_ok;
     use std::fs;
     use std::path::Path;
@@ -634,6 +634,11 @@ mod testutil {
 
     pub fn s(p: &Path) -> &str {
         p.to_str().unwrap()
+    }
+
+    /// `git <args>` in `p` that must succeed (for tests outside `git`).
+    pub fn run(p: &Path, args: &[&str]) -> String {
+        git_ok(p, args).unwrap()
     }
 
     /// Write `file` and commit everything with `msg`.
