@@ -262,7 +262,12 @@ fn repo_root(dir: String) -> Option<String> {
 /// Repository passed on the command line (`ddugit path/to/repo`), if any.
 #[tauri::command]
 fn initial_repo() -> Option<String> {
-    let arg = std::env::args().skip(1).find(|a| !a.starts_with('-'))?;
+    repo_arg(std::env::args().skip(1))
+}
+
+/// The first argument that isn't an option, as an absolute path.
+fn repo_arg(mut args: impl Iterator<Item = String>) -> Option<String> {
+    let arg = args.find(|a| !a.starts_with('-'))?;
     // `absolute` rather than `canonicalize`: no `\\?\` verbatim prefix on Windows.
     std::path::absolute(arg)
         .ok()
@@ -489,6 +494,17 @@ mod tests {
             let r = call(pro_dir.path().into(), s(d.path()).into(), &fix, out.path());
             assert_eq!(r, Ok(OpStatus::Ok), "{name}");
         }
+    }
+
+    #[test]
+    fn the_first_plain_argument_is_the_repository_to_open() {
+        let args = |a: &[&str]| repo_arg(a.iter().map(|s| s.to_string()));
+        assert_eq!(args(&[]), None);
+        assert_eq!(args(&["--verbose", "-x"]), None);
+        let abs = std::path::absolute("work/app").unwrap();
+        let want = Some(abs.to_string_lossy().into_owned());
+        assert_eq!(args(&["--flag", "work/app", "other"]), want);
+        assert_eq!(args(&[&want.clone().unwrap()]), want);
     }
 
     #[test]
