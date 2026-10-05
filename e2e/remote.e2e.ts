@@ -66,8 +66,11 @@ test("adds a remote from the GitHub tab, named after the owner", async ({ demo }
   await expect(dialog.getByLabel("이름", { exact: true })).toHaveValue("orbit-labs");
   await expect(dialog).toContainText("→ https://github.com/orbit-labs/design-system.git");
   await dialog.getByRole("button", { name: "추가하고 가져오기" }).click();
+  // The fetch plays out its progress card first; on a busy runner that alone can outlast an assertion's
+  // default 5 s. Wait for its result (the remote's branch), then read the toast it raises right after.
+  const added = page.locator(".sidebar section.remote-sub").filter({ hasText: "orbit-labs" });
+  await expect(added.locator("li")).toHaveCount(1, { timeout: 20_000 });
   await demo.toast("orbit-labs에서 브랜치 1개를 가져왔어요");
-  await expect(page.locator(".sidebar section.remote-sub").filter({ hasText: "orbit-labs" })).toHaveCount(1);
 });
 
 test("a push rides a comet into orbit and fetched commits arrive as meteors, unless sparkles are off", async ({
