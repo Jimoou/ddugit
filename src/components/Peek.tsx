@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
 import { t } from "../i18n";
 import type { CommitInfo, FileDiff, RefInfo } from "../types";
 import { Icon } from "./Icon";
+import { useLoaded } from "./useLoaded";
 
 /** Files listed on the card; the rest are counted. */
 const MAX_FILES = 5;
@@ -34,18 +34,9 @@ export function PeekCard(p: {
   width: number;
 }) {
   const { path, commit } = p;
-  const [loaded, setLoaded] = useState<{ id: string; files: FileDiff[] } | null>(null);
-  useEffect(() => {
-    let live = true;
-    api.commitDiff(path, commit.id).then(
-      (files) => live && setLoaded({ id: commit.id, files }),
-      () => live && setLoaded({ id: commit.id, files: [] }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, commit.id]);
-  const files = loaded?.id === commit.id ? loaded.files : null;
+  const files = useLoaded(`${path}\n${commit.id}`, () =>
+    api.commitDiff(path, commit.id).catch((): FileDiff[] => []),
+  ).data;
   const body = bodyPreview(commit.message);
   const big = Math.max(1, ...(files ?? []).map((f) => f.additions + f.deletions));
   // Beside the star, flipped to its left near the right edge.

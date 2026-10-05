@@ -3,7 +3,7 @@ import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { SyncPlan } from "../sync";
 import { Icon } from "./Icon";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 /** Commits listed by name before the rest are counted. */
 const LISTED = 8;
@@ -39,54 +39,19 @@ export function SyncConfirm(p: {
     if (never) p.onNeverAsk();
     p.onGo();
   };
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <div
-        className="dialog sync-confirm"
-        aria-label={t(`sync.ask.title.${plan.op}`)}
-        onClick={(e) => e.stopPropagation()}
-        {...dialog}
-      >
-        <h2 className="dialog-title">
+    <Modal
+      onClose={p.onCancel}
+      className="sync-confirm"
+      label={t(`sync.ask.title.${plan.op}`)}
+      title={
+        <>
           <Icon name={plan.op === "push" ? "arrowUp" : plan.op === "pull" ? "arrowDown" : "fetch"} size={12} />{" "}
           {t(`sync.ask.title.${plan.op}`)}
-        </h2>
-        <p>
-          <Rich k={body} vars={{ n, upstream: plan.upstream ?? "", branch: p.branch ?? "HEAD" }} />
-        </p>
-        {plan.op !== "fetch" && n === 0 && <p className="muted">{t(`sync.ask.none.${plan.op}`)}</p>}
-        {n > 0 && (
-          <ul className="sync-commits">
-            {plan.commits.slice(0, LISTED).map((c) => (
-              <li key={c.id}>
-                <code>{c.id.slice(0, 7)}</code> {c.summary}
-              </li>
-            ))}
-            {n > LISTED && <li className="muted">{t("sync.ask.more", { n: n - LISTED })}</li>}
-          </ul>
-        )}
-        {plan.op === "pull" && plan.dirty && <p className="note warn">{t("sync.ask.dirty")}</p>}
-        {p.target && (
-          <p className="sync-target muted small">
-            <Rich k="sync.ask.to" vars={{ remote: p.target.remote, url: p.target.url }} />
-          </p>
-        )}
-        {p.target?.fetchOnly && (
-          <p className="note warn">
-            <Rich k="sync.ask.fetchOnly" vars={{ remote: p.target.remote }} />
-          </p>
-        )}
-        {p.target && !p.target.fetchOnly && p.target.alt && p.target.remote !== "origin" && (
-          <p className="note warn">
-            <Rich k="sync.ask.notOrigin" vars={{ remote: p.target.remote, alt: p.target.alt }} />
-          </p>
-        )}
-        <label className="check">
-          <input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} />
-          {t("sync.ask.never")}
-        </label>
-        <div className="dialog-actions">
+        </>
+      }
+      actions={
+        <>
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
           {p.target?.alt && (p.target.fetchOnly || p.target.remote !== "origin") && (
             <button
@@ -105,8 +70,43 @@ export function SyncConfirm(p: {
           >
             {t(`sync.ask.go.${plan.op}`, { n })}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p>
+        <Rich k={body} vars={{ n, upstream: plan.upstream ?? "", branch: p.branch ?? "HEAD" }} />
+      </p>
+      {plan.op !== "fetch" && n === 0 && <p className="muted">{t(`sync.ask.none.${plan.op}`)}</p>}
+      {n > 0 && (
+        <ul className="sync-commits">
+          {plan.commits.slice(0, LISTED).map((c) => (
+            <li key={c.id}>
+              <code>{c.id.slice(0, 7)}</code> {c.summary}
+            </li>
+          ))}
+          {n > LISTED && <li className="muted">{t("sync.ask.more", { n: n - LISTED })}</li>}
+        </ul>
+      )}
+      {plan.op === "pull" && plan.dirty && <p className="note warn">{t("sync.ask.dirty")}</p>}
+      {p.target && (
+        <p className="sync-target muted small">
+          <Rich k="sync.ask.to" vars={{ remote: p.target.remote, url: p.target.url }} />
+        </p>
+      )}
+      {p.target?.fetchOnly && (
+        <p className="note warn">
+          <Rich k="sync.ask.fetchOnly" vars={{ remote: p.target.remote }} />
+        </p>
+      )}
+      {p.target && !p.target.fetchOnly && p.target.alt && p.target.remote !== "origin" && (
+        <p className="note warn">
+          <Rich k="sync.ask.notOrigin" vars={{ remote: p.target.remote, alt: p.target.alt }} />
+        </p>
+      )}
+      <label className="check">
+        <input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} />
+        {t("sync.ask.never")}
+      </label>
+    </Modal>
   );
 }

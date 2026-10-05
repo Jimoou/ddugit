@@ -1,10 +1,11 @@
 import { Icon } from "./Icon";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../api";
 import { blockText, conflictCount, parseConflicts, type Pick, resolveText } from "../conflict";
-import type { ConflictFile, Resolution } from "../types";
+import type { Resolution } from "../types";
 import { type Key, t } from "../i18n";
 import { useDialog } from "./useDialog";
+import { useLoaded } from "./useLoaded";
 
 interface Props {
   path: string;
@@ -32,27 +33,12 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
   // Move on when the current file gets resolved.
   const file = wanted && files.includes(wanted) ? wanted : files[0];
   // What was loaded / picked belongs to one file; another file starts empty.
-  const [loaded, setLoaded] = useState<{ file: string; data: ConflictFile | null; error: string | null } | null>(null);
   const [picked, setPicked] = useState<{ file: string; picks: (Pick | undefined)[] } | null>(null);
   // `file` is undefined once everything is resolved: compare against a real entry only.
-  const mine = loaded && loaded.file === file ? loaded : null;
-  const data = mine?.data ?? null;
-  const error = mine?.error ?? null;
+  const { data, error } = useLoaded(file ? `${path}\n${file}` : null, () => api.conflictFile(path, file!));
   const picks = picked && picked.file === file ? picked.picks : [];
   const sides = SIDES[state];
   const [ours, theirs] = sides ? [t(sides[0]), t(sides[1])] : ["ours", "theirs"];
-
-  useEffect(() => {
-    if (!file) return;
-    let live = true;
-    api.conflictFile(path, file).then(
-      (d) => live && setLoaded({ file, data: d, error: null }),
-      (e) => live && setLoaded({ file, data: null, error: String(e) }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, file]);
 
   const segments = useMemo(() => (data ? parseConflicts(data.merged) : []), [data]);
   const total = conflictCount(segments);

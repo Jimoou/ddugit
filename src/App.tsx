@@ -25,6 +25,7 @@ import { RepoView, type ToastAction } from "./RepoView";
 import { defaults, parseSettings, type Settings } from "./settings";
 import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
 import "./App.css";
+import { readStored, writeStored } from "./storage";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string; action?: ToastAction };
 
@@ -38,27 +39,18 @@ const SETTINGS = "ddugit.settings";
 /** Before the settings screen, only this one flag was stored. */
 const LEGACY_ANIMATE = "ddugit.animate";
 
-function store(key: string, value?: string): string | null {
-  try {
-    if (value === undefined) return localStorage.getItem(key);
-    localStorage.setItem(key, value);
-  } catch {
-    /* storage unavailable */
-  }
-  return null;
-}
-
 function loadSettings(): Settings {
   const base = defaults(!!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
-  const legacy = store(LEGACY_ANIMATE);
+  const legacy = readStored(LEGACY_ANIMATE);
   if (legacy !== null) base.animate = legacy === "1";
-  const settings = parseSettings(store(SETTINGS), base);
+  const settings = parseSettings(readStored(SETTINGS), base);
   setLocale(resolveLocale(settings.language));
   return settings;
 }
 
 /** Desktop: the tabs left open last time. Demo: the demo repository. */
-const loadTabs = (): Tabs => (isTauri ? parseTabs(store(TABS), store(LAST_REPO)) : parseTabs(null, DEMO_PATH));
+const loadTabs = (): Tabs =>
+  isTauri ? parseTabs(readStored(TABS), readStored(LAST_REPO)) : parseTabs(null, DEMO_PATH);
 
 /**
  * The window: a tab per open repository (each a `RepoView` that stays mounted
@@ -96,7 +88,7 @@ export default function App() {
     if (!stay) setHome(false);
     setTabsState((old) => {
       const next = f(old);
-      if (isTauri) store(TABS, serializeTabs(next));
+      if (isTauri) writeStored(TABS, serializeTabs(next));
       return next;
     });
     setRepoMenu(null);
@@ -123,7 +115,7 @@ export default function App() {
   const updateSettings = (patch: Partial<Settings>) => {
     setSettings((s) => {
       const next = { ...s, ...patch };
-      store(SETTINGS, JSON.stringify(next)); // the same write if React calls this twice
+      writeStored(SETTINGS, JSON.stringify(next)); // the same write if React calls this twice
       return next;
     });
     // Every component reads the locale while rendering, so this re-render switches them all.

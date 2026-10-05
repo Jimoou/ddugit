@@ -50,6 +50,7 @@ import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { planMove, rebaseRange } from "./rebasePlan";
+import { useLoaded } from "./components/useLoaded";
 import type { Settings } from "./settings";
 import { signingHint } from "./identity";
 import { isKey, type Key, t } from "./i18n";
@@ -70,10 +71,8 @@ import type {
   FileDiff,
   FileTouch,
   LfsOp,
-  LfsStatus,
   OpResult,
   OpStatus,
-  PrReport,
   Progress,
   PullRequest,
   RebaseStep,
@@ -177,6 +176,8 @@ function remoteBase(refs: RefInfo[]): string | null {
   return remote.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))[0] ?? null;
 }
 
+const NO_STACKS: StackBranch[] = [];
+
 /** One open repository: its graph, panels, sheets and every git action on it. */
 export function RepoView({
   path,
@@ -196,7 +197,6 @@ export function RepoView({
   const [remoteBusy, setRemoteBusy] = useState<RemoteOp | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedStash, setSelectedStash] = useState<number | null>(null);
-  const [panel, setPanel] = useState<{ id: string; files: FileDiff[] } | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
@@ -238,9 +238,7 @@ export function RepoView({
   /** Release notes up to this ref, when open. */
   const [notesTo, setNotesTo] = useState<string | null>(null);
   /** Git LFS, read apart from the snapshot (it runs `git lfs`). */
-  const [lfs, setLfs] = useState<LfsStatus | null>(null);
   const [lfsTick, setLfsTick] = useState(0);
-  const [stacks, setStacks] = useState<StackBranch[]>([]);
   const pro = proOpen(usePro());
   /** Adding a worktree, maybe for a branch picked from its menu. */
   const [worktreeReq, setWorktreeReq] = useState<{ branch?: string } | null>(null);
@@ -249,7 +247,6 @@ export function RepoView({
   const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stageGraph = useRef<HTMLDivElement>(null);
   /** Open pull requests on the forge remotes; `prTick` re-reads them. */
-  const [pulls, setPulls] = useState<PrReport | null>(null);
   const [prTick, setPrTick] = useState(0);
   const [tokenFor, setTokenFor] = useState<TokenForge | null>(null);
   /** Opening a pull request from this branch. */
@@ -401,19 +398,10 @@ export function RepoView({
 
   // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
   const panelId = stashSel?.id ?? selected;
-  useEffect(() => {
-    if (!panelId) return;
-    let live = true;
-    api
-      .commitDiff(path, panelId)
-      .then((files) => live && setPanel({ id: panelId, files }))
-      .catch(() => live && setPanel({ id: panelId, files: [] }));
-    return () => {
-      live = false;
-    };
-  }, [path, panelId]);
   // Files loaded for another commit don't count: show "loading" until ours arrive.
-  const panelFiles = panel && panel.id === panelId ? panel.files : null;
+  const panelFiles = useLoaded(panelId ? `${path}\n${panelId}` : null, () =>
+    api.commitDiff(path, panelId!).catch((): FileDiff[] => []),
+  ).data;
 
   /** Fetch the files for the open diff; only the latest request may land. */
   const fetchDiff = useCallback(
@@ -451,19 +439,13 @@ export function RepoView({
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
   // Pull requests: read when the tab shows, then every few minutes (forges rate-limit, so not per snapshot).
+  // Offline or no forge: the graph just has no PR labels.
+  const pulls = useLoaded(active ? `${path}\n${prTick}` : null, () => api.pullRequests(path)).last;
   useEffect(() => {
     if (!active) return;
-    let live = true;
-    api.pullRequests(path).then(
-      (r) => live && setPulls(r),
-      () => {}, // offline or no forge: the graph just has no PR labels
-    );
     const timer = setInterval(() => setPrTick((n) => n + 1), PR_REFRESH_MS);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  }, [path, active, prTick]);
+    return () => clearInterval(timer);
+  }, [active, prTick]);
   const graphRefs = useMemo(
     () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
     [snap, pulls, commitById],
@@ -949,17 +931,7 @@ export function RepoView({
 
   // Re-read LFS when the checkout moves (new files may be pointers) or after an LFS command.
   const lfsKey = `${path}\n${snap?.head.target ?? ""}\n${lfsTick}`;
-  useEffect(() => {
-    if (!active) return;
-    let live = true;
-    api.lfsStatus(path).then(
-      (status) => live && setLfs(status),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, active, lfsKey]);
+  const lfs = useLoaded(active ? lfsKey : null, () => api.lfsStatus(path)).last;
 
   // Re-read stacks whenever a local branch moves (commits, amends, restacks, renames).
   const stackKey = (snap?.refs ?? [])
@@ -967,17 +939,8 @@ export function RepoView({
     .map((r) => `${r.name}@${r.target}`)
     .join(" ");
   const [stackTick, setStackTick] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    let live = true;
-    api.stackList(path).then(
-      (list) => live && setStacks(list),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, active, stackKey, stackTick]);
+  const stacks =
+    useLoaded(active ? `${path}\n${stackKey}\n${stackTick}` : null, () => api.stackList(path)).last ?? NO_STACKS;
 
   const stackRun = async (label: string, op: StackOp) => {
     await run(label, () => api.stackOp(path, op));

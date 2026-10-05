@@ -3,23 +3,12 @@ import { useCallback, useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { complete, current, MISSIONS, type MissionId, NEW_VOYAGE, parseVoyage, type Voyage } from "../missions";
+import { readStored, writeStored } from "../storage";
 
 const KEY = "ddugit.voyage";
 
-function load(): Voyage {
-  try {
-    return parseVoyage(localStorage.getItem(KEY));
-  } catch {
-    return NEW_VOYAGE;
-  }
-}
-function save(v: Voyage) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(v));
-  } catch {
-    // storage unavailable: progress lasts for this session only
-  }
-}
+const load = (): Voyage => parseVoyage(readStored(KEY));
+const save = (v: Voyage) => writeStored(KEY, JSON.stringify(v));
 
 /** Tutorial progress (only on the demo repository); `mission` marks one done. */
 export function useVoyage(enabled: boolean) {

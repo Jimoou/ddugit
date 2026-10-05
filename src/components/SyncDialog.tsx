@@ -1,7 +1,7 @@
 import { NEON } from "../graph/scene";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 interface Props {
   /** `diverged`: pull couldn't fast-forward. `rejected`: push refused. */
@@ -38,47 +38,48 @@ function Fork({ ahead, behind, color }: { ahead: number; behind: number; color: 
 
 export function SyncDialog(p: Props) {
   const andPush = p.kind === "rejected";
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{andPush ? t("sync.rejected") : t("sync.diverged")}</h2>
-        <p>
-          {p.kind === "rejected" ? (
-            <>
-              <Rich k="sync.rejected.body" vars={{ upstream: p.upstream }} />
-            </>
-          ) : (
-            <>
-              <Rich k="sync.diverged.body" vars={{ branch: p.branch, upstream: p.upstream }} />
-            </>
-          )}
-        </p>
-        <Fork ahead={p.ahead} behind={p.behind} color={p.color} />
-        <div className="legend">
-          <span style={{ color: p.color }}>{t("sync.mine", { n: p.ahead })}</span>
-          <span style={{ color: NEON[0] }}>{t("sync.theirs", { n: p.behind })}</span>
-        </div>
-        <div className="choices">
-          <button disabled={p.busy} onClick={p.onMerge}>
-            <b>{andPush ? t("sync.mergePush") : t("sync.merge")}</b>
-            <span className="muted">{t("sync.merge.hint")}</span>
-          </button>
-          <button disabled={p.busy} onClick={p.onRebase}>
-            <b>{andPush ? t("sync.rebasePush") : t("sync.rebase")}</b>
-            <span className="muted">{t("sync.rebase.hint")}</span>
-          </button>
-          {p.kind === "rejected" && (
-            <button className="danger ghost" disabled={p.busy} onClick={p.onForce}>
-              <b>{t("sync.force")}</b>
-              <span className="muted">{t("sync.force.hint", { n: p.behind, upstream: p.upstream })}</span>
-            </button>
-          )}
-        </div>
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      title={andPush ? t("sync.rejected") : t("sync.diverged")}
+      actions={
+        <>
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
-        </div>
+        </>
+      }
+    >
+      <p>
+        {p.kind === "rejected" ? (
+          <>
+            <Rich k="sync.rejected.body" vars={{ upstream: p.upstream }} />
+          </>
+        ) : (
+          <>
+            <Rich k="sync.diverged.body" vars={{ branch: p.branch, upstream: p.upstream }} />
+          </>
+        )}
+      </p>
+      <Fork ahead={p.ahead} behind={p.behind} color={p.color} />
+      <div className="legend">
+        <span style={{ color: p.color }}>{t("sync.mine", { n: p.ahead })}</span>
+        <span style={{ color: NEON[0] }}>{t("sync.theirs", { n: p.behind })}</span>
       </div>
-    </div>
+      <div className="choices">
+        <button disabled={p.busy} onClick={p.onMerge}>
+          <b>{andPush ? t("sync.mergePush") : t("sync.merge")}</b>
+          <span className="muted">{t("sync.merge.hint")}</span>
+        </button>
+        <button disabled={p.busy} onClick={p.onRebase}>
+          <b>{andPush ? t("sync.rebasePush") : t("sync.rebase")}</b>
+          <span className="muted">{t("sync.rebase.hint")}</span>
+        </button>
+        {p.kind === "rejected" && (
+          <button className="danger ghost" disabled={p.busy} onClick={p.onForce}>
+            <b>{t("sync.force")}</b>
+            <span className="muted">{t("sync.force.hint", { n: p.behind, upstream: p.upstream })}</span>
+          </button>
+        )}
+      </div>
+    </Modal>
   );
 }

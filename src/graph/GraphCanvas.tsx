@@ -31,7 +31,7 @@ import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap } from "./Minimap";
 import { t } from "../i18n";
-import { isTypingTarget } from "../keys";
+import { isOnScreen, isTypingTarget } from "../keys";
 import { hasOpenLayer } from "../components/useDialog";
 
 export interface GraphHandle {
@@ -608,7 +608,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       // Keys pressed in a modal dialog belong to it.
       if ((e.target as Element).closest?.("[aria-modal]")) return;
       // Every tab keeps its graph mounted; only the one on screen takes keys.
-      if (!canvasRef.current?.offsetParent) return;
+      if (!isOnScreen(canvasRef.current)) return;
       if (e.key === "=" || e.key === "+") api.zoomBy(1.25);
       else if (e.key === "-") api.zoomBy(0.8);
       else if (e.key === "0") api.fit();

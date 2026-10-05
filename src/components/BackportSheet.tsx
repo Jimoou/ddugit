@@ -9,6 +9,7 @@ import { offerPro, proOpen, usePro } from "../pro";
 import { ProBadge } from "./ProOffer";
 import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
+import { readStored, writeStored } from "../storage";
 
 interface Props {
   path: string;
@@ -33,24 +34,14 @@ interface Props {
 }
 
 const GUIDE_KEY = "ddugit.backportGuide";
-const guideOpen = () => {
-  try {
-    return localStorage.getItem(GUIDE_KEY) === "open";
-  } catch {
-    return false;
-  }
-};
+const guideOpen = () => readStored(GUIDE_KEY) === "open";
 
 /** How backporting goes: a one-line "how to" that unfolds (and stays the way the user left it). */
 function BackportGuide({ source, target }: { source: string; target: string }) {
   const [open, setOpen] = useState(guideOpen);
   const fold = (o: boolean) => {
     setOpen(o);
-    try {
-      localStorage.setItem(GUIDE_KEY, o ? "open" : "closed");
-    } catch {
-      // storage unavailable: remembered for this session only
-    }
+    writeStored(GUIDE_KEY, o ? "open" : "closed");
   };
   return (
     <div className={`bp-guide ${open ? "open" : ""}`}>
