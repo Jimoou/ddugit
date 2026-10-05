@@ -444,7 +444,7 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   await page.keyboard.press("?");
   const dialog = page.getByRole("dialog", { name: "설정" });
   const lic = dialog.locator("section.license");
-  await expect(lic).toContainText("개인·오픈소스 사용은 무료");
+  await expect(lic).toContainText("Free로도 Git 작업은 모두");
   await lic.getByLabel("라이선스 붙여 넣기").fill("not a license");
   await lic.getByRole("button", { name: "라이선스 적용" }).click();
   await expect(lic.locator(".note.warn")).toContainText("not a ddugit license");
@@ -453,7 +453,22 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   await expect(lic).toContainText("Demo Corp");
   await expect(lic).toContainText("2027-10-02까지 나온 버전");
   await lic.getByRole("button", { name: /라이선스 지우기/ }).click();
-  await expect(lic).toContainText("개인·오픈소스 사용은 무료");
+  await expect(lic).toContainText("Free로도 Git 작업은 모두");
+});
+
+test("settings: Pro is activated by signing in on ddugit.com, and the wait can be cancelled", async ({ demo }) => {
+  const { page } = demo;
+  await page.keyboard.press("?");
+  const lic = page.getByRole("dialog", { name: "설정" }).locator("section.license");
+  await lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" }).click();
+  await expect(lic.locator(".license-waiting")).toContainText("브라우저에서 로그인을 마치면");
+  await lic.getByRole("button", { name: "그만두기" }).click();
+  await expect(lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" })).toBeVisible();
+  await expect(lic.locator(".note.warn")).toHaveCount(0);
+
+  await lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" }).click();
+  await expect(lic.locator(".license-plan")).toContainText("Pro 사용 중");
+  await expect(lic).toContainText("월간 구독");
 });
 
 test("settings: a lapsed subscription only reminds, and renews once paid", async ({ demo }) => {
@@ -1322,7 +1337,7 @@ test("on Free, private pull requests and backport actions offer Pro instead", as
   await sheet.locator("tbody tr").first().locator("input[type=checkbox]").check();
   await sheet.getByRole("button", { name: /cherry-pick/ }).click();
   await expect(offer).toContainText("백포트 실행");
-  await offer.getByRole("button", { name: "라이선스 입력" }).click();
+  await offer.getByRole("button", { name: "Pro 활성화" }).click();
   await expect(page.locator(".license-plan")).toContainText("Free");
 });
 

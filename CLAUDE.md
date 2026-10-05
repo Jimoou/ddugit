@@ -63,6 +63,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src-tauri/src/update.rs`: 앱 자동 업데이트(tauri-plugin-updater). 확인 주소는 빌드 때 `DDUGIT_UPDATE_URL`(Supabase의 `latest.json`, 없으면 업데이트 안 함), 서명 공개키는 `tauri.conf.json`. 화면은 `components/Update.tsx`(시작할 때와 6시간마다 확인)
 - `src-tauri/src/pro.rs`: Free / Pro 판정(유효한 라이선스·사이트 라이선스·처음 설치 후 14일 체험, 체험 시작일은 설정 폴더와 OS 키체인 중 이른 날). Pro 경계: 비공개·회사 서버 저장소의 PR 연동(`forge::report`의 `locked`), 백포트 실행·폐쇄망 반출입·스택 쌓기·대시보드 일괄 브랜치 전환(`pro::require`), 대시보드 3개 초과·릴리스 노트·일괄 Pull(화면). 화면 쪽은 `src/pro.ts`(상태 공유, `offerPro`)와 `components/ProOffer.tsx`
 - `src-tauri/src/license.rs`: 상업용 라이선스를 오프라인 검증(Ed25519, 공개키는 빌드 때 `DDUGIT_LICENSE_PUBKEY`). 발급은 `scripts/license.mjs`, 절차·서명은 `docs/RELEASE.md`
+- `src-tauri/src/activate.rs`: ddugit.com 로그인으로 Pro 활성화(RFC 8252 루프백). `127.0.0.1:<임의 포트>`에서 기다리며 브라우저로 `ddugit.com/activate?port&state`를 열고, 돌아온 1회용 코드를 `/api/license/activate`에서 라이선스로 바꿔 `license::install_in`. 붙여 넣기는 폐쇄망·사이트 라이선스용으로 남는다. 화면은 설정 → 라이선스(`components/License.tsx`)
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.

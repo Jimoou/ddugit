@@ -100,6 +100,8 @@ export interface Commands {
   license_install: [{ text: string }, LicenseStatus];
   license_remove: [Record<string, never>, LicenseStatus];
   license_refresh: [Record<string, never>, LicenseRefresh];
+  license_activate: [Record<string, never>, LicenseStatus];
+  license_activate_cancel: [Record<string, never>, void];
   pro_status: [Record<string, never>, ProStatus];
   transfer_export: [{ path: string; req: TransferExport }, OpResult];
   transfer_import: [{ path: string; file: string; name: string }, OpResult];
@@ -227,6 +229,9 @@ export const api = {
   licenseRemove: () => call("license_remove", {}),
   /** Swap in a renewed subscription license from ddugit.com (the license is the only credential). */
   licenseRefresh: () => call("license_refresh", {}),
+  /** Sign in on ddugit.com in the browser; resolves with the license it sends back (or "Cancelled"). */
+  licenseActivate: () => call("license_activate", {}),
+  licenseActivateCancel: () => call("license_activate_cancel", {}),
   /** Free or Pro (license, site license or the 14-day trial). */
   proStatus: () => call("pro_status", {}),
   /** Write a bundle of what `req.dest` doesn't have yet (and its .sha256); the output is its path. */

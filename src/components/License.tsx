@@ -34,10 +34,9 @@ export function useLicenseRenewal(remind: (text: string) => void) {
 }
 
 /**
- * Settings → license. Free for personal and open-source use; a company pastes
- * the license text it bought. It is checked on this computer only, with no
- * account and no network (so air-gapped sites work the same), and nothing is
- * ever locked without one.
+ * Settings → license. A Pro subscriber signs in on ddugit.com from here (the
+ * browser hands the license back, `activate.rs`); an air-gapped or site license
+ * is pasted. Either way it is then checked on this computer only.
  */
 export function LicenseSection() {
   const pro = usePro();
@@ -46,6 +45,7 @@ export function LicenseSection() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [renewal, setRenewal] = useState<LicenseRefresh | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -69,6 +69,18 @@ export function LicenseSection() {
       setError(String(e));
     } finally {
       setBusy(false);
+    }
+  };
+  const signIn = async () => {
+    setSigningIn(true);
+    setError(null);
+    try {
+      setStatus(await api.licenseActivate());
+      refreshPro();
+    } catch (e) {
+      if (String(e) !== "Cancelled") setError(String(e));
+    } finally {
+      setSigningIn(false);
     }
   };
   const lic = status?.license;
@@ -138,6 +150,22 @@ export function LicenseSection() {
             <p className="note">{t("license.devBuild")}</p>
           ) : (
             <>
+              <div className="row">
+                {signingIn ? (
+                  <>
+                    <span className="muted small license-waiting">{t("license.activating")}</span>
+                    <button onClick={() => void api.licenseActivateCancel()}>{t("license.cancel")}</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="primary" disabled={busy} onClick={() => void signIn()}>
+                      {t("license.activate")}
+                    </button>
+                    {BUY_URL && <button onClick={() => void api.openUrl("", BUY_URL)}>{t("license.buy")}</button>}
+                  </>
+                )}
+              </div>
+              <p className="muted small">{t("license.or")}</p>
               <textarea
                 className="license-text"
                 rows={3}
@@ -148,13 +176,11 @@ export function LicenseSection() {
               />
               <div className="row">
                 <button
-                  className="primary"
-                  disabled={busy || !text.trim()}
+                  disabled={busy || signingIn || !text.trim()}
                   onClick={() => void act(() => api.licenseInstall(text))}
                 >
                   {t("license.apply")}
                 </button>
-                {BUY_URL && <button onClick={() => void api.openUrl("", BUY_URL)}>{t("license.buy")}</button>}
               </div>
             </>
           )}

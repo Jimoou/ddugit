@@ -1,3 +1,4 @@
+mod activate;
 mod forge;
 mod git;
 mod license;
@@ -239,6 +240,23 @@ async fn update_install(app: tauri::AppHandle) -> Result<(), String> {
     update::install(&app).await
 }
 
+/// Sign in on ddugit.com in the browser and keep the license it sends back.
+#[tauri::command]
+async fn license_activate(app: tauri::AppHandle) -> Result<license::LicenseStatus, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        activate::activate_in(&dir, |url| {
+            tauri_plugin_opener::open_url(url, None::<&str>).map_err(|e| e.to_string())
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+fn license_activate_cancel() {
+    activate::cancel();
+}
+
 #[tauri::command]
 async fn license_refresh(app: tauri::AppHandle) -> Result<license::Refresh, String> {
     let dir = license_dir(&app)?;
@@ -373,6 +391,8 @@ pub fn run() {
             license_install,
             license_remove,
             license_refresh,
+            license_activate,
+            license_activate_cancel,
             pro_status,
             transfer_export,
             transfer_import,
