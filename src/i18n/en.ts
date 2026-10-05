@@ -367,7 +367,6 @@ export const en: Record<Key, string> = {
   "remote.add.name": "Name",
   "remote.add.url": "https://… or git@…:…",
   "remote.add.go": "Add and fetch",
-  "remote.add.done": "Added remote {name}",
   "common.delete": "Delete",
   "branch.delete.title": "Delete branch",
   "branch.delete.body": "Deletes the local branch <b>{name}</b>. Branches on remotes aren't affected.",
@@ -443,9 +442,6 @@ export const en: Record<Key, string> = {
 
   // commit / stash panels
   "inspector.eyebrow": "Commit",
-  "inspector.author": "Author",
-  "inspector.time": "Date",
-  "inspector.commit": "Commit",
   "inspector.copy": "Click to copy",
   "inspector.parents": "Parents",
   "inspector.parent": "Parent",
@@ -1083,7 +1079,6 @@ export const en: Record<Key, string> = {
   "identity.cleared": "This repository now uses the global identity",
   "identity.signedOn": "Signing is on",
   "identity.signedOff": "Signing is off",
-  "identity.saved": "Profile saved",
   "identity.profiles": "Profiles",
   "identity.profilesHint":
     "Commit with a different name, email and signing key per repository. Apply one from the name in the commit panel.",

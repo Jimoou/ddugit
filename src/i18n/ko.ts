@@ -360,7 +360,6 @@ export const ko = {
   "remote.add.name": "이름",
   "remote.add.url": "https://… 또는 git@…:…",
   "remote.add.go": "추가하고 가져오기",
-  "remote.add.done": "원격 {name:을} 추가했어요",
   "common.delete": "삭제",
   "branch.delete.title": "브랜치 삭제",
   "branch.delete.body": "로컬 브랜치 <b>{name}</b>{:을} 지워요. 원격 브랜치는 그대로예요.",
@@ -436,9 +435,6 @@ export const ko = {
 
   // commit / stash panels
   "inspector.eyebrow": "커밋",
-  "inspector.author": "작성자",
-  "inspector.time": "시간",
-  "inspector.commit": "커밋",
   "inspector.copy": "클릭해서 복사",
   "inspector.parents": "병합한 부모",
   "inspector.parent": "부모",
@@ -1069,7 +1065,6 @@ export const ko = {
   "identity.cleared": "이 저장소는 전역 설정으로 커밋해요",
   "identity.signedOn": "서명을 켰어요",
   "identity.signedOff": "서명을 껐어요",
-  "identity.saved": "프로필을 저장했어요",
   "identity.profiles": "프로필",
   "identity.profilesHint":
     "저장소마다 다른 이름·이메일·서명 키로 커밋할 수 있어요. 커밋 창에서 이름을 눌러 저장소에 적용하세요.",
