@@ -237,9 +237,6 @@ export interface CloneInit {
  */
 export function CloneDialog(p: {
   init: CloneInit;
-  /** Forge hosts whose `gh` / `glab` login may be used, and trusting one more. */
-  trusted: string[];
-  onTrust(host: string): void;
   onCancel(): void;
   onCloned(path: string): void;
   onAuth(req: Required<CloneInit>, output: string): void;
@@ -337,8 +334,6 @@ export function CloneDialog(p: {
                 key={source}
                 kind={source}
                 path=""
-                trusted={p.trusted}
-                onTrust={p.onTrust}
                 picked={picked}
                 onPick={(pk) => {
                   setPicked(pk);

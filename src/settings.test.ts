@@ -23,7 +23,6 @@ describe("parseSettings", () => {
       rotation: 0,
       sidebarCollapsed: false,
       closedSections: [],
-      trustedForgeHosts: [],
       confirmRemote: { fetch: false, pull: true, push: true },
       profiles: [],
     });

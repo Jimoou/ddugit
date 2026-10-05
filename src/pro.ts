@@ -21,7 +21,7 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 
-/** Ask the backend again (startup, and after a license is applied, removed or renewed). */
+/** Ask the backend again (startup, and after a license is applied or removed). */
 export function refreshPro() {
   void api.proStatus().then(
     (s) => {

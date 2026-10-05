@@ -124,8 +124,41 @@ fn state_name(s: RepositoryState) -> &'static str {
     }
 }
 
+/// Goes before a subcommand that takes file paths from the UI: they name files,
+/// so `[`, `*`, `?` and `:(magic)` must not match other files (`git clean -- 'a?'`
+/// would also delete `ab`). Not set globally: `lfs track` patterns are globs.
+/// Only for commands that run no hooks: git exports it to them as
+/// `GIT_LITERAL_PATHSPECS`, which would break a hook's own globs; those use [`literal`].
+pub(crate) const LITERAL: &str = "--literal-pathspecs";
+
+/// One UI file path as a pathspec that matches only that path (see [`LITERAL`]).
+pub(crate) fn literal(path: &str) -> String {
+    format!(":(literal){path}")
+}
+
 /// A remote's push URL meaning "never push here" (`git remote set-url --push`).
 pub(crate) const NO_PUSH: &str = "DISABLED";
+
+/// Whether commit `a` is `b` or one of its ancestors.
+fn is_ancestor(dir: &Path, a: &str, b: &str) -> bool {
+    git(dir, &["merge-base", "--is-ancestor", a, b]).is_ok_and(|o| o.ok)
+}
+
+/// The local config's keys matching `pattern` with their values, in file
+/// order. Read with `-z` ("key\nvalue\0"): names in keys may hold spaces and
+/// dots. Nothing set (or no answer) is empty.
+fn config_entries(dir: &Path, pattern: &str) -> Vec<(String, String)> {
+    let Ok(out) = git(dir, &["config", "--local", "-z", "--get-regexp", pattern]) else {
+        return Vec::new();
+    };
+    out.text
+        .split('\0')
+        .filter_map(|entry| {
+            let (k, v) = entry.trim_start_matches('\n').split_once('\n')?;
+            Some((k.to_string(), v.to_string()))
+        })
+        .collect()
+}
 
 /// Repo has stopped mid-operation (after a failed merge / rebase).
 fn in_progress(path: &str) -> bool {
@@ -155,9 +188,8 @@ fn git_program() -> String {
 /// `git --version` of `program` (`None`: the current one), or why it can't run.
 pub fn version(program: Option<&str>) -> Result<String> {
     let program = program.map_or_else(git_program, str::to_string);
-    let out = Command::new(&program)
+    let out = crate::proc::hidden(&program)
         .arg("--version")
-        .stdin(Stdio::null())
         .output()
         .map_err(|e| format!("Can't run '{program}': {e}"))?;
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -168,7 +200,10 @@ pub fn version(program: Option<&str>) -> Result<String> {
 }
 
 /// A git executable the user named: an absolute path to an existing file
-/// called `git` (`git.exe` on Windows). Checked before it is ever run.
+/// called `git` (`git.exe` on Windows). Checked before it is ever run. The
+/// file it resolves to must not be something a clone or a download could have
+/// put there: no file a repository tracks (or would add), nothing in a temp
+/// folder, and (Unix) nothing other users may rewrite.
 fn check_git_path(program: &str) -> Result<()> {
     let p = Path::new(program);
     let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -178,7 +213,62 @@ fn check_git_path(program: &str) -> Result<()> {
             "'{program}' is not a git executable (give the full path to git)"
         ));
     }
+    let real = p.canonicalize().map_err(err)?;
+    if in_temp(&real) {
+        return Err(format!("'{program}' is in a temporary folder"));
+    }
+    if in_repository(&real) {
+        return Err(format!("'{program}' is inside a git repository"));
+    }
+    if writable_by_others(&real) {
+        return Err(format!("'{program}' can be changed by other users"));
+    }
     Ok(())
+}
+
+/// Under the system temp folder (or `/tmp`, `/var/tmp`).
+fn in_temp(real: &Path) -> bool {
+    let mut temps = vec![std::env::temp_dir()];
+    if cfg!(unix) {
+        temps.extend(["/tmp", "/var/tmp"].map(std::path::PathBuf::from));
+    }
+    temps
+        .iter()
+        .filter_map(|t| t.canonicalize().ok())
+        .any(|t| real.starts_with(t))
+}
+
+/// In a repository's work tree and tracked there, or not ignored by it (a
+/// clone's files are tracked). Ignored files are fine: Homebrew's prefix is a
+/// repository that ignores its `bin/` and `Cellar/`.
+fn in_repository(real: &Path) -> bool {
+    let Some(parent) = real.parent() else {
+        return false;
+    };
+    let Ok(repo) = Repository::discover(parent) else {
+        return false;
+    };
+    let Some(rel) = repo
+        .workdir()
+        .and_then(|w| w.canonicalize().ok())
+        .and_then(|w| real.strip_prefix(w).ok().map(Path::to_path_buf))
+    else {
+        // Inside `.git` or a bare repository: hooks and such, never git itself.
+        return true;
+    };
+    let tracked = repo.index().is_ok_and(|i| i.get_path(&rel, 0).is_some());
+    tracked || !repo.is_path_ignored(&rel).unwrap_or(false)
+}
+
+#[cfg(unix)]
+fn writable_by_others(real: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(real).map_or(true, |m| m.permissions().mode() & 0o022 != 0)
+}
+
+#[cfg(not(unix))]
+fn writable_by_others(_: &Path) -> bool {
+    false
 }
 
 /// Use `program` for git (blank or `None`: back to PATH). Refused, keeping
@@ -193,14 +283,75 @@ pub fn set_program(program: Option<&str>) -> Result<String> {
     Ok(v)
 }
 
+/// Subcommands that may reach a remote (over ssh or http).
+const NETWORK: &[&str] = &[
+    "fetch",
+    "pull",
+    "push",
+    "clone",
+    "ls-remote",
+    "submodule",
+    "lfs",
+    "remote",
+];
+
+/// The git subcommand in `args` (after options like `-c key=value`).
+fn subcommand<'a>(args: &[&'a str]) -> Option<&'a str> {
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match *a {
+            "-c" | "-C" => {
+                it.next();
+            }
+            a if a.starts_with('-') => {}
+            a => return Some(a),
+        }
+    }
+    None
+}
+
+/// Environment and `-c` options for git that may reach a remote, so it can't
+/// hang: ssh in batch mode (an unknown host key or a passphrase without an
+/// agent fails at once, as `Host key verification failed` / `Permission
+/// denied (publickey)`, which `remote::is_auth_failure` reports) unless the
+/// user chose their own ssh command, and an HTTP transfer that stalls for a
+/// minute gives up unless the user set their own limit. `env` reads the
+/// process environment.
+fn network_guard(
+    dir: &Path,
+    env: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> (Vec<(&'static str, &'static str)>, Vec<&'static str>) {
+    let config = Repository::discover(dir)
+        .and_then(|r| r.config())
+        .or_else(|_| git2::Config::open_default())
+        .and_then(|mut c| c.snapshot())
+        .ok();
+    let set = |key: &str| config.as_ref().is_some_and(|c| c.get_entry(key).is_ok());
+    let mut vars = Vec::new();
+    if env("GIT_SSH_COMMAND").is_none() && env("GIT_SSH").is_none() && !set("core.sshCommand") {
+        vars.push(("GIT_SSH_COMMAND", "ssh -o BatchMode=yes"));
+    }
+    let mut options = Vec::new();
+    if !set("http.lowSpeedLimit") && !set("http.lowSpeedTime") && env("GIT_HTTP_LOW_SPEED_LIMIT").is_none() {
+        options.extend(["-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=60"]);
+    }
+    (vars, options)
+}
+
 fn command(dir: &Path, args: &[&str]) -> Command {
-    let mut cmd = Command::new(git_program());
+    let mut cmd = crate::proc::hidden(git_program());
+    if subcommand(args).is_some_and(|s| NETWORK.contains(&s)) {
+        let (env, config) = network_guard(dir, |k| std::env::var_os(k));
+        cmd.envs(env).args(config);
+    }
     cmd.args(args)
         .current_dir(dir)
         // Never block on a hidden prompt: no terminal credential prompt, no
-        // editor, and no stdin for ssh to read a passphrase from.
-        .stdin(Stdio::null())
+        // askpass helper (an empty GIT_ASKPASS also hides core.askPass and
+        // SSH_ASKPASS from git), no editor, and (`proc::hidden`) no stdin for
+        // ssh to read a passphrase from. Credential helpers still run.
         .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "")
         .env("GIT_EDITOR", "true")
         .env("LC_ALL", "C");
     // Tests use local folders as remotes (submodules too), which git blocks by default.
@@ -208,12 +359,6 @@ fn command(dir: &Path, args: &[&str]) -> Command {
     cmd.env("GIT_CONFIG_COUNT", "1")
         .env("GIT_CONFIG_KEY_0", "protocol.file.allow")
         .env("GIT_CONFIG_VALUE_0", "always");
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
     cmd
 }
 
@@ -297,7 +442,7 @@ fn git_streaming(dir: &Path, args: &[&str], mut on_segment: impl FnMut(&str) -> 
 }
 
 /// Like `git`, but feeds `input` on stdin (e.g. a patch for `git apply`).
-fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
+fn git_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Output> {
     use std::io::Write;
     let mut child = command(dir, args)
         .stdin(Stdio::piped())
@@ -309,7 +454,7 @@ fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
         .stdin
         .take()
         .expect("piped stdin")
-        .write_all(input.as_bytes())
+        .write_all(input)
         .map_err(err)?; // stdin drops here, closing the pipe
     let out = child.wait_with_output().map_err(err)?;
     Ok(join_output(
@@ -317,6 +462,11 @@ fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
         &String::from_utf8_lossy(&out.stdout),
         &String::from_utf8_lossy(&out.stderr),
     ))
+}
+
+/// Lowercase hex of `bytes` (digests).
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn git_ok(dir: &Path, args: &[&str]) -> Result<String> {
@@ -352,6 +502,96 @@ mod tests {
             "/bin/sh"
         })
         .is_err());
+    }
+
+    #[test]
+    fn remote_work_gets_no_hidden_prompts_unless_the_user_chose_ssh() {
+        assert_eq!(
+            subcommand(&["-c", "a=b", "--literal-pathspecs", "fetch"]),
+            Some("fetch")
+        );
+        assert_eq!(subcommand(&["-C", "x"]), None);
+        let d = testutil::repo();
+        let none = |_: &str| None;
+        let (vars, options) = network_guard(d.path(), none);
+        assert_eq!(vars, [("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")]);
+        assert_eq!(
+            options,
+            ["-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=60"]
+        );
+        // The user's own ssh command (config or environment) and speed limit are kept.
+        let set = |_: &str| Some(std::ffi::OsString::from("x"));
+        assert!(network_guard(d.path(), set).0.is_empty());
+        git_ok(d.path(), &["config", "core.sshCommand", "ssh -i key"]).unwrap();
+        git_ok(d.path(), &["config", "http.lowSpeedTime", "600"]).unwrap();
+        assert_eq!(network_guard(d.path(), none), (vec![], vec![]));
+    }
+
+    #[test]
+    fn a_fetch_over_ssh_that_would_prompt_fails_as_auth() {
+        // An ssh "client" that, like ssh asking about a new host key, needs a
+        // terminal; git hands it our options, so batch mode is visible here.
+        let d = testutil::repo();
+        let ssh = d.path().join("fake-ssh");
+        std::fs::write(
+            &ssh,
+            "#!/bin/sh\ncase \"$*\" in *BatchMode=yes*) echo 'Host key verification failed.' >&2; exit 255;; esac\nread answer\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o755)).unwrap();
+            git_ok(
+                d.path(),
+                &["remote", "add", "origin", "ssh://git@example.invalid/x.git"],
+            )
+            .unwrap();
+            // Our GIT_SSH_COMMAND with the fake in place of `ssh` (none when the
+            // environment already names an ssh command).
+            let mut cmd = command(d.path(), &["fetch", "origin"]);
+            let ours = cmd
+                .get_envs()
+                .find(|(k, _)| *k == "GIT_SSH_COMMAND")
+                .and_then(|(_, v)| v.map(|v| v.to_string_lossy().into_owned()));
+            if let Some(ours) = ours {
+                let replaced = ours.replacen("ssh", ssh.to_str().unwrap(), 1);
+                cmd.env("GIT_SSH_COMMAND", replaced);
+                let out = cmd.output().unwrap();
+                let text = String::from_utf8_lossy(&out.stderr);
+                assert!(!out.status.success());
+                assert!(remote::is_auth_failure(&text), "{text}");
+            }
+        }
+    }
+
+    #[test]
+    fn git_programs_a_clone_could_plant_are_refused() {
+        // A tracked file named `git` in a work tree (here also in a temp folder).
+        let d = testutil::repo();
+        let fake = d.path().join("git");
+        std::fs::write(&fake, "#!/bin/sh\necho git version 9\n").unwrap();
+        git_ok(d.path(), &["add", "git"]).unwrap();
+        let real = fake.canonicalize().unwrap();
+        assert!(in_repository(&real));
+        assert!(in_temp(&real));
+        assert!(check_git_path(real.to_str().unwrap()).is_err());
+        // Ignored and untracked: allowed as far as the repository goes.
+        let ignored = d.path().join("bin");
+        std::fs::create_dir(&ignored).unwrap();
+        std::fs::write(d.path().join(".gitignore"), "/bin/\n").unwrap();
+        std::fs::write(ignored.join("git"), "").unwrap();
+        assert!(!in_repository(&ignored.join("git").canonicalize().unwrap()));
+        assert!(!in_temp(Path::new("/usr/bin/git")));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let f = ignored.join("git");
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o757)).unwrap();
+            assert!(writable_by_others(&f));
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o755)).unwrap();
+            assert!(!writable_by_others(&f));
+        }
     }
 
     #[test]

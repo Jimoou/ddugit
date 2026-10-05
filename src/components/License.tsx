@@ -19,8 +19,7 @@ const CHECK_EVERY = 24 * 3_600_000;
 /**
  * At startup and about once a day: a device-bound license asks ddugit.com whether
  * it still holds, so a device removed on the website (or a refunded license) stops
- * here too; an old subscription near its expiry asks for a renewal. Offline changes
- * nothing.
+ * here too. Site licenses are never asked about. Offline changes nothing.
  */
 export function useLicenseCheck(remind: (text: string) => void) {
   useEffect(() => {
@@ -29,15 +28,12 @@ export function useLicenseCheck(remind: (text: string) => void) {
       const s = await api.licenseStatus().catch(() => null);
       const lic = s?.license;
       if (!lic || !live) return;
-      const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
-      const bound = !!lic.device || lic.plan === "lifetime";
-      if (!bound && !(lic.expires && (s.expired || lic.expires <= soon))) return;
+      if (!lic.device && lic.plan !== "lifetime") return;
       const r = await api.licenseRefresh().catch(() => null);
       if (!live) return;
-      if (r === "removed" || r === "revoked" || r === "renewed") refreshPro();
+      if (r === "removed" || r === "revoked") refreshPro();
       if (r === "removed") remind(t("license.removedToast"));
       else if (r === "revoked") remind(t("license.revokedToast"));
-      else if (lic.expires && s.expired && r !== "renewed") remind(t("license.lapsedToast", { date: lic.expires }));
     };
     void check();
     const timer = setInterval(() => void check(), CHECK_EVERY);
@@ -124,7 +120,13 @@ export function LicenseSection() {
     act(async () => {
       const d = await api.licenseDeactivate();
       setAsking(false);
-      setNotice(t(d.confirmed ? "license.deactivated" : "license.deactivatedOffline"));
+      setNotice(
+        d.confirmed
+          ? t("license.deactivated")
+          : d.error
+            ? t("license.deactivatedError", { error: d.error })
+            : t("license.deactivatedOffline"),
+      );
       return d.status;
     });
   const lic = status?.license;

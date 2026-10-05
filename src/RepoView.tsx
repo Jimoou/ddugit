@@ -275,7 +275,6 @@ export function RepoView({
   const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
-  const trustedHosts = settings.trustedForgeHosts;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
   // First-run tutorial, played on the demo repository only.
   const tour = useVoyage(path === DEMO_PATH);
@@ -432,7 +431,7 @@ export function RepoView({
   useEffect(() => {
     if (!active) return;
     let live = true;
-    api.pullRequests(path, trustedHosts).then(
+    api.pullRequests(path).then(
       (r) => live && setPulls(r),
       () => {}, // offline or no forge: the graph just has no PR labels
     );
@@ -441,7 +440,7 @@ export function RepoView({
       live = false;
       clearInterval(timer);
     };
-  }, [path, active, prTick, trustedHosts]);
+  }, [path, active, prTick]);
   const graphRefs = useMemo(
     () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
     [snap, pulls, commitById],
@@ -2207,7 +2206,7 @@ export function RepoView({
                             api.stageHunks(
                               path,
                               file,
-                              [hunk],
+                              [diff.files?.find((f) => f.path === file)?.hunks[hunk]?.key ?? ""],
                               diff.source.kind === "worktree" && diff.source.scope === "staged",
                               lines,
                             ),
@@ -2337,11 +2336,11 @@ export function RepoView({
             onPop={() =>
               run(
                 t("stash.popped"),
-                () => api.stash(path, "pop", stashSel.index),
+                () => api.stash(path, "pop", stashSel.id),
                 () => show({}),
               )
             }
-            onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.index))}
+            onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.id))}
             onDrop={() =>
               setConfirm({
                 title: t("stash.delete.title"),
@@ -2352,7 +2351,7 @@ export function RepoView({
                   setConfirm(null);
                   void run(
                     t("stash.deleted"),
-                    () => api.stash(path, "drop", stashSel.index),
+                    () => api.stash(path, "drop", stashSel.id),
                     () => show({}),
                   );
                 },
@@ -2390,8 +2389,6 @@ export function RepoView({
         <AddRemoteDialog
           path={path}
           remotes={snap?.remotes.map((r) => r.name) ?? []}
-          trusted={trustedHosts}
-          onTrust={(host) => onChangeSettings({ trustedForgeHosts: [...trustedHosts, host] })}
           busy={busy}
           onSubmit={(name, url) => void addRemote(name, url)}
           onCancel={() => setAddingRemote(false)}
@@ -2480,7 +2477,6 @@ export function RepoView({
           snap={snap}
           forges={pulls.forges}
           branch={prFrom}
-          trusted={trustedHosts}
           retry={prTick}
           onPush={(name, branch) => pushTo(name, branch)}
           onCreated={(kind, number, url) => {
@@ -2501,10 +2497,6 @@ export function RepoView({
           busy={busy}
           onSave={(token) => void saveToken(tokenFor, token)}
           onOpenPage={openUrl}
-          onTrustCli={() => {
-            onChangeSettings({ trustedForgeHosts: [...trustedHosts, tokenFor.host] });
-            setTokenFor(null);
-          }}
           onCancel={() => setTokenFor(null)}
         />
       )}

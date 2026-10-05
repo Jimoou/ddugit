@@ -108,6 +108,7 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
                 name.trim().into(),
                 "--track".into(),
                 remote_ref.clone(),
+                "--".into(),
             ]
         }
         RefOp::CheckoutRemote {
@@ -116,9 +117,14 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
         } => {
             let local = remote_ref.split_once('/').map(|(_, b)| b).unwrap_or(remote_ref);
             if repo.find_branch(local, BranchType::Local).is_ok() {
-                vec!["checkout".into(), local.into()]
+                vec!["checkout".into(), local.into(), "--".into()]
             } else {
-                vec!["checkout".into(), "--track".into(), remote_ref.clone()]
+                vec![
+                    "checkout".into(),
+                    "--track".into(),
+                    remote_ref.clone(),
+                    "--".into(),
+                ]
             }
         }
         RefOp::AddRemote { name, url, .. } => {

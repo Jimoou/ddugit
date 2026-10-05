@@ -73,9 +73,6 @@ interface Props {
   kind: ForgeKind;
   /** Routes the demo (a repository path, or "" outside one). */
   path: string;
-  /** Hosts whose `gh` / `glab` login may be used (settings). */
-  trusted: string[];
-  onTrust(host: string): void;
   picked: Picked | null;
   onPick(p: Picked | null): void;
   disabled?: boolean;
@@ -91,20 +88,19 @@ export function ForgeRepoPicker(p: Props) {
   const [proto, setProto] = useState(readProto);
   const [connecting, setConnecting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const key = `${p.kind}\n${host}\n${tick}\n${p.trusted.join(",")}`;
+  const key = `${p.kind}\n${host}\n${tick}`;
   const [loaded, setLoaded] = useState<{ key: string; r?: ForgeRepos; error?: string } | null>(null);
-  const trustedKey = p.trusted.join(",");
 
   useEffect(() => {
     let live = true;
-    api.forgeRepos(p.path, p.kind, host, trustedKey ? trustedKey.split(",") : []).then(
+    api.forgeRepos(p.path, p.kind, host).then(
       (r) => live && setLoaded({ key, r }),
       (e) => live && setLoaded({ key, error: String(e) }),
     );
     return () => {
       live = false;
     };
-  }, [key, p.path, p.kind, host, trustedKey]);
+  }, [key, p.path, p.kind, host]);
 
   const current = loaded && loaded.key === key ? loaded : null;
   const result = current?.r ?? null;
@@ -254,10 +250,6 @@ export function ForgeRepoPicker(p: Props) {
               busy={saving}
               onSave={saveToken}
               onOpenPage={(url) => void api.openUrl(p.path, url)}
-              onTrustCli={() => {
-                setConnecting(false);
-                p.onTrust(result.host);
-              }}
               onCancel={() => setConnecting(false)}
             />
           </div>,

@@ -12,9 +12,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
-use super::{git, git_ok, operand, repo_dir, OpResult, OpStatus, Result};
+use super::{config_entries, git, git_ok, is_ancestor, operand, repo_dir, OpResult, OpStatus, Result};
 
 /// `ddugit-transfer.<destination>.sent = "<branch> <commit> <unix time>"`, one value per export.
 const SECTION: &str = "ddugit-transfer";
@@ -109,16 +108,8 @@ fn now() -> i64 {
 
 /// Every transfer recorded in `dir`'s config, the latest per destination and branch.
 fn sent_in(dir: &Path) -> Vec<Sent> {
-    let pattern = format!(r"^{SECTION}\..*\.sent$");
-    // `-z`: "key\nvalue\0", since a destination name may hold spaces.
-    let Ok(out) = git(dir, &["config", "--local", "-z", "--get-regexp", &pattern]) else {
-        return Vec::new();
-    };
     let mut latest: BTreeMap<(String, String), Sent> = BTreeMap::new();
-    for entry in out.text.split('\0') {
-        let Some((key, value)) = entry.trim_start_matches('\n').split_once('\n') else {
-            continue;
-        };
+    for (key, value) in config_entries(dir, &format!(r"^{SECTION}\..*\.sent$")) {
         let Some(dest) = key
             .strip_prefix(&format!("{SECTION}."))
             .and_then(|k| k.strip_suffix(".sent"))
@@ -159,16 +150,11 @@ fn rev(dir: &Path, r: &str) -> Result<String> {
     .map_err(|_| format!("No such branch or commit: {r}"))
 }
 
-fn is_ancestor(dir: &Path, a: &str, b: &str) -> bool {
-    git(dir, &["merge-base", "--is-ancestor", a, b]).is_ok_and(|o| o.ok)
-}
-
+/// Streamed: a bundle may be several gigabytes.
 fn sha256_hex(file: &Path) -> Result<String> {
-    let bytes = std::fs::read(file).map_err(|e| format!("Can't read {}: {e}", file.display()))?;
-    Ok(Sha256::digest(&bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect())
+    std::fs::File::open(file)
+        .and_then(crate::digest::sha256_hex)
+        .map_err(|e| format!("Can't read {}: {e}", file.display()))
 }
 
 fn checksum_file(bundle: &Path) -> PathBuf {
@@ -353,6 +339,18 @@ mod tests {
 
     fn tip(p: &Path, r: &str) -> String {
         git_ok(p, &["rev-parse", r]).unwrap().trim().to_string()
+    }
+
+    #[test]
+    fn checksums_are_sha256sum_hex() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("x.bundle");
+        std::fs::write(&f, "abc").unwrap();
+        assert_eq!(
+            sha256_hex(&f).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert!(sha256_hex(&d.path().join("missing")).is_err());
     }
 
     #[test]

@@ -13,7 +13,7 @@ const file = (lines: DiffLine[]): FileDiff => ({
   deletions: 0,
   binary: false,
   truncated: false,
-  hunks: [{ header: "@@", lines }],
+  hunks: [{ header: "@@", key: "k", lines }],
 });
 
 describe("lfs", () => {

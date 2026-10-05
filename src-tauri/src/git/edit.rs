@@ -7,8 +7,8 @@
 
 use serde::Deserialize;
 
-use super::write::{conflict_aware, prepare_on};
-use super::{err, git, git_ok, open, OpResult, Result};
+use super::write::prepare_on;
+use super::{err, git, git_ok, literal, open, operand, OpResult, OpStatus, Result, LITERAL};
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "kind")]
@@ -136,18 +136,43 @@ pub fn edit_commit(path: &str, id: &str, edit: &CommitEdit) -> Result<OpResult> 
     }
     let o = git(&dir, &args);
     let _ = std::fs::remove_dir_all(&scratch);
-    Ok(conflict_aware(path, o?))
+    let o = o?;
+    // Replaying the same commits can't conflict, so a stop means the edit
+    // itself failed (a pre-commit or commit-msg hook said no). Put everything
+    // back as it was, local changes included, and show what the hook said.
+    if !o.ok && super::in_progress(path) {
+        let undo = git(&dir, &["rebase", "--abort"])?;
+        let mut out = OpResult::with(OpStatus::Failed, o);
+        if !undo.ok {
+            out.output = format!("{}\n{}", out.output, undo.text);
+        }
+        return Ok(out);
+    }
+    Ok(o.into())
 }
 
 /// Put `file` back the way commit `source` had it (deleting it if it didn't
-/// exist there). The result is an uncommitted, staged change.
+/// exist there). The result is an uncommitted, staged change. A `source` that
+/// doesn't name a commit is refused: it never turns into a deletion.
 pub fn restore_file(path: &str, source: &str, file: &str) -> Result<OpResult> {
+    operand(source)?;
     let dir = prepare_on(path, None)?;
-    let exists = git(&dir, &["cat-file", "-e", &format!("{source}:{file}")])?.ok;
-    Ok(if exists {
-        git(&dir, &["checkout", source, "--", file])?
+    let repo = open(path)?;
+    let commit = repo
+        .revparse_single(source)
+        .and_then(|o| o.peel_to_commit())
+        .map_err(|_| format!("Unknown commit '{source}'"))?;
+    let id = commit.id().to_string();
+    let found = match commit.tree().and_then(|t| t.get_path(std::path::Path::new(file))) {
+        Ok(_) => true,
+        Err(e) if e.code() == git2::ErrorCode::NotFound => false,
+        Err(e) => return Err(e.message().to_string()),
+    };
+    // `checkout` runs the post-checkout hook, so the path is spelled literal (see `LITERAL`).
+    Ok(if found {
+        git(&dir, &["checkout", &id, "--", &literal(file)])?
     } else {
-        git(&dir, &["rm", "-q", "-f", "--ignore-unmatch", "--", file])?
+        git(&dir, &[LITERAL, "rm", "-q", "-f", "--ignore-unmatch", "--", file])?
     }
     .into())
 }
@@ -156,7 +181,6 @@ pub fn restore_file(path: &str, source: &str, file: &str) -> Result<OpResult> {
 mod tests {
     use super::super::read::snapshot;
     use super::super::testutil::{commit_file, repo, s};
-    use super::super::OpStatus;
     use super::*;
     use std::path::Path;
 
@@ -178,6 +202,40 @@ mod tests {
             commit_file(d.path(), &format!("{n}.txt"), n, n);
         }
         d
+    }
+
+    #[test]
+    fn a_hook_that_refuses_the_edit_leaves_everything_as_it_was() {
+        let d = three();
+        std::fs::write(d.path().join("c.txt"), "dirty").unwrap();
+        let before = sha(d.path(), "HEAD");
+        let hook = d.path().join(".git/hooks/pre-commit");
+        std::fs::create_dir_all(hook.parent().unwrap()).unwrap();
+        std::fs::write(&hook, "#!/bin/sh\necho 'no commits today' >&2\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let b = sha(d.path(), "HEAD~1");
+        for edit in [
+            CommitEdit::Reword {
+                message: "b, reworded".into(),
+            },
+            CommitEdit::Split {
+                first: vec!["b.txt".into()],
+                first_message: "one".into(),
+                second_message: "two".into(),
+            },
+        ] {
+            let r = edit_commit(s(d.path()), &b, &edit).unwrap();
+            assert_eq!(r.status, OpStatus::Failed, "{}", r.output);
+            assert!(r.output.contains("no commits today"), "{}", r.output);
+            assert_eq!(snapshot(s(d.path()), 100).unwrap().state, "clean");
+            assert_eq!(sha(d.path(), "HEAD"), before);
+            assert_eq!(log(d.path(), "%s"), ["a", "b", "c"]);
+            assert_eq!(std::fs::read_to_string(d.path().join("c.txt")).unwrap(), "dirty");
+        }
     }
 
     #[test]
@@ -316,5 +374,15 @@ mod tests {
         assert!(!d.path().join("c.txt").exists());
         let snap = snapshot(s(d.path()), 10).unwrap();
         assert!(snap.changes.iter().all(|c| c.staged.is_some()));
+    }
+
+    #[test]
+    fn restoring_from_an_unknown_source_deletes_nothing() {
+        let d = three();
+        for bad in ["nope", "--output=x", "HEAD~9"] {
+            assert!(restore_file(s(d.path()), bad, "a.txt").is_err(), "{bad}");
+        }
+        assert!(d.path().join("a.txt").exists());
+        assert!(snapshot(s(d.path()), 10).unwrap().changes.is_empty());
     }
 }

@@ -200,13 +200,14 @@ export const en: Record<Key, string> = {
   "license.newer": "This version was released after your license's update period ended ({date}).",
   "license.until": "Until {date} · {email}",
   "license.lapsed": "Your license period ended on {date}. Pro features are locked.",
-  "license.lapsedToast": "Your ddugit license period ended on {date}. See Settings → License.",
   "license.devices": "Up to 3 devices · manage them at ddugit.com/account",
   "license.account": "Open ddugit.com/account",
   "license.deactivate": "Deactivate this device",
   "license.deactivateAsk": "Deactivate the license on this device? This frees a slot for another device.",
   "license.deactivateYes": "Deactivate",
   "license.deactivated": "Deactivated on this device",
+  "license.deactivatedError":
+    "Deactivated here, but ddugit.com didn't remove this device ({error}). Remove it at ddugit.com/account too.",
   "license.deactivatedOffline":
     "Deactivated here, but ddugit.com couldn't be reached. Remove this device at ddugit.com/account too.",
   "license.otherDevice":
@@ -990,7 +991,6 @@ export const en: Record<Key, string> = {
   "pr.token.forgotten": "Removed the saved token",
   "pr.token.foreign":
     "<b>{host}</b> isn't github.com or gitlab.com. Use a token from this server only if you trust it.",
-  "pr.token.trustCli": "Use my {cli} login for {host}",
   "remote.add.urlLabel": "URL",
   "forge.sources": "Source",
   "forge.source.url": "URL",

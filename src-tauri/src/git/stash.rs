@@ -4,7 +4,7 @@ use git2::Repository;
 use serde::{Deserialize, Serialize};
 
 use super::read::read_changes;
-use super::{err, git, git_ok, open, workdir, OpResult, OpStatus, Result};
+use super::{err, git, git_ok, literal, open, workdir, OpResult, OpStatus, Result, LITERAL};
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -78,16 +78,23 @@ pub fn discard(path: &str, paths: &[String]) -> Result<OpResult> {
     if !tracked.is_empty() {
         let mut args = if repo.head().is_ok() {
             // Paths missing from HEAD (newly added) are removed, matching the source.
-            vec!["restore", "--source=HEAD", "--staged", "--worktree", "--"]
+            vec![
+                LITERAL,
+                "restore",
+                "--source=HEAD",
+                "--staged",
+                "--worktree",
+                "--",
+            ]
         } else {
             // Unborn branch: nothing to restore from; just unstage, then delete below.
-            vec!["rm", "-r", "-q", "-f", "--"]
+            vec![LITERAL, "rm", "-r", "-q", "-f", "--"]
         };
         args.extend(&tracked);
         out.push(git_ok(&dir, &args)?);
     }
     if !untracked.is_empty() {
-        let mut args = vec!["clean", "-f", "-q", "--"];
+        let mut args = vec![LITERAL, "clean", "-f", "-q", "--"];
         args.extend(&untracked);
         out.push(git_ok(&dir, &args)?);
     }
@@ -100,19 +107,35 @@ pub fn discard(path: &str, paths: &[String]) -> Result<OpResult> {
 /// Stash `paths` (all changes when empty), including untracked files.
 pub fn stash_push(path: &str, message: &str, paths: &[String]) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
+    // Not `LITERAL`: stash's own internal pathspecs need magic, so each path is spelled literal.
+    let specs: Vec<String> = paths.iter().map(|p| literal(p)).collect();
     let mut args = vec!["stash", "push", "--include-untracked"];
     if !message.trim().is_empty() {
         args.extend(["-m", message.trim()]);
     }
     if !paths.is_empty() {
         args.push("--");
-        args.extend(paths.iter().map(String::as_str));
+        args.extend(specs.iter().map(String::as_str));
     }
     Ok(git(&dir, &args)?.into())
 }
 
-pub fn stash(path: &str, op: StashOp, index: usize) -> Result<OpResult> {
-    let dir = workdir(&open(path)?)?;
+/// Apply, pop or drop the stash whose commit is `id`. Its position is looked up
+/// right before acting: a stash pushed or dropped meanwhile (a terminal, an IDE)
+/// shifts `stash@{n}`, and acting on a stale position would drop another one.
+pub fn stash(path: &str, op: StashOp, id: &str) -> Result<OpResult> {
+    let mut repo = open(path)?;
+    let dir = workdir(&repo)?;
+    let mut index = None;
+    repo.stash_foreach(|i, _, oid| {
+        let hit = oid.to_string() == id;
+        if hit {
+            index = Some(i);
+        }
+        !hit
+    })
+    .map_err(err)?;
+    let index = index.ok_or("That stash no longer exists; the list has been refreshed")?;
     let name = format!("stash@{{{index}}}");
     let o = git(&dir, &["stash", op.verb(), &name])?;
     // Apply/pop conflicts leave unmerged paths but no repository state to detect.
@@ -156,6 +179,35 @@ mod tests {
         assert_eq!(changed(&d), vec!["keep.txt"]);
     }
 
+    /// File names are not globs: discarding `u?` must not delete `ux`, and a
+    /// file named `*` or `:(top)x` is just that file.
+    #[test]
+    fn discard_and_stash_take_paths_literally() {
+        // `[x]` is a pathspec glob that matches `x` and is a legal file name on every OS.
+        let d = repo();
+        commit_file(d.path(), "t[x].txt", "t", "base");
+        commit_file(d.path(), "tx.txt", "t", "base2");
+        for n in ["u[x]", "ux"] {
+            fs::write(d.path().join(n), "u").unwrap();
+        }
+        fs::write(d.path().join("t[x].txt"), "edit").unwrap();
+        fs::write(d.path().join("tx.txt"), "edit").unwrap();
+        discard(s(d.path()), &["u[x]".into()]).unwrap();
+        assert!(!d.path().join("u[x]").exists());
+        assert!(d.path().join("ux").exists());
+        discard(s(d.path()), &["t[x].txt".into()]).unwrap();
+        assert_eq!(fs::read_to_string(d.path().join("t[x].txt")).unwrap(), "t");
+        assert_eq!(fs::read_to_string(d.path().join("tx.txt")).unwrap(), "edit");
+        if cfg!(unix) {
+            // Pathspec magic in a name: only possible where `:` is allowed in file names.
+            fs::write(d.path().join(":(top)x"), "u").unwrap();
+            let r = stash_push(s(d.path()), "", &[":(top)x".into()]).unwrap();
+            assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+            assert!(!d.path().join(":(top)x").exists());
+            assert!(d.path().join("ux").exists());
+        }
+    }
+
     #[test]
     fn discard_on_unborn_branch() {
         let d = repo();
@@ -183,7 +235,10 @@ mod tests {
         let head = snapshot(s(d.path()), 1).unwrap().head.target.unwrap();
         assert_eq!(list[0].base, head);
 
-        assert_eq!(stash(s(d.path()), StashOp::Pop, 0).unwrap().status, OpStatus::Ok);
+        assert_eq!(
+            stash(s(d.path()), StashOp::Pop, &list[0].id).unwrap().status,
+            OpStatus::Ok
+        );
         assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "edit");
         assert!(read_stashes(s(d.path())).unwrap().is_empty());
     }
@@ -196,15 +251,40 @@ mod tests {
         fs::write(d.path().join("u.txt"), "u").unwrap();
         stash_push(s(d.path()), "", &[]).unwrap();
         assert!(changed(&d).is_empty());
+        let id = read_stashes(s(d.path())).unwrap()[0].id.clone();
 
         assert_eq!(
-            stash(s(d.path()), StashOp::Apply, 0).unwrap().status,
+            stash(s(d.path()), StashOp::Apply, &id).unwrap().status,
             OpStatus::Ok
         );
         assert!(d.path().join("u.txt").exists());
         assert_eq!(read_stashes(s(d.path())).unwrap().len(), 1); // apply keeps it
-        assert_eq!(stash(s(d.path()), StashOp::Drop, 0).unwrap().status, OpStatus::Ok);
+        assert_eq!(
+            stash(s(d.path()), StashOp::Drop, &id).unwrap().status,
+            OpStatus::Ok
+        );
         assert!(read_stashes(s(d.path())).unwrap().is_empty());
+        assert!(stash(s(d.path()), StashOp::Drop, &id).is_err());
+    }
+
+    /// A stash pushed from a terminal shifts `stash@{n}`; acting by id still hits the one shown.
+    #[test]
+    fn acts_on_the_stash_by_id_after_another_was_pushed() {
+        let d = repo();
+        commit_file(d.path(), "a.txt", "a", "base");
+        fs::write(d.path().join("a.txt"), "first").unwrap();
+        stash_push(s(d.path()), "first", &[]).unwrap();
+        let shown = read_stashes(s(d.path())).unwrap()[0].id.clone();
+        fs::write(d.path().join("a.txt"), "second").unwrap();
+        git_ok(d.path(), &["stash", "push", "-q", "-m", "second"]).unwrap();
+
+        let r = stash(s(d.path()), StashOp::Drop, &shown).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let left = read_stashes(s(d.path())).unwrap();
+        assert_eq!(left.len(), 1);
+        assert!(left[0].message.contains("second"));
+        assert!(stash(s(d.path()), StashOp::Pop, &shown).is_err());
+        assert!(stash(s(d.path()), StashOp::Pop, "not-an-id").is_err());
     }
 
     #[test]
@@ -215,7 +295,8 @@ mod tests {
         stash_push(s(d.path()), "x", &[]).unwrap();
         commit_file(d.path(), "a.txt", "committed", "other");
 
-        let r = stash(s(d.path()), StashOp::Pop, 0).unwrap();
+        let id = read_stashes(s(d.path())).unwrap()[0].id.clone();
+        let r = stash(s(d.path()), StashOp::Pop, &id).unwrap();
         assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
         assert_eq!(read_stashes(s(d.path())).unwrap().len(), 1);
     }

@@ -173,10 +173,9 @@ pub(super) fn fetch(
 /// The repositories the signed-in user owns, collaborates on or reaches through
 /// an organization / group on `host`. Without a token (or with a refused one)
 /// the list is empty and `needs_token` says to ask for one.
-/// `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used.
-pub fn list(kind: ForgeKind, host: &str, trusted: &[String]) -> Result<ForgeRepos> {
+pub fn list(kind: ForgeKind, host: &str) -> Result<ForgeRepos> {
     let host = normalize_host(host)?;
-    let (token, source) = token_for(kind, &host, trusted);
+    let (token, source) = token_for(kind, &host);
     let mut out = ForgeRepos {
         kind,
         public: is_public_forge(&host),
@@ -277,10 +276,10 @@ mod tests {
 
     #[test]
     fn an_untrusted_host_without_a_saved_token_asks_for_one() {
-        // Never reaches `gh` (untrusted), nothing in the keychain here: no network either.
-        let r = list(ForgeKind::Github, "https://GitHub.attacker.example/", &[]).unwrap();
+        // Never reaches `gh` (not signed in there), nothing in the keychain here: no network either.
+        let r = list(ForgeKind::Github, "https://GitHub.attacker.example/").unwrap();
         assert_eq!(r.host, "github.attacker.example");
         assert!(r.needs_token && !r.unauthorized && !r.public && r.repos.is_empty());
-        assert!(list(ForgeKind::Gitlab, "not a host", &[]).is_err());
+        assert!(list(ForgeKind::Gitlab, "not a host").is_err());
     }
 }

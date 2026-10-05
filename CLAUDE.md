@@ -32,7 +32,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 ## 구조
 
-- `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다)
+- `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다. 이름이 `git`인 절대 경로만 받고, 저장소가 추적하는(무시되지 않는) 파일·임시 폴더·다른 사용자가 쓸 수 있는 파일은 거부한다)
   - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태). 이력은 libgit2 정렬 revwalk(전체 이력을 먼저 읽는다) 대신 커밋 시각 순으로 직접 걷다가(`TimeWalk`) 페이지 크기에서 멈추고, `children_first`로 자식이 부모보다 앞에 오게 고친다
   - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃)
   - `pick.rs`: cherry-pick / revert
@@ -45,7 +45,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
   - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`)
   - `bisect.rs`: `git bisect` 시작·좋음·나쁨·건너뛰기와 상태 읽기(refs/bisect/*에서 후보·지금 확인할 커밋·범인). 끝내기는 `write::abort`(bisect reset)
-  - `edit.rs`: 지난 커밋 손보기(메시지·작성자·파일별로 둘로 나누기). 부모부터 rebase -i --autostash로 다시 쌓고 대상 바로 뒤에 `exec`을 끼운다. 파일 하나를 어떤 커밋 상태로 되돌리기(`restore_file`)
+  - `edit.rs`: 지난 커밋 손보기(메시지·작성자·파일별로 둘로 나누기). 부모부터 rebase -i --autostash로 다시 쌓고 대상 바로 뒤에 `exec`을 끼운다. 훅(pre-commit 등)이 거부하면 rebase를 취소해 원래대로 돌리고 훅 출력을 돌려준다. 파일 하나를 어떤 커밋 상태로 되돌리기(`restore_file`)
   - `identity.rs`: 커밋할 사람과 서명(`user.name`·`user.email`·`commit.gpgsign`·`gpg.format`·`user.signingkey`)을 값이 온 곳(`--show-scope`)과 함께 CLI로 읽고, 저장소(local)·전역에 프로필 적용·서명 켜고 끄기·지우기(`IdentityOp`). GPG 비밀 키(`--with-colons`)·SSH 공개 키(`ssh::keys_in`) 목록, 커밋 하나의 서명(`%G?`·`%GS`·`%GK`, 확인 못 한 SSH 서명은 libgit2로 서명 유무). 프로필은 설정(`settings.profiles`, 순수 로직 `identity.ts`), 화면은 `components/Identity.tsx`(커밋 창의 이름 줄·메뉴, 설정의 프로필), 서명 배지는 `Inspector`
   - `history.rs`: 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
   - `cleanup.rs`: 브랜치 정리 보고(기준 브랜치에 병합됨 / 원격에서 사라짐(gone) / 마지막 커밋 시각)와 여러 브랜치 한 번에 삭제
@@ -59,14 +59,14 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `transfer.rs`: 폐쇄망 반출입(Pro). 받는 곳별로 지난 반출 이후만 담은 `git bundle` + `.sha256`, 반출 기록은 로컬 config `ddugit-transfer.<받는 곳>.sent`. 반입은 검사(체크섬·빠진 선행 커밋) 후 `refs/remotes/<이름>/`으로 가져온다. 화면은 `components/Transfer.tsx`(사이드바 로컬 브랜치 머리의 버튼), 순수 로직 `transfer.ts`
   - `stack.rs`: 스택 브랜치(Pro). 부모와 base(마지막으로 쌓은 부모 끝)를 로컬 config `branch.<이름>.ddugit-parent`·`ddugit-base`에 두고, 다시 쌓기는 스택 맨 아래부터 `rebase --onto <부모> <base> <브랜치>`(amend·squash된 부모의 옛 커밋을 다시 얹지 않는다). 화면은 `components/Stacks.tsx`(사이드바 섹션)와 브랜치 메뉴(`RepoView`의 `stackItems`), 순수 로직 `stack.ts`
   - `changelog.rs`: 릴리스 노트(Pro, 화면에서 잠금). 두 리비전 사이 첫 번째 부모 줄의 커밋(PR당 하나)과, 병합마다 들여온 커밋(`inner`, PR 번호 없는 병합에 씀). 시작을 안 주면 직전 태그(`describe --tags <to>^`), 빈 문자열이면 첫 커밋부터. 묶기·Markdown은 순수 로직 `notes.ts`, 화면은 `components/ReleaseNotes.tsx`(태그·로컬 브랜치 메뉴)
-- `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). 토큰은 webview로 넘기지 않는다. `forge/repos.rs`: 로그인한 사용자의 저장소 목록(clone·원격 추가에서 고르기, `components/ForgeRepoPicker.tsx`, 순수 로직 `forgeRepos.ts`의 `FORGE_SOURCES`·검색). `forge/create.rs`: PR·MR 만들기(REST, 기본 브랜치·비공개 확인 후 POST, 이미 열림은 기존 링크). 화면은 `components/CreatePr.tsx`(브랜치 메뉴·PR 섹션 머리), 순수 로직 `prDraft.ts`
+- `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). github.com·gitlab.com 밖의 호스트는 그 CLI 설정(`hosts.yml`·`config.yml`)에 로그인된 호스트일 때만 CLI 토큰을 쓴다(webview가 정하지 않는다). 원격 URL의 호스트는 `normalize_host`로 검사한다. 키체인 서비스는 `keychain.rs`(forge 토큰 `ddugit-forge`, 기기 ID `ddugit-device`, 옛 `ddugit`에서 옮겨 온다). 토큰은 webview로 넘기지 않는다. `forge/repos.rs`: 로그인한 사용자의 저장소 목록(clone·원격 추가에서 고르기, `components/ForgeRepoPicker.tsx`, 순수 로직 `forgeRepos.ts`의 `FORGE_SOURCES`·검색). `forge/create.rs`: PR·MR 만들기(REST, 기본 브랜치·비공개 확인 후 POST, 이미 열림은 기존 링크). 화면은 `components/CreatePr.tsx`(브랜치 메뉴·PR 섹션 머리), 순수 로직 `prDraft.ts`
 - `src-tauri/src/ssh.rs`: SSH 준비(키 목록·생성, 호스트 키 지문을 GitHub·GitLab 공개 지문과 비교해 known_hosts에 추가, 연결 확인). 시스템 OpenSSH, 프롬프트 없음
 - `src-tauri/src/update.rs`: 앱 자동 업데이트(tauri-plugin-updater). 확인 주소는 빌드 때 `DDUGIT_UPDATE_URL`(Supabase의 `latest.json`, 없으면 업데이트 안 함), 서명 공개키는 `tauri.conf.json`. 화면은 `components/Update.tsx`(시작할 때와 6시간마다 확인)
 - `src-tauri/src/pro.rs`: Free / Pro 판정(이 기기의 유효한 라이선스 또는 사이트 라이선스, 체험 없음). Pro 경계: 비공개·회사 서버 저장소의 PR 연동(`forge::report`의 `locked`), 백포트 실행·폐쇄망 반출입·스택 쌓기·대시보드 일괄 브랜치 전환(`pro::require`), 대시보드 3개 초과·릴리스 노트·일괄 Pull(화면). 화면 쪽은 `src/pro.ts`(상태 공유, `offerPro`)와 `components/ProOffer.tsx`
 - `src-tauri/src/license.rs`: 라이선스를 오프라인 검증(Ed25519, 공개키는 빌드 때 `DDUGIT_LICENSE_PUBKEY`). 산 라이선스는 평생(`plan: lifetime`, `updatesUntil` 9999-12-31)이고 기기 하나에 서명된다(`device` = 기기 ID의 SHA-256, 다르면 `otherDevice`로 Pro 꺼짐). `refresh_in`은 시작할 때·하루마다(`License.tsx`의 `useLicenseCheck`) 묻고, 사이트에서 지운 기기(`removed`)·환불(`revoked`)이면 지운다. 기기 ID는 `device.rs`(32바이트 base64url, 설정 폴더 `device-id` + 키체인, 키체인 우선). 발급은 `scripts/license.mjs`, 절차·서명은 `docs/RELEASE.md`
 - `src-tauri/src/activate.rs`: ddugit.com 로그인으로 Pro 활성화(RFC 8252 루프백). `127.0.0.1:<임의 포트>`에서 기다리며 브라우저로 `ddugit.com/activate?port&state&device&name`을 열고(사이트가 기기를 3대까지 등록), 돌아온 1회용 코드와 기기 ID를 `/api/license/activate`에서 이 기기용 라이선스로 바꿔 `license::install_in`. `deactivate_in`은 `/api/license/deactivate`로 자리를 비우고 결과와 상관없이 여기서 지운다. 붙여 넣기는 폐쇄망·사이트 라이선스용으로 남는다. 화면은 설정 → 라이선스(`components/License.tsx`)
 - `src-tauri/src/report.rs`: 문제 신고·문의를 `ddugit.com/api/report`로 POST(`activate::post` 공유, 사이트와 같은 길이·이메일 검사). `about.rs`: 앱 버전·OS·아키텍처(`app_info`)와 열 수 있는 링크(https만). 화면은 `components/Report.tsx`(설정 '정보', 신고 창, 'Git을 찾을 수 없어요' 안내). 진단 정보는 순수 로직 `src/report.ts`(세션 오류 로그: 명령 실패는 `api.ts`의 `call`이, 잡히지 않은 오류는 `captureErrors`가 넣는다. `isUnexpected`가 토스트의 '신고' 버튼을 정한다)와 `src/redact.ts`(경로·URL·이메일·토큰 가리기)
-- `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다.
+- `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다. Pro 전용은 `command!(pro …)`(여기서 거부), 설정 폴더(라이선스)가 필요하면 `command!(이름(…) in dir -> …)`. 외부 프로그램은 `proc::hidden`(stdin 닫음, Windows 콘솔 창 없음)으로 띄운다
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`mock.ts`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, `mock` 세 곳에 추가한다.
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.
 - `src/recent.ts`: 최근 저장소·즐겨찾기 목록(순수 함수). 저장소 그룹은 `src/groups.ts`(폴더형: 저장소마다 그룹 하나, 대시보드 띠 `bands`). `components/Connect.tsx`가 저장(`useRecent`)과 화면(저장소 메뉴, 첫 화면 목록, clone 창)을 맡는다
@@ -103,5 +103,5 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 - UI 문자열은 `src/i18n`의 사전(`ko.ts` 원본 + `en.ts`)에 두고 `t("key")`로 읽는다. 코드·주석·커밋은 영어.
 - 렌더 루프(rAF) 안에서 매 프레임 `setState`를 부르지 않는다. 프레임 상태는 ref에 둔다.
-- git CLI는 `GIT_TERMINAL_PROMPT=0`, stdin을 닫은 상태로 실행한다. 프롬프트에서 멈추면 GUI가 굳는다.
+- git CLI는 `GIT_TERMINAL_PROMPT=0`, 빈 `GIT_ASKPASS`, stdin을 닫은 상태로 실행한다. 프롬프트에서 멈추면 GUI가 굳는다. 원격에 닿는 명령(`mod.rs`의 `NETWORK`)은 사용자가 ssh 명령을 정하지 않았으면 `ssh -o BatchMode=yes`, HTTP는 1분 멈추면 끊는다(`network_guard`)
 - 새 git 쓰기 작업에는 반드시 임시 저장소 테스트(각 `git/*.rs` 하단, `testutil` 사용)를 붙인다. 원격 작업은 로컬 bare 저장소로 테스트한다.

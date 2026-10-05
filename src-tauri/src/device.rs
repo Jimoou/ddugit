@@ -11,12 +11,9 @@ use std::sync::OnceLock;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
 use base64::Engine;
-use sha2::{Digest, Sha256};
-
 type Result<T> = std::result::Result<T, String>;
 
-const FILE: &str = "device-id";
-const KEYCHAIN_SERVICE: &str = "ddugit";
+const FILE: &str = crate::keychain::DEVICE_ACCOUNT;
 
 /// Read once per run: the keychain is asked at most once.
 static ID: OnceLock<String> = OnceLock::new();
@@ -26,7 +23,7 @@ pub fn id_in(dir: &Path) -> Result<String> {
     if let Some(id) = ID.get() {
         return Ok(id.clone());
     }
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, FILE).ok();
+    let entry = crate::keychain::entry(crate::keychain::DEVICE, FILE);
     let held = entry.as_ref().and_then(|e| e.get_password().ok());
     let id = settle(dir, held, |id| {
         if let Some(e) = &entry {
@@ -75,10 +72,7 @@ fn valid(id: &str) -> bool {
 
 /// Lowercase SHA-256 hex of the id's text: the `device` a license is bound to.
 pub fn hash(id: &str) -> String {
-    Sha256::digest(id.as_bytes())
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    crate::digest::sha256_hex(id.as_bytes()).expect("reading bytes in memory can't fail")
 }
 
 /// How the website lists this computer: its name, without control characters, at most 64 characters.
@@ -98,16 +92,7 @@ fn raw_name() -> Option<String> {
     if cfg!(windows) {
         return std::env::var("COMPUTERNAME").ok();
     }
-    let run = |cmd: &str, args: &[&str]| {
-        std::process::Command::new(cmd)
-            .args(args)
-            .stdin(std::process::Stdio::null())
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-            .filter(|s| !s.is_empty())
-    };
+    let run = |cmd: &str, args: &[&str]| crate::proc::stdout_of(crate::proc::hidden(cmd).args(args));
     // macOS: the name people gave the Mac ("Kim's MacBook Pro"), not the network host name.
     let friendly = if cfg!(target_os = "macos") {
         run("scutil", &["--get", "ComputerName"])

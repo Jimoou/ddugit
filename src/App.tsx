@@ -361,8 +361,6 @@ export default function App() {
       {clone && (
         <CloneDialog
           init={clone}
-          trusted={settings.trustedForgeHosts}
-          onTrust={(host) => updateSettings({ trustedForgeHosts: [...settings.trustedForgeHosts, host] })}
           onCancel={() => setClone(null)}
           onCloned={(dest) => {
             setClone(null);

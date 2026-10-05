@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use super::read::read_head;
 use super::write::conflict_aware;
-use super::{git_streaming, open, workdir, OpResult, OpStatus, Result};
+use std::path::Path;
+
+use super::{git_streaming, open, workdir, OpResult, OpStatus, Output, Result};
 
 /// One progress update parsed from git's `--progress` output.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -53,6 +55,36 @@ const AUTH_FAILURES: &[&str] = &[
 
 pub(super) fn is_auth_failure(text: &str) -> bool {
     AUTH_FAILURES.iter().any(|p| text.contains(p))
+}
+
+/// Run remote work (fetch, push, clone) in `dir`: git's progress lines go to
+/// `on_progress` instead of the output text.
+pub(super) fn stream_remote(
+    dir: &Path,
+    args: &[&str],
+    mut on_progress: impl FnMut(Progress),
+) -> Result<Output> {
+    git_streaming(dir, args, |line| match parse_progress(line) {
+        Some(p) => {
+            on_progress(p);
+            true
+        }
+        None => false,
+    })
+}
+
+/// How remote work ended, apart from what is particular to one operation:
+/// missing credentials, and (for a push) a rejected update.
+pub(super) fn remote_status(o: &Output, push: bool) -> OpStatus {
+    if o.ok {
+        OpStatus::Ok
+    } else if is_auth_failure(&o.text) {
+        OpStatus::Auth
+    } else if push && o.text.contains("[rejected]") {
+        OpStatus::Rejected
+    } else {
+        OpStatus::Failed
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -107,7 +139,7 @@ fn default_remote(repo: &Repository) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+pub fn remote(path: &str, op: RemoteOp, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     let head = read_head(&repo);
@@ -138,25 +170,17 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
             }
             let remote = default_remote(&repo).ok_or("No remote configured")?;
             super::operand(&remote)?;
-            super::operand(&branch)?;
-            args.extend(["-u".into(), remote, branch]);
+            args.extend(["-u".into(), remote, heads_refspec(&branch)]);
         }
     }
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
-    let o = git_streaming(&dir, &argv, |line| match parse_progress(line) {
-        Some(p) => {
-            on_progress(p);
-            true
-        }
-        None => false,
-    })?;
-    if o.ok {
-        return Ok(o.into());
+    let o = stream_remote(&dir, &argv, on_progress)?;
+    let status = remote_status(&o, matches!(op, RemoteOp::Push | RemoteOp::ForcePush));
+    if status != OpStatus::Failed {
+        return Ok(OpResult::with(status, o));
     }
 
     let status = match op {
-        _ if is_auth_failure(&o.text) => OpStatus::Auth,
-        RemoteOp::Push | RemoteOp::ForcePush if o.text.contains("[rejected]") => OpStatus::Rejected,
         RemoteOp::Pull => {
             // ff-only failed: diverged if both sides have new commits after the pull's fetch.
             let h = read_head(&open(path)?);
@@ -170,6 +194,12 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
         _ => OpStatus::Failed,
     };
     Ok(OpResult::with(status, o))
+}
+
+/// `refs/heads/b:refs/heads/b`: a branch name as a refspec is read by git, and
+/// a branch named `+main` (a legal name) would mean "force-push main".
+fn heads_refspec(branch: &str) -> String {
+    format!("refs/heads/{branch}:refs/heads/{branch}")
 }
 
 /// The remote of an upstream like `upstream/main` (remote names may hold slashes).
@@ -191,7 +221,7 @@ pub fn push_to(
     path: &str,
     remote: &str,
     branch: Option<&str>,
-    mut on_progress: impl FnMut(Progress),
+    on_progress: impl FnMut(Progress),
 ) -> Result<OpResult> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
@@ -204,45 +234,18 @@ pub fn push_to(
     if !pushable(&repo, super::operand(remote)?) {
         return Err(format!("{remote} is fetch-only"));
     }
-    let args = ["push", "--progress", "-u", remote, super::operand(&branch)?];
-    let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
-        Some(p) => {
-            on_progress(p);
-            true
-        }
-        None => false,
-    })?;
-    let status = if o.ok {
-        OpStatus::Ok
-    } else if is_auth_failure(&o.text) {
-        OpStatus::Auth
-    } else if o.text.contains("[rejected]") {
-        OpStatus::Rejected
-    } else {
-        OpStatus::Failed
-    };
-    Ok(OpResult::with(status, o))
+    let spec = heads_refspec(super::operand(&branch)?);
+    let args = ["push", "--progress", "-u", remote, &spec];
+    let o = stream_remote(&dir, &args, on_progress)?;
+    Ok(OpResult::with(remote_status(&o, true), o))
 }
 
 /// Fetch one remote (e.g. one just added), not all of them.
-pub fn fetch_one(path: &str, name: &str, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+pub fn fetch_one(path: &str, name: &str, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
     let args = ["fetch", "--prune", "--progress", super::operand(name)?];
-    let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
-        Some(p) => {
-            on_progress(p);
-            true
-        }
-        None => false,
-    })?;
-    let status = if o.ok {
-        OpStatus::Ok
-    } else if is_auth_failure(&o.text) {
-        OpStatus::Auth
-    } else {
-        OpStatus::Failed
-    };
-    Ok(OpResult::with(status, o))
+    let o = stream_remote(&dir, &args, on_progress)?;
+    Ok(OpResult::with(remote_status(&o, false), o))
 }
 
 #[cfg(test)]
@@ -527,6 +530,17 @@ mod tests {
         );
         assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
         assert!(push_to(pb, "origin", Some("--all"), |_| {}).is_err());
+
+        // A branch named `+main` is pushed as itself, never as a forced push of main.
+        let main_before = git_ok(origin.path(), &["rev-parse", "main"]).unwrap();
+        git_ok(b.path(), &["branch", "-q", "+main", "HEAD~1"]).unwrap();
+        let r = push_to(pb, "origin", Some("+main"), |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(
+            git_ok(origin.path(), &["rev-parse", "main"]).unwrap(),
+            main_before
+        );
+        assert!(git_ok(origin.path(), &["rev-parse", "--verify", "refs/heads/+main"]).is_ok());
 
         // Pushing can be allowed again.
         let allow = RefOp::SetPushable {

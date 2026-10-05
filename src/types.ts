@@ -362,6 +362,8 @@ export interface DiffLine {
 
 export interface DiffHunk {
   header: string;
+  /** Fingerprint of the hunk's content; staging names hunks by it. */
+  key: string;
   lines: DiffLine[];
 }
 
@@ -426,18 +428,20 @@ export interface LicenseInfo {
   issued: string;
   /** `9999-12-31` = every update (`LIFETIME_UPDATES`). */
   updatesUntil: string;
-  /** Old subscriptions only: paid through + grace. */
+  /** Last day it opens Pro, if it has one (none are issued now). */
   expires?: string;
   plan?: "lifetime" | string;
   /** The device it is signed for (hash); absent = any computer. */
   device?: string;
 }
 /** What asking ddugit.com about the license came to (`license::Refresh`); removed / revoked drop it here. */
-export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown" | "removed" | "revoked";
+export type LicenseRefresh = "current" | "unknown" | "removed" | "revoked";
 /** `activate::Deactivation`: the license is gone here; `confirmed` = ddugit.com freed this device too. */
 export interface Deactivation {
   status: LicenseStatus;
   confirmed: boolean;
+  /** What ddugit.com (or the connection) said when the place wasn't freed. */
+  error: string | null;
 }
 /** Mirrors `git/transfer.rs`. */
 export interface TransferExport {

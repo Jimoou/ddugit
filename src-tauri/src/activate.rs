@@ -46,7 +46,7 @@ pub fn activate_in(dir: &Path, open: impl FnOnce(&str) -> Result<()>) -> Result<
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let state = token()?;
     let device = device::id_in(dir)?;
-    let name = encode(&device::name());
+    let name = crate::http::encode(&device::name());
     open(&format!(
         "{SITE}/activate?port={port}&state={state}&device={device}&name={name}"
     ))?;
@@ -57,16 +57,6 @@ pub fn activate_in(dir: &Path, open: impl FnOnce(&str) -> Result<()>) -> Result<
     let page = if done.is_ok() { "ok" } else { "failed" };
     redirect(stream, &format!("{SITE}/activate/done?result={page}"));
     done
-}
-
-/// Percent-encode a query value (UTF-8; unreserved characters stay).
-fn encode(s: &str) -> String {
-    s.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
 }
 
 /// 32 random bytes, base64url: the `state` that ties the browser's answer to this request.
@@ -122,9 +112,17 @@ fn wait_for_code(
         };
         match (param("code"), param("state")) {
             (Some(code), Some(s)) if s == state => return Ok((stream, code.to_string())),
-            _ => {
+            // Our request, but the site gave no code (the user said no there).
+            (None, Some(s)) if s == state => {
                 redirect(stream, &format!("{SITE}/activate/done?result=failed"));
-                return Err("The browser came back with an answer for another request".into());
+                return Err("The browser came back without an activation code".into());
+            }
+            // Someone else's answer (another local process, a page probing ports):
+            // refused, and the real browser is still awaited.
+            _ => {
+                let _ = stream
+                    .write_all(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                continue;
             }
         }
     }
@@ -165,15 +163,9 @@ pub(crate) struct Reply {
 
 /// POST `body` to the site; an error status still brings `{ error }` (a short English sentence).
 pub(crate) fn post(path: &str, body: serde_json::Value) -> Result<Reply> {
-    ureq::post(&format!("{SITE}{path}"))
-        .config()
-        .http_status_as_error(false)
-        .build()
-        .send_json(body)
-        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?
-        .body_mut()
-        .read_json()
-        .map_err(|_| "ddugit.com gave an unexpected answer. Try again later.".into())
+    let (_, v) = crate::http::send(&format!("{SITE}{path}"), None, Some(&body))
+        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?;
+    serde_json::from_value(v).map_err(|_| "ddugit.com gave an unexpected answer. Try again later.".into())
 }
 
 /// Trade the one-time code (and this device's id) for the license text.
@@ -195,6 +187,8 @@ pub struct Deactivation {
     pub status: LicenseStatus,
     /// ddugit.com freed this device's place; if not (offline), the user removes it on the website.
     pub confirmed: bool,
+    /// What ddugit.com (or the connection) said when the place wasn't freed.
+    pub error: Option<String>,
 }
 
 /// Free this device's place on the license at ddugit.com, then remove the license here
@@ -221,16 +215,22 @@ fn deactivate_with(
     device: &str,
     tell: impl FnOnce(&str) -> Result<bool>,
 ) -> Result<Deactivation> {
-    let confirmed = match (bound, license::text_in(dir)) {
+    let told = match (bound, license::text_in(dir)) {
         // Signed for this device: the site frees its place.
-        (Some(hash), Some(text)) if hash == device::hash(device) => tell(&text).unwrap_or(false),
-        // Not bound, or bound elsewhere: there is no place of ours to free.
-        (None, _) => true,
-        _ => false,
+        (Some(hash), Some(text)) if hash == device::hash(device) => tell(&text),
+        // Not bound: there is no place of ours to free.
+        (None, _) => Ok(true),
+        // Bound elsewhere: not ours to free from here.
+        _ => Ok(false),
+    };
+    let (confirmed, error) = match told {
+        Ok(c) => (c, None),
+        Err(e) => (false, Some(e)),
     };
     Ok(Deactivation {
         status: license::remove_in(dir)?,
         confirmed,
+        error,
     })
 }
 
@@ -274,9 +274,23 @@ mod tests {
     }
 
     #[test]
-    fn another_state_is_refused_and_waiting_ends() {
+    fn another_state_is_refused_and_waiting_goes_on() {
         let (l, port) = listen();
-        let b = browser(port, "/callback?code=abc&state=OTHER");
+        let other = browser(port, "/callback?code=abc&state=OTHER");
+        let ours = std::thread::spawn(move || {
+            let reply = other.join().unwrap();
+            assert!(reply.starts_with("HTTP/1.1 400"), "{reply}");
+            browser(port, "/callback?code=mine&state=S1").join().unwrap()
+        });
+        let (stream, code) =
+            wait_for_code(&l, "S1", Instant::now() + Duration::from_secs(10), || true).unwrap();
+        assert_eq!(code, "mine");
+        redirect(stream, "https://ddugit.com/activate/done?result=ok");
+        assert!(ours.join().unwrap().starts_with("HTTP/1.1 302"));
+
+        // Our state without a code: the site said no, the wait ends.
+        let (l, port) = listen();
+        let b = browser(port, "/callback?error=denied&state=S1");
         let r = wait_for_code(&l, "S1", Instant::now() + Duration::from_secs(10), || true);
         assert!(r.is_err());
         assert!(b.join().unwrap().contains("result=failed"));
@@ -290,12 +304,6 @@ mod tests {
         let (l, _) = listen();
         let r = wait_for_code(&l, "S1", Instant::now() + Duration::from_millis(300), || true);
         assert_eq!(r.err().as_deref(), Some("Timed out waiting for the browser"));
-    }
-
-    #[test]
-    fn device_names_are_percent_encoded() {
-        assert_eq!(encode("Kim's Mac 맥"), "Kim%27s%20Mac%20%EB%A7%A5");
-        assert_eq!(encode("a-b_c.d~"), "a-b_c.d~");
     }
 
     #[test]
@@ -313,6 +321,7 @@ mod tests {
         })
         .unwrap();
         assert!(!out.confirmed && out.status.license.is_none() && !lic.exists());
+        assert_eq!(out.error.as_deref(), Some("Couldn't reach ddugit.com"));
         // The site freed the place.
         put();
         let out = deactivate_with(dir.path(), Some(&here), "dev", |_| Ok(true)).unwrap();

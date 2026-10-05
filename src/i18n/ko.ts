@@ -197,13 +197,14 @@ export const ko = {
   "license.newer": "이 버전은 라이선스의 업데이트 기간({date}) 이후에 나왔어요.",
   "license.until": "{date}까지 · {email}",
   "license.lapsed": "라이선스 기간({date})이 지났어요. Pro 기능은 잠겨요.",
-  "license.lapsedToast": "ddugit 라이선스 기간({date})이 지났어요. 설정 → 라이선스에서 확인하세요.",
   "license.devices": "기기 3대까지 · ddugit.com/account에서 기기 관리",
   "license.account": "ddugit.com/account 열기",
   "license.deactivate": "이 기기에서 해제",
   "license.deactivateAsk": "이 기기에서 라이선스를 해제할까요? 자리가 하나 비어 다른 기기에서 활성화할 수 있어요.",
   "license.deactivateYes": "해제",
   "license.deactivated": "이 기기에서 해제했어요.",
+  "license.deactivatedError":
+    "이 기기에서는 지웠지만 ddugit.com에서 지우지 못했어요({error}). ddugit.com/account에서도 이 기기를 지워 주세요.",
   "license.deactivatedOffline":
     "이 기기에서는 지웠지만 ddugit.com에 알리지 못했어요. ddugit.com/account에서도 이 기기를 지워 주세요.",
   "license.otherDevice": "이 라이선스는 다른 컴퓨터용이에요. 이 컴퓨터에서 ddugit.com 계정으로 다시 활성화하세요.",
@@ -977,7 +978,6 @@ export const ko = {
   "pr.token.forgotten": "저장된 토큰을 지웠어요",
   "pr.token.foreign":
     "<b>{host}</b>{:은} github.com·gitlab.com이 아니에요. 믿을 수 있는 서버일 때만 그 서버의 토큰을 쓰세요.",
-  "pr.token.trustCli": "{host}에 {cli} 로그인 사용",
   "remote.add.urlLabel": "URL",
   "forge.sources": "가져올 곳",
   "forge.source.url": "URL",
