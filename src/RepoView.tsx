@@ -17,6 +17,7 @@ import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { ConflictSheet } from "./components/ConflictSheet";
 import { ContextMenu, type MenuItem } from "./components/ContextMenu";
 import { NameDialog, type NameRequest } from "./components/NameDialog";
+import { AddRemoteDialog } from "./components/AddRemote";
 import { DiffSheet } from "./components/DiffSheet";
 import { Inspector } from "./components/Inspector";
 import { MergeDialog } from "./components/MergeDialog";
@@ -232,6 +233,7 @@ export function RepoView({
   const [pulls, setPulls] = useState<PrReport | null>(null);
   const [prTick, setPrTick] = useState(0);
   const [tokenFor, setTokenFor] = useState<ForgeStatus | null>(null);
+  const [addingRemote, setAddingRemote] = useState(false);
   /** File history: the commits that touched one file, drawn as a constellation. */
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
   const [blameReq, setBlameReq] = useState<{ rev: string; file: string } | null>(null);
@@ -1027,7 +1029,7 @@ export function RepoView({
       title: t("tag.new.title", { sha: at.slice(0, 7) }),
       placeholder: "v1.0.0",
       confirmLabel: t("tag.new.go"),
-      extra: { placeholder: t("tag.new.message"), multiline: true },
+      extra: { placeholder: t("tag.new.message") },
       onSubmit: (name, message) => {
         setNameReq(null);
         void refRun(t("tag.new.done", { name }), { kind: "createTag", name, at, message });
@@ -1100,29 +1102,21 @@ export function RepoView({
     removeRemoteItem(name),
   ];
 
-  const askRemote = () =>
-    setNameReq({
-      title: t("remote.add.title"),
-      placeholder: snap?.remotes.some((r) => r.name === "upstream")
-        ? t("remote.add.name")
-        : t("remote.add.nameExample"),
-      extra: { placeholder: t("remote.add.url"), required: true },
-      confirmLabel: t("remote.add.go"),
-      onSubmit: async (name, url) => {
-        setNameReq(null);
-        // Added quietly; what the user waits for is the fetch, shown on the progress card.
-        // Anything but `origin` is someone else's project (the original of a fork): fetch only.
-        const fetchOnly = name !== "origin";
-        const r = await api.ref(path, { kind: "addRemote", name, url, fetchOnly }).catch((e) => ({
-          status: "failed" as const,
-          output: String(e),
-        }));
-        if (r.status !== "ok") return toast("err", r.output);
-        await refresh();
-        if (fetchOnly) toast("ok", t("remote.addedFetchOnly", { name }));
-        await fetchOne(name);
-      },
-    });
+  const askRemote = () => setAddingRemote(true);
+  const addRemote = async (name: string, url: string) => {
+    setAddingRemote(false);
+    // Added quietly; what the user waits for is the fetch, shown on the progress card.
+    // Anything but `origin` is someone else's project (the original of a fork): fetch only.
+    const fetchOnly = name !== "origin";
+    const r = await api.ref(path, { kind: "addRemote", name, url, fetchOnly }).catch((e) => ({
+      status: "failed" as const,
+      output: String(e),
+    }));
+    if (r.status !== "ok") return toast("err", r.output);
+    await refresh();
+    if (fetchOnly) toast("ok", t("remote.addedFetchOnly", { name }));
+    await fetchOne(name);
+  };
 
   /** Delete a local branch; if git says it's unmerged, ask again before forcing. */
   const deleteBranch = (name: string) =>
@@ -2347,6 +2341,17 @@ export function RepoView({
         />
       )}
       {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
+      {addingRemote && (
+        <AddRemoteDialog
+          path={path}
+          remotes={snap?.remotes.map((r) => r.name) ?? []}
+          trusted={trustedHosts}
+          onTrust={(host) => onChangeSettings({ trustedForgeHosts: [...trustedHosts, host] })}
+          busy={busy}
+          onSubmit={(name, url) => void addRemote(name, url)}
+          onCancel={() => setAddingRemote(false)}
+        />
+      )}
 
       {notesTo && (
         <ReleaseNotesDialog

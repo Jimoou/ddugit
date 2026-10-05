@@ -7,9 +7,11 @@ _마지막 갱신: 2026-10-05_
 
 ## 방금 끝난 것
 
-- v0.7.1 버전 올림(이 PR) → merge 후 main에서 Release 수동 실행. 계정으로 Pro 활성화(#105), 흰색 글자(#106)
+- 내 GitHub·GitLab 저장소에서 clone·원격 추가(브랜치 `feat/forge-repos`, 로컬 커밋, 아직 PR 없음): clone 창 출처 목록(URL / GitHub / GitLab), 원격 추가 창 탭, Enterprise·자체 운영 서버, 토큰 없으면 기존 연결 창. Free
+- 그 전: v0.7.1 버전 올림. 계정으로 Pro 활성화(#105), 흰색 글자(#106)
 - 사이트: 달러 가격·`/activate`(ddugit-site#16), 흰색 글자(#17)
 - 사용자: Lemon Squeezy 상품 'ddugit Pro'(Monthly $5 / Yearly $50, 스토어 체험·라이선스 키 끔)
+- 다음 forge: Bitbucket·Azure DevOps는 `forgeRepos.ts`의 `FORGE_SOURCES`에 한 줄 + 토큰·목록 백엔드(`ForgeKind`)
 
 ## 결정 (2026-10-04, 수익 모델)
 

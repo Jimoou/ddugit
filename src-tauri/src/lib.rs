@@ -284,6 +284,9 @@ async fn pro_status(app: tauri::AppHandle) -> Result<pro::ProStatus, String> {
     let dir = license_dir(&app)?;
     blocking(move || Ok(pro::status_in(&dir))).await
 }
+// Listing one's own repositories is Free whatever the host: it only saves copying a URL.
+command!(forge_repos(kind: forge::ForgeKind, host: String, trusted: Vec<String>) -> forge::repos::ForgeRepos
+    => forge::repos::list(kind, &host, &trusted));
 command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
 // Open a pull request page in the browser (web links only).
 command!(open_url(url: String) -> () => {
@@ -410,6 +413,7 @@ pub fn run() {
             ssh_trust_host,
             ssh_test,
             set_forge_token,
+            forge_repos,
             open_url,
             git_blame,
             git_discard,

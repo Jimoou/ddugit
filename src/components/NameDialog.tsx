@@ -13,8 +13,8 @@ export interface NameRequest {
   value?: string;
   /** Free text (a display name): spaces stay, instead of becoming dashes like a ref name. */
   free?: boolean;
-  /** A second field: a tag message (multiline, optional) or a remote URL (required). */
-  extra?: { placeholder: string; multiline?: boolean; required?: boolean };
+  /** A second, optional field: a tag message. */
+  extra?: { placeholder: string };
   onSubmit(name: string, extra: string): void;
 }
 
@@ -23,7 +23,7 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
   const { title, placeholder, confirmLabel, initial = "", extra, onSubmit } = req;
   const [name, setName] = useState(req.value ?? initial);
   const [message, setMessage] = useState("");
-  const ok = name.trim() !== "" && name.trim() !== initial && !busy && (!extra?.required || message.trim() !== "");
+  const ok = name.trim() !== "" && name.trim() !== initial && !busy;
   return (
     <div className="scrim" onClick={onCancel}>
       <form
@@ -44,22 +44,13 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
           onChange={(e) => setName(req.free ? e.target.value : e.target.value.replace(/\s+/g, "-"))}
           onKeyDown={(e) => e.key === "Escape" && onCancel()}
         />
-        {extra?.multiline && (
+        {extra && (
           <textarea
             className="message"
             rows={3}
             placeholder={extra.placeholder}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-          />
-        )}
-        {extra && !extra.multiline && (
-          <input
-            className="text"
-            placeholder={extra.placeholder}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && onCancel()}
           />
         )}
         <div className="dialog-actions">

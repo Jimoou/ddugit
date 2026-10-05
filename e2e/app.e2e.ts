@@ -541,7 +541,7 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
-    .getByRole("button", { name: /URL로 복제/ })
+    .getByRole("button", { name: /저장소 복제/ })
     .click();
   const dialog = page.locator(".dialog.clone");
   await dialog.getByPlaceholder("https://github.com/owner/repo.git").fill("https://github.com/acme/rocket.git");
@@ -564,7 +564,7 @@ test("sets up SSH for a clone inside the app: key, host trust, test", async ({ d
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
-    .getByRole("button", { name: /URL로 복제/ })
+    .getByRole("button", { name: /저장소 복제/ })
     .click();
   const dialog = page.locator(".dialog.clone");
   const url = dialog.getByPlaceholder("https://github.com/owner/repo.git");
@@ -587,6 +587,82 @@ test("sets up SSH for a clone inside the app: key, host trust, test", async ({ d
   // Back to HTTPS: the same repository.
   await dialog.getByRole("radio", { name: "HTTPS" }).click();
   await expect(dialog.locator("input.text").first()).toHaveValue("https://github.com/acme/rocket.git");
+});
+
+test("clones one of my GitHub repositories by searching for it", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(
+    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work"),
+  );
+  await page.locator(".tab.on .tab-menu").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /저장소 복제/ })
+    .click();
+  const dialog = page.locator(".dialog.clone");
+  await dialog.getByRole("tab", { name: "GitHub" }).click();
+  const list = dialog.getByRole("listbox", { name: "GitHub 저장소" });
+  await expect(list.getByRole("option")).toHaveCount(8);
+  await expect(dialog).toContainText("github.com에 stella(으)로 로그인돼 있어요");
+
+  await dialog.getByPlaceholder("내 저장소 검색").fill("tele");
+  await expect(list.getByRole("option")).toHaveCount(1);
+  const row = list.getByRole("option", { name: /orbit-labs\/telemetry/ });
+  await expect(row).toContainText("비공개");
+  await row.click();
+  await expect(row).toHaveAttribute("aria-selected", "true");
+  await dialog.getByRole("radio", { name: "SSH" }).click();
+  await dialog.getByRole("button", { name: "고르기…" }).click();
+  await expect(dialog).toContainText("→ /work/telemetry");
+  await dialog.getByRole("button", { name: "복제", exact: true }).click();
+  await demo.toast("telemetry을(를) 복제했어요");
+  // The source and the protocol are remembered for next time.
+  expect(
+    await page.evaluate(() => [localStorage.getItem("ddugit.cloneSource"), localStorage.getItem("ddugit.forgeProto")]),
+  ).toEqual(["github", "ssh"]);
+});
+
+test("a self-managed GitLab asks to connect before listing repositories", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".tab.on .tab-menu").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /저장소 복제/ })
+    .click();
+  const dialog = page.locator(".dialog.clone");
+  await dialog.getByRole("tab", { name: "GitLab" }).click();
+  const host = dialog.getByLabel("서버", { exact: true });
+  await expect(host).toHaveValue("gitlab.com");
+  await host.fill("https://gitlab.corp.example/");
+  await host.press("Enter");
+  await expect(dialog.locator(".forge-connect")).toContainText("GitLab에 연결하면 내 저장소를 바로 고를 수 있어요");
+  await dialog.getByRole("button", { name: "GitLab 연결" }).click();
+
+  const token = page.getByRole("dialog", { name: "GitLab 연결" });
+  await expect(token).toContainText("gitlab.corp.example");
+  await token.getByLabel("토큰").fill("glpat-demo");
+  await token.getByRole("button", { name: "연결", exact: true }).click();
+  await expect(token).toHaveCount(0);
+  // The clone dialog stays open and lists the projects on that host.
+  await expect(dialog.getByRole("listbox").getByRole("option")).toHaveCount(8);
+  await expect(dialog.getByRole("option").first()).toHaveAttribute(
+    "title",
+    "https://gitlab.corp.example/stella/ddugit-demo.git",
+  );
+});
+
+test("adds a remote from the GitHub tab, named after the owner", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".sidebar").getByTitle("원격 저장소 추가").click();
+  const dialog = page.locator(".dialog.add-remote");
+  await dialog.getByRole("tab", { name: "GitHub" }).click();
+  await dialog.getByPlaceholder("내 저장소 검색").fill("design");
+  await dialog.getByRole("option", { name: /orbit-labs\/design-system/ }).click();
+  await expect(dialog.getByLabel("이름", { exact: true })).toHaveValue("orbit-labs");
+  await expect(dialog).toContainText("→ https://github.com/orbit-labs/design-system.git");
+  await dialog.getByRole("button", { name: "추가하고 가져오기" }).click();
+  await demo.toast("orbit-labs에서 브랜치 1개를 가져왔어요");
+  await expect(page.locator(".sidebar section.remote-sub").filter({ hasText: "orbit-labs" })).toHaveCount(1);
 });
 
 test("creates a new repository in a plain folder", async ({ demo }) => {

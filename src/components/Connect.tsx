@@ -6,6 +6,8 @@ import { SshSetup } from "./SshSetup";
 import { isSshUrl, toHttps, toSsh } from "../sshUrl";
 import { PlanetDot } from "./Planet";
 import { useCallback, useState } from "react";
+import { ForgeRepoPicker, type Picked, SourceTabs } from "./ForgeRepoPicker";
+import { SOURCES, type Source } from "../forgeRepos";
 import { api } from "../api";
 import { t } from "../i18n";
 import {
@@ -34,6 +36,7 @@ import {
 const RECENT = "ddugit.recent";
 const GROUPS = "ddugit.groups";
 const CLONE_PARENT = "ddugit.cloneParent";
+const CLONE_SOURCE = "ddugit.cloneSource";
 
 function read(key: string): string | null {
   try {
@@ -231,16 +234,27 @@ export interface CloneInit {
 }
 
 /**
- * Clone a URL into <folder>/<name>. The name follows the URL until edited.
+ * Clone a URL, or one of the user's repositories on GitHub / GitLab, into
+ * <folder>/<name>. The name follows the URL until edited.
  * Credentials problems hand back to the caller (`onAuth`) to explain setup.
  */
 export function CloneDialog(p: {
   init: CloneInit;
+  /** Forge hosts whose `gh` / `glab` login may be used, and trusting one more. */
+  trusted: string[];
+  onTrust(host: string): void;
   onCancel(): void;
   onCloned(path: string): void;
   onAuth(req: Required<CloneInit>, output: string): void;
 }) {
-  const [url, setUrl] = useState(p.init.url ?? "");
+  // A retry after an auth problem comes back to the address it tried.
+  const [source, setSource] = useState<Source>(() => {
+    const last = read(CLONE_SOURCE) as Source | null;
+    return p.init.url || !last || !SOURCES.includes(last) ? "url" : last;
+  });
+  const [typed, setTyped] = useState(p.init.url ?? "");
+  const [picked, setPicked] = useState<Picked | null>(null);
+  const url = source === "url" ? typed : (picked?.url ?? "");
   const [parent, setParent] = useState(p.init.parent ?? read(CLONE_PARENT) ?? "");
   const [name, setName] = useState<string | null>(p.init.name ?? null);
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -271,6 +285,13 @@ export function CloneDialog(p: {
     else setError(r.output || t("connect.clone.failed"));
   };
 
+  const chooseSource = (next: Source) => {
+    setSource(next);
+    setPicked(null);
+    setName(null);
+    write(CLONE_SOURCE, next);
+  };
+
   const chooseParent = async () => {
     const dir = await api.pickFolder(t("connect.clone.where"));
     if (dir) setParent(dir);
@@ -288,71 +309,92 @@ export function CloneDialog(p: {
         onKeyDown={(e) => e.key === "Escape" && !running && p.onCancel()}
       >
         <div className="eyebrow">{t("connect.clone")}</div>
-        <div className="field col">
-          <span className="row url-head">
-            <label htmlFor="clone-url">{t("connect.clone.url")}</label>
-            <span className="spacer" />
-            {/* Same repository, other transport: switch between the two forge address forms. */}
-            <span className="proto" role="radiogroup" aria-label={t("connect.clone.proto")}>
-              {(["https", "ssh"] as const).map((proto) => (
-                <button
-                  key={proto}
-                  type="button"
-                  role="radio"
-                  aria-checked={(proto === "ssh") === ssh}
-                  className={(proto === "ssh") === ssh ? "on" : ""}
+        <div className="clone-body">
+          <SourceTabs value={source} onChange={chooseSource} disabled={running} />
+          <div className="clone-source">
+            {source === "url" ? (
+              <div className="field col">
+                <span className="row url-head">
+                  <label htmlFor="clone-url">{t("connect.clone.url")}</label>
+                  <span className="spacer" />
+                  {/* Same repository, other transport: switch between the two forge address forms. */}
+                  <span className="proto" role="radiogroup" aria-label={t("connect.clone.proto")}>
+                    {(["https", "ssh"] as const).map((proto) => (
+                      <button
+                        key={proto}
+                        type="button"
+                        role="radio"
+                        aria-checked={(proto === "ssh") === ssh}
+                        className={(proto === "ssh") === ssh ? "on" : ""}
+                        disabled={running}
+                        onClick={() => setTyped(proto === "ssh" ? toSsh(url) : toHttps(url))}
+                      >
+                        {proto.toUpperCase()}
+                      </button>
+                    ))}
+                  </span>
+                </span>
+                <input
+                  id="clone-url"
+                  className="text"
+                  autoFocus
+                  placeholder={ssh ? "git@github.com:owner/repo.git" : "https://github.com/owner/repo.git"}
+                  value={url}
                   disabled={running}
-                  onClick={() => setUrl(proto === "ssh" ? toSsh(url) : toHttps(url))}
-                >
-                  {proto.toUpperCase()}
+                  onChange={(e) => setTyped(e.target.value)}
+                />
+              </div>
+            ) : (
+              <ForgeRepoPicker
+                key={source}
+                kind={source}
+                path=""
+                trusted={p.trusted}
+                onTrust={p.onTrust}
+                picked={picked}
+                onPick={(pk) => {
+                  setPicked(pk);
+                  setName(null);
+                }}
+                disabled={running}
+              />
+            )}
+            {ssh && url.includes(":") && (
+              <details className="ssh-ready" open={sshOpen} onToggle={(e) => setSshOpen(e.currentTarget.open)}>
+                <summary>{t("ssh.title")}</summary>
+                <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
+              </details>
+            )}
+            <div className="field col">
+              <span>{t("connect.clone.where")}</span>
+              <span className="row">
+                <code className="folder">{parent || t("connect.clone.noFolder")}</code>
+                <button type="button" disabled={running} onClick={() => void chooseParent()}>
+                  {t("connect.clone.choose")}
                 </button>
-              ))}
-            </span>
-          </span>
-          <input
-            id="clone-url"
-            className="text"
-            autoFocus
-            placeholder={ssh ? "git@github.com:owner/repo.git" : "https://github.com/owner/repo.git"}
-            value={url}
-            disabled={running}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-        </div>
-        {ssh && url.includes(":") && (
-          <details className="ssh-ready" open={sshOpen} onToggle={(e) => setSshOpen(e.currentTarget.open)}>
-            <summary>{t("ssh.title")}</summary>
-            <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
-          </details>
-        )}
-        <div className="field col">
-          <span>{t("connect.clone.where")}</span>
-          <span className="row">
-            <code className="folder">{parent || t("connect.clone.noFolder")}</code>
-            <button type="button" disabled={running} onClick={() => void chooseParent()}>
-              {t("connect.clone.choose")}
-            </button>
-          </span>
-        </div>
-        <label className="field col">
-          {t("connect.clone.name")}
-          <input
-            className="text"
-            value={finalName}
-            disabled={running}
-            onChange={(e) => setName(e.target.value.replace(/[\\/]/g, "-"))}
-          />
-        </label>
-        {dest && <p className="muted small">→ {dest}</p>}
-        {running && (
-          <div className="clone-progress" role="status">
-            <span>{progress ? `${progress.phase} ${progress.percent}%` : t("connect.clone.starting")}</span>
-            <span className="progress">
-              <i style={{ width: `${progress?.percent ?? 0}%` }} />
-            </span>
+              </span>
+            </div>
+            <label className="field col">
+              {t("connect.clone.name")}
+              <input
+                className="text"
+                value={finalName}
+                disabled={running}
+                onChange={(e) => setName(e.target.value.replace(/[\\/]/g, "-"))}
+              />
+            </label>
+            {dest && <p className="muted small">→ {dest}</p>}
+            {running && (
+              <div className="clone-progress" role="status">
+                <span>{progress ? `${progress.phase} ${progress.percent}%` : t("connect.clone.starting")}</span>
+                <span className="progress">
+                  <i style={{ width: `${progress?.percent ?? 0}%` }} />
+                </span>
+              </div>
+            )}
+            {error && <pre className="note warn raw">{error}</pre>}
           </div>
-        )}
-        {error && <pre className="note warn raw">{error}</pre>}
+        </div>
         <div className="dialog-actions">
           <button type="button" disabled={running} onClick={p.onCancel}>
             {t("common.cancel")}
