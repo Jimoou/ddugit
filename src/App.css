@@ -30,13 +30,13 @@
   --scanlines: repeating-linear-gradient(0deg, rgba(var(--signal), 0.03) 0 1px, transparent 1px 3px);
   --line: rgba(255, 255, 255, 0.09);
   --line-strong: rgba(255, 255, 255, 0.18);
-  --text: #f3f1ff;
-  --text-2: #cbc6ea;
-  --muted: #a09ac6;
+  --text: #ffffff;
+  --text-2: #e8e8ee;
+  --muted: #c2c2cc;
   --ui: #6d5ae6;
   --ui-hover: #7c6af0;
   --ui-soft: rgba(143, 124, 255, 0.18);
-  --ui-text: #cfc6ff;
+  --ui-text: #ffffff;
   --focus: #b3a6ff;
   --ok: #4fd1a5;
   --danger: #e5485f;
