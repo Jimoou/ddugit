@@ -6,7 +6,6 @@
 
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -391,23 +390,10 @@ fn graphql<T: serde::de::DeserializeOwned>(
     query: &str,
     variables: serde_json::Value,
 ) -> std::result::Result<T, FetchError> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(15)))
-        .http_status_as_error(false)
-        .build()
-        .into();
-    let mut resp = agent
-        .post(url)
-        .header("Authorization", &format!("Bearer {token}"))
-        .header("User-Agent", "ddugit")
-        .header("Accept", "application/json")
-        .send_json(serde_json::json!({ "query": query, "variables": variables }))
-        .map_err(|e| FetchError::Other(e.to_string()))?;
-    let reply: Gql<T> = match resp.status().as_u16() {
-        200..=299 => resp
-            .body_mut()
-            .read_json()
-            .map_err(|e| FetchError::Other(e.to_string()))?,
+    let body = serde_json::json!({ "query": query, "variables": variables });
+    let (status, v) = crate::http::send(url, Some(token), Some(&body)).map_err(FetchError::Other)?;
+    let reply: Gql<T> = match status {
+        200..=299 => serde_json::from_value(v).map_err(|e| FetchError::Other(e.to_string()))?,
         401 | 403 => return Err(FetchError::Unauthorized),
         s => return Err(FetchError::Other(format!("HTTP {s} from {url}"))),
     };

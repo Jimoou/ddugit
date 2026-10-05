@@ -3,10 +3,11 @@
 //! The token stays here: only the new request's number and link go back.
 
 use std::path::Path;
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+
+use crate::http::encode;
 
 use super::{is_public_forge, parse_remote, token_for, FetchError, Forge, ForgeKind, TokenSource};
 
@@ -70,22 +71,11 @@ pub fn api_base(kind: ForgeKind, host: &str) -> String {
     }
 }
 
-/// Percent-encode everything but RFC 3986's unreserved characters
-/// (GitLab project paths as ids, branch names in queries).
-fn enc(s: &str) -> String {
-    s.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => (b as char).to_string(),
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
-}
-
 /// The project's REST resource: `/repos/owner/repo` or `/projects/group%2Fproject`.
 pub fn project_url(base: &str, forge: &Forge) -> String {
     match forge.kind {
         ForgeKind::Github => format!("{base}/repos/{}", forge.slug),
-        ForgeKind::Gitlab => format!("{base}/projects/{}", enc(&forge.slug)),
+        ForgeKind::Gitlab => format!("{base}/projects/{}", encode(&forge.slug)),
     }
 }
 
@@ -106,12 +96,12 @@ fn existing_url(base: &str, forge: &Forge, head: &str) -> String {
             let owner = forge.slug.split('/').next().unwrap_or("");
             format!(
                 "{project}/pulls?state=open&head={}",
-                enc(&format!("{owner}:{head}"))
+                encode(&format!("{owner}:{head}"))
             )
         }
         ForgeKind::Gitlab => format!(
             "{project}/merge_requests?state=opened&source_branch={}",
-            enc(head)
+            encode(head)
         ),
     }
 }
@@ -199,30 +189,7 @@ pub fn already_exists(status: u16, text: &str) -> bool {
 
 /// One REST call; any status comes back with its JSON body (`Null` when it has none).
 fn rest(method: &str, url: &str, token: &str, body: Option<&Value>) -> Result<(u16, Value)> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(20)))
-        .http_status_as_error(false)
-        .build()
-        .into();
-    let auth = format!("Bearer {token}");
-    let mut resp = match body {
-        Some(b) => agent
-            .post(url)
-            .header("Authorization", &auth)
-            .header("User-Agent", "ddugit")
-            .header("Accept", "application/json")
-            .send_json(b),
-        None => agent
-            .get(url)
-            .header("Authorization", &auth)
-            .header("User-Agent", "ddugit")
-            .header("Accept", "application/json")
-            .call(),
-    }
-    .map_err(|e| format!("{method} {url}: {e}"))?;
-    let status = resp.status().as_u16();
-    let text = resp.body_mut().read_to_string().unwrap_or_default();
-    Ok((status, serde_json::from_str(&text).unwrap_or(Value::Null)))
+    crate::http::send(url, Some(token), body).map_err(|e| format!("{method} {url}: {e}"))
 }
 
 /// The project's default branch and whether it is private (GitLab's `internal` too).

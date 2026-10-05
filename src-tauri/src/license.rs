@@ -228,12 +228,19 @@ struct RefreshReply {
 /// failures are errors and change nothing.
 pub fn refresh_in(dir: &Path) -> Result<Refresh> {
     let text = text_in(dir).ok_or("No license on this computer")?;
-    let reply: RefreshReply = ureq::post(REFRESH_URL)
-        .send_json(serde_json::json!({ "license": text }))
-        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?
-        .body_mut()
-        .read_json()
-        .map_err(|e| e.to_string())?;
+    let (code, v) = crate::http::send(REFRESH_URL, None, Some(&serde_json::json!({ "license": text })))
+        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?;
+    let reply: RefreshReply = serde_json::from_value(v.clone()).unwrap_or(RefreshReply {
+        license: None,
+        status: None,
+    });
+    if reply.license.is_none() && reply.status.is_none() {
+        // An error status without an answer: say what the site said, change nothing.
+        return Err(match v["error"].as_str() {
+            Some(e) => e.to_string(),
+            None => format!("ddugit.com answered HTTP {code}. Try again later."),
+        });
+    }
     apply_refresh(dir, &text, reply, &key()?)
 }
 

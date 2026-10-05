@@ -46,7 +46,7 @@ pub fn activate_in(dir: &Path, open: impl FnOnce(&str) -> Result<()>) -> Result<
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let state = token()?;
     let device = device::id_in(dir)?;
-    let name = encode(&device::name());
+    let name = crate::http::encode(&device::name());
     open(&format!(
         "{SITE}/activate?port={port}&state={state}&device={device}&name={name}"
     ))?;
@@ -57,16 +57,6 @@ pub fn activate_in(dir: &Path, open: impl FnOnce(&str) -> Result<()>) -> Result<
     let page = if done.is_ok() { "ok" } else { "failed" };
     redirect(stream, &format!("{SITE}/activate/done?result={page}"));
     done
-}
-
-/// Percent-encode a query value (UTF-8; unreserved characters stay).
-fn encode(s: &str) -> String {
-    s.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
 }
 
 /// 32 random bytes, base64url: the `state` that ties the browser's answer to this request.
@@ -165,15 +155,9 @@ pub(crate) struct Reply {
 
 /// POST `body` to the site; an error status still brings `{ error }` (a short English sentence).
 pub(crate) fn post(path: &str, body: serde_json::Value) -> Result<Reply> {
-    ureq::post(&format!("{SITE}{path}"))
-        .config()
-        .http_status_as_error(false)
-        .build()
-        .send_json(body)
-        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?
-        .body_mut()
-        .read_json()
-        .map_err(|_| "ddugit.com gave an unexpected answer. Try again later.".into())
+    let (_, v) = crate::http::send(&format!("{SITE}{path}"), None, Some(&body))
+        .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?;
+    serde_json::from_value(v).map_err(|_| "ddugit.com gave an unexpected answer. Try again later.".into())
 }
 
 /// Trade the one-time code (and this device's id) for the license text.
@@ -290,12 +274,6 @@ mod tests {
         let (l, _) = listen();
         let r = wait_for_code(&l, "S1", Instant::now() + Duration::from_millis(300), || true);
         assert_eq!(r.err().as_deref(), Some("Timed out waiting for the browser"));
-    }
-
-    #[test]
-    fn device_names_are_percent_encoded() {
-        assert_eq!(encode("Kim's Mac 맥"), "Kim%27s%20Mac%20%EB%A7%A5");
-        assert_eq!(encode("a-b_c.d~"), "a-b_c.d~");
     }
 
     #[test]

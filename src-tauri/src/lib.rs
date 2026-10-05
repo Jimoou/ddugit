@@ -3,6 +3,7 @@ mod activate;
 mod device;
 mod forge;
 mod git;
+mod http;
 mod license;
 mod pro;
 mod report;
