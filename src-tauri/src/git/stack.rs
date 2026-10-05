@@ -14,7 +14,9 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::{git, git_ok, in_progress, operand, repo_dir, OpResult, OpStatus, Result};
+use super::{
+    config_entries, git, git_ok, in_progress, is_ancestor, operand, repo_dir, OpResult, OpStatus, Result,
+};
 
 /// `branch.<name>.ddugit-parent`: git moves and removes `branch.<name>.*` with the branch.
 const PARENT: &str = "ddugit-parent";
@@ -67,23 +69,14 @@ fn local(dir: &Path, branch: &str) -> Option<String> {
     tip(dir, &format!("refs/heads/{branch}"))
 }
 
-fn is_ancestor(dir: &Path, a: &str, b: &str) -> bool {
-    git(dir, &["merge-base", "--is-ancestor", a, b]).is_ok_and(|o| o.ok)
-}
-
 /// Every `branch.<name>.<what>` in the local config, by branch.
 fn config_values(dir: &Path, what: &str) -> BTreeMap<String, String> {
-    let pattern = format!(r"^branch\..*\.{what}$");
-    // `-z`: "key\nvalue\0"; branch names may hold dots, so the key is cut at both ends.
-    let Ok(out) = git(dir, &["config", "--local", "-z", "--get-regexp", &pattern]) else {
-        return BTreeMap::new();
-    };
-    out.text
-        .split('\0')
-        .filter_map(|entry| {
-            let (k, v) = entry.trim_start_matches('\n').split_once('\n')?;
+    // Branch names may hold dots, so the key is cut at both ends.
+    config_entries(dir, &format!(r"^branch\..*\.{what}$"))
+        .into_iter()
+        .filter_map(|(k, v)| {
             let name = k.strip_prefix("branch.")?.strip_suffix(&format!(".{what}"))?;
-            Some((name.to_string(), v.to_string()))
+            Some((name.to_string(), v))
         })
         .collect()
 }

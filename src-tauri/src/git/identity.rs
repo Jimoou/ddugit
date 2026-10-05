@@ -284,7 +284,7 @@ fn parse_gpg(text: &str) -> Vec<SigningKey> {
 }
 
 fn gpg_keys() -> Option<Vec<SigningKey>> {
-    let out = crate::ssh::tool("gpg")
+    let out = crate::proc::hidden("gpg")
         .args([
             "--batch",
             "--list-secret-keys",

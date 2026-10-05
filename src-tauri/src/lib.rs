@@ -1,12 +1,14 @@
 mod about;
 mod activate;
 mod device;
+mod digest;
 mod forge;
 mod git;
 mod http;
 mod keychain;
 mod license;
 mod pro;
+mod proc;
 mod report;
 mod ssh;
 mod update;

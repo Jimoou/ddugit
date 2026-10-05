@@ -52,18 +52,24 @@ pub fn commit_index(path: &str, message: &str, amend: bool) -> Result<OpResult> 
     Ok(git(&repo_dir(path)?, &args)?.into())
 }
 
+/// Refuse to start while another operation is half-done.
+fn require_clean(repo: &git2::Repository) -> Result<()> {
+    match repo.state() {
+        RepositoryState::Clean => Ok(()),
+        state => Err(format!(
+            "Repository is in the middle of a {}; finish or abort it first",
+            state_name(state)
+        )),
+    }
+}
+
 /// Refuse to start while another operation is half-done, then check out
 /// `target` if it isn't already HEAD. Shared by merge and cherry-pick.
 pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {
     target.map(operand).transpose()?;
     let repo = open(path)?;
     let dir = workdir(&repo)?;
-    if repo.state() != RepositoryState::Clean {
-        return Err(format!(
-            "Repository is in the middle of a {}; finish or abort it first",
-            state_name(repo.state())
-        ));
-    }
+    require_clean(&repo)?;
     if let Some(t) = target {
         if read_head(&repo).branch.as_deref() != Some(t) {
             git_ok(&dir, &["checkout", t, "--"])?;
@@ -210,12 +216,7 @@ pub fn switch_or_create(path: &str, name: &str) -> Result<SwitchResult> {
     let name = operand(name.trim())?;
     let repo = open(path)?;
     let dir = workdir(&repo)?;
-    if repo.state() != RepositoryState::Clean {
-        return Err(format!(
-            "Repository is in the middle of a {}; finish or abort it first",
-            state_name(repo.state())
-        ));
-    }
+    require_clean(&repo)?;
     let done = |o: Output, how: Switched| {
         let ok = o.ok;
         SwitchResult {

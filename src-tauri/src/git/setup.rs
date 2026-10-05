@@ -3,12 +3,12 @@
 
 use std::path::Path;
 
-use super::remote::{is_auth_failure, parse_progress, Progress};
-use super::{git, git_streaming, OpResult, OpStatus, Result};
+use super::remote::{remote_status, stream_remote, Progress};
+use super::{git, OpResult, Result};
 
 /// `git clone <url> <dest>`; `dest` must not exist yet or be an empty folder.
 /// Progress streams like fetch; missing credentials come back as `Auth`.
-pub fn clone(url: &str, dest: &str, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+pub fn clone(url: &str, dest: &str, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
     let url = url.trim();
     if url.is_empty() {
         return Err("Enter a repository URL".into());
@@ -21,23 +21,8 @@ pub fn clone(url: &str, dest: &str, mut on_progress: impl FnMut(Progress)) -> Re
         )
     })?;
     let target = dest.to_string_lossy();
-    let o = git_streaming(
-        parent,
-        &["clone", "--progress", "--", url, &target],
-        |line| match parse_progress(line) {
-            Some(p) => {
-                on_progress(p);
-                true
-            }
-            None => false,
-        },
-    )?;
-    let status = match () {
-        _ if o.ok => OpStatus::Ok,
-        _ if is_auth_failure(&o.text) => OpStatus::Auth,
-        _ => OpStatus::Failed,
-    };
-    Ok(OpResult::with(status, o))
+    let o = stream_remote(parent, &["clone", "--progress", "--", url, &target], on_progress)?;
+    Ok(OpResult::with(remote_status(&o, false), o))
 }
 
 /// `git init` with `main` as the first branch, in an existing folder.
@@ -60,9 +45,9 @@ pub fn repo_root(path: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::git_ok;
     use super::super::read::snapshot;
     use super::super::testutil::{commit_file, repo, s};
+    use super::super::{git_ok, OpStatus};
     use super::*;
 
     #[test]

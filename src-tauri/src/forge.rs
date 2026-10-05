@@ -5,7 +5,6 @@
 //! get token`), then a token the user typed in, kept in the OS keychain.
 
 use std::path::Path;
-use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 
@@ -206,21 +205,12 @@ fn cli_token(kind: ForgeKind, host: &str) -> Option<String> {
         ForgeKind::Gitlab => ("glab", vec!["config", "get", "token", "--host", host]),
     };
     for program in cli_candidates(bin) {
-        let mut cmd = Command::new(&program);
+        let mut cmd = crate::proc::hidden(&program);
         cmd.args(&args)
-            .stdin(Stdio::null())
             .env("GH_PROMPT_DISABLED", "1")
             .env("NO_COLOR", "1");
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-        }
-        if let Ok(out) = cmd.output() {
-            let token = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if out.status.success() && !token.is_empty() && !token.contains(char::is_whitespace) {
-                return Some(token);
-            }
+        if let Some(token) = crate::proc::stdout_of(&mut cmd).filter(|t| !t.contains(char::is_whitespace)) {
+            return Some(token);
         }
     }
     None

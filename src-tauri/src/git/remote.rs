@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 
 use super::read::read_head;
 use super::write::conflict_aware;
-use super::{git_streaming, open, workdir, OpResult, OpStatus, Result};
+use std::path::Path;
+
+use super::{git_streaming, open, workdir, OpResult, OpStatus, Output, Result};
 
 /// One progress update parsed from git's `--progress` output.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -53,6 +55,36 @@ const AUTH_FAILURES: &[&str] = &[
 
 pub(super) fn is_auth_failure(text: &str) -> bool {
     AUTH_FAILURES.iter().any(|p| text.contains(p))
+}
+
+/// Run remote work (fetch, push, clone) in `dir`: git's progress lines go to
+/// `on_progress` instead of the output text.
+pub(super) fn stream_remote(
+    dir: &Path,
+    args: &[&str],
+    mut on_progress: impl FnMut(Progress),
+) -> Result<Output> {
+    git_streaming(dir, args, |line| match parse_progress(line) {
+        Some(p) => {
+            on_progress(p);
+            true
+        }
+        None => false,
+    })
+}
+
+/// How remote work ended, apart from what is particular to one operation:
+/// missing credentials, and (for a push) a rejected update.
+pub(super) fn remote_status(o: &Output, push: bool) -> OpStatus {
+    if o.ok {
+        OpStatus::Ok
+    } else if is_auth_failure(&o.text) {
+        OpStatus::Auth
+    } else if push && o.text.contains("[rejected]") {
+        OpStatus::Rejected
+    } else {
+        OpStatus::Failed
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -107,7 +139,7 @@ fn default_remote(repo: &Repository) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+pub fn remote(path: &str, op: RemoteOp, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     let head = read_head(&repo);
@@ -142,20 +174,13 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
         }
     }
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
-    let o = git_streaming(&dir, &argv, |line| match parse_progress(line) {
-        Some(p) => {
-            on_progress(p);
-            true
-        }
-        None => false,
-    })?;
-    if o.ok {
-        return Ok(o.into());
+    let o = stream_remote(&dir, &argv, on_progress)?;
+    let status = remote_status(&o, matches!(op, RemoteOp::Push | RemoteOp::ForcePush));
+    if status != OpStatus::Failed {
+        return Ok(OpResult::with(status, o));
     }
 
     let status = match op {
-        _ if is_auth_failure(&o.text) => OpStatus::Auth,
-        RemoteOp::Push | RemoteOp::ForcePush if o.text.contains("[rejected]") => OpStatus::Rejected,
         RemoteOp::Pull => {
             // ff-only failed: diverged if both sides have new commits after the pull's fetch.
             let h = read_head(&open(path)?);
@@ -196,7 +221,7 @@ pub fn push_to(
     path: &str,
     remote: &str,
     branch: Option<&str>,
-    mut on_progress: impl FnMut(Progress),
+    on_progress: impl FnMut(Progress),
 ) -> Result<OpResult> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
@@ -211,44 +236,16 @@ pub fn push_to(
     }
     let spec = heads_refspec(super::operand(&branch)?);
     let args = ["push", "--progress", "-u", remote, &spec];
-    let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
-        Some(p) => {
-            on_progress(p);
-            true
-        }
-        None => false,
-    })?;
-    let status = if o.ok {
-        OpStatus::Ok
-    } else if is_auth_failure(&o.text) {
-        OpStatus::Auth
-    } else if o.text.contains("[rejected]") {
-        OpStatus::Rejected
-    } else {
-        OpStatus::Failed
-    };
-    Ok(OpResult::with(status, o))
+    let o = stream_remote(&dir, &args, on_progress)?;
+    Ok(OpResult::with(remote_status(&o, true), o))
 }
 
 /// Fetch one remote (e.g. one just added), not all of them.
-pub fn fetch_one(path: &str, name: &str, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+pub fn fetch_one(path: &str, name: &str, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
     let args = ["fetch", "--prune", "--progress", super::operand(name)?];
-    let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
-        Some(p) => {
-            on_progress(p);
-            true
-        }
-        None => false,
-    })?;
-    let status = if o.ok {
-        OpStatus::Ok
-    } else if is_auth_failure(&o.text) {
-        OpStatus::Auth
-    } else {
-        OpStatus::Failed
-    };
-    Ok(OpResult::with(status, o))
+    let o = stream_remote(&dir, &args, on_progress)?;
+    Ok(OpResult::with(remote_status(&o, false), o))
 }
 
 #[cfg(test)]

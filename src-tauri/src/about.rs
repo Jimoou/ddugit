@@ -2,7 +2,6 @@
 //! and its version, the CPU architecture. Nothing about the user or their work.
 
 use serde::Serialize;
-use std::process::{Command, Stdio};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,17 +33,7 @@ pub fn openable(url: &str) -> Result<(), String> {
 }
 
 fn run(program: &str, args: &[&str]) -> Option<String> {
-    let mut cmd = Command::new(program);
-    cmd.args(args).stdin(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    }
-    let out = cmd.output().ok()?;
-    out.status
-        .success()
-        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    crate::proc::stdout_of(crate::proc::hidden(program).args(args))
 }
 
 #[cfg(target_os = "macos")]

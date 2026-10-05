@@ -139,6 +139,27 @@ pub(crate) fn literal(path: &str) -> String {
 /// A remote's push URL meaning "never push here" (`git remote set-url --push`).
 pub(crate) const NO_PUSH: &str = "DISABLED";
 
+/// Whether commit `a` is `b` or one of its ancestors.
+fn is_ancestor(dir: &Path, a: &str, b: &str) -> bool {
+    git(dir, &["merge-base", "--is-ancestor", a, b]).is_ok_and(|o| o.ok)
+}
+
+/// The local config's keys matching `pattern` with their values, in file
+/// order. Read with `-z` ("key\nvalue\0"): names in keys may hold spaces and
+/// dots. Nothing set (or no answer) is empty.
+fn config_entries(dir: &Path, pattern: &str) -> Vec<(String, String)> {
+    let Ok(out) = git(dir, &["config", "--local", "-z", "--get-regexp", pattern]) else {
+        return Vec::new();
+    };
+    out.text
+        .split('\0')
+        .filter_map(|entry| {
+            let (k, v) = entry.trim_start_matches('\n').split_once('\n')?;
+            Some((k.to_string(), v.to_string()))
+        })
+        .collect()
+}
+
 /// Repo has stopped mid-operation (after a failed merge / rebase).
 fn in_progress(path: &str) -> bool {
     open(path)
@@ -167,9 +188,8 @@ fn git_program() -> String {
 /// `git --version` of `program` (`None`: the current one), or why it can't run.
 pub fn version(program: Option<&str>) -> Result<String> {
     let program = program.map_or_else(git_program, str::to_string);
-    let out = Command::new(&program)
+    let out = crate::proc::hidden(&program)
         .arg("--version")
-        .stdin(Stdio::null())
         .output()
         .map_err(|e| format!("Can't run '{program}': {e}"))?;
     let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -319,7 +339,7 @@ fn network_guard(
 }
 
 fn command(dir: &Path, args: &[&str]) -> Command {
-    let mut cmd = Command::new(git_program());
+    let mut cmd = crate::proc::hidden(git_program());
     if subcommand(args).is_some_and(|s| NETWORK.contains(&s)) {
         let (env, config) = network_guard(dir, |k| std::env::var_os(k));
         cmd.envs(env).args(config);
@@ -328,9 +348,8 @@ fn command(dir: &Path, args: &[&str]) -> Command {
         .current_dir(dir)
         // Never block on a hidden prompt: no terminal credential prompt, no
         // askpass helper (an empty GIT_ASKPASS also hides core.askPass and
-        // SSH_ASKPASS from git), no editor, and no stdin for ssh to read a
-        // passphrase from. Credential helpers still run.
-        .stdin(Stdio::null())
+        // SSH_ASKPASS from git), no editor, and (`proc::hidden`) no stdin for
+        // ssh to read a passphrase from. Credential helpers still run.
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_ASKPASS", "")
         .env("GIT_EDITOR", "true")
@@ -340,12 +359,6 @@ fn command(dir: &Path, args: &[&str]) -> Command {
     cmd.env("GIT_CONFIG_COUNT", "1")
         .env("GIT_CONFIG_KEY_0", "protocol.file.allow")
         .env("GIT_CONFIG_VALUE_0", "always");
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
     cmd
 }
 

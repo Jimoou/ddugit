@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
+
+use crate::proc::hidden;
 
 use serde::Serialize;
 
@@ -69,17 +71,6 @@ pub fn ssh_dir() -> Result<PathBuf> {
     let home =
         std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).ok_or("No home folder")?;
     Ok(PathBuf::from(home).join(".ssh"))
-}
-
-pub(crate) fn tool(name: &str) -> Command {
-    let mut cmd = Command::new(name);
-    cmd.stdin(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    }
-    cmd
 }
 
 /// Host (and port, if not 22) of an SSH remote: `git@host:path` or `ssh://user@host[:port]/path`.
@@ -145,7 +136,7 @@ pub fn keys_in(dir: &Path) -> Vec<SshKey> {
 }
 
 pub fn status() -> Result<SshStatus> {
-    let available = tool("ssh-keygen").arg("-?").output().is_ok();
+    let available = hidden("ssh-keygen").arg("-?").output().is_ok();
     Ok(SshStatus {
         available,
         keys: keys_in(&ssh_dir()?),
@@ -163,7 +154,7 @@ pub fn keygen_in(dir: &Path, comment: &str) -> Result<SshKey> {
         .ok_or("Keys named id_ed25519 and id_ed25519_ddugit already exist")?;
     let file = dir.join(name);
     let comment = comment.replace(['\n', '\r'], " ");
-    let out = tool("ssh-keygen")
+    let out = hidden("ssh-keygen")
         .args(["-q", "-t", "ed25519", "-N", "", "-C", comment.trim(), "-f"])
         .arg(&file)
         .output()
@@ -191,7 +182,7 @@ fn known_name(host: &str, port: Option<u16>) -> String {
 
 /// `ssh-keyscan` lines (`host type key`) → their SHA256 fingerprints, via `ssh-keygen -lf -`.
 fn fingerprints(scan: &str) -> Result<Vec<String>> {
-    let mut child = tool("ssh-keygen")
+    let mut child = hidden("ssh-keygen")
         .args(["-l", "-E", "sha256", "-f", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -230,7 +221,7 @@ fn published_match(host: &str, fps: &[String]) -> Option<bool> {
 }
 
 fn scan(host: &str, port: Option<u16>) -> Result<String> {
-    let mut cmd = tool("ssh-keyscan");
+    let mut cmd = hidden("ssh-keyscan");
     cmd.args(["-T", "8", "-t", "ed25519,ecdsa,rsa"]);
     if let Some(p) = port {
         cmd.args(["-p", &p.to_string()]);
@@ -250,7 +241,7 @@ fn scan(host: &str, port: Option<u16>) -> Result<String> {
 /// What the server at `url` presents, and whether we already trust it.
 pub fn host_key_in(dir: &Path, url: &str) -> Result<HostKey> {
     let (host, port) = ssh_host(url).ok_or("Not an SSH address")?;
-    let known = tool("ssh-keygen")
+    let known = hidden("ssh-keygen")
         .arg("-F")
         .arg(known_name(&host, port))
         .arg("-f")
@@ -319,7 +310,7 @@ fn greeted(output: &str) -> Option<String> {
 /// `ssh -T git@host`: does the server let us in with the keys we have?
 pub fn test(url: &str) -> Result<SshTest> {
     let (host, port) = ssh_host(url).ok_or("Not an SSH address")?;
-    let mut cmd = tool("ssh");
+    let mut cmd = hidden("ssh");
     cmd.args([
         "-T",
         "-o",
@@ -399,7 +390,7 @@ mod tests {
 
     #[test]
     fn makes_a_key_and_lists_it_with_its_public_half() {
-        if tool("ssh-keygen").arg("-?").output().is_err() {
+        if hidden("ssh-keygen").arg("-?").output().is_err() {
             return; // OpenSSH isn't installed here
         }
         let dir = tempfile::tempdir().unwrap();
@@ -423,7 +414,7 @@ mod tests {
 
     #[test]
     fn fingerprints_a_scanned_key() {
-        if tool("ssh-keygen").arg("-?").output().is_err() {
+        if hidden("ssh-keygen").arg("-?").output().is_err() {
             return;
         }
         // A key line as ssh-keyscan prints it (github.com's published ed25519 key).
