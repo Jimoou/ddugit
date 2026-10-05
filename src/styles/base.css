@@ -1,0 +1,259 @@
+/* Tokens, page base, buttons and the wordmark. */
+
+:root {
+  /* Galaxy UI: deep space behind glass surfaces. Controls use the --ui-* and
+     surface tokens only; the neon colours below are for the graph and data
+     (branches, diff signs, file status), never for buttons or chrome. */
+  --space: #05040e;
+  /* Brand colours (design/brand/README.md): wordmark letters and its star. */
+  --brand-ink: #f3f1ff;
+  --brand-star: #ffc56b;
+  --bg: #07061a;
+  --bg-2: #0c0b20;
+  --glass: rgba(18, 16, 42, 0.66);
+  /* Top bar and sidebar: plain black so the galaxy reads as the work area. */
+  --chrome: #000;
+  --glass-strong: rgba(20, 18, 46, 0.92);
+  --panel: var(--glass-strong);
+  /* Side panels and dialogs: black like the chrome, so only the galaxy has colour. */
+  --surface: #000;
+  /* Control console: square edges, a signal colour for what is live, corner brackets on panels. */
+  --signal: 34, 232, 255;
+  --bracket: rgba(var(--signal), 0.7);
+  --brackets:
+    linear-gradient(var(--bracket), var(--bracket)) top left / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top left / 1px 10px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top right / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) top right / 1px 10px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom left / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom left / 1px 10px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom right / 10px 1px no-repeat,
+    linear-gradient(var(--bracket), var(--bracket)) bottom right / 1px 10px no-repeat;
+  --scanlines: repeating-linear-gradient(0deg, rgba(var(--signal), 0.03) 0 1px, transparent 1px 3px);
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --text: #ffffff;
+  --text-2: #e8e8ee;
+  --muted: #c2c2cc;
+  --ui: #6d5ae6;
+  --ui-hover: #7c6af0;
+  --ui-soft: rgba(143, 124, 255, 0.18);
+  --ui-text: #ffffff;
+  --focus: #b3a6ff;
+  --ok: #4fd1a5;
+  --danger: #e5485f;
+  --cyan: #22e8ff;
+  --magenta: #ff3df2;
+  --lime: #a6ff4d;
+  --amber: #ffb84d;
+  --red: #ff4d6d;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+/* Thin scrollbars that sit on the dark surfaces instead of the OS's grey gutter. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background: rgba(207, 198, 255, 0.16) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(207, 198, 255, 0.32) padding-box;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 60% 45% at 18% 12%, rgba(98, 70, 220, 0.22), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 85% 80%, rgba(30, 120, 190, 0.16), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 60% 35%, rgba(190, 70, 170, 0.1), transparent 70%), var(--space);
+  color: var(--text);
+  font: 13px/1.45 var(--sans);
+  /* Korean wraps between words, not inside them; long tokens (paths, hashes) still break. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  /* No one-word last lines in paragraphs. */
+  text-wrap: pretty;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Buttons are console keys: square, with corner ticks that light up in the signal colour. */
+button {
+  --tick: rgba(207, 198, 255, 0.35);
+  font: inherit;
+  color: var(--text);
+  background-color: rgba(255, 255, 255, 0.045);
+  background-image:
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
+  background-size:
+    5px 1px,
+    1px 5px,
+    5px 1px,
+    1px 5px;
+  background-position:
+    top left,
+    top left,
+    bottom right,
+    bottom right;
+  background-repeat: no-repeat;
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+button:hover:not(:disabled) {
+  --tick: rgba(var(--signal), 0.9);
+  border-color: rgba(var(--signal), 0.38);
+  background-color: rgba(var(--signal), 0.06);
+  box-shadow: inset 0 0 14px rgba(var(--signal), 0.08);
+}
+button:focus-visible,
+select:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Dialogs take focus themselves when nothing inside asks for it (useDialog); that is not a control to ring. */
+[role="dialog"]:focus {
+  outline: none;
+}
+/* Compact controls keep their look; an invisible box of at least 24px around them takes the pointer. */
+.sidebar h3 .fold,
+.sidebar h3 .h3-add,
+.sidebar li .to-local,
+.sidebar .lfs li .icon,
+button.demo-pill,
+.rb-grip,
+.rb-move button,
+.bp-actions button {
+  position: relative;
+}
+.sidebar h3 .fold::before,
+.sidebar h3 .h3-add::before,
+.sidebar li .to-local::before,
+.sidebar .lfs li .icon::before,
+button.demo-pill::before,
+.rb-grip::before,
+.rb-move button::before,
+.bp-actions button::before {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc(50% - 12px));
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.primary {
+  background: var(--ui);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 650;
+  /* Clipped corners: the one key that commits to something. */
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+button.primary:hover:not(:disabled) {
+  background: var(--ui-hover);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 0 14px rgba(255, 255, 255, 0.12);
+}
+button.ghost {
+  background-color: transparent;
+}
+button.danger {
+  border-color: rgba(229, 72, 95, 0.55);
+  color: #ffc2cc;
+}
+button.danger:not(.ghost) {
+  background: var(--danger);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  color: #fff;
+  font-weight: 650;
+}
+button.danger:hover:not(:disabled) {
+  border-color: #ff8a9c;
+}
+.dialog-title.danger {
+  color: var(--red);
+}
+button.ghost.on {
+  background-color: var(--ui-soft);
+  color: var(--ui-text);
+}
+button.icon {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 4px 6px;
+}
+kbd {
+  font: 10px var(--mono);
+  margin-left: 8px;
+  opacity: 0.6;
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+input.text,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  outline: none;
+  width: 100%;
+  user-select: text;
+}
+select,
+select option {
+  background-color: #0c0b20;
+  color: var(--text);
+}
+input.text:focus,
+textarea:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgba(143, 124, 255, 0.22);
+}
+
+/* ---------------------------------------------------------------- wordmark */
+.brand {
+  margin: 0;
+  line-height: 0;
+}
+/* The wordmark as drawn (design/brand): never under 20px tall, clear space of a star around it. */
+.brand .wordmark {
+  display: block;
+  height: 64px;
+  width: auto;
+}
+.brand.small .wordmark {
+  height: 20px;
+}

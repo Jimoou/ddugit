@@ -1,0 +1,390 @@
+/* The first screen and the galaxy dashboard (components/Galaxy.tsx, Planet.tsx). */
+
+/* ----------------------------------------------------------------- welcome */
+.welcome {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  overflow: hidden;
+}
+/* The new-tab screen floats in the same galaxy as the branch map. */
+.welcome > :not(.space-backdrop) {
+  position: relative;
+}
+.space-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* A repository's planet as a glyph: lit from the upper left, ringed for some. */
+.planet-dot {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  background: radial-gradient(
+    circle at 32% 30%,
+    hsl(var(--h) 85% 78%),
+    hsl(var(--h) 60% 42%) 55%,
+    hsl(calc(var(--h) + 20) 50% 12%)
+  );
+  box-shadow: 0 0 6px hsl(var(--h) 90% 65% / 0.5);
+}
+.planet-dot.ringed::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 3px;
+  height: 4px;
+  border: 1px solid hsl(calc(var(--h) + 30) 55% 72% / 0.75);
+  border-radius: 50%;
+  transform: rotate(-20deg);
+}
+.planet-dot.big {
+  width: 20px;
+  height: 20px;
+  vertical-align: -5px;
+}
+.planet-dot.big.ringed::after {
+  left: -7px;
+  right: -7px;
+  top: 7px;
+  height: 7px;
+}
+
+/* The galaxy dashboard: every recent repository as a world card. */
+.galaxy {
+  width: min(1120px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  min-height: 0;
+}
+.galaxy-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.galaxy-head .eyebrow {
+  margin: 0;
+}
+.galaxy-tally {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.worlds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px;
+}
+/* Groups and the cards scroll together under the header. */
+.galaxy-body {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* With repositories to show, the hero steps back: a smaller wordmark, no
+   tagline. The dashboard takes the height that is
+   left and the demo button stays in flow under it, never over a card. */
+.welcome:has(> .galaxy) {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 18px 0 14px;
+}
+/* Auto margins centre it while it fits and keep the top in view once it does not. */
+.welcome:has(> .galaxy) > .brand {
+  margin-top: auto;
+}
+.welcome:has(> .galaxy) > :last-child {
+  margin-bottom: auto;
+}
+.welcome:has(> .galaxy) .brand .wordmark {
+  height: 40px;
+}
+.welcome:has(> .galaxy) > p {
+  display: none;
+}
+.welcome:has(> .galaxy) .connect-actions {
+  margin-top: 0;
+}
+.welcome > .galaxy {
+  flex: 0 1 auto;
+}
+.welcome > :not(.galaxy, .space-backdrop) {
+  flex-shrink: 0;
+}
+.band {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.band-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.band-head .fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+}
+.band-head .fold:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.band-head .chev {
+  transition: transform 0.15s;
+}
+.band-head .fold[aria-expanded="true"] .chev {
+  transform: rotate(90deg);
+}
+.band-head > button:not(.fold) {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+/* The group's star: its colour. */
+.band-star {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: hsl(var(--h) 90% 65%);
+  box-shadow: 0 0 8px hsl(var(--h) 90% 65% / 0.7);
+}
+.band:not(.ungrouped) .world {
+  border-left: 2px solid hsl(var(--h) 80% 60% / 0.8);
+}
+/* A card picked for grouping, and a band a card is dragged over. */
+.world.picked {
+  border-color: rgba(var(--signal), 0.9);
+  background: rgba(var(--signal), 0.06);
+}
+.band.drop {
+  outline: 1px dashed rgba(var(--signal), 0.8);
+  outline-offset: 4px;
+}
+.group-hint,
+.pick-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.group-hint {
+  color: var(--text-2);
+  border-color: rgba(var(--signal), 0.35);
+}
+.group-hint > span {
+  flex: 1;
+}
+.group-hint button,
+.pick-bar button {
+  padding: 2px 8px;
+  font-size: 11.5px;
+}
+.band-empty {
+  margin: 0 0 0 22px;
+}
+.world {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.world:hover,
+.world:focus-within {
+  border-color: rgba(var(--signal), 0.45);
+}
+.world.missing {
+  opacity: 0.6;
+}
+.world-open {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  text-align: left;
+  min-width: 0;
+}
+.world-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding-right: 52px;
+}
+.world-path,
+.world-last,
+.world-branch {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.world-path {
+  color: var(--muted);
+  font: 11px var(--mono);
+}
+.world-branch {
+  font: 12px var(--mono);
+  color: var(--text-2);
+}
+.world-last {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.world-signals {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 18px;
+}
+.sig {
+  --sig: var(--text-2);
+  padding: 0 7px;
+  font: 600 10.5px/18px var(--sans);
+  color: var(--sig);
+  background: color-mix(in srgb, var(--sig) 12%, transparent);
+  white-space: nowrap;
+}
+.sig-missing,
+.sig-stopped {
+  --sig: var(--red);
+}
+.sig-changes {
+  --sig: var(--amber);
+}
+.sig-behind {
+  --sig: var(--cyan);
+}
+.sig-ahead {
+  --sig: var(--lime);
+}
+.sig-quiet {
+  --sig: var(--muted);
+  background: none;
+}
+/* The dashboard's totals stay quiet beside the cards: plain text, the signal only as a dot. */
+.galaxy-tally .sig {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 0;
+  color: var(--text-2);
+  background: none;
+  font-weight: 500;
+}
+.galaxy-tally .sig::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sig);
+}
+.world-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+}
+/* The menu always shows (dimmed until hover); the star shows on hover and stays lit. */
+.world-tools button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.world-tools .more {
+  color: var(--text);
+  border-color: var(--line);
+  opacity: 0.85;
+}
+/* Unstarred: a clear outline, brighter on hover; starred: filled amber. */
+.world-tools .star {
+  color: var(--text-2);
+  opacity: 0.75;
+}
+.world-tools .star .icon-svg {
+  width: 16px;
+  height: 16px;
+}
+.world:hover .world-tools button,
+.world:focus-within .world-tools button,
+.world-tools .star.on {
+  opacity: 1;
+}
+.world-tools button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line-strong);
+}
+.world-tools .star.on {
+  color: var(--amber);
+}
+.world-fetch {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.world-fetch.ok {
+  color: var(--ok);
+}
+.world-fetch.auth,
+.world-fetch.failed {
+  color: var(--red);
+}
+.world-fetch.diverged {
+  color: var(--amber);
+}
+.pick-bar .pick-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+}
+.welcome p {
+  color: var(--muted);
+  margin: 0;
+}
+.welcome .row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.welcome.loading {
+  color: var(--muted);
+}

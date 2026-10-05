@@ -1,0 +1,506 @@
+/* Side panels (inspector, composer, stash), menus' icon column, segmented controls, dialogs and toasts. */
+
+/* ------------------------------------------------------------------ panels */
+.panel {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  animation: slide-in 0.18s ease-out;
+}
+@keyframes slide-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+.panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.panel h2 {
+  font-size: 16px;
+  margin: 2px 0 0;
+  word-break: break-word;
+}
+.composer h2 {
+  font-weight: 400;
+  color: var(--text-2);
+}
+.composer h2 b {
+  color: var(--text);
+}
+.eyebrow {
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
+}
+.note {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(143, 124, 255, 0.1);
+  border: 1px solid rgba(143, 124, 255, 0.3);
+  font-size: 12px;
+}
+.note.warn {
+  background: rgba(255, 184, 77, 0.08);
+  border-color: rgba(255, 184, 77, 0.35);
+  color: #ffe0b0;
+}
+
+.files-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 38vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+}
+.files li {
+  padding: 3px 4px;
+}
+.files li:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.files .empty {
+  color: var(--muted);
+  padding: 14px;
+  text-align: center;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+.check input {
+  accent-color: var(--ui);
+}
+.path {
+  font: 12px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.chip {
+  font: 700 10px/16px var(--mono);
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.k-modified {
+  color: var(--amber);
+  background: rgba(255, 184, 77, 0.12);
+}
+.k-untracked,
+.k-added {
+  color: var(--lime);
+  background: rgba(166, 255, 77, 0.12);
+}
+.k-deleted {
+  color: var(--red);
+  background: rgba(255, 77, 109, 0.12);
+}
+.k-renamed,
+.k-copied,
+.k-typechange {
+  color: #9b7bff;
+  background: rgba(155, 123, 255, 0.14);
+}
+.k-conflict,
+.k-conflicted {
+  color: #07060d;
+  background: var(--red);
+}
+
+.message {
+  resize: vertical;
+  min-height: 80px;
+}
+.branch-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ref {
+  font: 600 11px var(--mono);
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+.badge.ref {
+  padding: 0 6px;
+  font: 600 11px/1 var(--mono);
+}
+.ref-remote {
+  opacity: 0.75;
+}
+.ref-tag {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+/* ---------------------------------------------------- commit panel, reading first */
+.inspector .byline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.inspector .avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font: 700 11px var(--sans);
+}
+.inspector .who {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inspector .ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.inspector .ids .sha {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+}
+.inspector .ids .sha.parent {
+  color: var(--muted);
+}
+.inspector .where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.inspector .ref-pr {
+  border-color: #c9b8ff;
+  color: #c9b8ff;
+}
+.inspector .contained {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.inspector .contained .local {
+  color: var(--text-2);
+}
+.inspector .toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+}
+.inspector .toolbar .spacer {
+  flex: 1;
+}
+.inspector .tool {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-2);
+}
+.inspector .tool:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--ui-soft);
+}
+.context-menu .menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* In a menu where some entries have icons, the others keep the same text column. */
+.context-menu:has(.menu-label svg) .menu-label:not(:has(svg))::before {
+  content: "";
+  width: 13px;
+  flex: none;
+}
+.body {
+  margin: 0;
+  font: 12px/1.5 var(--mono);
+  white-space: pre-wrap;
+  color: #cfc9f2;
+  user-select: text;
+}
+.meta {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 6px 10px;
+  margin: 0;
+}
+.meta dt {
+  color: var(--muted);
+}
+.meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sha {
+  font: 12px var(--mono);
+  color: var(--ui-text);
+  cursor: pointer;
+}
+.parents {
+  display: flex;
+  gap: 8px;
+}
+.sha.link:hover {
+  text-decoration: underline;
+}
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tip {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------- segmented (components/Segmented.tsx) */
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+}
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  background: none;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.segmented button.on {
+  background: var(--ui-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.segmented button:disabled {
+  opacity: 0.45;
+}
+/* A list beside what it switches: where a repository comes from, the settings sections. */
+.segmented.column {
+  flex-direction: column;
+  align-self: start;
+}
+.segmented.column button {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
+/* ------------------------------------------------------------------ dialog */
+.scrim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 2, 8, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+  animation: scrim-in 0.16s ease-out;
+}
+.scrim > * {
+  animation: popup-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* A closed popup's copy playing out (leaving.ts). */
+.scrim.leaving {
+  pointer-events: none;
+  animation: scrim-out 0.16s ease-in forwards;
+}
+.scrim.leaving > * {
+  animation: popup-out 0.16s ease-in forwards;
+}
+.context-menu.leaving {
+  pointer-events: none;
+  animation: menu-out 0.1s ease-in forwards;
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+@keyframes popup-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .scrim > *,
+  .sidebar.slide,
+  .sidebar.slide > * {
+    animation: none;
+  }
+}
+@keyframes menu-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.dialog {
+  width: min(460px, calc(100vw - 32px));
+  /* A tall dialog in a short window scrolls instead of losing its buttons off the edges. */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+.dialog p {
+  margin: 0;
+}
+/* One title style for every dialog and sheet (the heading useDialog labels the layer with). */
+.dialog-title {
+  margin: 0;
+  font: 600 15px/1.3 var(--sans);
+  color: var(--text);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.merge-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chip-lg {
+  font: 700 13px var(--mono);
+  padding: 6px 12px;
+  border: 1.5px solid var(--c);
+  color: var(--c);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent);
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow-arrow {
+  flex: 1;
+  height: 2px;
+  position: relative;
+  background: linear-gradient(90deg, var(--line-strong), var(--cyan));
+  overflow: hidden;
+}
+.flow-arrow i {
+  position: absolute;
+  top: -2px;
+  width: 24px;
+  height: 6px;
+  background: #fff;
+  box-shadow:
+    0 0 10px #fff,
+    0 0 18px var(--cyan);
+  animation: flow 1.2s linear infinite;
+}
+@keyframes flow {
+  from {
+    left: -24px;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* ------------------------------------------------------------------ toasts */
+.toasts {
+  position: absolute;
+  right: 14px;
+  bottom: 120px; /* above the HUD, inside the graph area */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+}
+.toast {
+  max-width: 380px;
+  padding: 9px 14px;
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
+  box-shadow:
+    inset 3px 0 0 var(--ok),
+    0 10px 30px rgba(0, 0, 0, 0.45);
+  white-space: pre-wrap;
+  animation: slide-in 0.18s ease-out;
+}
+.toast.err {
+  box-shadow:
+    inset 3px 0 0 var(--danger),
+    0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-arrow i,
+  .panel,
+  .toast,
+  .diff-sheet,
+  .remote.running .ico {
+    animation: none;
+  }
+}
