@@ -19,7 +19,7 @@ export function MergeDialog(p: Props) {
   return (
     <div className="scrim" onClick={p.onCancel}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">{t("merge.title")}</div>
+        <h2 className="dialog-title">{t("merge.title")}</h2>
         <div className="merge-flow">
           <span className="chip-lg" style={{ ["--c" as string]: p.sourceColor }}>
             {p.source}

@@ -41,6 +41,12 @@ export class Demo {
     return this.page.evaluate(() => (window as unknown as DemoWindow).__ddugitDemo.snapshot());
   }
 
+  /** Open one of the branch tools (backport, transfer, cleanup) from the ⋯ on the sidebar's branches. */
+  async branchTool(name: "백포트…" | "폐쇄망 반출입…" | "브랜치 정리…") {
+    await this.page.locator(".app:not([hidden]) .sidebar").getByRole("button", { name: "브랜치 작업 더 보기" }).click();
+    await this.page.locator(".context-menu").getByRole("menuitem", { name }).click();
+  }
+
   /** Go ahead in the "before pull / push" confirmation. */
   async confirmSync() {
     await this.page.locator(".dialog.sync-confirm button.primary").click();

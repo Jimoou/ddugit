@@ -69,7 +69,7 @@ export function EditCommitDialog(p: {
           if (edit && !p.busy) p.onSubmit(edit);
         }}
       >
-        <div className="eyebrow">{t(`edit.${p.mode}`)}</div>
+        <h2 className="dialog-title">{t(`edit.${p.mode}`)}</h2>
         <p className="muted small">
           <code>{commit.id.slice(0, 7)}</code> {commit.summary}
         </p>

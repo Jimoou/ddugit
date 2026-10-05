@@ -7,6 +7,7 @@ import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { offerPro, proOpen, usePro } from "../pro";
 import { ProBadge } from "./ProOffer";
+import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
 
 interface Props {
@@ -34,13 +35,13 @@ interface Props {
 const GUIDE_KEY = "ddugit.backportGuide";
 const guideOpen = () => {
   try {
-    return localStorage.getItem(GUIDE_KEY) !== "closed";
+    return localStorage.getItem(GUIDE_KEY) === "open";
   } catch {
-    return true;
+    return false;
   }
 };
 
-/** How backporting goes, open until the user folds it (then a one-line "how to" stays). */
+/** How backporting goes: a one-line "how to" that unfolds (and stays the way the user left it). */
 function BackportGuide({ source, target }: { source: string; target: string }) {
   const [open, setOpen] = useState(guideOpen);
   const fold = (o: boolean) => {
@@ -48,7 +49,7 @@ function BackportGuide({ source, target }: { source: string; target: string }) {
     try {
       localStorage.setItem(GUIDE_KEY, o ? "open" : "closed");
     } catch {
-      // storage unavailable: folded for this session only
+      // storage unavailable: remembered for this session only
     }
   };
   return (
@@ -168,7 +169,7 @@ export function BackportSheet(p: Props) {
     <section className="diff-sheet backport-sheet" style={{ height: "50vh" }} {...sheet}>
       <header>
         <div className="title">
-          <span className="eyebrow">{t("bp.title")}</span>
+          <h2 className="dialog-title">{t("bp.title")}</h2>
           {select(t("bp.source"), source, (s) => p.onPair(s, target))}
           <span className="muted">→</span>
           {select(t("bp.target"), target, (tg) => p.onPair(source, tg))}
@@ -178,25 +179,17 @@ export function BackportSheet(p: Props) {
             </span>
           )}
         </div>
-        <div className="scope-tabs" role="tablist">
-          {(
-            [
-              ["missing", "bp.state.missing"],
-              ["all", "bp.tab.all"],
-              ["targets", "bp.tab.targets"],
-            ] as const
-          ).map(([v, label]) => (
-            <button
-              key={v}
-              role="tab"
-              aria-selected={view === v}
-              className={view === v ? "on" : ""}
-              onClick={() => setView(v)}
-            >
-              {t(label)}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          role="tablist"
+          label={t("bp.title")}
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "missing", label: t("bp.state.missing") },
+            { value: "all", label: t("bp.tab.all") },
+            { value: "targets", label: t("bp.tab.targets") },
+          ]}
+        />
         <button className="icon" onClick={p.onClose} title={t("common.close")}>
           <Icon name="close" />
         </button>

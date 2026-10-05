@@ -5,7 +5,7 @@ import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
 import { Galaxy } from "./components/Galaxy";
-import { SettingsDialog } from "./components/SettingsDialog";
+import { SettingsDialog, type SettingsSection } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
 import { UpdateNotice } from "./components/Update";
@@ -62,7 +62,7 @@ const loadTabs = (): Tabs => (isTauri ? parseTabs(store(TABS), store(LAST_REPO))
  */
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
-  const [settingsAt, setSettingsAt] = useState<"top" | "shortcuts" | null>(null);
+  const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
   const [tabs, setTabsState] = useState(loadTabs);
   /** The galaxy dashboard is showing (the home tab), over whichever tab is active. */
   const [home, setHome] = useState(false);
@@ -262,7 +262,7 @@ export default function App() {
         onClose={(id) => setTabs((tb) => closeTab(tb, id), home)}
         onNew={() => setTabs(addEmpty)}
         onRepoMenu={(x) => setRepoMenu((o) => (o === null ? x : null))}
-        onSettings={() => setSettingsAt("top")}
+        onSettings={() => setSettingsAt("screen")}
         menu={
           repoMenu !== null && current.path
             ? {
@@ -366,12 +366,12 @@ export default function App() {
       {settingsAt && (
         <SettingsDialog
           settings={settings}
-          focus={settingsAt === "top" ? undefined : settingsAt}
+          at={settingsAt}
           onChange={updateSettings}
           onClose={() => setSettingsAt(null)}
         />
       )}
-      <ProOffer onLicense={() => setSettingsAt("top")} />
+      <ProOffer onLicense={() => setSettingsAt("license")} />
       <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
         {toasts.map((item) => (
           <div key={item.id} className={`toast ${item.kind}`}>

@@ -9,6 +9,7 @@ import { joinPath, parentDir, repoName } from "../recent";
 import type { WorktreeInfo, WorktreeOp } from "../types";
 import { Icon } from "./Icon";
 import { SideSection } from "./Sidebar";
+import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
 
 export function WorktreeSection(p: {
@@ -20,6 +21,7 @@ export function WorktreeSection(p: {
   return (
     <SideSection
       id="worktree"
+      icon="folder"
       className="worktrees"
       title={t("wt.title")}
       count={p.worktrees.length}
@@ -47,7 +49,7 @@ export function WorktreeSection(p: {
               {repoName(w.path)}
               <span className="muted"> {w.missing ? t("wt.missing") : (w.branch ?? t("galaxy.detached"))}</span>
             </span>
-            {w.current && <span className="head-pill">{t("wt.here")}</span>}
+            {w.current && <span className="badge head">{t("wt.here")}</span>}
             {w.main && !w.current && <span className="muted small">{t("wt.main")}</span>}
           </li>
         ))}
@@ -99,23 +101,17 @@ export function WorktreeDialog(p: {
             });
         }}
       >
-        <div className="eyebrow">{t("wt.add")}</div>
+        <h2 className="dialog-title">{t("wt.add")}</h2>
         <p className="muted small">{t("wt.explain")}</p>
-        <span className="proto" role="radiogroup" aria-label={t("wt.add")}>
-          {[false, true].map((isNew) => (
-            <button
-              key={String(isNew)}
-              type="button"
-              role="radio"
-              aria-checked={fresh === isNew}
-              className={fresh === isNew ? "on" : ""}
-              disabled={!isNew && p.free.length === 0}
-              onClick={() => setFresh(isNew)}
-            >
-              {t(isNew ? "wt.newBranch" : "wt.existing")}
-            </button>
-          ))}
-        </span>
+        <Segmented
+          label={t("wt.add")}
+          value={fresh ? "new" : "existing"}
+          onChange={(v) => setFresh(v === "new")}
+          options={[
+            { value: "existing", label: t("wt.existing"), disabled: p.free.length === 0 },
+            { value: "new", label: t("wt.newBranch") },
+          ]}
+        />
         {fresh ? (
           <input
             className="text"

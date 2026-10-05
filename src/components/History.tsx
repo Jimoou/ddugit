@@ -58,7 +58,7 @@ export function BlameSheet(p: {
     <section className="diff-sheet blame-sheet" style={{ height: "50vh" }} {...sheet}>
       <header>
         <div className="title">
-          <span className="eyebrow">{t("history.blame.title")}</span>
+          <h2 className="dialog-title">{t("history.blame.title")}</h2>
           <code>{file}</code>
           <span className="muted">
             {t("history.blame.at", { sha: rev.slice(0, 7) })} · {t("history.blame.hint")}

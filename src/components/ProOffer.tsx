@@ -16,7 +16,7 @@ function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void 
   return (
     <div className="scrim" onClick={closeProOffer}>
       <div className="dialog pro-offer" aria-label={t("pro.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">{t("pro.title")}</div>
+        <h2 className="dialog-title">{t("pro.title")}</h2>
         <p>
           <b>{t(`pro.feature.${feature}`, { n: FREE_DASHBOARD })}</b>
         </p>

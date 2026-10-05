@@ -10,6 +10,7 @@ import { t } from "../i18n";
 import type { ForgeKind, ForgeRepo, ForgeRepos } from "../types";
 import { Icon } from "./Icon";
 import { FORGE_NAME, TokenDialog } from "./Pulls";
+import { Segmented } from "./Segmented";
 
 const PROTO = "ddugit.forgeProto";
 
@@ -21,28 +22,45 @@ function readProto(): Proto {
   }
 }
 
-/** URL, GitHub, GitLab: where the repository comes from. Vertical in the clone dialog, a row in add-remote. */
+/** URL, GitHub, GitLab: where the repository comes from. A column beside the form (a row in a narrow window). */
 export function SourceTabs(p: { value: Source; onChange(s: Source): void; disabled?: boolean }) {
   const sources: { id: Source; label: string; icon: "link" | ForgeKind }[] = [
     { id: "url", label: t("forge.source.url"), icon: "link" },
     ...FORGE_SOURCES.map((f) => ({ id: f.id, label: FORGE_NAME[f.kind], icon: f.kind })),
   ];
   return (
-    <div className="source-tabs" role="tablist" aria-label={t("forge.sources")}>
-      {sources.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          role="tab"
-          aria-selected={p.value === s.id}
-          className={p.value === s.id ? "on" : ""}
-          disabled={p.disabled}
-          onClick={() => p.onChange(s.id)}
-        >
-          <Icon name={s.icon} /> {s.label}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      className="column"
+      role="tablist"
+      label={t("forge.sources")}
+      value={p.value}
+      onChange={p.onChange}
+      disabled={p.disabled}
+      options={sources.map((s) => ({
+        value: s.id,
+        label: (
+          <>
+            <Icon name={s.icon} /> {s.label}
+          </>
+        ),
+      }))}
+    />
+  );
+}
+
+/** HTTPS or SSH: the two address forms of one forge repository. */
+export function ProtoSwitch(p: { value: Proto; onChange(p: Proto): void; disabled?: boolean }) {
+  return (
+    <Segmented
+      label={t("connect.clone.proto")}
+      value={p.value}
+      onChange={p.onChange}
+      disabled={p.disabled}
+      options={[
+        { value: "https", label: "HTTPS" },
+        { value: "ssh", label: "SSH" },
+      ]}
+    />
   );
 }
 
@@ -190,21 +208,7 @@ export function ForgeRepoPicker(p: Props) {
                 }}
               />
             </span>
-            <span className="proto" role="radiogroup" aria-label={t("connect.clone.proto")}>
-              {(["https", "ssh"] as const).map((pr) => (
-                <button
-                  key={pr}
-                  type="button"
-                  role="radio"
-                  aria-checked={proto === pr}
-                  className={proto === pr ? "on" : ""}
-                  disabled={p.disabled}
-                  onClick={() => switchProto(pr)}
-                >
-                  {pr.toUpperCase()}
-                </button>
-              ))}
-            </span>
+            <ProtoSwitch value={proto} onChange={switchProto} disabled={p.disabled} />
           </div>
           <ul className="forge-repos" role="listbox" aria-label={t("forge.list", { forge: name })}>
             {shown.map((r) => {

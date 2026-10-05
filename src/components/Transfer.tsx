@@ -6,6 +6,7 @@ import { offerPro, proOpen, usePro } from "../pro";
 import type { BundleCheck, OpResult, TransferSent } from "../types";
 import { guessName } from "../transfer";
 import { ProBadge } from "./ProOffer";
+import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
 
 /**
@@ -68,27 +69,19 @@ export function TransferDialog(p: {
   return (
     <div className="scrim" onClick={p.onClose}>
       <div className="dialog transfer" aria-label={t("tr.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">
+        <h2 className="dialog-title">
           {t("tr.title")} {!pro && <ProBadge />}
-        </div>
-        <div className="scope-tabs" role="tablist">
-          <button
-            role="tab"
-            aria-selected={tab === "out"}
-            className={tab === "out" ? "on" : ""}
-            onClick={() => setTab("out")}
-          >
-            {t("tr.out")}
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === "in"}
-            className={tab === "in" ? "on" : ""}
-            onClick={() => setTab("in")}
-          >
-            {t("tr.in")}
-          </button>
-        </div>
+        </h2>
+        <Segmented
+          role="tablist"
+          label={t("tr.title")}
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "out", label: t("tr.out") },
+            { value: "in", label: t("tr.in") },
+          ]}
+        />
 
         {tab === "out" ? (
           <>
@@ -146,9 +139,14 @@ export function TransferDialog(p: {
         ) : (
           <>
             <p className="muted small">{t("tr.inHint")}</p>
-            <div className="row">
-              <button onClick={() => void pickBundle()}>{t("tr.pick")}</button>
-              {file && <span className="mono small tr-file">{file}</span>}
+            <div className="field col">
+              <span>{t("tr.pickIn")}</span>
+              <span className="row">
+                <code className="folder" title={file ?? undefined}>
+                  {file ?? t("tr.noFile")}
+                </code>
+                <button onClick={() => void pickBundle()}>{t("tr.pick")}</button>
+              </span>
             </div>
             {check && (
               <div className="tr-check">

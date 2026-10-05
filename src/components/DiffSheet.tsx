@@ -4,6 +4,7 @@ import { lfsChange } from "../lfs";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
+import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
 import { Rich } from "../i18n/Rich";
 
@@ -97,7 +98,7 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
       />
       <header>
         <div className="title">
-          <span className="eyebrow">{t("diff.title")}</span>
+          <h2 className="dialog-title">{t("diff.title")}</h2>
           <b>{title}</b>
           {files && (
             <span className="muted">
@@ -107,19 +108,16 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
           )}
         </div>
         {stage && (
-          <div className="scope-tabs" role="tablist">
-            {(["unstaged", "staged"] as const).map((sc) => (
-              <button
-                key={sc}
-                role="tab"
-                aria-selected={stage.scope === sc}
-                className={stage.scope === sc ? "on" : ""}
-                onClick={() => stage.onScope(sc)}
-              >
-                {sc === "unstaged" ? t("diff.tab.unstaged") : t("diff.tab.staged")}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            role="tablist"
+            label={t("diff.title")}
+            value={stage.scope}
+            onChange={stage.onScope}
+            options={[
+              { value: "unstaged", label: t("diff.tab.unstaged") },
+              { value: "staged", label: t("diff.tab.staged") },
+            ]}
+          />
         )}
         <span className="muted keys">
           <Rich k="diff.keys" />

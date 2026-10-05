@@ -30,8 +30,7 @@ export function AddRemoteDialog(p: Props) {
     <input
       className="text"
       autoFocus={source === "url"}
-      aria-label={t("remote.add.name")}
-      placeholder={p.remotes.includes("upstream") ? t("remote.add.name") : t("remote.add.nameExample")}
+      placeholder={p.remotes.includes("upstream") ? undefined : "upstream"}
       value={name}
       onChange={(e) => setTypedName(e.target.value.replace(/\s+/g, "-"))}
     />
@@ -48,47 +47,50 @@ export function AddRemoteDialog(p: Props) {
         }}
         {...dialog}
       >
-        <div className="eyebrow">{t("remote.add.title")}</div>
-        <SourceTabs
-          value={source}
-          onChange={(s) => {
-            setSource(s);
-            setTypedName(null);
-            setPicked(null);
-          }}
-        />
-        {source === "url" ? (
-          <>
-            {nameField}
-            <input
-              className="text"
-              aria-label={t("remote.add.urlLabel")}
-              placeholder={t("remote.add.url")}
-              value={typedUrl}
-              onChange={(e) => setTypedUrl(e.target.value)}
-            />
-          </>
-        ) : (
-          <>
-            <ForgeRepoPicker
-              key={source}
-              kind={source}
-              path={p.path}
-              trusted={p.trusted}
-              onTrust={p.onTrust}
-              picked={picked}
-              onPick={(pk) => {
-                setPicked(pk);
-                setTypedName(null);
-              }}
-            />
+        <h2 className="dialog-title">{t("remote.add.title")}</h2>
+        <div className="source-body">
+          <SourceTabs
+            value={source}
+            onChange={(s) => {
+              setSource(s);
+              setTypedName(null);
+              setPicked(null);
+            }}
+          />
+          <div className="source-pane">
+            {source !== "url" && (
+              <ForgeRepoPicker
+                key={source}
+                kind={source}
+                path={p.path}
+                trusted={p.trusted}
+                onTrust={p.onTrust}
+                picked={picked}
+                onPick={(pk) => {
+                  setPicked(pk);
+                  setTypedName(null);
+                }}
+              />
+            )}
             <label className="field col">
               {t("remote.add.name")}
               {nameField}
             </label>
-            {picked && <p className="muted small add-remote-url">→ {picked.url}</p>}
-          </>
-        )}
+            {source === "url" ? (
+              <label className="field col">
+                {t("remote.add.urlLabel")}
+                <input
+                  className="text"
+                  placeholder={t("remote.add.url")}
+                  value={typedUrl}
+                  onChange={(e) => setTypedUrl(e.target.value)}
+                />
+              </label>
+            ) : (
+              picked && <p className="muted small add-remote-url">→ {picked.url}</p>
+            )}
+          </div>
+        </div>
         <div className="dialog-actions">
           <button type="button" onClick={p.onCancel}>
             {t("common.cancel")}

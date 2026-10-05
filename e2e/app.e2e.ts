@@ -258,25 +258,19 @@ test("asks before pull and push, lists what moves, and can stop asking", async (
 test("opens backport from the sidebar with a guide, into the current branch", async ({ demo }) => {
   const { page } = demo;
   const snap = await demo.snapshot();
-  await page
-    .locator(".sidebar")
-    .getByLabel(/백포트: 다른 브랜치에만 있는 커밋/)
-    .click();
+  await demo.branchTool("백포트…");
   const sheet = page.locator(".backport-sheet");
   await expect(sheet).toBeVisible();
   await expect(sheet.getByLabel("받는 쪽")).toHaveValue(snap.head.branch!);
   await expect(sheet.getByLabel("가져올 쪽")).not.toHaveValue(snap.head.branch!);
+  // The guide starts folded; unfolded once, it stays open.
   const guide = sheet.locator(".bp-guide");
-  await expect(guide.locator("ol li")).toHaveCount(3);
-  // Folded once, it stays folded.
-  await guide.locator(".bp-guide-head").click();
   await expect(guide.locator("ol")).toHaveCount(0);
+  await guide.locator(".bp-guide-head").click();
+  await expect(guide.locator("ol li")).toHaveCount(3);
   await page.reload();
-  await page
-    .locator(".sidebar")
-    .getByLabel(/백포트: 다른 브랜치에만 있는 커밋/)
-    .click();
-  await expect(page.locator(".backport-sheet .bp-guide ol")).toHaveCount(0);
+  await demo.branchTool("백포트…");
+  await expect(page.locator(".backport-sheet .bp-guide ol li")).toHaveCount(3);
 });
 
 test("ignores are per target and the overview counts each branch", async ({ demo }) => {
@@ -308,7 +302,10 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
   const dialog = page.getByRole("dialog", { name: "설정" });
   await expect(dialog).toBeVisible();
   await expect(dialog.locator("kbd", { hasText: "⌘/Ctrl + F" })).toBeVisible();
+  // Mouse gestures read as words, not keys.
+  await expect(dialog.locator(".gesture", { hasText: "우클릭" })).toBeVisible();
 
+  await dialog.getByRole("tab", { name: "화면" }).click();
   await dialog.getByLabel(/반짝임 효과/).uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).animate)).toBe(false);
   // The space backdrop and the glow switch off on their own (the graph keeps drawing).
@@ -319,6 +316,7 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
     glow: false,
   });
 
+  await dialog.getByRole("tab", { name: "Git" }).click();
   const git = dialog.getByPlaceholder("비워 두면 PATH의 git");
   await git.fill("/usr/bin/nope");
   await dialog.getByRole("button", { name: "확인하고 적용" }).click();
@@ -471,8 +469,12 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   const { page } = demo;
   await page.keyboard.press("?");
   const dialog = page.getByRole("dialog", { name: "설정" });
+  await dialog.getByRole("tab", { name: "라이선스" }).click();
   const lic = dialog.locator("section.license");
   await expect(lic).toContainText("ddugit.com 계정으로 로그인해 활성화");
+  // Pasting is for air-gapped and site licenses: folded away until asked for.
+  await expect(lic.getByLabel("라이선스 붙여 넣기")).toBeHidden();
+  await lic.locator(".license-paste summary").click();
   await lic.getByLabel("라이선스 붙여 넣기").fill("not a license");
   await lic.getByRole("button", { name: "라이선스 적용" }).click();
   await expect(lic.locator(".note.warn")).toContainText("not a ddugit license");
@@ -486,7 +488,8 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
 
 test("settings: Pro is activated by signing in on ddugit.com, and the wait can be cancelled", async ({ demo }) => {
   const { page } = demo;
-  await page.keyboard.press("?");
+  await page.locator(".tabrow-settings").click();
+  await page.getByRole("dialog", { name: "설정" }).getByRole("tab", { name: "라이선스" }).click();
   const lic = page.getByRole("dialog", { name: "설정" }).locator("section.license");
   await lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" }).click();
   await expect(lic.locator(".license-waiting")).toContainText("브라우저에서 로그인을 마치면");
@@ -505,7 +508,8 @@ test("settings: a lapsed subscription only reminds, and renews once paid", async
     d.setLicense("lapsedMonthly");
     d.subscription = "lapsed";
   });
-  await page.keyboard.press("?");
+  await page.locator(".tabrow-settings").click();
+  await page.getByRole("dialog", { name: "설정" }).getByRole("tab", { name: "라이선스" }).click();
   const lic = page.getByRole("dialog", { name: "설정" }).locator("section.license");
   await expect(lic).toContainText("월간 구독");
   await expect(lic.locator(".license-lapsed")).toContainText("기능은 그대로 쓸 수 있어요");
@@ -523,7 +527,7 @@ test("settings: a lapsed subscription only reminds, and renews once paid", async
 
 test("settings: switching to English relabels the app and is remembered", async ({ demo }) => {
   const { page } = demo;
-  await page.keyboard.press("?");
+  await page.locator(".tabrow-settings").click();
   const dialog = page.getByRole("dialog", { name: "설정" });
   await dialog.getByLabel("언어").selectOption("en");
   await expect(page.getByRole("dialog", { name: "Settings" })).toContainText("Shortcuts");
@@ -808,7 +812,7 @@ test("cleans up merged and gone branches from the sidebar", async ({ demo }) => 
   await demo.mutate((d) => {
     (d as unknown as { goneBranches: string[] }).goneBranches = ["feature/theme"];
   });
-  await page.getByRole("button", { name: "브랜치 정리" }).click();
+  await demo.branchTool("브랜치 정리…");
   const sheet = page.locator(".cleanup-sheet");
   await expect(sheet).toContainText("병합 완료");
   await expect(sheet).toContainText("원격에서 사라짐");
@@ -960,7 +964,7 @@ test("a push rides a comet into orbit and fetched commits arrive as meteors, unl
   await expect(meteors).toHaveCount(2);
 
   // Sparkles off (in settings): the same moments play nothing.
-  await page.keyboard.press("?");
+  await page.locator(".tabrow-settings").click();
   await page
     .getByRole("dialog", { name: "설정" })
     .getByLabel(/반짝임 효과/)
@@ -1421,7 +1425,8 @@ test("a newer version shows an update notice that installs or waits", async ({ d
 
 test("on Free, private pull requests and backport actions offer Pro instead", async ({ demo }) => {
   const { page } = demo;
-  await page.keyboard.press("?");
+  await page.locator(".tabrow-settings").click();
+  await page.getByRole("dialog", { name: "설정" }).getByRole("tab", { name: "라이선스" }).click();
   await expect(page.locator(".license-plan")).toContainText("Pro 체험 중 · 12일 남음");
   await page.keyboard.press("Escape");
   await page.addInitScript(() => {
@@ -1453,7 +1458,7 @@ test("air-gapped transfer writes only what a destination lacks, and imports a bu
   demo,
 }) => {
   const { page } = demo;
-  await page.locator(".sidebar button[title='폐쇄망 반출입']").click();
+  await demo.branchTool("폐쇄망 반출입…");
   const dialog = page.locator(".dialog.transfer");
   await dialog.getByPlaceholder("예: 고객사 이름").fill("acme");
   await expect(dialog.locator(".tr-branches")).toContainText("처음부터 전부");
@@ -1482,7 +1487,7 @@ test("on Free, air-gapped transfer offers Pro", async ({ demo }) => {
     (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
   });
   await page.reload();
-  await page.locator(".sidebar button[title='폐쇄망 반출입']").click();
+  await demo.branchTool("폐쇄망 반출입…");
   const dialog = page.locator(".dialog.transfer");
   await dialog.getByPlaceholder("예: 고객사 이름").fill("acme");
   await dialog.getByRole("button", { name: /폴더 고르고 반출/ }).click();
@@ -1624,6 +1629,7 @@ test("identity: a profile made in settings is applied to the repository from the
   const { page } = demo;
   await page.locator(".tabrow-settings").click();
   const dialog = page.getByRole("dialog", { name: "설정" });
+  await dialog.getByRole("tab", { name: "프로필" }).click();
   const profiles = dialog.locator("section.profiles");
   await expect(profiles.locator(".global-identity")).toContainText("Demo Pilot <pilot@ddugit.dev>");
   // First use: offered to start from the global identity.
@@ -1642,7 +1648,7 @@ test("identity: a profile made in settings is applied to the repository from the
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).profiles)).toEqual([
     { name: "Kim Work", email: "kim@corp.example", signing: { format: "ssh", key: "/home/pilot/.ssh/id_ed25519.pub" } },
   ]);
-  await dialog.locator(".dialog-actions button.primary").click();
+  await dialog.getByRole("button", { name: "닫기" }).click();
 
   await page.locator(".topbar button", { hasText: "커밋" }).click();
   const line = page.locator(".composer .identity-line");
@@ -1665,7 +1671,7 @@ test("identity: a profile made in settings is applied to the repository from the
   const head = (await demo.snapshot()).head.target!;
   const at = (await demo.screenOf(head))!;
   await page.mouse.click(at.x, at.y);
-  await expect(page.locator(".inspector .sig")).toHaveText("서명됨");
+  await expect(page.locator(".inspector .signature")).toHaveText("서명됨");
 
   // Back to the global identity.
   await page.locator(".topbar button", { hasText: "커밋" }).click();
@@ -1680,7 +1686,7 @@ test("inspector: shows whether a commit is signed", async ({ demo }) => {
   const head = (await demo.snapshot()).head.target!;
   const at = (await demo.screenOf(head))!;
   await page.mouse.click(at.x, at.y);
-  const sig = page.locator(".inspector .sig");
+  const sig = page.locator(".inspector .signature");
   await expect(sig).toHaveText("서명됨");
   await expect(sig).toHaveAttribute("title", /Jimin <jimin@ddugit.dev>/);
   await page.locator(".inspector .sha.parent").first().click();

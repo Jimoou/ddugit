@@ -165,23 +165,27 @@ export function LicenseSection() {
                   </>
                 )}
               </div>
-              <p className="muted small">{t("license.or")}</p>
-              <textarea
-                className="license-text"
-                rows={3}
-                aria-label={t("license.paste")}
-                placeholder="DDUGIT1.…"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-              <div className="row">
-                <button
-                  disabled={busy || signingIn || !text.trim()}
-                  onClick={() => void act(() => api.licenseInstall(text))}
-                >
-                  {t("license.apply")}
-                </button>
-              </div>
+              {/* Air-gapped and site licenses only: out of the way of the usual sign-in. */}
+              <details className="license-paste">
+                <summary>{t("license.paste")}</summary>
+                <p className="muted small">{t("license.or")}</p>
+                <textarea
+                  className="license-text"
+                  rows={3}
+                  aria-label={t("license.paste")}
+                  placeholder="DDUGIT1.…"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                />
+                <div className="row">
+                  <button
+                    disabled={busy || signingIn || !text.trim()}
+                    onClick={() => void act(() => api.licenseInstall(text))}
+                  >
+                    {t("license.apply")}
+                  </button>
+                </div>
+              </details>
             </>
           )}
         </>

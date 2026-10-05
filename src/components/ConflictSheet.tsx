@@ -64,7 +64,7 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
     <section className="diff-sheet conflict-sheet" style={{ height: "55vh" }} {...sheet}>
       <header>
         <div className="title">
-          <span className="eyebrow danger">{t("cf.title")}</span>
+          <h2 className="dialog-title danger">{t("cf.title")}</h2>
           <b>{file ?? t("cf.allResolved")}</b>
           <span className="muted">{t("cf.left", { n: files.length })}</span>
         </div>

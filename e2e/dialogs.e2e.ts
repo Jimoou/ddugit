@@ -25,7 +25,7 @@ test("Esc closes the repository menu and the dialogs opened from the sidebar", a
   await sidebar.locator(".worktrees").getByRole("button", { name: "워크트리 추가" }).click();
   await escCloses(page, page.locator(".worktree-dialog"));
 
-  await sidebar.locator("button[title='폐쇄망 반출입']").click();
+  await demo.branchTool("폐쇄망 반출입…");
   await escCloses(page, page.locator(".dialog.transfer"));
 
   await page.click(".sidebar li >> text=v0.2.0", { button: "right" });
@@ -35,15 +35,14 @@ test("Esc closes the repository menu and the dialogs opened from the sidebar", a
 
 test("Esc closes sheets, and a menu over a sheet closes alone", async ({ demo }) => {
   const { page } = demo;
-  const sidebar = page.locator(".app:not([hidden]) .sidebar");
-  await page.getByRole("button", { name: "브랜치 정리" }).click();
+  await demo.branchTool("브랜치 정리…");
   const cleanup = page.locator(".cleanup-sheet");
   await expect(cleanup).toBeVisible();
   await page.click(".sidebar li >> text=feature/theme", { button: "right" });
   await escCloses(page, page.locator(".context-menu"));
   await escCloses(page, cleanup);
 
-  await sidebar.getByLabel(/백포트: 다른 브랜치에만 있는 커밋/).click();
+  await demo.branchTool("백포트…");
   await escCloses(page, page.locator(".backport-sheet"));
 
   await page.getByRole("button", { name: "작업 기록 (reflog)" }).click();
@@ -72,10 +71,66 @@ test("? opens settings at the shortcut table; Esc closes it", async ({ demo }) =
   const { page } = demo;
   await page.keyboard.press("?");
   const dialog = page.getByRole("dialog", { name: "설정" });
-  const keys = dialog.getByRole("region", { name: "단축키" });
+  await expect(dialog.getByRole("tab", { name: "단축키" })).toHaveAttribute("aria-selected", "true");
+  const keys = dialog.getByRole("tabpanel", { name: "단축키" });
   await expect(keys).toBeFocused();
-  await expect(keys).toBeInViewport();
+  await expect(keys.locator("kbd").first()).toBeInViewport();
   await escCloses(page, dialog);
+});
+
+test("settings: the section list switches sections, by click and by arrow keys", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".tabrow-settings").click();
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  const tab = (name: string) => dialog.getByRole("tab", { name });
+  await expect(tab("화면")).toHaveAttribute("aria-selected", "true");
+  await expect(dialog.getByLabel(/반짝임 효과/)).toBeVisible();
+
+  await tab("라이선스").click();
+  await expect(dialog.locator("section.license")).toBeVisible();
+  await expect(dialog.getByLabel(/반짝임 효과/)).toHaveCount(0);
+
+  // One Tab stop: the chosen section; arrows move along the list and wrap.
+  await expect(tab("라이선스")).toHaveAttribute("tabindex", "0");
+  await expect(tab("화면")).toHaveAttribute("tabindex", "-1");
+  await tab("라이선스").focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(tab("Git")).toBeFocused();
+  await expect(dialog.getByRole("tabpanel", { name: "Git" })).toBeVisible();
+  await page.keyboard.press("End");
+  await expect(tab("단축키")).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowDown");
+  await expect(tab("화면")).toHaveAttribute("aria-selected", "true");
+
+  // The close button sits in the header.
+  await dialog.getByRole("button", { name: "닫기" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("a segmented switch moves with the arrow keys, one Tab stop for the group", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".tab.on .tab-menu").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /저장소 복제/ })
+    .click();
+  const dialog = page.locator(".dialog.clone");
+  const url = dialog.getByPlaceholder("https://github.com/owner/repo.git");
+  await url.fill("https://github.com/acme/rocket.git");
+  const proto = dialog.getByRole("radiogroup", { name: "주소 형식" });
+  await proto.getByRole("radio", { name: "HTTPS" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(proto.getByRole("radio", { name: "SSH" })).toBeFocused();
+  await expect(proto.getByRole("radio", { name: "SSH" })).toHaveAttribute("aria-checked", "true");
+  await expect(dialog.locator("#clone-url")).toHaveValue("git@github.com:acme/rocket.git");
+  await page.keyboard.press("ArrowLeft");
+  await expect(dialog.locator("#clone-url")).toHaveValue("https://github.com/acme/rocket.git");
+
+  // Where the repository comes from: the same control, laid out as a column.
+  const sources = dialog.getByRole("tablist", { name: "가져올 곳" });
+  await sources.getByRole("tab", { name: "URL" }).focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(sources.getByRole("tab", { name: "GitHub" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("Tab stays inside a modal dialog, and focus goes back to the opener", async ({ demo }) => {
@@ -111,7 +166,7 @@ test("on Free, the Pro offer over a dialog closes with Esc, then the dialog", as
     (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
   });
   await page.reload();
-  await page.locator(".sidebar button[title='폐쇄망 반출입']").click();
+  await demo.branchTool("폐쇄망 반출입…");
   const transfer = page.locator(".dialog.transfer");
   await transfer.getByPlaceholder("예: 고객사 이름").fill("acme");
   await transfer.getByRole("button", { name: /폴더 고르고 반출/ }).click();

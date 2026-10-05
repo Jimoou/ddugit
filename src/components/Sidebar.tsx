@@ -1,3 +1,4 @@
+import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
@@ -52,19 +53,38 @@ const GROUPS: { kind: RefInfo["kind"]; title: Key; icon: IconName }[] = [
   { kind: "tag", title: "side.tag", icon: "tag" },
 ];
 
-const Sections = createContext<{ closed: string[]; toggle(id: string): void }>({ closed: [], toggle: () => {} });
+const Sections = createContext<{
+  closed: string[];
+  toggle(id: string): void;
+  /** Folded to the rail: sections show as icons that unfold the sidebar at them. */
+  rail: ((id: string) => void) | null;
+}>({ closed: [], toggle: () => {}, rail: null });
 
-/** A sidebar section whose title folds it open and shut; `actions` sit at the end of the title row. */
+/**
+ * A sidebar section whose title folds it open and shut; `actions` sit at the end of the title row.
+ * On the folded rail a section with an `icon` is that icon and its count (one without is left out).
+ */
 export function SideSection(p: {
   id: string;
   title: ReactNode;
   count: number;
+  icon?: IconName;
   actions?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
-  const { closed, toggle } = useContext(Sections);
+  const { closed, toggle, rail } = useContext(Sections);
   const shut = closed.includes(p.id);
+  if (rail) {
+    if (!p.icon) return null;
+    const name = typeof p.title === "string" ? p.title : p.id;
+    return (
+      <button className="rail-btn" onClick={() => rail(p.id)} title={`${name} ${p.count}`} aria-label={name}>
+        <Icon name={p.icon} />
+        <span className="rail-n">{p.count}</span>
+      </button>
+    );
+  }
   return (
     <section className={`${p.className ?? ""} ${shut ? "shut" : ""}`}>
       <h3>
@@ -83,11 +103,12 @@ export function Sidebar(props: Props) {
   const { refs, headBranch, colorOf, focused, onFocus, onCheckout, onRefMenu, stashes, selectedStash, onStash } = props;
   const { collapsed, closed, onLayout, active } = props;
   const [q, setQ] = useState("");
-  const searching = q.trim() !== "";
+  // The rail has no search box: it counts everything.
+  const shown = collapsed ? "" : q.trim().toLowerCase();
+  const searching = shown !== "";
   const filtered = useMemo(
-    () =>
-      refs.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)),
-    [refs, q],
+    () => refs.filter((r) => r.name.toLowerCase().includes(shown)).sort((a, b) => a.name.localeCompare(b.name)),
+    [refs, shown],
   );
 
   const localNames = useMemo(() => new Set(refs.filter((r) => r.kind === "local").map((r) => r.name)), [refs]);
@@ -120,7 +141,7 @@ export function Sidebar(props: Props) {
       >
         <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
         <span className="name">{label}</span>
-        {isHead && <span className="head-pill">HEAD</span>}
+        {isHead && <span className="badge head">HEAD</span>}
         {remoteOnly && (
           <button
             className="icon to-local"
@@ -165,63 +186,37 @@ export function Sidebar(props: Props) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  if (collapsed) {
-    // The rail: a button to unfold, and each section as an icon with its count that opens it.
-    const open = (id: string) => {
-      setSlide(true);
-      onLayout({ sidebarCollapsed: false, closedSections: closed.filter((x) => x !== id) });
-    };
-    const rail: { id: string; icon: IconName; title: string; n: number }[] = [
-      ...GROUPS.map((g) => ({
-        id: g.kind,
-        icon: g.icon,
-        title: t(g.title),
-        n: refs.filter((r) => r.kind === g.kind).length,
-      })),
-      ...(stashes.length ? [{ id: "stash", icon: "stash" as const, title: t("side.stash"), n: stashes.length }] : []),
-    ];
-    return (
-      <nav
-        className={`sidebar rail ${slide ? "slide" : ""}`}
-        onAnimationEnd={(e) => e.target === e.currentTarget && setSlide(false)}
-      >
-        <button className="rail-btn" onClick={fold} title={t("side.unfold")} aria-label={t("side.unfold")}>
-          <Icon name="sidebar" />
-        </button>
-        {rail.map((x) => (
-          <button
-            key={x.id}
-            className="rail-btn"
-            onClick={() => open(x.id)}
-            title={`${x.title} ${x.n}`}
-            aria-label={x.title}
-          >
-            <Icon name={x.icon} />
-            <span className="rail-n">{x.n}</span>
-          </button>
-        ))}
-      </nav>
-    );
-  }
+  // The rail: a button to unfold, and each section as an icon with its count that opens it.
+  const openAt = (id: string) => {
+    setSlide(true);
+    onLayout({ sidebarCollapsed: false, closedSections: closed.filter((x) => x !== id) });
+  };
+  const [more, setMore] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <Sections.Provider value={{ closed: searching ? [] : closed, toggle }}>
+    <Sections.Provider value={{ closed: searching ? [] : closed, toggle, rail: collapsed ? openAt : null }}>
       <nav
-        className={`sidebar ${slide ? "slide" : ""}`}
+        className={`sidebar ${collapsed ? "rail" : ""} ${slide ? "slide" : ""}`}
         onAnimationEnd={(e) => e.target === e.currentTarget && setSlide(false)}
       >
-        <div className="side-top">
-          <input
-            className="text search"
-            placeholder={t("side.search")}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <button className="icon fold-side" onClick={fold} title={t("side.fold")} aria-label={t("side.fold")}>
+        {collapsed ? (
+          <button className="rail-btn" onClick={fold} title={t("side.unfold")} aria-label={t("side.unfold")}>
             <Icon name="sidebar" />
           </button>
-        </div>
-        {focused.length > 1 && (
+        ) : (
+          <div className="side-top">
+            <input
+              className="text search"
+              placeholder={t("side.search")}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <button className="icon fold-side" onClick={fold} title={t("side.fold")} aria-label={t("side.fold")}>
+              <Icon name="sidebar" />
+            </button>
+          </div>
+        )}
+        {focused.length > 1 && !collapsed && (
           <div className="side-picked" role="status">
             <span>{t("side.picked", { n: focused.length })}</span>
             <button className="ghost" onClick={props.onClearFocus}>
@@ -239,6 +234,7 @@ export function Sidebar(props: Props) {
               id={g.kind}
               title={t(g.title)}
               count={items.length}
+              icon={g.icon}
               actions={
                 <>
                   {g.kind === "remote" && (
@@ -263,32 +259,13 @@ export function Sidebar(props: Props) {
                   )}
                   {g.kind === "local" && (
                     <button
-                      className="h3-add"
-                      title={t("bp.open")}
-                      aria-label={t("bp.open")}
-                      onClick={props.onBackport}
+                      className="h3-add h3-more"
+                      title={t("side.branchMore")}
+                      aria-label={t("side.branchMore")}
+                      aria-haspopup="menu"
+                      onClick={(e) => setMore({ x: e.clientX, y: e.clientY })}
                     >
-                      <Icon name="backport" size={12} />
-                    </button>
-                  )}
-                  {g.kind === "local" && (
-                    <button
-                      className="h3-add"
-                      title={t("tr.title")}
-                      aria-label={t("tr.title")}
-                      onClick={props.onTransfer}
-                    >
-                      <Icon name="bundle" size={12} />
-                    </button>
-                  )}
-                  {g.kind === "local" && (
-                    <button
-                      className="h3-add"
-                      title={t("clean.open")}
-                      aria-label={t("clean.open")}
-                      onClick={props.onCleanup}
-                    >
-                      <Icon name="sparkles" size={12} />
+                      <Icon name="more" size={14} />
                     </button>
                   )}
                 </>
@@ -341,7 +318,7 @@ export function Sidebar(props: Props) {
         })}
         {props.extra}
         {stashes.length > 0 && (
-          <SideSection id="stash" title={t("side.stash")} count={stashes.length}>
+          <SideSection id="stash" title={t("side.stash")} count={stashes.length} icon="stash">
             <ul>
               {stashes.map((st) => (
                 <li
@@ -358,6 +335,18 @@ export function Sidebar(props: Props) {
           </SideSection>
         )}
       </nav>
+      {more && (
+        <ContextMenu
+          x={more.x}
+          y={more.y}
+          onClose={() => setMore(null)}
+          items={[
+            { label: t("side.more.backport"), icon: "backport", onSelect: props.onBackport },
+            { label: t("side.more.transfer"), icon: "bundle", onSelect: props.onTransfer },
+            { label: t("side.more.cleanup"), icon: "sparkles", onSelect: props.onCleanup },
+          ]}
+        />
+      )}
     </Sections.Provider>
   );
 }

@@ -42,7 +42,7 @@ export function SyncDialog(p: Props) {
   return (
     <div className="scrim" onClick={p.onCancel}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">{andPush ? t("sync.rejected") : t("sync.diverged")}</div>
+        <h2 className="dialog-title">{andPush ? t("sync.rejected") : t("sync.diverged")}</h2>
         <p>
           {p.kind === "rejected" ? (
             <>

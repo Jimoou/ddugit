@@ -104,6 +104,7 @@ export function PullSection(p: {
   return (
     <SideSection
       id="pulls"
+      icon="pull"
       className="pulls"
       title={t("pr.section", { noun })}
       count={open.length}
@@ -191,7 +192,7 @@ export function TokenDialog(p: {
         onClick={(e) => e.stopPropagation()}
         {...dialog}
       >
-        <div className="eyebrow">{t("pr.token.title", { forge: name })}</div>
+        <h2 className="dialog-title">{t("pr.token.title", { forge: name })}</h2>
         {!p.forge.public && (
           // Only the remote URL says this host is a GitHub / GitLab: make sure before a token goes there.
           <p className="note warn">

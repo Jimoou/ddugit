@@ -6,7 +6,7 @@ import { SshSetup } from "./SshSetup";
 import { isSshUrl, toHttps, toSsh } from "../sshUrl";
 import { PlanetDot } from "./Planet";
 import { useCallback, useState } from "react";
-import { ForgeRepoPicker, type Picked, SourceTabs } from "./ForgeRepoPicker";
+import { ForgeRepoPicker, type Picked, ProtoSwitch, SourceTabs } from "./ForgeRepoPicker";
 import { SOURCES, type Source } from "../forgeRepos";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -306,31 +306,21 @@ export function CloneDialog(p: {
         }}
         {...dialog}
       >
-        <div className="eyebrow">{t("connect.clone")}</div>
-        <div className="clone-body">
+        <h2 className="dialog-title">{t("connect.clone")}</h2>
+        <div className="source-body">
           <SourceTabs value={source} onChange={chooseSource} disabled={running} />
-          <div className="clone-source">
+          <div className="source-pane">
             {source === "url" ? (
               <div className="field col">
                 <span className="row url-head">
                   <label htmlFor="clone-url">{t("connect.clone.url")}</label>
                   <span className="spacer" />
                   {/* Same repository, other transport: switch between the two forge address forms. */}
-                  <span className="proto" role="radiogroup" aria-label={t("connect.clone.proto")}>
-                    {(["https", "ssh"] as const).map((proto) => (
-                      <button
-                        key={proto}
-                        type="button"
-                        role="radio"
-                        aria-checked={(proto === "ssh") === ssh}
-                        className={(proto === "ssh") === ssh ? "on" : ""}
-                        disabled={running}
-                        onClick={() => setTyped(proto === "ssh" ? toSsh(url) : toHttps(url))}
-                      >
-                        {proto.toUpperCase()}
-                      </button>
-                    ))}
-                  </span>
+                  <ProtoSwitch
+                    value={ssh ? "ssh" : "https"}
+                    disabled={running}
+                    onChange={(proto) => setTyped(proto === "ssh" ? toSsh(url) : toHttps(url))}
+                  />
                 </span>
                 <input
                   id="clone-url"
