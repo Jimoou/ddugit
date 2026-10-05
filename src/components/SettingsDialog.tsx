@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
 import { ProfilesSection } from "./Identity";
 import { LicenseSection } from "./License";
+import { useDialog } from "./useDialog";
 
 interface Props {
   settings: Settings;
   onChange(patch: Partial<Settings>): void;
+  /** Open at this section instead of the top. */
+  focus?: "shortcuts";
   onClose(): void;
 }
 
@@ -18,19 +21,19 @@ const LANGUAGE_NAMES = { ko: "한국어", en: "English" } as const;
 const label = (text: string) => (isKey(text) ? t(text) : text);
 
 /** Settings plus the shortcut table (opened with ? or the ⚙ button). */
-export function SettingsDialog({ settings, onChange, onClose }: Props) {
+export function SettingsDialog({ settings, focus, onChange, onClose }: Props) {
   const [gitPath, setGitPath] = useState(settings.gitPath);
   const [gitStatus, setGitStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [checking, setChecking] = useState(false);
 
-  // Esc closes wherever focus is (a button disabled while checking drops it).
+  const dialog = useDialog(onClose);
+  // "?" opens straight at the shortcut table.
+  const keys = useRef<HTMLElement>(null);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    if (!focus) return;
+    keys.current?.scrollIntoView({ block: "start" });
+    keys.current?.focus({ preventScroll: true });
+  }, [focus]);
 
   const applyGit = async () => {
     setChecking(true);
@@ -49,9 +52,9 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
     <div className="scrim" onClick={onClose}>
       <div
         className="dialog settings"
-        role="dialog"
         aria-label={t("settings.title")}
         onClick={(e) => e.stopPropagation()}
+        {...dialog}
       >
         <div className="eyebrow">{t("settings.title")}</div>
 
@@ -139,7 +142,7 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
           </p>
         </section>
 
-        <section>
+        <section ref={keys} tabIndex={-1} aria-label={t("settings.shortcuts")}>
           <h4>{t("settings.shortcuts")}</h4>
           <div className="shortcuts">
             {SHORTCUTS.map((g) => (

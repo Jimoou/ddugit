@@ -3,6 +3,7 @@ import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { SyncPlan } from "../sync";
 import { Icon } from "./Icon";
+import { useDialog } from "./useDialog";
 
 /** Commits listed by name before the rest are counted. */
 const LISTED = 8;
@@ -38,14 +39,14 @@ export function SyncConfirm(p: {
     if (never) p.onNeverAsk();
     p.onGo();
   };
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
       <div
         className="dialog sync-confirm"
-        role="dialog"
         aria-label={t(`sync.ask.title.${plan.op}`)}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
+        {...dialog}
       >
         <div className="eyebrow">
           <Icon name={plan.op === "push" ? "arrowUp" : plan.op === "pull" ? "arrowDown" : "fetch"} size={12} />{" "}

@@ -32,6 +32,7 @@ import {
   type RepoGroup,
   updateGroup,
 } from "../groups";
+import { useDialog } from "./useDialog";
 
 const RECENT = "ddugit.recent";
 const GROUPS = "ddugit.groups";
@@ -205,15 +206,11 @@ export function RepoMenu(p: {
     p.onClose();
     f();
   };
+  const dialog = useDialog(p.onClose);
   return (
     <>
       <div className="menu-catch" onClick={p.onClose} />
-      <div
-        className="repo-menu"
-        role="dialog"
-        aria-label={t("connect.title")}
-        onKeyDown={(e) => e.key === "Escape" && p.onClose()}
-      >
+      <div className="repo-menu" aria-label={t("connect.title")} {...dialog}>
         <ConnectActions onOpen={pick(p.onOpen)} onClone={pick(p.onClone)} onInit={pick(p.onInit)} />
         <div className="eyebrow">{t("connect.recent")}</div>
         <RecentList
@@ -297,6 +294,7 @@ export function CloneDialog(p: {
     if (dir) setParent(dir);
   };
 
+  const dialog = useDialog(() => !running && p.onCancel());
   return (
     <div className="scrim" onClick={() => !running && p.onCancel()}>
       <form
@@ -306,7 +304,7 @@ export function CloneDialog(p: {
           e.preventDefault();
           if (ok) void start();
         }}
-        onKeyDown={(e) => e.key === "Escape" && !running && p.onCancel()}
+        {...dialog}
       >
         <div className="eyebrow">{t("connect.clone")}</div>
         <div className="clone-body">

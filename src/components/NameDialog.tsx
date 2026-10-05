@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { t } from "../i18n";
+import { useDialog } from "./useDialog";
 
 export interface NameRequest {
   title: string;
@@ -24,10 +25,12 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
   const [name, setName] = useState(req.value ?? initial);
   const [message, setMessage] = useState("");
   const ok = name.trim() !== "" && name.trim() !== initial && !busy;
+  const dialog = useDialog(onCancel);
   return (
     <div className="scrim" onClick={onCancel}>
       <form
         className="dialog"
+        {...dialog}
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
@@ -42,7 +45,6 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
           placeholder={placeholder}
           value={name}
           onChange={(e) => setName(req.free ? e.target.value : e.target.value.replace(/\s+/g, "-"))}
-          onKeyDown={(e) => e.key === "Escape" && onCancel()}
         />
         {extra && (
           <textarea

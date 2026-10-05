@@ -4,6 +4,7 @@ import { fmtTime } from "../format";
 import { ACTIONS, applyPlan, move, planProblem, resultCount, runsProblem, todoRuns } from "../rebasePlan";
 import type { CommitInfo, RebaseAction, RebaseStep, TodoItem } from "../types";
 import { t } from "../i18n";
+import { useDialog } from "./useDialog";
 
 interface Props {
   branch: string;
@@ -55,8 +56,10 @@ export function RebaseSheet({ branch, base, commits, todo, initial, unpushed, bu
     if (j >= 0 && j < steps.length && sameRun(i, j)) setSteps((ss) => move(ss, i, j));
   };
 
+  // Esc must not throw away a plan the user has edited; the close button still does.
+  const sheet = useDialog(changed ? () => {} : onClose, false);
   return (
-    <section className="diff-sheet rebase-sheet" style={{ height: "50vh" }}>
+    <section className="diff-sheet rebase-sheet" style={{ height: "50vh" }} {...sheet}>
       <header>
         <div className="title">
           <span className="eyebrow">{t("rb.title")}</span>

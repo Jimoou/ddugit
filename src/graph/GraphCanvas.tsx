@@ -603,6 +603,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Keys pressed in a modal dialog belong to it.
+      if ((e.target as Element).closest?.("[aria-modal]")) return;
       // Every tab keeps its graph mounted; only the one on screen takes keys.
       if (!canvasRef.current?.offsetParent) return;
       if (e.key === "=" || e.key === "+") api.zoomBy(1.25);

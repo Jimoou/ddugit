@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
+import { useDialog } from "./useDialog";
 
 export interface Confirm {
   title: string;
@@ -11,9 +12,10 @@ export interface Confirm {
 }
 
 export function ConfirmDialog({ confirm, busy, onCancel }: { confirm: Confirm; busy: boolean; onCancel(): void }) {
+  const dialog = useDialog(onCancel);
   return (
     <div className="scrim" onClick={onCancel}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === "Escape" && onCancel()}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className={`eyebrow ${confirm.danger ? "danger" : ""}`}>{confirm.title}</div>
         <div className="confirm-body">{confirm.body}</div>
         <div className="dialog-actions">

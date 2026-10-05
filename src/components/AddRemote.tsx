@@ -4,6 +4,7 @@ import { useState } from "react";
 import { remoteNameFor, type Source } from "../forgeRepos";
 import { t } from "../i18n";
 import { ForgeRepoPicker, type Picked, SourceTabs } from "./ForgeRepoPicker";
+import { useDialog } from "./useDialog";
 
 interface Props {
   path: string;
@@ -35,6 +36,7 @@ export function AddRemoteDialog(p: Props) {
       onChange={(e) => setTypedName(e.target.value.replace(/\s+/g, "-"))}
     />
   );
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
       <form
@@ -44,7 +46,7 @@ export function AddRemoteDialog(p: Props) {
           e.preventDefault();
           if (ok) p.onSubmit(name.trim(), url.trim());
         }}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
+        {...dialog}
       >
         <div className="eyebrow">{t("remote.add.title")}</div>
         <SourceTabs

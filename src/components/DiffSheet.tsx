@@ -4,6 +4,7 @@ import { lfsChange } from "../lfs";
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
+import { useDialog } from "./useDialog";
 
 interface Props {
   title: string;
@@ -67,7 +68,6 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "Escape") onClose();
       if ((e.key === "]" || e.key === "[") && files?.length && current) {
         const i = files.indexOf(current) + (e.key === "]" ? 1 : -1);
         setPath(files[(i + files.length) % files.length].path);
@@ -75,10 +75,11 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [files, current, onClose]);
+  }, [files, current]);
 
+  const sheet = useDialog(onClose, false);
   return (
-    <section className="diff-sheet" style={{ height }}>
+    <section className="diff-sheet" style={{ height }} {...sheet}>
       <div
         className="grip"
         title={t("diff.resize")}

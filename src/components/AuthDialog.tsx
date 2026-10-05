@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useState } from "react";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
+import { useDialog } from "./useDialog";
 
 interface Props {
   /** Remote URL the operation talked to. */
@@ -124,9 +125,10 @@ export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onC
     </ol>
   );
 
+  const dialog = useDialog(onClose);
   return (
     <div className="scrim" onClick={onClose}>
-      <div className="dialog auth" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog auth" onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">{t("auth.title")}</div>
         <p>
           <Rich k={ssh ? "auth.bodySsh" : "auth.bodyHttps"} vars={{ host }} />

@@ -4,6 +4,7 @@ import { api } from "../api";
 import { fmtTime } from "../format";
 import { t } from "../i18n";
 import type { Blame } from "../types";
+import { useDialog } from "./useDialog";
 
 /** Star temperature for a line's age: old lines glow a cool, dim red; the newest a hot blue-white. */
 export function ageColor(time: number, oldest: number, newest: number): string {
@@ -46,22 +47,15 @@ export function BlameSheet(p: {
     };
   }, [path, rev, file, key]);
   const { onClose } = p;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (e.key === "Escape" && tag !== "INPUT" && tag !== "TEXTAREA") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
   const cur = loaded?.key === key ? loaded : null;
   const blame = cur?.blame ?? null;
   const times = blame?.hunks.map((h) => h.time) ?? [];
   const oldest = Math.min(...times),
     newest = Math.max(...times);
 
+  const sheet = useDialog(onClose, false);
   return (
-    <section className="diff-sheet blame-sheet" style={{ height: "50vh" }}>
+    <section className="diff-sheet blame-sheet" style={{ height: "50vh" }} {...sheet}>
       <header>
         <div className="title">
           <span className="eyebrow">{t("history.blame.title")}</span>

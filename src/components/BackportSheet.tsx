@@ -7,6 +7,7 @@ import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { offerPro, proOpen, usePro } from "../pro";
 import { ProBadge } from "./ProOffer";
+import { useDialog } from "./useDialog";
 
 interface Props {
   path: string;
@@ -162,8 +163,9 @@ export function BackportSheet(p: Props) {
     </select>
   );
 
+  const sheet = useDialog(p.onClose, false);
   return (
-    <section className="diff-sheet backport-sheet" style={{ height: "50vh" }}>
+    <section className="diff-sheet backport-sheet" style={{ height: "50vh" }} {...sheet}>
       <header>
         <div className="title">
           <span className="eyebrow">{t("bp.title")}</span>
