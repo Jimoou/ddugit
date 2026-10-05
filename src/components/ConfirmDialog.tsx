@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 export interface Confirm {
   title: string;
@@ -14,7 +14,7 @@ export interface Confirm {
 export function ConfirmDialog({ confirm, busy, onCancel }: { confirm: Confirm; busy: boolean; onCancel(): void }) {
   const dialog = useDialog(onCancel);
   return (
-    <div className="scrim" onClick={onCancel}>
+    <div className="scrim" {...closeOnScrim(onCancel)}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className={`dialog-title ${confirm.danger ? "danger" : ""}`}>{confirm.title}</h2>
         <div className="confirm-body">{confirm.body}</div>

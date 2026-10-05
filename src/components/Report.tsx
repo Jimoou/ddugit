@@ -9,7 +9,7 @@ import { usePro } from "../pro";
 import { diagnostics, recentLog, reportText } from "../report";
 import type { AppInfo, ReportKind } from "../types";
 import { Segmented } from "./Segmented";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 const SITE_URL = "https://ddugit.com";
 const PRIVACY_URL = "https://ddugit.com/privacy";
@@ -129,7 +129,7 @@ export function ReportDialog({ lastError, onSent, onClose }: ReportProps) {
   const ready = !!what.trim() && !(withDiag && diag === null) && !sending;
 
   return (
-    <div className="scrim" onClick={onClose}>
+    <div className="scrim" {...closeOnScrim(onClose)}>
       <div className="dialog report" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t(kind === "bug" ? "report.title" : "report.askTitle")}</h2>
         <Segmented
@@ -215,7 +215,7 @@ interface GitMissingProps {
 export function GitMissing({ error, onRecheck, onSetPath, onClose }: GitMissingProps) {
   const dialog = useDialog(onClose);
   return (
-    <div className="scrim" onClick={onClose}>
+    <div className="scrim" {...closeOnScrim(onClose)}>
       <div className="dialog git-missing" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("gitMissing.title")}</h2>
         <p>{t("gitMissing.body")}</p>

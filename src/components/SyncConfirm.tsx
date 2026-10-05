@@ -3,7 +3,7 @@ import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { SyncPlan } from "../sync";
 import { Icon } from "./Icon";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 /** Commits listed by name before the rest are counted. */
 const LISTED = 8;
@@ -41,7 +41,7 @@ export function SyncConfirm(p: {
   };
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <div
         className="dialog sync-confirm"
         aria-label={t(`sync.ask.title.${plan.op}`)}

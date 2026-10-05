@@ -8,7 +8,7 @@ import { ProfilesSection } from "./Identity";
 import { AboutSection } from "./Report";
 import { LicenseSection } from "./License";
 import { Segmented } from "./Segmented";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 /** The settings, one at a time beside a list of them. */
 const SETTINGS_SECTIONS = ["screen", "profiles", "license", "git", "shortcuts", "about"] as const;
@@ -49,7 +49,7 @@ export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Pr
   }, [at]);
 
   return (
-    <div className="scrim" onClick={onClose}>
+    <div className="scrim" {...closeOnScrim(onClose)}>
       <div
         className="dialog settings"
         aria-label={t("settings.title")}

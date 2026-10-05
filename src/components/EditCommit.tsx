@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import type { CommitEdit, CommitInfo, FileDiff } from "../types";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 export type EditMode = CommitEdit["kind"];
 
@@ -58,7 +58,7 @@ export function EditCommitDialog(p: {
 
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <form
         className="dialog edit-commit"
         aria-label={t(`edit.${p.mode}`)}

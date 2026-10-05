@@ -32,7 +32,7 @@ import {
   type RepoGroup,
   updateGroup,
 } from "../groups";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 const RECENT = "ddugit.recent";
 const GROUPS = "ddugit.groups";
@@ -293,7 +293,7 @@ export function CloneDialog(p: {
 
   const dialog = useDialog(() => !running && p.onCancel());
   return (
-    <div className="scrim" onClick={() => !running && p.onCancel()}>
+    <div className="scrim" {...closeOnScrim(() => !running && p.onCancel())}>
       <form
         className="dialog clone"
         onClick={(e) => e.stopPropagation()}

@@ -4,7 +4,7 @@ import { api } from "../api";
 import { useState } from "react";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 import { safeHost, shellCommand, shellOf } from "../shell";
 
 interface Props {
@@ -138,7 +138,7 @@ export function AuthDialog({ url, output, repoPath, signIn, busy, onRetry, onClo
 
   const dialog = useDialog(onClose);
   return (
-    <div className="scrim" onClick={onClose}>
+    <div className="scrim" {...closeOnScrim(onClose)}>
       <div className="dialog auth" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("auth.title")}</h2>
         <p>

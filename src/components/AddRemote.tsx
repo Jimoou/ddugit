@@ -4,7 +4,7 @@ import { useState } from "react";
 import { remoteNameFor, type Source } from "../forgeRepos";
 import { t } from "../i18n";
 import { ForgeRepoPicker, type Picked, SourceTabs } from "./ForgeRepoPicker";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 interface Props {
   path: string;
@@ -35,7 +35,7 @@ export function AddRemoteDialog(p: Props) {
   );
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <form
         className="dialog add-remote"
         onClick={(e) => e.stopPropagation()}

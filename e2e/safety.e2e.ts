@@ -69,3 +69,21 @@ test("a second git operation is refused while one is still running", async ({ de
   expect((await demo.snapshot()).head.branch).toBe(before);
   await demo.mutateQuietly((d) => (d.slow = 0));
 });
+
+test("a selection dragged out of a dialog onto the scrim keeps the dialog open", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".app:not([hidden]) .sidebar").getByRole("button", { name: "새 브랜치…" }).click();
+  const input = page.locator(".dialog input.text");
+  await input.fill("spike/half-typed");
+  const box = (await input.boundingBox())!;
+  // Press in the field, drag out past the dialog and release over the scrim.
+  await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(5, 5, { steps: 5 });
+  await page.mouse.up();
+  await expect(input).toHaveValue("spike/half-typed");
+
+  // A click that starts on the scrim still closes it.
+  await page.mouse.click(5, 5);
+  await expect(page.locator(".dialog")).toHaveCount(0);
+});

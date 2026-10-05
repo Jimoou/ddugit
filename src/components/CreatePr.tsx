@@ -10,7 +10,7 @@ import { commitsBetween, defaultBody, defaultTitle, pickBase, pushNeed, remoteBr
 import { FORGE_NAME, prNoun } from "./Pulls";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrTarget, RepoSnapshot } from "../types";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 /** `#12` / `!12`. */
 export const prTag = (kind: ForgeKind, n: number) => `${kind === "gitlab" ? "!" : "#"}${n}`;
@@ -109,7 +109,7 @@ export function CreatePr(p: Props) {
 
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <form
         className="dialog create-pr"
         aria-label={t("pr.new.title", { noun })}
