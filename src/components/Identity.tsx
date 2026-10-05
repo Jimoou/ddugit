@@ -182,7 +182,7 @@ export function ProfilesSection({ profiles, onProfiles }: SectionProps) {
         <span className="tag">{t("identity.global")}</span>
         <span className={g?.missing ? "warn-text" : ""}>{g && !g.missing ? g.text : t("identity.globalNone")}</span>
         {global?.key?.value && (
-          <label className="check inline">
+          <label className="check">
             <input
               type="checkbox"
               checked={!!global.sign?.value}

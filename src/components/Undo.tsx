@@ -36,7 +36,7 @@ export function ResetDialog(p: {
   return (
     <div className="scrim" onClick={p.onCancel}>
       <div className="dialog reset" aria-label={t("undo.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">{t("undo.title")}</div>
+        <h2 className="dialog-title">{t("undo.title")}</h2>
         <p>
           {p.passed > 0 ? (
             <Rich k="undo.body" vars={{ branch: p.branch, summary: p.summary, n: p.passed }} />
@@ -121,7 +121,7 @@ export function ReflogSheet(p: {
     <section className="diff-sheet reflog-sheet" style={{ height: "45vh" }} {...sheet}>
       <header>
         <div className="title">
-          <span className="eyebrow">{t("undo.log.title")}</span>
+          <h2 className="dialog-title">{t("undo.log.title")}</h2>
           <span className="muted">{t("undo.log.hint")}</span>
         </div>
         <button className="icon" onClick={p.onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>

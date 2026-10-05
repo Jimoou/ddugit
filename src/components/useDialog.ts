@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
  * - Esc closes the topmost visible layer only (a token dialog over "new PR" closes alone).
  *   Hidden tabs keep their layers mounted, so a layer counts only while it is on screen.
  * - A modal layer takes focus when it opens (its `autoFocus` element, else itself),
- *   keeps Tab / Shift+Tab inside, and is labelled by its title (`.eyebrow` or heading).
+ *   keeps Tab / Shift+Tab inside, and is labelled by its title (`.dialog-title` or another heading).
  * - A non-modal layer (sheets beside the graph, menus) leaves focus alone and ignores
  *   Esc typed into a field outside it, so search and the commit message keep their own Esc.
  * - Whatever had focus before the layer opened gets it back when the layer goes away.
@@ -32,7 +32,7 @@ export function useDialog(onClose: () => void, modal = true) {
     const el = me.el;
     if (el && modal) {
       if (!el.hasAttribute("aria-label") && !el.hasAttribute("aria-labelledby")) {
-        const title = el.querySelector<HTMLElement>(".eyebrow, h1, h2, h3");
+        const title = el.querySelector<HTMLElement>(".dialog-title, h1, h2, h3");
         if (title) {
           title.id ||= titleId;
           el.setAttribute("aria-labelledby", title.id);
@@ -83,14 +83,16 @@ function top(): Layer | undefined {
 const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
 
-/** What Tab visits: shown controls, and of a radio group only its checked one (when one is). */
+/** What Tab visits: shown controls out of the tab order's -1, and of a radio group only its checked one (when one is). */
 function tabStops(el: HTMLElement) {
   const skipped = (x: HTMLElement) =>
     x instanceof HTMLInputElement &&
     x.type === "radio" &&
     !x.checked &&
     !!el.querySelector(`input[type=radio][name="${CSS.escape(x.name)}"]:checked`);
-  return [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.getClientRects().length && !skipped(x));
+  return [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+    (x) => x.tabIndex >= 0 && x.getClientRects().length && !skipped(x),
+  );
 }
 
 function onKey(e: KeyboardEvent) {

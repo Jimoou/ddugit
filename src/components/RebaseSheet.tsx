@@ -62,7 +62,7 @@ export function RebaseSheet({ branch, base, commits, todo, initial, unpushed, bu
     <section className="diff-sheet rebase-sheet" style={{ height: "50vh" }} {...sheet}>
       <header>
         <div className="title">
-          <span className="eyebrow">{t("rb.title")}</span>
+          <h2 className="dialog-title">{t("rb.title")}</h2>
           <b>{branch}</b>
           <span className="muted">
             {base.summary} <code>{base.id.slice(0, 7)}</code>{" "}

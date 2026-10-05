@@ -80,7 +80,7 @@ export function ReleaseNotesDialog(p: {
   return (
     <div className="scrim" onClick={p.onClose}>
       <div className="dialog notes" aria-label={t("notes.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">{t("notes.title")}</div>
+        <h2 className="dialog-title">{t("notes.title")}</h2>
         <p className="muted small">{t("notes.hint")}</p>
         <div className="notes-range">
           <label className="field col">

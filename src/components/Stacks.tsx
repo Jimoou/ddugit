@@ -22,7 +22,7 @@ export function StackSection(p: {
   const groups = stackGroups(p.stacks);
   if (!groups.length) return null;
   return (
-    <SideSection id="stack" className="stacks" title={t("stack.title")} count={groups.length}>
+    <SideSection id="stack" icon="stack" className="stacks" title={t("stack.title")} count={groups.length}>
       {groups.map((g) => {
         const lowest = g.rows[0].branch.name;
         return (

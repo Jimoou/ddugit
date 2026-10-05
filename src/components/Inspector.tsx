@@ -29,6 +29,7 @@ interface Props {
 }
 
 const SIG_LABEL = { verified: "sig.verified", unverified: "sig.unverified", bad: "sig.bad" } as const;
+const SIG_TONE = { verified: "ok", unverified: "muted", bad: "danger" } as const;
 
 /** The commit's signature, checked on demand (not part of the snapshot: it runs gpg / ssh-keygen). */
 function useSignature(path: string, id: string): Signature | null {
@@ -52,7 +53,7 @@ function SignatureBadge({ sig }: { sig: Signature | null }) {
   const who = sig.signer || sig.key;
   return (
     <span
-      className={`sig sig-${sig.status}`}
+      className={`badge signature ${SIG_TONE[sig.status]}`}
       title={who ? t("sig.title", { signer: sig.signer || "?", key: sig.key || "?" }) : t("sig.unknown")}
     >
       <Icon name={sig.status === "bad" ? "close" : "check"} size={10} />
@@ -86,7 +87,7 @@ export function Inspector(props: Props) {
       <header>
         <div>
           <div className="eyebrow">
-            {t("inspector.eyebrow")} {isHead && <span className="head-pill">HEAD</span>}
+            {t("inspector.eyebrow")} {isHead && <span className="badge head">HEAD</span>}
           </div>
           <h2>{commit.summary || t("common.noMessage")}</h2>
         </div>
@@ -130,7 +131,7 @@ export function Inspector(props: Props) {
       {(refs.length > 0 || containedIn.length > 0) && (
         <div className="where">
           {refs.map((r) => (
-            <span key={r.kind + r.name} className={`ref ref-${r.kind}`}>
+            <span key={r.kind + r.name} className={`badge ref ref-${r.kind}`}>
               {r.kind === "remote" && <Icon name="cloud" size={12} />}
               {r.kind === "tag" && <Icon name="tag" size={11} />}
               {r.kind === "pr" && <span className={`pr-ci ${r.checks ?? "none"}`} />} {r.name}

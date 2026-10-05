@@ -48,10 +48,10 @@ export function SyncConfirm(p: {
         onClick={(e) => e.stopPropagation()}
         {...dialog}
       >
-        <div className="eyebrow">
+        <h2 className="dialog-title">
           <Icon name={plan.op === "push" ? "arrowUp" : plan.op === "pull" ? "arrowDown" : "fetch"} size={12} />{" "}
           {t(`sync.ask.title.${plan.op}`)}
-        </div>
+        </h2>
         <p>
           <Rich k={body} vars={{ n, upstream: plan.upstream ?? "", branch: p.branch ?? "HEAD" }} />
         </p>

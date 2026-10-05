@@ -77,7 +77,7 @@ export function CleanupSheet(p: {
     <section className="diff-sheet cleanup-sheet" style={{ height: "45vh" }} {...sheet}>
       <header>
         <div className="title">
-          <span className="eyebrow">{t("clean.title")}</span>
+          <h2 className="dialog-title">{t("clean.title")}</h2>
           {report?.base && <span className="muted">{t("clean.base", { base: report.base })}</span>}
         </div>
         <button className="icon" onClick={p.onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>

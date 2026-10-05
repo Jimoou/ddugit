@@ -20,6 +20,7 @@ export function SubmoduleSection(p: {
   return (
     <SideSection
       id="submodule"
+      icon="orbit"
       className="submodules"
       title={t("sub.title")}
       count={p.submodules.length}

@@ -37,7 +37,7 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
           if (ok) onSubmit(name.trim(), message.trim());
         }}
       >
-        <div className="eyebrow">{title}</div>
+        <h2 className="dialog-title">{title}</h2>
         {req.hint && <p className="muted">{req.hint}</p>}
         <input
           className="text"

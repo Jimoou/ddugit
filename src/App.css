@@ -136,8 +136,7 @@ input[type="checkbox"]:focus-visible {
   outline-offset: 2px;
 }
 /* Dialogs take focus themselves when nothing inside asks for it (useDialog); that is not a control to ring. */
-[role="dialog"]:focus,
-.dialog.settings section:focus {
+[role="dialog"]:focus {
   outline: none;
 }
 /* Compact controls keep their look; an invisible box of at least 24px around them takes the pointer. */
@@ -196,7 +195,7 @@ button.danger:not(.ghost) {
 button.danger:hover:not(:disabled) {
   border-color: #ff8a9c;
 }
-.eyebrow.danger {
+.dialog-title.danger {
   color: var(--red);
 }
 button.ghost.on {
@@ -527,31 +526,46 @@ textarea:focus {
   min-height: 18px;
 }
 .sig {
+  --sig: var(--text-2);
   padding: 0 7px;
   font: 600 10.5px/18px var(--sans);
-  color: var(--text-2);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--sig);
+  background: color-mix(in srgb, var(--sig) 12%, transparent);
   white-space: nowrap;
 }
 .sig-missing,
 .sig-stopped {
-  color: var(--red);
-  background: rgba(255, 77, 109, 0.14);
+  --sig: var(--red);
 }
 .sig-changes {
-  color: var(--amber);
-  background: rgba(255, 184, 77, 0.14);
+  --sig: var(--amber);
 }
 .sig-behind {
-  color: var(--cyan);
-  background: rgba(34, 232, 255, 0.1);
+  --sig: var(--cyan);
 }
 .sig-ahead {
-  color: var(--lime);
-  background: rgba(166, 255, 77, 0.12);
+  --sig: var(--lime);
 }
 .sig-quiet {
-  color: var(--muted);
+  --sig: var(--muted);
+  background: none;
+}
+/* The dashboard's totals stay quiet beside the cards: plain text, the signal only as a dot. */
+.galaxy-tally .sig {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 0;
+  color: var(--text-2);
+  background: none;
+  font-weight: 500;
+}
+.galaxy-tally .sig::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sig);
 }
 .world-tools {
   position: absolute;
@@ -865,8 +879,7 @@ textarea:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.demo-pill,
-.head-pill {
+.demo-pill {
   font: 700 9px/1 var(--mono);
   letter-spacing: 0.08em;
   padding: 3px 6px;
@@ -1141,15 +1154,35 @@ button.link {
   flex: 1;
   min-width: 0;
 }
-.head-pill {
+/* Small status labels (HEAD, a branch the commit is on, "signed"): one shape, the tone says what. */
+.badge {
   display: inline-flex;
   align-items: center;
-  height: 16px;
+  gap: 4px;
+  height: 18px;
   padding: 0 6px;
   flex-shrink: 0;
-  margin-left: auto;
-  border-color: var(--ui-text);
+  border: 1px solid currentColor;
+  font: 600 10.5px/1 var(--sans);
+  color: var(--text-2);
+  white-space: nowrap;
+  cursor: default;
+}
+.badge.head {
   color: var(--ui-text);
+}
+.badge.ok {
+  color: var(--ok);
+}
+.badge.muted {
+  color: var(--muted);
+}
+.badge.danger {
+  color: var(--danger);
+}
+.sidebar li .badge.head,
+.worktrees .badge.head {
+  margin-left: auto;
 }
 
 .row {
@@ -1199,9 +1232,7 @@ button.link {
 .sidebar h3 {
   display: flex;
   align-items: center;
-  font: 700 10px var(--sans);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 600 11.5px var(--sans);
   color: var(--muted);
   margin: 14px 0 6px;
 }
@@ -1213,8 +1244,6 @@ button.link {
   border: none;
   background: none;
   font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
   color: inherit;
 }
 .sidebar h3 .fold:hover {
@@ -1568,10 +1597,8 @@ button.link {
   color: var(--text);
 }
 .eyebrow {
-  font: 700 10px var(--sans);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
 }
 .note {
   margin: 0;
@@ -1681,6 +1708,10 @@ button.link {
   border: 1px solid var(--accent);
   color: var(--accent);
 }
+.badge.ref {
+  padding: 0 6px;
+  font: 600 11px/1 var(--mono);
+}
 .ref-remote {
   opacity: 0.75;
 }
@@ -1732,11 +1763,6 @@ button.link {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-}
-.inspector .where .ref {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 .inspector .ref-pr {
   border-color: #c9b8ff;
@@ -1835,6 +1861,44 @@ button.link {
   font-size: 12px;
 }
 
+/* ------------------------------------------------- segmented (components/Segmented.tsx) */
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+}
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  background: none;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.segmented button.on {
+  background: var(--ui-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.segmented button:disabled {
+  opacity: 0.45;
+}
+/* A list beside what it switches: where a repository comes from, the settings sections. */
+.segmented.column {
+  flex-direction: column;
+  align-self: start;
+}
+.segmented.column button {
+  padding: 6px 10px;
+  font-size: 12.5px;
+}
+
 /* ------------------------------------------------------------------ dialog */
 .scrim {
   position: fixed;
@@ -1913,6 +1977,13 @@ button.link {
 .dialog p {
   margin: 0;
 }
+/* One title style for every dialog and sheet (the heading useDialog labels the layer with). */
+.dialog-title {
+  margin: 0;
+  font: 600 15px/1.3 var(--sans);
+  color: var(--text);
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -2021,9 +2092,7 @@ button.link {
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 700 10px var(--sans);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 600 11.5px var(--sans);
   color: var(--muted);
   margin: 0 0 6px;
 }
@@ -2147,7 +2216,7 @@ button.link {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.diff-sheet .title > .eyebrow,
+.diff-sheet .title > .dialog-title,
 .diff-sheet header > :not(.title, .keys) {
   flex-shrink: 0;
 }
@@ -2434,23 +2503,6 @@ table.diff tr.rem .sign {
 }
 
 /* ------------------------------------------------------------ hunk staging */
-.scope-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line);
-}
-.scope-tabs button {
-  border: none;
-  padding: 3px 10px;
-  font-size: 12px;
-  background: none;
-}
-.scope-tabs button.on {
-  background: var(--ui-soft);
-  color: var(--text);
-  font-weight: 600;
-}
 table.diff tr.hunk td {
   position: relative;
 }
@@ -2819,18 +2871,56 @@ b.bp-missing {
 
 /* --------------------------------------------------------- settings dialog */
 .dialog.settings {
-  width: min(720px, calc(100vw - 32px));
-  max-height: calc(100vh - 80px);
-  overflow: auto;
+  width: min(780px, calc(100vw - 32px));
+  /* One height for every section, so switching does not make the dialog jump. */
+  height: min(560px, calc(100vh - 32px));
+  overflow: hidden;
 }
-.dialog.settings section {
-  margin-top: 14px;
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+}
+.settings-pane {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.settings-pane:focus {
+  outline: none;
 }
 .dialog.settings h4 {
-  margin: 0 0 8px;
-  font: 700 11px var(--sans);
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  margin: 0 0 12px;
+  font: 600 13px var(--sans);
+  color: var(--text);
+}
+.settings-form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 14px 24px;
+  font-size: 13px;
+}
+.settings-form select {
+  justify-self: start;
+}
+.settings-form .checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .settings-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
 }
 .dialog.settings .field {
   display: flex;
@@ -2883,7 +2973,11 @@ b.bp-missing {
   width: 42%;
 }
 .shortcuts kbd {
-  white-space: normal;
+  margin: 0;
+  opacity: 1;
+}
+.shortcuts .gesture {
+  color: var(--text-2);
 }
 kbd {
   display: inline-block;
@@ -3040,51 +3134,20 @@ kbd {
   border: 1px solid var(--line);
 }
 /* Clone / add remote: where the repository comes from (components/ForgeRepoPicker.tsx). */
-.dialog.clone {
+.dialog.clone,
+.dialog.add-remote {
   width: min(720px, calc(100vw - 32px));
 }
-.dialog.add-remote {
-  width: min(560px, calc(100vw - 32px));
-}
-.clone-body {
+.source-body {
   display: grid;
   grid-template-columns: 150px minmax(0, 1fr);
   gap: 18px;
 }
-.clone-source {
+.source-pane {
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-width: 0;
-}
-.source-tabs {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--line);
-}
-.clone-body .source-tabs {
-  flex-direction: column;
-  align-self: start;
-}
-.source-tabs button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: none;
-  padding: 6px 10px;
-  font-size: 12.5px;
-  background: none;
-  color: var(--text-2);
-}
-.add-remote .source-tabs button {
-  flex: 1;
-  justify-content: center;
-}
-.source-tabs button.on {
-  background: var(--ui-soft);
-  color: var(--text);
-  font-weight: 600;
 }
 .forge-picker {
   display: flex;
@@ -3199,11 +3262,12 @@ kbd {
   overflow-wrap: anywhere;
 }
 @media (max-width: 560px) {
-  .clone-body {
+  .source-body {
     grid-template-columns: 1fr;
   }
-  .clone-body .source-tabs {
+  .segmented.column {
     flex-direction: row;
+    flex-wrap: wrap;
   }
 }
 .clone-progress {
@@ -4190,8 +4254,6 @@ button.demo-pill {
   gap: 5px;
   margin-bottom: 6px;
   font: 600 9.5px var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: rgba(34, 232, 255, 0.85);
 }
 .peek-signal code {
@@ -4306,16 +4368,6 @@ button.demo-pill {
   color: rgba(var(--signal), 0.85);
   margin-right: 6px;
 }
-.dialog.settings .confirm-remote {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.dialog.settings .check.inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
 
 /* ------------------------------------------------ backport: how it works */
 .bp-guide {
@@ -4331,9 +4383,7 @@ button.demo-pill {
   padding: 6px 10px;
   border: none;
   background: none;
-  font: 600 11px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 12px var(--sans);
   color: rgba(var(--signal), 0.85);
 }
 .bp-guide ol {
@@ -4348,25 +4398,10 @@ button.demo-pill {
 .url-head {
   align-items: center;
 }
-.proto {
-  display: inline-flex;
-}
-.proto button {
-  padding: 2px 8px;
-  font: 600 10.5px var(--mono);
-  letter-spacing: 0.06em;
-}
-.proto button.on {
-  border-color: rgba(var(--signal), 0.6);
-  color: rgb(var(--signal));
-  background-color: rgba(var(--signal), 0.08);
-}
 .ssh-ready summary {
   cursor: pointer;
   color: rgb(var(--signal));
-  font: 600 11px var(--mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 600 12px var(--sans);
 }
 .ssh-setup ol {
   margin: 8px 0 0;
@@ -4425,9 +4460,18 @@ button.demo-pill {
   font-size: 12px;
 }
 .dialog.settings .license-text {
+  width: 100%;
   font: 11px var(--mono);
   resize: vertical;
-  margin-bottom: 6px;
+  margin-top: 8px;
+}
+.dialog.settings .license-paste {
+  margin-top: 14px;
+}
+.dialog.settings .license-paste summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-2);
 }
 .dialog.settings .license .row {
   margin-top: 8px;
@@ -4526,10 +4570,6 @@ button.demo-pill {
 .tr-branches .check .muted {
   margin-left: auto;
 }
-.tr-file {
-  overflow-wrap: anywhere;
-  color: var(--text-2);
-}
 .tr-heads {
   margin: 4px 0 10px;
   padding-left: 18px;
@@ -4611,6 +4651,8 @@ button.demo-pill {
 /* Release notes (components/ReleaseNotes.tsx). */
 .dialog.notes {
   width: min(680px, calc(100vw - 32px));
+  /* Tall as the window allows: the notes take whatever the fields leave. */
+  height: min(760px, calc(100vh - 32px));
 }
 .notes-range {
   display: flex;
@@ -4632,12 +4674,11 @@ button.demo-pill {
 .notes-range .mono {
   padding-bottom: 9px;
 }
-/* Gives up height first when the window is short, so the buttons stay on screen. */
+/* Fills the dialog, and gives up height first when the window is short, so the buttons stay on screen. */
 .notes-md {
+  flex: 1 1 0;
   width: 100%;
-  height: 260px;
   min-height: 120px;
-  margin-top: 10px;
   padding: 10px;
   resize: vertical;
   font-size: 12px;
@@ -4757,23 +4798,6 @@ button.demo-pill {
   margin-top: 6px;
 }
 
-.inspector .sig {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex-shrink: 0;
-  padding: 1px 6px;
-  font-size: 10px;
-  color: var(--ok);
-  border: 1px solid currentColor;
-  cursor: default;
-}
-.inspector .sig-unverified {
-  color: var(--muted);
-}
-.inspector .sig-bad {
-  color: var(--danger);
-}
 /* A toast's one action (open the pull request just made). */
 .toast button {
   pointer-events: auto;
@@ -4847,4 +4871,16 @@ button.demo-pill {
 }
 .create-pr .pr-connect p {
   margin: 0;
+}
+.create-pr .pr-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.create-pr .pr-fields:disabled {
+  opacity: 0.45;
 }

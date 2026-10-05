@@ -24,6 +24,7 @@ export function LfsSection(p: {
   return (
     <SideSection
       id="lfs"
+      icon="bundle"
       className="lfs"
       title={t("lfs.title")}
       count={s.patterns.length}
@@ -67,6 +68,7 @@ export function LfsSection(p: {
         <ul>
           {s.patterns.map((pattern) => (
             <li key={pattern} title={pattern}>
+              <Icon name="bundle" size={11} />
               <span className="name mono">{pattern}</span>
               {s.version && (
                 <button

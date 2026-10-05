@@ -129,7 +129,7 @@ export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onC
   return (
     <div className="scrim" onClick={onClose}>
       <div className="dialog auth" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className="eyebrow">{t("auth.title")}</div>
+        <h2 className="dialog-title">{t("auth.title")}</h2>
         <p>
           <Rich k={ssh ? "auth.bodySsh" : "auth.bodyHttps"} vars={{ host }} />
         </p>

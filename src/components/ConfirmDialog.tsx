@@ -16,7 +16,7 @@ export function ConfirmDialog({ confirm, busy, onCancel }: { confirm: Confirm; b
   return (
     <div className="scrim" onClick={onCancel}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <div className={`eyebrow ${confirm.danger ? "danger" : ""}`}>{confirm.title}</div>
+        <h2 className={`dialog-title ${confirm.danger ? "danger" : ""}`}>{confirm.title}</h2>
         <div className="confirm-body">{confirm.body}</div>
         <div className="dialog-actions">
           <button onClick={onCancel}>{t("common.cancel")}</button>
