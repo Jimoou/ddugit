@@ -123,3 +123,52 @@ test("several branches can be picked in the sidebar, lighting their histories to
   await side.getByRole("button", { name: "선택 해제" }).click();
   await expect(side.locator("li.focused")).toHaveCount(0);
 });
+
+test("finds commits with Ctrl+F, walks the matches with Enter and Shift+Enter, and flies to each", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const id = (summary: string) => snap.commits.find((c) => c.summary === summary)!.id;
+  // Newest first: the two commits that mention particles.
+  const [newer, older] = [id("Tune particle speed"), id("Sparkle particles")];
+  const bar = page.locator(".search-bar");
+  const input = bar.getByPlaceholder("메시지 · 작성자 · SHA · 브랜치");
+  const count = bar.locator(".count");
+  const title = page.locator(".inspector h2");
+  const centered = async (commit: string) => {
+    const box = (await page.locator(".app:not([hidden]) .graph-area canvas").boundingBox())!;
+    const at = (await demo.screenOf(commit))!;
+    return Math.abs(at.x - (box.x + box.width / 2)) < 40 && Math.abs(at.y - (box.y + box.height / 2)) < 40;
+  };
+
+  await page.keyboard.press("Control+f");
+  await expect(input).toBeFocused();
+  await input.fill("PARTICLE");
+  await expect(count).toHaveText("1 / 2");
+  await expect(title).toHaveText("Tune particle speed");
+  await expect.poll(() => centered(newer)).toBe(true);
+
+  await input.press("Enter");
+  await expect(count).toHaveText("2 / 2");
+  await expect(title).toHaveText("Sparkle particles");
+  await expect.poll(() => centered(older)).toBe(true);
+  // Past either end it wraps around.
+  await input.press("Enter");
+  await expect(count).toHaveText("1 / 2");
+  await input.press("Shift+Enter");
+  await expect(count).toHaveText("2 / 2");
+  await bar.getByTitle("이전 (Shift+Enter)").click();
+  await expect(count).toHaveText("1 / 2");
+
+  // A SHA prefix finds its commit; nothing matching says so and the arrows rest.
+  await input.fill(older.slice(0, 6));
+  await expect(count).toHaveText("1 / 1");
+  await expect(title).toHaveText("Sparkle particles");
+  await input.fill("no such words");
+  await expect(count).toHaveText("없음");
+  await expect(bar.getByTitle("다음 (Enter)")).toBeDisabled();
+
+  // Esc closes the bar and keeps the selected commit.
+  await input.press("Escape");
+  await expect(bar).toHaveCount(0);
+  await expect(title).toHaveText("Sparkle particles");
+});

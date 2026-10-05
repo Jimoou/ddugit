@@ -56,6 +56,8 @@ export interface DemoFlags {
   GitMissing: boolean;
   /** A license on the demo computer from the start. */
   License: { kind: "lifetime" | "site"; deviceRemoved?: boolean };
+  /** Remember the open tabs across reloads, like the desktop app (the demo otherwise starts on its repository). */
+  Tabs: boolean;
 }
 
 const flag = <K extends keyof DemoFlags>(name: K): DemoFlags[K] | undefined =>
@@ -71,7 +73,7 @@ export const demoControls = {
   goneBranches: [] as string[],
   /** Folder the next "choose folder" dialog returns (default: the demo repository). */
   nextFolder: null as string | null,
-  /** Make the next merge stop on a conflict in two files. */
+  /** Make the next merge, cherry-pick or revert stop on a conflict in two files. */
   conflictNext: false,
   /** Make the next backport stop on a commit whose change is already there (nothing to commit). */
   emptyNext: false,
@@ -105,6 +107,8 @@ export const demoControls = {
   update: flag("Update") ?? (null as UpdateInfo | null),
   /** git can't be found (the first-run notice); the `GitMissing` flag starts that way. */
   gitMissing: !!flag("GitMissing"),
+  /** The open tabs are remembered across reloads (the `Tabs` flag). */
+  keepTabs: !!flag("Tabs"),
   /** The demo tab throws while rendering (the tab's error boundary, e2e) until this is cleared. */
   crashTab: false,
   /** Extra milliseconds every demo remote operation takes (e2e: something still running). */

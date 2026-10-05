@@ -349,3 +349,131 @@ test("on Free, batch pull and branch switching offer Pro", async ({ demo }) => {
     .click();
   await expect(page.locator(".dialog.pro-offer")).toContainText("여러 저장소");
 });
+
+test("a clone refused over SSH explains the setup in the app, and trying again reopens the clone", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => {
+    window.__ddugitDemo.nextFolder = "/work";
+    window.__ddugitDemo.failNextRemote = "ssh";
+  });
+  await page.locator(".tab.on .tab-menu").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /저장소 복제/ })
+    .click();
+  const clone = page.locator(".dialog.clone");
+  await clone.getByPlaceholder("https://github.com/owner/repo.git").fill("git@github.com:acme/rocket.git");
+  await clone.getByRole("button", { name: "고르기…" }).click();
+  await clone.getByRole("button", { name: "복제", exact: true }).click();
+
+  const dialog = page.locator(".dialog.auth");
+  await expect(dialog).toContainText("github.com에 SSH 키로 접속하지 못했어요");
+  await expect(dialog.locator("code.url")).toHaveText("git@github.com:acme/rocket.git");
+  // SSH is set up right here; the terminal steps stay folded away.
+  const ssh = dialog.locator(".ssh-setup");
+  await expect(ssh.getByRole("button", { name: "키 만들기" })).toBeVisible();
+  await expect(dialog.locator("details").filter({ hasText: "터미널에서 직접 하기" })).not.toHaveAttribute("open");
+  await dialog.getByText("git 출력 보기").click();
+  await expect(dialog.locator("pre.raw")).toContainText("Permission denied (publickey)");
+
+  await dialog.getByRole("button", { name: "다시 시도" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(clone.locator("input.text").first()).toHaveValue("git@github.com:acme/rocket.git");
+  await clone.getByRole("button", { name: "복제", exact: true }).click();
+  await demo.toast("rocket을 복제했어요");
+});
+
+test("on Free, the dashboard reads three repositories, starred first, and offers Pro for the rest", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
+  await page.evaluate(() => {
+    const recent = [
+      { path: "/work/anchor", starred: true, at: 0 },
+      { path: "/work/alpha", starred: false, at: 4 },
+      { path: "/work/bravo", starred: false, at: 3 },
+      { path: "/work/charlie", starred: false, at: 2 },
+      { path: "/work/delta", starred: false, at: 1 },
+    ];
+    localStorage.setItem("ddugit.recent", JSON.stringify(recent));
+  });
+  await page.reload();
+  await page.locator(".tab-home").click();
+  const galaxy = page.locator(".welcome .galaxy");
+  const world = (name: string) => galaxy.locator(".world").filter({ hasText: `/work/${name}` });
+  await expect(galaxy.locator(".world")).toHaveCount(5);
+  // The starred one and the two most recent are read; the other two only show their names.
+  for (const name of ["anchor", "alpha", "bravo"]) {
+    await expect(world(name)).not.toHaveClass(/locked/);
+    await expect(world(name).locator(".world-branch")).toBeVisible();
+  }
+  for (const name of ["charlie", "delta"]) {
+    await expect(world(name)).toHaveClass(/locked/);
+    await expect(world(name).locator(".world-branch")).toHaveCount(0);
+  }
+  await expect(galaxy.locator(".world.locked")).toHaveCount(2);
+
+  await world("delta")
+    .getByRole("button", { name: /상태 보기/ })
+    .click();
+  const offer = page.locator(".dialog.pro-offer");
+  await expect(offer).toContainText("저장소 3개까지 무료예요");
+  await page.keyboard.press("Escape");
+  await expect(offer).toHaveCount(0);
+  // A locked card still opens its repository.
+  await world("delta").locator(".world-open").click();
+  await expect(page.locator(".tabbar .tab:not(.tab-home)").filter({ hasText: "delta" })).toHaveCount(1);
+});
+
+test("tabs follow the keyboard: new, by number, cycle, home and close, and come back after a reload", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await demoFlags(page, { Tabs: true });
+  await page.reload();
+  const tabs = page.locator(".tabbar .tab:not(.tab-home)");
+  const active = page.locator(".tabbar .tab.on:not(.tab-home)");
+  await expect(tabs).toHaveCount(1);
+  for (const name of ["second", "third"]) {
+    await page.keyboard.press("Control+t");
+    await expect(page.locator(".welcome:not([hidden])")).toContainText("최근 저장소");
+    await page.evaluate((name) => (window.__ddugitDemo.nextFolder = `/work/${name}`), name);
+    await page
+      .locator(".welcome")
+      .getByRole("button", { name: /폴더 열기/ })
+      .click();
+    await expect(active).toHaveAttribute("title", `/work/${name}`);
+  }
+  await expect(tabs).toHaveCount(3);
+
+  await page.keyboard.press("Control+1");
+  await expect(active).toHaveAttribute("title", "demo");
+  await page.keyboard.press("Control+Tab");
+  await expect(active).toHaveAttribute("title", "/work/second");
+  await page.keyboard.press("Control+Shift+Tab");
+  await page.keyboard.press("Control+Shift+Tab"); // wraps around to the last tab
+  await expect(active).toHaveAttribute("title", "/work/third");
+  // A number past the last tab does nothing.
+  await page.keyboard.press("Control+9");
+  await expect(active).toHaveAttribute("title", "/work/third");
+
+  // Ctrl+0 shows my repositories over the open tab.
+  await page.keyboard.press("Control+0");
+  await expect(page.locator(".tab-home")).toHaveClass(/\bon\b/);
+  await expect(page.locator(".welcome .galaxy")).toBeVisible();
+  await page.keyboard.press("Control+2");
+  await expect(page.locator(".tab-home")).not.toHaveClass(/\bon\b/);
+  await expect(active).toHaveAttribute("title", "/work/second");
+
+  // Ctrl+W closes the active tab; its neighbour takes over.
+  await page.keyboard.press("Control+w");
+  await expect(tabs).toHaveCount(2);
+  await expect(active).toHaveAttribute("title", "/work/third");
+
+  await page.reload();
+  await expect(tabs).toHaveCount(2);
+  await expect(tabs.nth(0)).toHaveAttribute("title", "demo");
+  await expect(tabs.nth(1)).toHaveAttribute("title", "/work/third");
+  await expect(active).toHaveAttribute("title", "/work/third");
+});

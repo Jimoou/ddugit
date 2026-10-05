@@ -146,3 +146,106 @@ test("inspector: shows whether a commit is signed", async ({ demo }) => {
   await expect(page.locator(".inspector h2")).toHaveText("Semantic zoom levels");
   await expect(sig).toHaveCount(0);
 });
+
+test("stashes picked files, finds the stash on the graph, and applies, pops and drops stashes", async ({ demo }) => {
+  const { page } = demo;
+  const head = (await demo.snapshot()).head.target!;
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  const composer = page.locator(".composer");
+  // Only the renderer: unpick everything, then pick that one file.
+  await composer.locator(".files-head input[type=checkbox]").uncheck();
+  await composer.locator(".files li", { hasText: "src/graph/renderer.ts" }).locator("input").check();
+  await page.fill("textarea.message", "half-done glow");
+  await composer.getByRole("button", { name: /스태시에 보관/ }).click();
+  await demo.toast("스태시에 보관했어요");
+  let snap = await demo.snapshot();
+  expect(snap.stashes.map((s) => s.message)).toEqual([
+    "On feature/graph-zoom: half-done glow",
+    "On main: try warmer glow palette",
+  ]);
+  expect(snap.stashes[0].base).toBe(head);
+  expect(snap.changes.map((c) => c.path)).not.toContain("src/graph/renderer.ts");
+  const side = page.locator(".sidebar section", { has: page.locator("h3", { hasText: "스태시" }) });
+  await expect(side.locator("li")).toHaveCount(2);
+
+  // The new stash hangs off HEAD on the graph as a diamond; clicking it opens the stash.
+  await expect.poll(() => page.evaluate(() => window.__ddugit.stashScreenOf(0))).not.toBeNull();
+  const at = (await page.evaluate(() => window.__ddugit.stashScreenOf(0)))!;
+  await page.mouse.click(at.x, at.y);
+  const panel = page.locator(".stash-panel");
+  await expect(panel.locator("h2")).toHaveText("half-done glow");
+  await expect(panel.locator(".eyebrow")).toContainText("stash@{0}");
+  await expect(panel.locator(".meta code.sha")).toHaveText(head.slice(0, 7));
+  await expect(side.locator("li.focused")).toHaveText("half-done glow");
+
+  // Apply keeps the stash.
+  await panel.getByRole("button", { name: /^적용/ }).click();
+  await demo.toast("스태시를 적용했어요");
+  snap = await demo.snapshot();
+  expect(snap.changes.map((c) => c.path)).toContain("src/graph/renderer.ts");
+  expect(snap.stashes).toHaveLength(2);
+
+  // Pop the older one (from the sidebar): its file comes back and the stash is gone.
+  await side.locator("li", { hasText: "try warmer glow palette" }).click();
+  await expect(panel.locator("h2")).toHaveText("try warmer glow palette");
+  await panel.getByRole("button", { name: /꺼내기/ }).click();
+  await demo.toast("스태시를 꺼냈어요");
+  snap = await demo.snapshot();
+  expect(snap.changes.map((c) => c.path)).toContain("src/App.css");
+  expect(snap.stashes.map((s) => s.message)).toEqual(["On feature/graph-zoom: half-done glow"]);
+  await expect(panel).toHaveCount(0);
+
+  // Drop asks first; cancelling keeps it.
+  await side.locator("li").first().click();
+  await panel.getByRole("button", { name: /삭제/ }).click();
+  const confirm = page.getByRole("dialog", { name: "스태시 삭제" });
+  await expect(confirm).toContainText("“half-done glow” 스태시를 지워요");
+  await confirm.getByRole("button", { name: "취소" }).click();
+  expect((await demo.snapshot()).stashes).toHaveLength(1);
+  await panel.getByRole("button", { name: /삭제/ }).click();
+  await confirm.getByRole("button", { name: "삭제" }).click();
+  await demo.toast("스태시를 삭제했어요");
+  expect((await demo.snapshot()).stashes).toEqual([]);
+  await expect(side).toHaveCount(0);
+});
+
+test("stages a whole hunk from the diff sheet and takes it back from the staged tab", async ({ demo }) => {
+  const { page } = demo;
+  const file = "src/graph/renderer.ts";
+  const change = async () => (await demo.snapshot()).changes.find((c) => c.path === file);
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await page.locator(".composer .path", { hasText: file }).click();
+  const sheet = page.locator(".diff-sheet");
+  await expect(sheet.getByRole("tab", { name: "변경" })).toHaveAttribute("aria-selected", "true");
+  await expect(sheet.locator(".file-list li.on .path")).toHaveText(file);
+  await sheet.getByRole("button", { name: "이 부분 스테이지", exact: true }).click();
+  await demo.toast("스테이지했어요");
+  expect(await change()).toMatchObject({ staged: "modified", unstaged: null });
+
+  await sheet.getByRole("tab", { name: "스테이지됨" }).click();
+  await expect(sheet.getByRole("tab", { name: "스테이지됨" })).toHaveAttribute("aria-selected", "true");
+  await sheet.locator(".file-list li", { hasText: file }).click();
+  await expect(sheet.locator(".file-list li.on .path")).toHaveText(file);
+  await sheet.getByRole("button", { name: "이 부분 스테이지에서 내리기", exact: true }).click();
+  await demo.toast("스테이지에서 내렸어요");
+  expect(await change()).toMatchObject({ staged: null, unstaged: "modified" });
+});
+
+test("discarding picked files asks first, and only those files are restored", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  const composer = page.locator(".composer");
+  await composer.locator(".files-head input[type=checkbox]").uncheck();
+  await composer.locator(".files li", { hasText: "src/graph/minimap.ts" }).locator("input").check();
+  await composer.getByRole("button", { name: "선택 버리기" }).click();
+  const dialog = page.getByRole("dialog", { name: "변경 버리기" });
+  await expect(dialog.locator("li")).toHaveText(["src/graph/minimap.ts"]);
+  // Cancel: nothing is lost.
+  await dialog.getByRole("button", { name: "취소" }).click();
+  expect((await demo.snapshot()).changes).toHaveLength(3);
+
+  await composer.getByRole("button", { name: "선택 버리기" }).click();
+  await dialog.getByRole("button", { name: "1개 파일 버리기" }).click();
+  await demo.toast("변경을 버렸어요");
+  expect((await demo.snapshot()).changes.map((c) => c.path)).toEqual(["src/graph/renderer.ts", "README.md"]);
+});

@@ -291,6 +291,13 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         const p = toScreen(st.current.view, { x: xOf(node.row, sc.layout.rowCount), y: yOf(node.lane) });
         return { x: p.x + r.left, y: p.y + r.top };
       },
+      stashScreenOf(index: number): Pt | null {
+        const m = marksRef.current.find((x) => x.index === index);
+        if (!m) return null;
+        const r = canvasRef.current!.getBoundingClientRect();
+        const p = toScreen(st.current.view, m.pos);
+        return { x: p.x + r.left, y: p.y + r.top };
+      },
       centerOn: (id: string, zoom?: number) => api.centerOn(id, zoom),
     };
   });

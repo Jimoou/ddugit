@@ -5,7 +5,12 @@ import type { RepoSnapshot } from "../src/types";
 declare global {
   interface Window {
     /** The visible graph's screen positions (dev builds). */
-    __ddugit: { screenOf(id: string): { x: number; y: number } | null };
+    __ddugit: {
+      screenOf(id: string): { x: number; y: number } | null;
+      /** Where a stash's diamond is drawn, by its index. */
+      stashScreenOf(index: number): { x: number; y: number } | null;
+      centerOn(id: string, zoom?: number): void;
+    };
     /** The demo's switches (src/mock/controls.ts). */
     __ddugitDemo: DemoControls;
   }

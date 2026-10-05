@@ -153,3 +153,74 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   await demo.toast("origin/main을 로컬로 가져와 이동했어요");
   expect((await demo.snapshot()).head.branch).toBe("origin-main");
 });
+
+test("tags a commit and deletes the tag from the sidebar", async ({ demo }) => {
+  const { page } = demo;
+  const head = (await demo.snapshot()).head.target!;
+  await (await demo.commitMenu(head)).getByText("여기에 태그…").click();
+  const dialog = page.getByRole("dialog", { name: `${head.slice(0, 7)}에 태그` });
+  await dialog.getByPlaceholder("v1.0.0").fill("v0.3.0");
+  await dialog.getByPlaceholder(/주석 태그/).fill("Zoom release");
+  await dialog.getByRole("button", { name: "태그 만들기" }).click();
+  await demo.toast("v0.3.0 태그를 만들었어요");
+  expect((await demo.snapshot()).refs.find((r) => r.kind === "tag" && r.name === "v0.3.0")?.target).toBe(head);
+  const tags = page.locator(".sidebar section", { has: page.locator("h3", { hasText: "태그" }) });
+  await expect(tags.locator("li")).toHaveCount(3);
+
+  await tags.locator("li", { hasText: "v0.3.0" }).click({ button: "right" });
+  await page.locator(".context-menu").getByText("태그 삭제").click();
+  const confirm = page.getByRole("dialog", { name: "태그 삭제" });
+  await expect(confirm).toContainText("로컬 태그 v0.3.0");
+  await confirm.getByRole("button", { name: "삭제" }).click();
+  await demo.toast("v0.3.0 태그를 지웠어요");
+  await expect(tags.locator("li")).toHaveCount(2);
+  expect((await demo.snapshot()).refs.some((r) => r.name === "v0.3.0")).toBe(false);
+});
+
+test("renames a branch, and deleting an unmerged one asks a second time", async ({ demo }) => {
+  const { page } = demo;
+  const local = page.locator(".sidebar section", { has: page.locator("h3", { hasText: "브랜치" }) }).first();
+  const row = (name: string) =>
+    local.locator("li").filter({ has: page.locator(".name").getByText(name, { exact: true }) });
+  const branches = async () => (await demo.snapshot()).refs.filter((r) => r.kind === "local").map((r) => r.name);
+  const theme = (await demo.snapshot()).refs.find((r) => r.name === "feature/theme")!.target;
+
+  await row("feature/theme").click({ button: "right" });
+  await page.locator(".context-menu").getByText("이름 바꾸기…").click();
+  const rename = page.getByRole("dialog", { name: "브랜치 이름 바꾸기" });
+  const name = rename.locator("input.text");
+  await expect(name).toHaveValue("feature/theme");
+  // The old name can't be "renamed" to itself.
+  await expect(rename.getByRole("button", { name: "바꾸기" })).toBeDisabled();
+  await name.fill("feature/warm theme");
+  await expect(name).toHaveValue("feature/warm-theme");
+  await rename.getByRole("button", { name: "바꾸기" }).click();
+  await demo.toast(/feature\/warm-theme.* 이름을 바꿨어요/);
+  expect(await branches()).toContain("feature/warm-theme");
+  expect(await branches()).not.toContain("feature/theme");
+  expect((await demo.snapshot()).refs.find((r) => r.name === "feature/warm-theme")!.target).toBe(theme);
+
+  // A merged branch goes after one confirmation.
+  await row("hotfix/crash").click({ button: "right" });
+  await page.locator(".context-menu").getByText("브랜치 삭제…").click();
+  await page.getByRole("dialog", { name: "브랜치 삭제" }).getByRole("button", { name: "삭제" }).click();
+  await demo.toast("hotfix/crash 브랜치를 지웠어요");
+  expect(await branches()).not.toContain("hotfix/crash");
+
+  // An unmerged one asks again; cancelling there keeps it.
+  const deleteWarm = async () => {
+    await row("feature/warm-theme").click({ button: "right" });
+    await page.locator(".context-menu").getByText("브랜치 삭제…").click();
+    await page.getByRole("dialog", { name: "브랜치 삭제" }).getByRole("button", { name: "삭제" }).click();
+  };
+  const again = page.getByRole("dialog", { name: "병합되지 않은 브랜치" });
+  await deleteWarm();
+  await expect(again).toContainText("feature/warm-theme");
+  await again.getByRole("button", { name: "취소" }).click();
+  await expect(again).toHaveCount(0);
+  expect(await branches()).toContain("feature/warm-theme");
+  await deleteWarm();
+  await again.getByRole("button", { name: "그래도 삭제" }).click();
+  await demo.toast("feature/warm-theme 브랜치를 지웠어요");
+  expect(await branches()).not.toContain("feature/warm-theme");
+});

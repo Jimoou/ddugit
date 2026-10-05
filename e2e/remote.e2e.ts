@@ -184,3 +184,97 @@ test("a remote can be disconnected from its menu, even the only one", async ({ d
   await expect(page.locator(".sidebar section.remote-sub")).toHaveCount(0);
   expect((await demo.snapshot()).remotes).toEqual([]);
 });
+
+test("a fetch or push refused for credentials explains the HTTPS setup and tries again", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutateQuietly((d) => (d.failNextRemote = "https"));
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  const dialog = page.locator(".dialog.auth");
+  await expect(dialog.locator(".dialog-title")).toHaveText("인증 필요");
+  await expect(dialog).toContainText("github.com에 HTTPS로 접속하지 못했어요");
+  await expect(dialog.locator("code.url")).toHaveText("https://github.com/ddugit/ddugit-demo.git");
+  // The steps (for this OS) carry commands to copy; git's own output is one click away.
+  await expect(dialog.locator(".steps li").first().locator("code")).toContainText("credential.helper");
+  await expect(dialog.locator(".ssh-setup")).toHaveCount(0);
+  await dialog.getByText("git 출력 보기").click();
+  await expect(dialog.locator("pre.raw")).toContainText("terminal prompts disabled");
+  // The demo fails once: trying again goes through.
+  await dialog.getByRole("button", { name: "다시 시도" }).click();
+  await expect(dialog).toHaveCount(0);
+  await demo.toast("원격 커밋을 가져왔어요");
+
+  // A push refused the same way: retrying pushes without asking again.
+  await demo.mutateQuietly((d) => (d.failNextRemote = "https"));
+  await page.locator(".topbar button", { hasText: "Push" }).click();
+  await demo.confirmSync();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "다시 시도" }).click();
+  await expect(page.locator(".dialog.sync-confirm")).toHaveCount(0);
+  // The first fetch brought a teammate's commit to the upstream, so this push is rejected next.
+  await expect(page.locator(".dialog", { hasText: "Push 거부됨" })).toBeVisible();
+});
+
+test("a pull that can't fast-forward offers to merge", async ({ demo }) => {
+  const { page } = demo;
+  // The first fetch brings a teammate's commit to the upstream, beside our own unpushed one.
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+  const before = await demo.snapshot();
+  expect([before.head.ahead, before.head.behind]).toEqual([1, 1]);
+  const theirs = before.refs.find((r) => r.name === before.head.upstream)!.target;
+
+  await page.locator(".topbar button", { hasText: "Pull" }).click();
+  await demo.confirmSync();
+  const dialog = page.getByRole("dialog", { name: "갈라진 이력" });
+  await expect(dialog).toContainText("feature/graph-zoom");
+  await expect(dialog.locator(".legend")).toContainText("내 커밋 1개");
+  await expect(dialog.locator(".legend")).toContainText("원격 커밋 1개");
+  await expect(dialog.getByRole("button", { name: /덮어쓰기/ })).toHaveCount(0);
+  await dialog.getByRole("button", { name: /^병합/ }).click();
+  await demo.toast("병합해서 받았어요");
+  const after = await demo.snapshot();
+  const tip = after.commits.find((c) => c.id === after.head.target)!;
+  expect(tip.parents).toEqual([before.head.target, theirs]);
+  expect([after.head.ahead, after.head.behind]).toEqual([2, 0]);
+});
+
+test("a pull that can't fast-forward offers to rebase", async ({ demo }) => {
+  const { page } = demo;
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+  const before = await demo.snapshot();
+  const mine = before.commits.find((c) => c.id === before.head.target)!;
+  const theirs = before.refs.find((r) => r.name === before.head.upstream)!.target;
+
+  await page.locator(".topbar button", { hasText: "Pull" }).click();
+  await demo.confirmSync();
+  const dialog = page.getByRole("dialog", { name: "갈라진 이력" });
+  await dialog.getByRole("button", { name: /^리베이스/ }).click();
+  await demo.toast("리베이스해서 받았어요");
+  // My commit is copied on top of theirs: one line, still one ahead.
+  const after = await demo.snapshot();
+  const tip = after.commits.find((c) => c.id === after.head.target)!;
+  expect(tip.summary).toBe(mine.summary);
+  expect(tip.parents).toEqual([theirs]);
+  expect([after.head.ahead, after.head.behind]).toEqual([1, 0]);
+});
+
+test("a rejected push merges the upstream in, then pushes", async ({ demo }) => {
+  const { page } = demo;
+  // A teammate pushed to our branch: the push is refused until their commit is merged in.
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await demo.toast("원격 커밋을 가져왔어요");
+  const before = await demo.snapshot();
+  const theirs = before.refs.find((r) => r.name === before.head.upstream)!.target;
+  await page.locator(".topbar button", { hasText: "Push" }).click();
+  await demo.confirmSync();
+  const dialog = page.getByRole("dialog", { name: "Push 거부됨" });
+  await expect(dialog).toContainText("origin/feature/graph-zoom");
+  await dialog.getByRole("button", { name: /병합하고 Push/ }).click();
+  await demo.toast("원격에 올렸어요");
+  const after = await demo.snapshot();
+  const tip = after.commits.find((c) => c.id === after.head.target)!;
+  expect(tip.parents).toEqual([before.head.target, theirs]);
+  expect(after.refs.find((r) => r.name === after.head.upstream)!.target).toBe(after.head.target);
+  expect([after.head.ahead, after.head.behind]).toEqual([0, 0]);
+});

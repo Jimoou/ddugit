@@ -64,6 +64,8 @@ import { t } from "./i18n";
 
 /** True inside the Tauri shell; false in a plain browser (demo mode). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** The open tabs are remembered across launches: in the desktop app, and in a demo told to (e2e). */
+export const keepsTabs = isTauri || demoControls.keepTabs;
 
 export const DEMO_PATH = "demo";
 

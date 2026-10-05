@@ -314,3 +314,116 @@ test("cherry-picks a commit from its menu and a comet carries the copy over", as
   expect(snap.commits.find((c) => c.id === snap.head.target)!.parents).toEqual([before.head.target]);
   await expect(page.locator(".fx-clip .pick-comet")).toHaveCount(1);
 });
+
+test("a merge stopped on conflicts is cancelled from its banner, and a resolved one ends with a commit", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const theirs = before.refs.find((r) => r.kind === "local" && r.name === "feature/theme")!.target;
+  const mergeTheme = async () => {
+    await demo.mutate((d) => (d.conflictNext = true));
+    await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+    await page.click(".context-menu >> text=에 병합");
+    await page.click(".dialog button.primary");
+    await expect(page.locator(".conflict-sheet")).toBeVisible();
+  };
+  const banner = page.locator(".banner", { hasText: "진행 중" });
+
+  await mergeTheme();
+  await expect(banner).toContainText("병합 진행 중 — 충돌 파일 2개");
+  // A merge is finished by committing: no "continue" or "skip" here.
+  await expect(banner.getByRole("button", { name: "계속" })).toHaveCount(0);
+  await expect(banner.getByRole("button", { name: "건너뛰기" })).toHaveCount(0);
+  await banner.getByRole("button", { name: "취소" }).click();
+  await demo.toast("취소했어요");
+  await expect(banner).toHaveCount(0);
+  let snap = await demo.snapshot();
+  expect(snap.state).toBe("clean");
+  expect(snap.head.target).toBe(before.head.target);
+  expect(snap.changes.map((c) => c.path)).toEqual(before.changes.map((c) => c.path));
+
+  // Again, this time resolved: the banner says to commit, and the commit joins both sides.
+  await mergeTheme();
+  const resolveAll = page.getByRole("button", { name: /^모두 (현재|들어오는)/ }).first();
+  await resolveAll.click();
+  await expect(page.locator(".conflict-sheet header")).toContainText("남은 파일 1개");
+  await resolveAll.click();
+  await expect(banner).not.toContainText("충돌 파일");
+  await expect(banner).toContainText("해결한 뒤 ＋로 커밋하면 병합이 끝나요");
+  await page.keyboard.press("Escape");
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await page.fill("textarea.message", "Merge feature/theme");
+  await page.keyboard.press("Control+Enter");
+  await demo.toast("커밋했어요");
+  await expect(banner).toHaveCount(0);
+  snap = await demo.snapshot();
+  expect(snap.commits.find((c) => c.id === snap.head.target)!.parents).toEqual([before.head.target, theirs]);
+});
+
+test("a cherry-pick stopped on conflicts goes on from its banner", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const main = before.refs.find((r) => r.kind === "local" && r.name === "main")!.target;
+  const summary = before.commits.find((c) => c.id === main)!.summary;
+  await demo.mutate((d) => (d.conflictNext = true));
+  await (await demo.commitMenu(main)).getByText(/에 cherry-pick$/).click();
+  await page.click(".dialog button.primary");
+  await expect(page.locator(".conflict-sheet")).toBeVisible();
+  const banner = page.locator(".banner", { hasText: "진행 중" });
+  await expect(banner).toContainText("cherry-pick 진행 중 — 충돌 파일 2개");
+  expect((await demo.snapshot()).incoming).toBe(main);
+
+  await page.keyboard.press("Escape");
+  await banner.getByRole("button", { name: "계속" }).click();
+  await demo.toast("이어서 마쳤어요");
+  await expect(banner).toHaveCount(0);
+  const snap = await demo.snapshot();
+  const tip = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect([tip.summary, tip.parents]).toEqual([summary, [before.head.target]]);
+  expect(snap.state).toBe("clean");
+  expect(snap.changes.some((c) => c.conflicted)).toBe(false);
+});
+
+test("reverts a commit from its menu", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const target = before.commits.find((c) => c.id === before.head.target)!.parents[0];
+  const summary = before.commits.find((c) => c.id === target)!.summary;
+  await (await demo.commitMenu(target)).getByText("되돌리는 커밋 만들기 (revert)").click();
+  const dialog = page.getByRole("dialog", { name: "revert" });
+  await expect(dialog).toContainText(`“${summary}”의 변경을 거꾸로 적용하는 새 커밋을 feature/graph-zoom에 만들어요`);
+  await dialog.getByRole("button", { name: "되돌리는 커밋 만들기" }).click();
+  await demo.toast("되돌리는 커밋을 만들었어요");
+  const snap = await demo.snapshot();
+  const tip = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect([tip.summary, tip.parents]).toEqual([`Revert "${summary}"`, [before.head.target]]);
+});
+
+test("Alt-dragging a commit onto a branch tip cherry-picks it there", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const source = before.refs.find((r) => r.kind === "local" && r.name === "feature/theme")!.target;
+  const a = (await demo.screenOf(source))!;
+  const z = (await demo.screenOf(before.head.target!))!;
+  await page.keyboard.down("Alt");
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 30, a.y - 20, { steps: 6 });
+  await page.mouse.move(z.x, z.y, { steps: 12 });
+  await expect(page.locator(".drag-hint")).toContainText("놓으면 이 커밋을 복사(cherry-pick)해요");
+  await page.mouse.up();
+  await page.keyboard.up("Alt");
+
+  const dialog = page.getByRole("dialog", { name: "cherry-pick" });
+  await expect(dialog).toContainText("Tune particle speed");
+  await dialog.getByRole("button", { name: "복사" }).click();
+  await demo.toast("feature/graph-zoom에 복사했어요");
+  const snap = await demo.snapshot();
+  const tip = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect([tip.summary, tip.parents]).toEqual(["Tune particle speed", [before.head.target]]);
+  // Not a merge: the source branch is left alone.
+  expect(snap.refs.find((r) => r.name === "feature/theme")!.target).toBe(
+    before.refs.find((r) => r.name === "feature/theme")!.target,
+  );
+});
