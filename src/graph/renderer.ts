@@ -846,7 +846,7 @@ function drawMapCaptions(
     ctx.lineWidth = 3.5;
     ctx.strokeStyle = "rgba(5,4,14,0.85)";
     ctx.strokeText(line, c.x, y);
-    ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : on ? "#ffffff" : "rgba(230,225,255,0.82)";
+    ctx.fillStyle = L.d ? "rgba(255,255,255,0.24)" : on ? "#ffffff" : "rgba(255,255,255,0.88)";
     ctx.fillText(line, c.x, y);
   }
 }
@@ -888,7 +888,7 @@ function drawUprightCaption(
   ctx.lineWidth = 3.5;
   ctx.strokeStyle = "rgba(5,4,14,0.85)";
   ctx.strokeText(line, x, L.y);
-  ctx.fillStyle = L.d ? "rgba(220,215,255,0.22)" : on ? "#ffffff" : "rgba(230,225,255,0.8)";
+  ctx.fillStyle = L.d ? "rgba(255,255,255,0.24)" : on ? "#ffffff" : "rgba(255,255,255,0.86)";
   ctx.fillText(line, x, L.y);
 }
 
