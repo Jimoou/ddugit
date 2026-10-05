@@ -252,16 +252,45 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): string {
-  if (ctx.measureText(text).width <= max) return text;
-  let lo = 0,
-    hi = text.length;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (ctx.measureText(text.slice(0, mid) + "…").width <= max) lo = mid;
-    else hi = mid - 1;
+/**
+ * Label widths and cuts per font: the same labels are measured on every frame they are drawn,
+ * and cutting one to fit takes a dozen measurements. Cleared when a font finishes loading.
+ */
+const widths = new Map<string, number>();
+const cuts = new Map<string, string>();
+const MEASURED_MAX = 20_000;
+if (typeof document !== "undefined")
+  document.fonts?.addEventListener?.("loadingdone", () => {
+    widths.clear();
+    cuts.clear();
+  });
+
+function remember<V>(m: Map<string, V>, key: string, make: () => V): V {
+  let v = m.get(key);
+  if (v === undefined) {
+    if (m.size >= MEASURED_MAX) m.clear();
+    v = make();
+    m.set(key, v);
   }
-  return text.slice(0, lo) + "…";
+  return v;
+}
+
+/** `ctx.measureText(text).width` in the current font, remembered. */
+const textWidth = (ctx: CanvasRenderingContext2D, text: string) =>
+  remember(widths, `${ctx.font}\n${text}`, () => ctx.measureText(text).width);
+
+function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): string {
+  return remember(cuts, `${ctx.font}\n${max}\n${text}`, () => {
+    if (textWidth(ctx, text) <= max) return text;
+    let lo = 0,
+      hi = text.length;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (textWidth(ctx, text.slice(0, mid) + "…") <= max) lo = mid;
+      else hi = mid - 1;
+    }
+    return text.slice(0, lo) + "…";
+  });
 }
 
 export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
@@ -374,7 +403,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.restore();
     ctx.font = `600 11px ${SANS}`;
     const label = t("graph.loadMore");
-    const bw = ctx.measureText(label).width + 18,
+    const bw = textWidth(ctx, label) + 18,
       bh = 22;
     const rect = { x: b.x - bw / 2, y: b.y - bh / 2, w: bw, h: bh };
     roundRect(ctx, rect.x, rect.y, bw, bh, 11);
@@ -508,7 +537,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const label = `${run.ids.length}`;
       const cx = x + bw / 2,
         cy = y + bh / 2;
-      if (ctx.measureText(label).width + 10 < Math.max(bw, bh * 2.5)) {
+      if (textWidth(ctx, label) + 10 < Math.max(bw, bh * 2.5)) {
         ctx.fillStyle = on ? "#ffffff" : c;
         ctx.fillText(label, cx, cy + 0.5);
       }
@@ -579,7 +608,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         const icon: IconName | null = isHead ? "head" : (REF_ICON[rf.kind] ?? null);
         const text = rf.name;
         const mark = rf.review ? REVIEW_ICON[rf.review] : undefined;
-        const w = Math.min(ctx.measureText(text).width, 160) + 14 + (icon ? ICON_W : 0) + (mark ? ICON_W : 0);
+        const w = Math.min(textWidth(ctx, text), 160) + 14 + (icon ? ICON_W : 0) + (mark ? ICON_W : 0);
         return { rf, isHead, icon, mark, text, w };
       });
       return { L, labels };
@@ -768,7 +797,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     if (s.changeCount) {
       ctx.font = `700 10px ${MONO}`;
       const label = String(s.changeCount);
-      const bw = Math.max(16, ctx.measureText(label).width + 8);
+      const bw = Math.max(16, textWidth(ctx, label) + 8);
       const bx = plusS.x + pr * 0.6,
         by = plusS.y - pr - 6;
       roundRect(ctx, bx, by, bw, 15, 7.5);
@@ -844,7 +873,7 @@ function drawMapCaptions(
       id: L.id,
       x: L.x,
       y: L.y,
-      w: Math.min(ctx.measureText(s.summaries.get(L.id)!).width + 2, inHand(L.id) ? CAPTION_FULL : CAPTION_MAX),
+      w: Math.min(textWidth(ctx, s.summaries.get(L.id)!) + 2, inHand(L.id) ? CAPTION_FULL : CAPTION_MAX),
       up: !badged.has(L.id),
     };
   });
