@@ -263,14 +263,76 @@ pub fn set_program(program: Option<&str>) -> Result<String> {
     Ok(v)
 }
 
+/// Subcommands that may reach a remote (over ssh or http).
+const NETWORK: &[&str] = &[
+    "fetch",
+    "pull",
+    "push",
+    "clone",
+    "ls-remote",
+    "submodule",
+    "lfs",
+    "remote",
+];
+
+/// The git subcommand in `args` (after options like `-c key=value`).
+fn subcommand<'a>(args: &[&'a str]) -> Option<&'a str> {
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        match *a {
+            "-c" | "-C" => {
+                it.next();
+            }
+            a if a.starts_with('-') => {}
+            a => return Some(a),
+        }
+    }
+    None
+}
+
+/// Environment and `-c` options for git that may reach a remote, so it can't
+/// hang: ssh in batch mode (an unknown host key or a passphrase without an
+/// agent fails at once, as `Host key verification failed` / `Permission
+/// denied (publickey)`, which `remote::is_auth_failure` reports) unless the
+/// user chose their own ssh command, and an HTTP transfer that stalls for a
+/// minute gives up unless the user set their own limit. `env` reads the
+/// process environment.
+fn network_guard(
+    dir: &Path,
+    env: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> (Vec<(&'static str, &'static str)>, Vec<&'static str>) {
+    let config = Repository::discover(dir)
+        .and_then(|r| r.config())
+        .or_else(|_| git2::Config::open_default())
+        .and_then(|mut c| c.snapshot())
+        .ok();
+    let set = |key: &str| config.as_ref().is_some_and(|c| c.get_entry(key).is_ok());
+    let mut vars = Vec::new();
+    if env("GIT_SSH_COMMAND").is_none() && env("GIT_SSH").is_none() && !set("core.sshCommand") {
+        vars.push(("GIT_SSH_COMMAND", "ssh -o BatchMode=yes"));
+    }
+    let mut options = Vec::new();
+    if !set("http.lowSpeedLimit") && !set("http.lowSpeedTime") && env("GIT_HTTP_LOW_SPEED_LIMIT").is_none() {
+        options.extend(["-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=60"]);
+    }
+    (vars, options)
+}
+
 fn command(dir: &Path, args: &[&str]) -> Command {
     let mut cmd = Command::new(git_program());
+    if subcommand(args).is_some_and(|s| NETWORK.contains(&s)) {
+        let (env, config) = network_guard(dir, |k| std::env::var_os(k));
+        cmd.envs(env).args(config);
+    }
     cmd.args(args)
         .current_dir(dir)
         // Never block on a hidden prompt: no terminal credential prompt, no
-        // editor, and no stdin for ssh to read a passphrase from.
+        // askpass helper (an empty GIT_ASKPASS also hides core.askPass and
+        // SSH_ASKPASS from git), no editor, and no stdin for ssh to read a
+        // passphrase from. Credential helpers still run.
         .stdin(Stdio::null())
         .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "")
         .env("GIT_EDITOR", "true")
         .env("LC_ALL", "C");
     // Tests use local folders as remotes (submodules too), which git blocks by default.
@@ -427,6 +489,67 @@ mod tests {
             "/bin/sh"
         })
         .is_err());
+    }
+
+    #[test]
+    fn remote_work_gets_no_hidden_prompts_unless_the_user_chose_ssh() {
+        assert_eq!(
+            subcommand(&["-c", "a=b", "--literal-pathspecs", "fetch"]),
+            Some("fetch")
+        );
+        assert_eq!(subcommand(&["-C", "x"]), None);
+        let d = testutil::repo();
+        let none = |_: &str| None;
+        let (vars, options) = network_guard(d.path(), none);
+        assert_eq!(vars, [("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")]);
+        assert_eq!(
+            options,
+            ["-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=60"]
+        );
+        // The user's own ssh command (config or environment) and speed limit are kept.
+        let set = |_: &str| Some(std::ffi::OsString::from("x"));
+        assert!(network_guard(d.path(), set).0.is_empty());
+        git_ok(d.path(), &["config", "core.sshCommand", "ssh -i key"]).unwrap();
+        git_ok(d.path(), &["config", "http.lowSpeedTime", "600"]).unwrap();
+        assert_eq!(network_guard(d.path(), none), (vec![], vec![]));
+    }
+
+    #[test]
+    fn a_fetch_over_ssh_that_would_prompt_fails_as_auth() {
+        // An ssh "client" that, like ssh asking about a new host key, needs a
+        // terminal; git hands it our options, so batch mode is visible here.
+        let d = testutil::repo();
+        let ssh = d.path().join("fake-ssh");
+        std::fs::write(
+            &ssh,
+            "#!/bin/sh\ncase \"$*\" in *BatchMode=yes*) echo 'Host key verification failed.' >&2; exit 255;; esac\nread answer\n",
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&ssh, std::fs::Permissions::from_mode(0o755)).unwrap();
+            git_ok(
+                d.path(),
+                &["remote", "add", "origin", "ssh://git@example.invalid/x.git"],
+            )
+            .unwrap();
+            // Our GIT_SSH_COMMAND with the fake in place of `ssh` (none when the
+            // environment already names an ssh command).
+            let mut cmd = command(d.path(), &["fetch", "origin"]);
+            let ours = cmd
+                .get_envs()
+                .find(|(k, _)| *k == "GIT_SSH_COMMAND")
+                .and_then(|(_, v)| v.map(|v| v.to_string_lossy().into_owned()));
+            if let Some(ours) = ours {
+                let replaced = ours.replacen("ssh", ssh.to_str().unwrap(), 1);
+                cmd.env("GIT_SSH_COMMAND", replaced);
+                let out = cmd.output().unwrap();
+                let text = String::from_utf8_lossy(&out.stderr);
+                assert!(!out.status.success());
+                assert!(remote::is_auth_failure(&text), "{text}");
+            }
+        }
     }
 
     #[test]
