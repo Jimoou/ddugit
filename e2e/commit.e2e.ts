@@ -422,3 +422,40 @@ test("a stash that conflicts when popped stops on the conflicts and is kept", as
   expect(snap.changes.filter((c) => c.conflicted)).toHaveLength(2);
   await expect(page.locator(".banner", { hasText: "진행 중" })).toHaveCount(0);
 });
+
+test("stages a new, untracked file from the diff sheet as an added file", async ({ demo }) => {
+  const { page } = demo;
+  const file = "src/graph/minimap.ts";
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await page.locator(".composer .path", { hasText: file }).click();
+  const sheet = page.locator(".diff-sheet");
+  await expect(sheet.locator(".file-list li.on .path")).toHaveText(file);
+  // All of a new file's lines are additions.
+  await expect(sheet.locator("table.diff tr.rem")).toHaveCount(0);
+  await expect(sheet.locator("table.diff tr.ins")).not.toHaveCount(0);
+  await sheet.getByRole("button", { name: "이 부분 스테이지", exact: true }).click();
+  await demo.toast("스테이지했어요");
+  expect((await demo.snapshot()).changes.find((c) => c.path === file)).toMatchObject({
+    staged: "added",
+    unstaged: null,
+  });
+});
+
+test("identity: the signing key field suggests the GPG and SSH keys found on this computer", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".tabrow-settings").click();
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  await dialog.getByRole("tab", { name: "프로필" }).click();
+  const profiles = dialog.locator("section.profiles");
+  await profiles.getByRole("button", { name: "+ 프로필 추가" }).click();
+  const form = profiles.locator(".profile-form");
+  const suggested = form.locator("datalist#signing-keys option");
+  await form.locator("select").selectOption("openpgp");
+  await expect(suggested).toHaveCount(1);
+  await expect(suggested).toHaveAttribute("value", "3AA5C34371567BD2");
+  await expect(suggested).toHaveText("Demo Pilot <pilot@ddugit.dev>");
+  await form.locator("select").selectOption("ssh");
+  await expect(suggested).toHaveAttribute("value", "/home/pilot/.ssh/id_ed25519.pub");
+  // The field points at the list, so the browser offers them while typing.
+  await expect(form.locator("input[list=signing-keys]")).toBeVisible();
+});
