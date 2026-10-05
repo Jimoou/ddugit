@@ -281,3 +281,144 @@ test("inspector: copies the commit id, lists the branches holding it, and says w
   await sha.click();
   await demo.toast("클립보드에 복사하지 못했어요");
 });
+
+test("changes the author of a past commit and replays the commits after it", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const head = before.commits.find((c) => c.id === before.head.target)!;
+  const target = before.commits.find((c) => c.id === head.parents[0])!;
+  await (await demo.commitMenu(target.id)).getByText("작성자 바꾸기…").click();
+  const dialog = page.getByRole("dialog", { name: "작성자 바꾸기" });
+  await expect(dialog.getByLabel("이름")).toHaveValue(target.author);
+  await expect(dialog.getByLabel("이메일")).toHaveValue(target.email);
+  await expect(dialog).toContainText("커밋 2개를 다시 써요");
+  await dialog.getByLabel("이름").fill("Stella Park");
+  await dialog.getByLabel("이메일").fill("stella@ddugit.dev");
+  await dialog.getByRole("button", { name: "적용" }).click();
+  await demo.toast("작성자를 바꿨어요");
+
+  const snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  const tip = byId.get(snap.head.target!)!;
+  const edited = byId.get(tip.parents[0])!;
+  expect(tip.summary).toBe(head.summary);
+  expect([edited.summary, edited.author, edited.email]).toEqual([target.summary, "Stella Park", "stella@ddugit.dev"]);
+  expect(edited.parents).toEqual(target.parents);
+});
+
+test("inspector: a changed file opens the commit's diff sheet, read-only", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const head = snap.commits.find((c) => c.id === snap.head.target)!;
+  const at = (await demo.screenOf(head.id))!;
+  await page.mouse.click(at.x, at.y);
+  const files = page.locator(".inspector .changed li:not(.dir)");
+  await expect(files).not.toHaveCount(0);
+  const n = await files.count();
+  await files.first().click();
+
+  const sheet = page.locator(".diff-sheet");
+  await expect(sheet.locator("header b")).toHaveText(head.summary);
+  await expect(sheet.locator("header")).toContainText(`파일 ${n}개`);
+  await expect(sheet.locator(".file-list li")).toHaveCount(n);
+  await expect(sheet.locator(".file-list li.on")).toHaveCount(1);
+  await expect(sheet.locator("table.diff tr.ins").first()).toBeVisible();
+  // A commit's diff has no staging: no tabs, no hunk buttons.
+  await expect(sheet.getByRole("tab")).toHaveCount(0);
+  await expect(sheet.locator(".hunk-btn")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+});
+
+test("the diff sheet steps through files with [ and ], and draws only the rows near view in a long file", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await page.locator(".composer .path").first().click();
+  const sheet = page.locator(".diff-sheet");
+  const current = sheet.locator(".file-list li.on .path");
+  // The unstaged changes: the modified renderer and the new minimap (README is staged only).
+  await expect(sheet.locator(".file-list li")).toHaveCount(2);
+  const files = await sheet.locator(".file-list li .path").allTextContents();
+  await expect(current).toHaveText(files[0]);
+  await page.keyboard.press("]");
+  await expect(current).toHaveText(files[1]);
+  await page.keyboard.press("[");
+  await expect(current).toHaveText(files[0]);
+  // Past the first file it wraps around to the last.
+  await page.keyboard.press("[");
+  await expect(current).toHaveText(files[files.length - 1]);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+
+  // A 3,000-line file: only the rows around the viewport are in the table.
+  await demo.mutateQuietly((d) => {
+    const lines = Array.from({ length: 3000 }, (_, i) => ({
+      kind: "+" as const,
+      old: null,
+      new: i + 1,
+      text: `line ${i + 1}`,
+    }));
+    d.diffs = [
+      {
+        path: "big.txt",
+        oldPath: null,
+        status: "added",
+        additions: 3000,
+        deletions: 0,
+        binary: false,
+        truncated: false,
+        hunks: [{ header: "@@ -0,0 +1,3000 @@", key: "big", lines }],
+      },
+    ];
+  });
+  const snap = await demo.snapshot();
+  const at = (await demo.screenOf(snap.head.target!))!;
+  await page.mouse.click(at.x, at.y);
+  await page.locator(".inspector .changed li:not(.dir)").first().click();
+  const rows = sheet.locator("table.diff tr.ins");
+  await expect(rows.first()).toContainText("line 1");
+  expect(await rows.count()).toBeLessThan(400);
+  await sheet.locator(".diff-body").evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(rows.last()).toContainText("line 3000");
+  expect(await rows.count()).toBeLessThan(400);
+});
+
+test("a commit refused while signing explains what signing needs", async ({ demo }) => {
+  const { page } = demo;
+  const before = (await demo.snapshot()).head.target;
+  await demo.mutateQuietly((d) => (d.signFail = "gpg"));
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await page.fill("textarea.message", "Signed work");
+  await page.keyboard.press("Control+Enter");
+  const toast = page.locator(".toast.err");
+  await expect(toast).toContainText("gpg failed to sign the data");
+  await expect(toast).toContainText("pinentry");
+  // Nothing was committed, and the message is still there to try again.
+  expect((await demo.snapshot()).head.target).toBe(before);
+  await expect(page.locator("textarea.message")).toHaveValue("Signed work");
+
+  await demo.mutateQuietly((d) => (d.signFail = "ssh"));
+  await page.keyboard.press("Control+Enter");
+  await expect(page.locator(".toast.err").last()).toContainText("ssh-agent");
+});
+
+test("a stash that conflicts when popped stops on the conflicts and is kept", async ({ demo }) => {
+  const { page } = demo;
+  await demo.mutateQuietly((d) => (d.conflictNext = true));
+  const side = page.locator(".sidebar section", { has: page.locator("h3", { hasText: "스태시" }) });
+  await side.locator("li").first().click();
+  await page
+    .locator(".stash-panel")
+    .getByRole("button", { name: /꺼내기/ })
+    .click();
+  await expect(page.locator(".conflict-sheet")).toBeVisible();
+  await expect(page.locator(".conflict-sheet header")).toContainText("남은 파일 2개");
+  const snap = await demo.snapshot();
+  // The stash stays for another try; a stash isn't an operation to continue or cancel.
+  expect(snap.stashes).toHaveLength(1);
+  expect(snap.state).toBe("clean");
+  expect(snap.changes.filter((c) => c.conflicted)).toHaveLength(2);
+  await expect(page.locator(".banner", { hasText: "진행 중" })).toHaveCount(0);
+});

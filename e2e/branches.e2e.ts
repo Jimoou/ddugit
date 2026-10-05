@@ -224,3 +224,105 @@ test("renames a branch, and deleting an unmerged one asks a second time", async 
   await demo.toast("feature/warm-theme 브랜치를 지웠어요");
   expect(await branches()).not.toContain("feature/warm-theme");
 });
+
+test("removing a worktree with changes left in it asks again before deleting them", async ({ demo }) => {
+  const { page } = demo;
+  const section = page.locator(".app:not([hidden]) .sidebar .worktrees");
+  await section.getByRole("button", { name: "워크트리 추가" }).click();
+  const dialog = page.locator(".worktree-dialog");
+  await dialog.getByRole("radio", { name: "새 브랜치" }).click();
+  await dialog.getByLabel("새 브랜치").fill("dirty-work");
+  // The demo treats a folder named "dirty" as one with uncommitted changes.
+  await expect(dialog.getByLabel("워크트리 폴더")).toHaveValue("/demo/ddugit-demo-dirty-work");
+  await dialog.getByRole("button", { name: "추가하고 탭으로 열기" }).click();
+  await demo.toast("dirty-work를 새 워크트리에 체크아웃했어요");
+  await page.locator(".tabbar .tab:not(.tab-home)").nth(0).click();
+  const row = section.locator("li").filter({ hasText: "ddugit-demo-dirty-work" });
+  const remove = async () => {
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "워크트리 제거…" }).click();
+    await page.getByRole("dialog", { name: "워크트리 제거" }).getByRole("button", { name: "제거" }).click();
+  };
+
+  const again = page.getByRole("dialog", { name: "변경이 남은 워크트리" });
+  await remove();
+  await expect(again).toContainText("/demo/ddugit-demo-dirty-work에 커밋하지 않은 변경이 있어요");
+  await again.getByRole("button", { name: "취소" }).click();
+  await expect(row).toHaveCount(1);
+  await remove();
+  await again.getByRole("button", { name: "변경까지 지우기" }).click();
+  await demo.toast("워크트리를 제거했어요");
+  await expect(row).toHaveCount(0);
+  // The branch stays.
+  expect((await demo.snapshot()).refs.some((r) => r.name === "dirty-work")).toBe(true);
+});
+
+test("a submodule's menu updates it (saying when it needs sign-in), copies its URL and syncs", async ({ demo }) => {
+  const { page } = demo;
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const section = page.locator(".app:not([hidden]) .sidebar .submodules");
+  const math = section.locator("li").filter({ hasText: "libs/orbit-math" });
+  const stardust = section.locator("li").filter({ hasText: "vendor/stardust" });
+  const menu = async (row: typeof math, item: string) => {
+    await row.click({ button: "right" });
+    await page.locator(".context-menu").getByRole("menuitem", { name: item }).click();
+  };
+
+  // Its remote refuses the first time: say so, and leave it as it was.
+  await demo.mutateQuietly((d) => (d.failNextRemote = "https"));
+  await menu(math, "기록된 커밋으로 업데이트");
+  await demo.toast("서브모듈을 받으려면 인증이 필요해요. 원격 인증을 먼저 설정하세요");
+  await expect(math).toContainText("초기화 안 됨");
+  await menu(math, "기록된 커밋으로 업데이트");
+  await demo.toast("서브모듈을 기록된 커밋으로 맞췄어요");
+  await expect(math).toContainText("최신");
+
+  // Up to date already: nothing to update.
+  await stardust.click({ button: "right" });
+  await expect(
+    page.locator(".context-menu").getByRole("menuitem", { name: "기록된 커밋으로 업데이트" }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await menu(stardust, "URL 복사");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("https://github.com/ddugit/stardust.git");
+  await menu(stardust, "URL 다시 맞추기 (sync)");
+  await demo.toast("서브모듈 URL을 .gitmodules에 맞췄어요");
+});
+
+test("LFS: turns LFS on for the repository, untracks a pattern, and says when git-lfs is missing", async ({ demo }) => {
+  const { page } = demo;
+  const section = page.locator(".app:not([hidden]) .sidebar .lfs");
+  // LFS is read again when HEAD moves (or after an LFS command): move it along with the switch.
+  await demo.mutate((d) => {
+    d.lfs = "off";
+    d.grow(1);
+  });
+  await expect(section).toContainText("이 저장소에서 LFS가 꺼져 있어요");
+  await section.getByRole("button", { name: "LFS 켜기" }).click();
+  await demo.toast("이 저장소에서 LFS를 켰어요");
+  await expect(section).not.toContainText("LFS가 꺼져 있어요");
+
+  // Downloading needs the remote: a refused sign-in says so and leaves the files as pointers.
+  await demo.mutateQuietly((d) => (d.failNextRemote = "https"));
+  await section.getByRole("button", { name: "받기" }).click();
+  await demo.toast("LFS 파일을 받으려면 원격 인증이 필요해요");
+  await expect(section).toContainText("받지 않은 파일 3개");
+
+  await section.getByRole("button", { name: "추적 해제 *.psd" }).click();
+  await demo.toast("*.psd를 LFS에서 뺐어요. 바뀐 .gitattributes를 커밋하세요");
+  await expect(section).not.toContainText("*.psd");
+  expect((await demo.snapshot()).changes.some((c) => c.path === ".gitattributes")).toBe(true);
+
+  // Without git-lfs: the patterns stay listed, the actions go, and the install guide is offered.
+  await demo.mutate((d) => {
+    d.lfs = "missing";
+    d.grow(1);
+  });
+  await expect(section).toContainText("git-lfs가 설치되어 있지 않아서 큰 파일이 포인터로만 보여요");
+  await expect(section.getByRole("button", { name: "git-lfs 설치 안내" })).toBeVisible();
+  await expect(section.getByRole("button", { name: "LFS로 관리할 파일 형식 추가" })).toHaveCount(0);
+  await expect(section.getByRole("button", { name: /추적 해제/ })).toHaveCount(0);
+  await expect(section.getByRole("button", { name: "받기" })).toBeDisabled();
+});

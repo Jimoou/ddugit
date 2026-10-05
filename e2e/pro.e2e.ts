@@ -279,3 +279,20 @@ test("a bundle with a bad checksum or missing prerequisite commits is not import
   await expect(importButton).toBeEnabled();
   expect((await demo.snapshot()).refs.some((r) => r.name.startsWith("acme/"))).toBe(false);
 });
+
+test("exports picked backport commits as numbered patches into a chosen folder", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/work/patches"));
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  const rows = sheet.locator("tbody tr");
+  await expect(rows.first()).toBeVisible();
+  await rows.nth(0).locator("input[type=checkbox]").check();
+  await rows.nth(1).locator("input[type=checkbox]").check();
+  const before = await demo.snapshot();
+  await sheet.getByRole("button", { name: /패치로 내보내기/ }).click();
+  await demo.toast("패치 2개를 저장했어요");
+  // Exporting writes files only: no branch moves.
+  expect((await demo.snapshot()).refs).toEqual(before.refs);
+});

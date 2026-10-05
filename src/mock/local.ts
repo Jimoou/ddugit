@@ -3,6 +3,7 @@
 import type { Args } from "../api";
 import type { FileChange, Identity, IdentityOp, OpResult, Signature } from "../types";
 import { demoControls } from "./controls";
+import { DEMO_BINARY, stopOnConflict } from "./history";
 import { type Table, delay, fail, fakeFile, fakeId, filesOf, hash, repo, res } from "./repo";
 
 /** The demo's git config for identity and signing: global, and each repository's own. */
@@ -51,6 +52,11 @@ const DEMO_SIGNED: Record<string, Signature> = {
   Minimap: { status: "unverified", signer: "", key: "4AEE18F83AFDEB23" },
 };
 const demoSigned = new Set<string>();
+/** What git prints when signing a commit fails (`signFail`). */
+const SIGN_FAILURES = {
+  gpg: "error: gpg failed to sign the data\nfatal: failed to write commit object",
+  ssh: 'error: Load key "/home/pilot/.ssh/id_ed25519": incorrect passphrase supplied to decrypt private key?\nfatal: failed to write commit object',
+};
 
 /** A commit in the demo (signing is noted by `git_commit`). */
 function demoCommit({ message, paths, amend, stagedOnly }: Args<"git_commit">): Promise<OpResult> {
@@ -87,6 +93,11 @@ function demoCommit({ message, paths, amend, stagedOnly }: Args<"git_commit">): 
 export const localCommands = {
   repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
   async git_commit(args) {
+    const sign = demoControls.signFail;
+    if (sign) {
+      demoControls.signFail = null;
+      return delay(res("failed", SIGN_FAILURES[sign]));
+    }
     const r = await demoCommit(args);
     const id = demoReadIdentity(args.path);
     if (r.status === "ok" && id.sign?.value && id.key) demoSigned.add(repo.branches.get(repo.head)!);
@@ -134,6 +145,8 @@ export const localCommands = {
     const index = repo.stashes.findIndex((s) => s.id === id);
     const st = repo.stashes[index];
     if (!st) return fail("That stash no longer exists; the list has been refreshed");
+    // Like `git stash pop` that conflicts: the files stop in conflict and the stash is kept.
+    if (op !== "drop" && demoControls.conflictNext) return stopOnConflict("clean", st.id, "Stashed changes");
     if (op !== "drop") {
       const have = new Set(repo.changes.map((c) => c.path));
       repo.changes.push(...st.changes.filter((c) => !have.has(c.path)));
@@ -145,6 +158,8 @@ export const localCommands = {
   conflict_file({ file }) {
     const merged = repo.pending?.files.get(file);
     if (merged === undefined) return fail(`'${file}' is not in conflict`);
+    if (merged === DEMO_BINARY)
+      return delay({ path: file, base: null, ours: null, theirs: null, merged: "", binary: true });
     const side = (pick: 1 | 2) => merged.replace(/<<<<<<< .*\n([\s\S]*?)=======\n([\s\S]*?)>>>>>>> .*\n/g, `$${pick}`);
     return delay({ path: file, base: null, ours: side(1), theirs: side(2), merged, binary: false });
   },

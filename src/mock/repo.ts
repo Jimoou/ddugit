@@ -42,10 +42,11 @@ class MockRepo {
   clock = Math.floor(Date.now() / 1000) - 86400 * 40;
   fetched = false;
   /**
-   * In-progress demo merge, cherry-pick or revert: source commit, the conflicted files' marked-up text,
-   * and for a pick or revert the summary of the commit it makes.
+   * In-progress demo merge, cherry-pick, revert or rebase (or a conflicted stash pop): source commit, the
+   * conflicted files' marked-up text, and what "continue" finishes with: a pick or revert's commit summary,
+   * a rebase's tip.
    */
-  pending: { source: string; label: string; files: Map<string, string>; summary?: string } | null = null;
+  pending: { source: string; label: string; files: Map<string, string>; summary?: string; tip?: string } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();

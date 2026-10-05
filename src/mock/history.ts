@@ -102,17 +102,28 @@ const fileLog: Table["file_log"] = ({ rev, file }) => {
   return delay(repo.order.filter((id) => seen.has(id) && filesOf(id).includes(file)).map((id) => ({ id, path: file })));
 };
 
+/** Marks a binary file among the demo's conflicted files (`conflict_file` shows no text for it). */
+export const DEMO_BINARY = "\0binary";
+
 /**
- * Stop `state` (merge, cherry-pick, revert) on a conflict in two files, like `conflictNext` asks.
- * A stopped pick or revert keeps the commit it will make (`summary`) for "continue".
+ * Stop `state` (merge, cherry-pick, revert, rebase; "clean" for a stash pop) on a conflict in two files,
+ * like `conflictNext` asks. A stopped pick or revert keeps the commit it will make (`summary`), a stopped
+ * rebase the tip it will leave (`tip`), for "continue".
  */
-function stopOnConflict(state: string, source: string, label: string, summary?: string) {
+export function stopOnConflict(
+  state: string,
+  source: string,
+  label: string,
+  done: { summary?: string; tip?: string } = {},
+) {
   demoControls.conflictNext = false;
   const files = new Map([
     ["src/App.css", DEMO_CONFLICT_CSS.replaceAll("{theirs}", label)],
     ["src/graph/scene.ts", DEMO_CONFLICT_TS.replaceAll("{theirs}", label)],
   ]);
-  repo.pending = { source, label, files, summary };
+  if (demoControls.binaryConflict) files.set("assets/logo.png", DEMO_BINARY);
+  demoControls.binaryConflict = false;
+  repo.pending = { source, label, files, ...done };
   repo.state = state;
   for (const path of files.keys()) repo.changes.push({ path, staged: null, unstaged: "modified", conflicted: true });
   return delay(res("conflict", "CONFLICT (content): Merge conflict in src/App.css"));
@@ -148,7 +159,7 @@ export const historyCommands = {
     repo.head = t;
     const summary = op === "revert" ? `Revert "${c.summary}"` : c.summary;
     if (demoControls.conflictNext)
-      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", id, id.slice(0, 7), summary);
+      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", id, id.slice(0, 7), { summary });
     repo.add(t, summary);
     return delay(res("ok"));
   },
@@ -166,10 +177,9 @@ export const historyCommands = {
     if (repo.state === "clean" || repo.state === "merge") return fail(`Nothing to continue (${repo.state})`);
     // The real one stages tracked files first (`add -u`), so what is left in conflict goes in as it is.
     const p = repo.pending;
-    if (p?.summary) {
-      repo.add(repo.head, p.summary);
-      repo.changes = repo.changes.filter((c) => !p.files.has(c.path));
-    }
+    if (p?.summary) repo.add(repo.head, p.summary);
+    if (p?.tip) repo.branches.set(repo.head, p.tip);
+    if (p) repo.changes = repo.changes.filter((c) => !p.files.has(c.path));
     repo.pending = null;
     repo.state = "clean";
     return delay(res("ok"));
@@ -221,6 +231,8 @@ export const historyCommands = {
         if (s.action === "squash") prev.message += `\n${c.message}`;
       }
     }
+    // Stopped part-way: "continue" leaves the branch where the whole plan would have.
+    if (demoControls.conflictNext) return stopOnConflict("rebase", steps[0].id, steps[0].id.slice(0, 7), { tip });
     repo.branches.set(repo.head, tip);
     return delay(res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`));
   },

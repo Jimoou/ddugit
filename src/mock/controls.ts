@@ -67,14 +67,20 @@ const flag = <K extends keyof DemoFlags>(name: K): DemoFlags[K] | undefined =>
 
 /** Dev/e2e hooks, exposed as `window.__ddugitDemo`. */
 export const demoControls = {
-  /** Make the next remote call fail authentication. */
+  /** Make the next call that reaches a remote (fetch, pull, push, clone, submodule update, LFS pull) fail authentication. */
   failNextRemote: null as null | "https" | "ssh",
   /** Local branches the demo reports as deleted on the remote. */
   goneBranches: [] as string[],
   /** Folder the next "choose folder" dialog returns (default: the demo repository). */
   nextFolder: null as string | null,
-  /** Make the next merge, cherry-pick or revert stop on a conflict in two files. */
+  /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */
   conflictNext: false,
+  /** The next conflict also stops on a binary file (`assets/logo.png`), resolved by picking a side. */
+  binaryConflict: false,
+  /** Make the next commit fail while signing, the way gpg or ssh-keygen report it. */
+  signFail: null as null | "gpg" | "ssh",
+  /** git-lfs isn't installed, or LFS is off in the demo repository (`git lfs install` turns it on). */
+  lfs: null as null | "missing" | "off",
   /** Make the next backport stop on a commit whose change is already there (nothing to commit). */
   emptyNext: false,
   /** How the next checked bundle (transfer import) turns out: a bad checksum, prerequisites missing here, or no `.sha256`. */

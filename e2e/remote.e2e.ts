@@ -281,3 +281,36 @@ test("a rejected push merges the upstream in, then pushes", async ({ demo }) => 
   expect(after.refs.find((r) => r.name === after.head.upstream)!.target).toBe(after.head.target);
   expect([after.head.ahead, after.head.behind]).toEqual([0, 0]);
 });
+
+test("a remote's menu copies its URL, fetches it alone, and blocks or allows pushing to it", async ({ demo }) => {
+  const { page } = demo;
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const origin = page.locator(".sidebar section.remote-sub").filter({ hasText: "origin" });
+  const menu = async (item: string | RegExp) => {
+    await origin.getByRole("button", { name: "origin 메뉴" }).click();
+    await page.locator(".context-menu").getByRole("menuitem", { name: item }).click();
+  };
+  await menu("URL 복사");
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("https://github.com/ddugit/ddugit-demo.git");
+
+  await menu("origin만 가져오기 (Fetch)");
+  await demo.toast("origin에서 브랜치 4개를 가져왔어요");
+
+  await menu("origin에 올리기 막기 (가져오기 전용)");
+  await demo.toast("origin은 이제 가져오기 전용이에요");
+  await expect(origin.locator(".fetch-only")).toBeVisible();
+  expect((await demo.snapshot()).remotes).toEqual([
+    { name: "origin", url: "https://github.com/ddugit/ddugit-demo.git", push: false },
+  ]);
+  // Push now asks to go elsewhere instead.
+  await page.locator(".topbar").getByRole("button", { name: /Push/ }).click();
+  await expect(page.locator(".dialog.sync-confirm")).toContainText("가져오기 전용 원격이라 올리지 않아요");
+  await page.keyboard.press("Escape");
+
+  await menu("origin에 올리기 허용");
+  await demo.toast("origin에 올릴 수 있어요");
+  await expect(origin.locator(".fetch-only")).toHaveCount(0);
+  expect((await demo.snapshot()).remotes[0].push).toBe(true);
+});

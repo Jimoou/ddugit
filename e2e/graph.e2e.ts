@@ -203,3 +203,58 @@ test("loads older history from the end of the graph and keeps the camera where i
   const newestAfter = (await demo.screenOf(all[0]))!;
   expect(Math.abs(newestAfter.x - newest.x)).toBeLessThan(2);
 });
+
+test("zooms with the keys and Ctrl+wheel, pans with the wheel, and the minimap jumps there", async ({ demo }) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const head = snap.head.target!;
+  const root = snap.commits[snap.commits.length - 1].id;
+  await page.locator(".app:not([hidden]) .graph-area canvas").focus();
+  const start = await demo.zoom();
+
+  await page.keyboard.press("+");
+  await expect.poll(() => demo.zoom()).toBeGreaterThan(start);
+  await page.keyboard.press("-");
+  await expect.poll(() => demo.zoom()).toBe(start);
+  await page.keyboard.press("-");
+  await expect.poll(() => demo.zoom()).toBeLessThan(start);
+  // 0 fits the whole history: the first and the last commit are both on screen.
+  await page.keyboard.press("0");
+  const box = (await page.locator(".app:not([hidden]) .graph-area canvas").boundingBox())!;
+  const onScreen = (p: { x: number; y: number }) =>
+    p.x >= box.x && p.x <= box.x + box.width && p.y >= box.y && p.y <= box.y + box.height;
+  expect(onScreen((await demo.screenOf(head))!)).toBe(true);
+  expect(onScreen((await demo.screenOf(root))!)).toBe(true);
+
+  // Ctrl+wheel zooms at the pointer; the plain wheel scrolls through time, Shift+wheel across lanes.
+  await page.keyboard.press("h");
+  const at = (await demo.screenOf(head))!;
+  await page.mouse.move(at.x - 100, at.y);
+  const zoomed = await demo.zoom();
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.up("Control");
+  await expect.poll(() => demo.zoom()).toBeGreaterThan(zoomed);
+  const k = await demo.zoom();
+  const a = (await demo.screenOf(head))!;
+  await page.mouse.wheel(0, 200);
+  const b = (await demo.screenOf(head))!;
+  expect(Math.abs(b.x - a.x)).toBeGreaterThan(50);
+  expect(Math.abs(b.y - a.y)).toBeLessThan(1);
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, 120);
+  await page.keyboard.up("Shift");
+  const c = (await demo.screenOf(head))!;
+  expect(Math.abs(c.y - b.y)).toBeGreaterThan(50);
+  expect(await demo.zoom()).toBe(k);
+
+  // A click on the overview's far left brings the oldest commits to the middle.
+  const map = page.locator(".app:not([hidden]) .stage-graph .minimap");
+  const m = (await map.boundingBox())!;
+  const before = (await demo.screenOf(root))!;
+  await page.mouse.click(m.x + 4, m.y + m.height / 2);
+  const after = (await demo.screenOf(root))!;
+  const middle = box.x + box.width / 2;
+  expect(Math.abs(after.x - middle)).toBeLessThan(Math.abs(before.x - middle));
+  expect(Math.abs(after.x - middle)).toBeLessThan(box.width / 4);
+});
