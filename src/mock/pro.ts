@@ -2,7 +2,7 @@
 
 import type { BackportItem, NoteCommit, OpResult, StackBranch, TransferSent } from "../types";
 import { PRO_LOCKED, demoControls } from "./controls";
-import { type Table, delay, fail, repo, res } from "./repo";
+import { type Table, delay, fail, fakeId, repo, res } from "./repo";
 
 /** Demo commits read like a Conventional Commits history, so the release notes have sections. */
 function demoConventional(summary: string): string {
@@ -219,13 +219,19 @@ export const proCommands = {
     }
     return delay(res("ok", `${req.outDir}/demo-${req.dest.replace(/\W+/g, "-")}-2026-10-04-120000.bundle`));
   },
-  transfer_check: () =>
-    delay({
-      ok: true,
-      checksum: "match" as const,
+  transfer_check() {
+    const how = demoControls.nextBundle;
+    demoControls.nextBundle = null;
+    const checksum = how === "mismatch" || how === "absent" ? how : ("match" as const);
+    // Like `git bundle verify`: the commits the bundle was cut from, which this repository lacks.
+    const missing = how === "missing" ? [fakeId(), fakeId()] : [];
+    return delay({
+      ok: !missing.length && checksum !== "mismatch",
+      checksum,
       heads: ["main", "feature/theme"].map((b) => ({ name: `refs/heads/${b}`, id: repo.branches.get(b)! })),
-      missing: [],
-    }),
+      missing,
+    });
+  },
   transfer_import({ name }) {
     if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
     for (const b of ["main", "feature/theme"]) repo.remotes.set(`${name}/${b}`, repo.branches.get(b)!);

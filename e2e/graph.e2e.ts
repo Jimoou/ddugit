@@ -172,3 +172,34 @@ test("finds commits with Ctrl+F, walks the matches with Enter and Shift+Enter, a
   await expect(bar).toHaveCount(0);
   await expect(title).toHaveText("Sparkle particles");
 });
+
+test("loads older history from the end of the graph and keeps the camera where it was", async ({ demo }) => {
+  const { page } = demo;
+  // Ten commits at a time (`?page=`, like the history size setting).
+  await page.goto("/?page=10");
+  await expect(page.locator(".topbar")).toBeVisible();
+  const all = (await demo.snapshot()).commits.map((c) => c.id);
+  const drawn = (id: string) => page.evaluate((id) => window.__ddugit.screenOf(id), id);
+  await expect.poll(() => drawn(all[9])).not.toBeNull();
+  expect(await drawn(all[10])).toBeNull();
+  const hint = page.locator(".stage-graph .hint");
+  await expect(hint).toContainText("최근 10개 표시 중");
+
+  // Fit everything: the "load older" button hangs 1.6 columns left of the oldest loaded commit.
+  await page.locator(".app:not([hidden]) .graph-area canvas").focus();
+  await page.keyboard.press("0");
+  const oldest = (await demo.screenOf(all[9]))!;
+  const next = (await demo.screenOf(all[8]))!;
+  const newest = (await demo.screenOf(all[0]))!;
+  const column = Math.abs(next.x - oldest.x);
+  await page.mouse.click(oldest.x - 1.6 * column, oldest.y);
+
+  await expect(hint).toContainText("최근 20개 표시 중");
+  await expect.poll(() => drawn(all[10])).not.toBeNull();
+  // Older commits come in off to the left; what was on screen stays put.
+  const after = (await demo.screenOf(all[9]))!;
+  expect(Math.abs(after.x - oldest.x)).toBeLessThan(2);
+  expect(Math.abs(after.y - oldest.y)).toBeLessThan(2);
+  const newestAfter = (await demo.screenOf(all[0]))!;
+  expect(Math.abs(newestAfter.x - newest.x)).toBeLessThan(2);
+});

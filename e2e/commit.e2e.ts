@@ -249,3 +249,35 @@ test("discarding picked files asks first, and only those files are restored", as
   await demo.toast("변경을 버렸어요");
   expect((await demo.snapshot()).changes.map((c) => c.path)).toEqual(["src/graph/renderer.ts", "README.md"]);
 });
+
+test("inspector: copies the commit id, lists the branches holding it, and says when copying fails", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const snap = await demo.snapshot();
+  const head = snap.commits.find((c) => c.id === snap.head.target)!;
+  const at = (await demo.screenOf(head.id))!;
+  await page.mouse.click(at.x, at.y);
+  const inspector = page.locator(".inspector");
+  await inspector.locator(".sha.parent").click();
+  await expect(inspector.locator("h2")).toHaveText("Minimap");
+  // Minimap is in the branch and in the remote branch it was pushed to, not in main.
+  const contained = inspector.locator(".contained");
+  await expect(contained).toContainText("들어 있는 브랜치");
+  await expect(contained).toContainText("feature/graph-zoom");
+  await expect(contained).toContainText("origin/feature/graph-zoom");
+  await expect(contained).not.toContainText("main");
+
+  const sha = inspector.getByTitle("클릭해서 복사");
+  await sha.click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(head.parents[0]);
+
+  // A clipboard that refuses (no permission) is reported instead of failing silently.
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = () =>
+      Promise.reject(new DOMException("Write permission denied.", "NotAllowedError"));
+  });
+  await sha.click();
+  await demo.toast("클립보드에 복사하지 못했어요");
+});

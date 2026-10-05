@@ -77,6 +77,8 @@ export const demoControls = {
   conflictNext: false,
   /** Make the next backport stop on a commit whose change is already there (nothing to commit). */
   emptyNext: false,
+  /** How the next checked bundle (transfer import) turns out: a bad checksum, prerequisites missing here, or no `.sha256`. */
+  nextBundle: null as null | "mismatch" | "missing" | "absent",
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
   /** Free or Pro in the demo (Pro by default, so every feature shows); the `Pro` flag starts it otherwise. */
