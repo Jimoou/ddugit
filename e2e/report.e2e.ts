@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { demoFlags, expect, test } from "./fixtures";
 
 /** A path, a remote URL with a token and an email that must never reach a report. */
 const SECRET =
@@ -37,9 +37,7 @@ test("a report from settings → About is sent with redacted diagnostics", async
   await send.click();
   await demo.toast("보냈어요");
   await expect(dialog).toHaveCount(0);
-  const sent = await page.evaluate(
-    () => (window as unknown as { __ddugitDemo: { sent: unknown[] } }).__ddugitDemo.sent,
-  );
+  const sent = await page.evaluate(() => window.__ddugitDemo.sent);
   expect(sent).toHaveLength(2);
   expect(sent[1]).toMatchObject({ kind: "bug", message: "The graph went blank.", email: "me@example.com" });
   expect((sent[1] as { diagnostics: string }).diagnostics).toMatch(/^ddugit .*\nOS: /);
@@ -57,18 +55,13 @@ test("a question leaves diagnostics out unless asked", async ({ page, demo }) =>
   await dialog.getByLabel("문의 내용").fill("Does it work offline?");
   await dialog.getByRole("button", { name: "보내기" }).click();
   await demo.toast("보냈어요");
-  const sent = await page.evaluate(
-    () => (window as unknown as { __ddugitDemo: { sent: unknown[] } }).__ddugitDemo.sent,
-  );
+  const sent = await page.evaluate(() => window.__ddugitDemo.sent);
   expect(sent).toEqual([{ kind: "question", message: "Does it work offline?", email: null, diagnostics: null }]);
 });
 
 test("an unexpected error toast offers a report with the error, redacted", async ({ demo }) => {
   const { page } = demo;
-  await page.evaluate(
-    (text) => ((window as unknown as { __ddugitDemo: { failNext: string } }).__ddugitDemo.failNext = text),
-    SECRET,
-  );
+  await page.evaluate((text) => (window.__ddugitDemo.failNext = text), SECRET);
   await page
     .locator(".app:not([hidden]) .sidebar li")
     .filter({ hasText: /^main$/ })
@@ -97,7 +90,7 @@ test("the first screen offers every way in, and the shortcuts", async ({ demo })
 });
 
 test("a missing git is reported at startup with a way to fix it", async ({ page }) => {
-  await page.addInitScript(() => ((window as unknown as Record<string, unknown>).__ddugitDemoGitMissing = true));
+  await demoFlags(page, { GitMissing: true });
   await page.goto("/");
   const notice = page.getByRole("dialog", { name: "Git을 찾을 수 없어요" });
   await expect(notice).toBeVisible();

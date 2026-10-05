@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { t } from "../i18n";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 export interface NameRequest {
   title: string;
@@ -25,45 +25,41 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
   const [name, setName] = useState(req.value ?? initial);
   const [message, setMessage] = useState("");
   const ok = name.trim() !== "" && name.trim() !== initial && !busy;
-  const dialog = useDialog(onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(onCancel)}>
-      <form
-        className="dialog"
-        {...dialog}
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ok) onSubmit(name.trim(), message.trim());
-        }}
-      >
-        <h2 className="dialog-title">{title}</h2>
-        {req.hint && <p className="muted">{req.hint}</p>}
-        <input
-          className="text"
-          autoFocus
-          placeholder={placeholder}
-          value={name}
-          onChange={(e) => setName(req.free ? e.target.value : e.target.value.replace(/\s+/g, "-"))}
-        />
-        {extra && (
-          <textarea
-            className="message"
-            rows={3}
-            placeholder={extra.placeholder}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-        )}
-        <div className="dialog-actions">
+    <Modal
+      onClose={onCancel}
+      title={title}
+      onSubmit={() => {
+        if (ok) onSubmit(name.trim(), message.trim());
+      }}
+      actions={
+        <>
           <button type="button" onClick={onCancel}>
             {t("common.cancel")}
           </button>
           <button className="primary" type="submit" disabled={!ok}>
             {confirmLabel}
           </button>
-        </div>
-      </form>
-    </div>
+        </>
+      }
+    >
+      {req.hint && <p className="muted">{req.hint}</p>}
+      <input
+        className="text"
+        autoFocus
+        placeholder={placeholder}
+        value={name}
+        onChange={(e) => setName(req.free ? e.target.value : e.target.value.replace(/\s+/g, "-"))}
+      />
+      {extra && (
+        <textarea
+          className="message"
+          rows={3}
+          placeholder={extra.placeholder}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+      )}
+    </Modal>
   );
 }

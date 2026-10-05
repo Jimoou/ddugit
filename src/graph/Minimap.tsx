@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { type Bounds, turnBounds } from "./camera";
 import { toWorld, turn, type Turn, upright, type View } from "./renderer";
 import { COL, LANE, NEON, type Pt, type Scene, xOf, yOf } from "./scene";
@@ -12,14 +12,24 @@ interface Props {
   onJump(world: Pt): void;
 }
 
+/** The graph asks the strip to draw after each frame it draws (the viewport may have moved). */
+export interface MinimapHandle {
+  draw(): void;
+}
+
 /** Thickness of the strip. */
 const H = 54;
 const PAD = 8;
 
 /** Whole-history overview strip with the current viewport; click or drag to jump. */
-export function Minimap({ scene, rotation, getView, getSize, onJump }: Props) {
+export const Minimap = forwardRef<MinimapHandle, Props>(function Minimap(
+  { scene, rotation, getView, getSize, onJump },
+  handle,
+) {
   const ref = useRef<HTMLCanvasElement>(null);
   const cache = useRef<HTMLCanvasElement | null>(null);
+  /** The viewport box last drawn: the strip is drawn again only when it moves. */
+  const drawn = useRef("");
   const dragging = useRef(false);
   const tall = upright(rotation);
 
@@ -91,6 +101,7 @@ export function Minimap({ scene, rotation, getView, getSize, onJump }: Props) {
       c.width = Math.round(c.clientWidth * dpr);
       c.height = Math.round(c.clientHeight * dpr);
       renderCache();
+      draw(true);
     };
     resize();
     const ro = new ResizeObserver(() => ref.current && resize()); // gone once unmounted (e.g. switching repositories)
@@ -99,39 +110,37 @@ export function Minimap({ scene, rotation, getView, getSize, onJump }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene, rotation]);
 
-  useEffect(() => {
-    let raf = 0;
-    const frame = () => {
-      raf = requestAnimationFrame(frame);
-      const c = ref.current;
-      // Nothing to draw before layout or while the tab is hidden (0×0).
-      if (!c || !cache.current || cache.current.width === 0 || c.width === 0) return;
-      const ctx = c.getContext("2d")!;
-      const dpr = window.devicePixelRatio || 1;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, c.width, c.height);
-      ctx.drawImage(cache.current, 0, 0);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const { w, h, to } = mapping();
-      const v = getView();
-      const size = getSize();
-      // The screen's corners, through the world, onto the strip.
-      const a = to(toWorld(v, { x: 0, y: 0 })),
-        b = to(toWorld(v, { x: size.w, y: size.h }));
-      ctx.fillStyle = "rgba(34,232,255,0.08)";
-      ctx.strokeStyle = "rgba(34,232,255,0.8)";
-      ctx.lineWidth = 1;
-      const rx = Math.max(1, Math.min(a.x, b.x)),
-        ry = Math.max(1, Math.min(a.y, b.y));
-      const rw = Math.max(4, Math.min(w - 1, Math.max(a.x, b.x)) - rx);
-      const rh = Math.max(4, Math.min(h - 1, Math.max(a.y, b.y)) - ry);
-      ctx.fillRect(rx, ry, rw, rh);
-      ctx.strokeRect(rx + 0.5, ry + 0.5, rw, rh);
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, rotation]);
+  /** Draw the cached strip and the viewport box over it, unless the box is where it was (`force` after a new cache). */
+  const draw = (force = false) => {
+    const c = ref.current;
+    // Nothing to draw before layout or while the tab is hidden (0×0).
+    if (!c || !cache.current || cache.current.width === 0 || c.width === 0) return;
+    const { w, h, to } = mapping();
+    const v = getView();
+    const size = getSize();
+    // The screen's corners, through the world, onto the strip.
+    const a = to(toWorld(v, { x: 0, y: 0 })),
+      b = to(toWorld(v, { x: size.w, y: size.h }));
+    const rx = Math.max(1, Math.min(a.x, b.x)),
+      ry = Math.max(1, Math.min(a.y, b.y));
+    const rw = Math.max(4, Math.min(w - 1, Math.max(a.x, b.x)) - rx);
+    const rh = Math.max(4, Math.min(h - 1, Math.max(a.y, b.y)) - ry);
+    const box = `${rx} ${ry} ${rw} ${rh}`;
+    if (!force && box === drawn.current) return;
+    drawn.current = box;
+    const ctx = c.getContext("2d")!;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(cache.current, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = "rgba(34,232,255,0.08)";
+    ctx.strokeStyle = "rgba(34,232,255,0.8)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeRect(rx + 0.5, ry + 0.5, rw, rh);
+  };
+  useImperativeHandle(handle, () => ({ draw: () => draw() }));
 
   const jump = (e: React.PointerEvent) => {
     const r = ref.current!.getBoundingClientRect();
@@ -152,4 +161,4 @@ export function Minimap({ scene, rotation, getView, getSize, onJump }: Props) {
       onPointerUp={() => (dragging.current = false)}
     />
   );
-}
+});

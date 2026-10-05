@@ -8,7 +8,8 @@ import { fmtTime } from "../format";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { ReflogEntry, ResetMode } from "../types";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
+import { useDialog } from "./useDialog";
 
 const MODES: { mode: ResetMode; title: Key; hint: Key }[] = [
   { mode: "soft", title: "undo.soft", hint: "undo.soft.hint" },
@@ -32,40 +33,14 @@ export function ResetDialog(p: {
   onReset(mode: ResetMode): void;
 }) {
   const [mode, setMode] = useState<ResetMode>(p.initial ?? "mixed");
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <div className="dialog reset" aria-label={t("undo.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{t("undo.title")}</h2>
-        <p>
-          {p.passed > 0 ? (
-            <Rich k="undo.body" vars={{ branch: p.branch, summary: p.summary, n: p.passed }} />
-          ) : (
-            <Rich k="undo.moveTo" vars={{ branch: p.branch, summary: p.summary }} />
-          )}
-        </p>
-        <div className="choices" role="radiogroup">
-          {MODES.map((m) => (
-            <label
-              key={m.mode}
-              className={`choice ${mode === m.mode ? "on" : ""} ${m.mode === "hard" ? "danger" : ""}`}
-            >
-              <input type="radio" name="reset" checked={mode === m.mode} onChange={() => setMode(m.mode)} />
-              <span>
-                <b>{t(m.title)}</b>
-                <span className="muted">{t(m.hint)}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        {/* One note about what can be recovered: a hard reset over uncommitted changes can't be undone. */}
-        {mode === "hard" && p.dirty > 0 ? (
-          <p className="note warn">{t("undo.hard.dirty", { n: p.dirty })}</p>
-        ) : (
-          <p className="muted small">{t("undo.safety")}</p>
-        )}
-        {p.pushed && <p className="note warn">{t("undo.pushed")}</p>}
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      className="reset"
+      label={t("undo.title")}
+      title={t("undo.title")}
+      actions={
+        <>
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
           <button
             className={mode === "hard" ? "primary danger" : "primary"}
@@ -75,9 +50,35 @@ export function ResetDialog(p: {
           >
             {t("undo.go")}
           </button>
-        </div>
+        </>
+      }
+    >
+      <p>
+        {p.passed > 0 ? (
+          <Rich k="undo.body" vars={{ branch: p.branch, summary: p.summary, n: p.passed }} />
+        ) : (
+          <Rich k="undo.moveTo" vars={{ branch: p.branch, summary: p.summary }} />
+        )}
+      </p>
+      <div className="choices" role="radiogroup">
+        {MODES.map((m) => (
+          <label key={m.mode} className={`choice ${mode === m.mode ? "on" : ""} ${m.mode === "hard" ? "danger" : ""}`}>
+            <input type="radio" name="reset" checked={mode === m.mode} onChange={() => setMode(m.mode)} />
+            <span>
+              <b>{t(m.title)}</b>
+              <span className="muted">{t(m.hint)}</span>
+            </span>
+          </label>
+        ))}
       </div>
-    </div>
+      {/* One note about what can be recovered: a hard reset over uncommitted changes can't be undone. */}
+      {mode === "hard" && p.dirty > 0 ? (
+        <p className="note warn">{t("undo.hard.dirty", { n: p.dirty })}</p>
+      ) : (
+        <p className="muted small">{t("undo.safety")}</p>
+      )}
+      {p.pushed && <p className="note warn">{t("undo.pushed")}</p>}
+    </Modal>
   );
 }
 

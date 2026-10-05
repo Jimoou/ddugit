@@ -1,0 +1,458 @@
+/* Settings, connecting a repository (clone, recent, forge picker) and the update bar. */
+
+/* --------------------------------------------------------- settings dialog */
+.dialog.settings {
+  width: min(780px, calc(100vw - 32px));
+  /* One height for every section, so switching does not make the dialog jump. */
+  height: min(560px, calc(100vh - 32px));
+  overflow: hidden;
+}
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+}
+.settings-pane {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.settings-pane:focus {
+  outline: none;
+}
+.dialog.settings h4 {
+  margin: 0 0 12px;
+  font: 600 13px var(--sans);
+  color: var(--text);
+}
+.settings-form {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 14px 24px;
+  font-size: 13px;
+}
+.settings-form select {
+  justify-self: start;
+}
+.settings-form .checks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@media (max-width: 560px) {
+  .settings-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+.dialog.settings .field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 13px;
+}
+.dialog.settings .field input.text {
+  flex: 1;
+}
+.dialog.settings .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.dialog.settings select {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  padding: 3px 6px;
+}
+.dialog.settings .small {
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px 18px;
+}
+.shortcuts table {
+  align-self: start;
+  border-collapse: collapse;
+}
+.shortcuts caption {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  padding-bottom: 4px;
+}
+.shortcuts td {
+  padding: 3px 8px 3px 0;
+  font-size: 12px;
+  vertical-align: top;
+}
+/* Keys get a fixed share and long chords wrap, so the descriptions are not squeezed into a sliver. */
+.shortcuts td:first-child {
+  width: 42%;
+}
+.shortcuts kbd {
+  margin: 0;
+  opacity: 1;
+}
+.shortcuts .gesture {
+  color: var(--text-2);
+}
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  font: 11px var(--mono);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+/* Visually hidden, still read by screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.graph-area canvas:focus-visible {
+  outline: 2px solid rgba(179, 166, 255, 0.55);
+  outline-offset: -1px;
+}
+
+/* ------------------------------------------------------- connect & recent */
+.connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.connect-actions .ico {
+  opacity: 0.75;
+}
+.welcome .connect-actions {
+  margin-top: 12px;
+  justify-content: center;
+}
+.welcome-recent {
+  width: min(520px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 46vh;
+  overflow: auto;
+}
+.recent-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.recent-list li:hover,
+.recent-list li.on {
+  background: var(--ui-soft);
+}
+.recent-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 10px;
+  background: none;
+  border: 0;
+  text-align: left;
+}
+.recent-open .muted {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 11px var(--mono);
+}
+.recent-list .star.on {
+  color: var(--amber);
+}
+.recent-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 46vh;
+  overflow: auto;
+}
+.recent-groups .recent-list {
+  max-height: none;
+  overflow: visible;
+}
+.recent-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.recent-group button {
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.recent-empty {
+  margin: 4px 10px;
+}
+.menu-catch {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+}
+.repo-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  width: min(440px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  animation: slide-in 0.1s ease-out;
+}
+.dialog .field.col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.dialog .field.col .row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dialog .folder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+}
+/* Clone / add remote: where the repository comes from (components/ForgeRepoPicker.tsx). */
+.dialog.clone,
+.dialog.add-remote {
+  width: min(720px, calc(100vw - 32px));
+}
+.source-body {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+}
+.source-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.forge-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.forge-picker .field .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.forge-picker .forge-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+.forge-connect {
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+}
+.forge-connect button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.forge-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.forge-search .search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+}
+.forge-search .search-box:focus-within {
+  border-color: var(--focus);
+}
+.forge-search .search-box input.text {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+.forge-repos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+}
+.forge-repos li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.forge-repos li:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.forge-repos li.on {
+  background: var(--ui-soft);
+}
+.forge-repos li.empty {
+  cursor: default;
+  border: none;
+}
+.forge-repo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.forge-repo-head b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.forge-repo-head .when {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.forge-private {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 0 6px;
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+}
+.forge-repos .desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.add-remote-url {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .source-body {
+    grid-template-columns: 1fr;
+  }
+  .segmented.column {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+.clone-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-2);
+}
+.clone-progress .progress {
+  height: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+.clone-progress .progress i {
+  display: block;
+  height: 100%;
+  background: var(--ui-text);
+  transition: width 0.15s;
+}
+.toasts.floating {
+  position: fixed;
+  bottom: 140px; /* above the HUD and minimap */
+}
+.toasts.floating.welcome-toasts {
+  bottom: 24px;
+}
+/* A newer version: a slim bar in flow under the tab row. It pushes the
+   window down instead of floating over the topbar's actions. */
+.update-notice {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px;
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border-bottom: 1px solid rgba(var(--signal), 0.3);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.update-notice > span {
+  flex: 1;
+  min-width: 0;
+}
+.update-notice button {
+  padding: 3px 12px;
+}
+.drop-zone {
+  position: fixed;
+  inset: 12px;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--focus);
+  background: rgba(10, 8, 30, 0.72);
+  color: var(--text);
+  font-size: 18px;
+  pointer-events: none;
+}

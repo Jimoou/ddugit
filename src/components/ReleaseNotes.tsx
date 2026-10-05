@@ -7,7 +7,7 @@ import { t } from "../i18n";
 import { copyText } from "../share";
 import { forgeWeb, noteItems, releaseMarkdown } from "../notes";
 import type { NoteRange } from "../types";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 /** Section headings in the app's language. */
 const LABELS = () => ({
@@ -82,56 +82,59 @@ export function ReleaseNotesDialog(p: {
   const start = from === undefined ? (range?.from ?? "") : from;
   const tags = knownTags.filter((tag) => tag !== p.to);
 
-  const dialog = useDialog(p.onClose);
   return (
-    <div className="scrim" {...closeOnScrim(p.onClose)}>
-      <div className="dialog notes" aria-label={t("notes.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{t("notes.title")}</h2>
-        <p className="muted small">{t("notes.hint")}</p>
-        <div className="notes-range">
-          <label className="field col">
-            <span>{t("notes.from")}</span>
-            <select value={start} onChange={(e) => reset(setFrom)(e.target.value)}>
-              <option value="">{t("notes.fromStart")}</option>
-              {tags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="notes-arrow" aria-hidden>
-            →
-          </span>
-          <span className="mono">{p.to}</span>
-        </div>
-        <label className="field col">
-          <span>{t("notes.heading")}</span>
-          <input className="text" value={title} onChange={(e) => reset(setTitle)(e.target.value)} />
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={includeOther} onChange={(e) => reset(setIncludeOther)(e.target.checked)} />
-          <span>{t("notes.other")}</span>
-        </label>
-        {error && <p className="note warn">{error}</p>}
-        <textarea
-          className="notes-md mono"
-          aria-label={t("notes.title")}
-          value={range ? text : ""}
-          spellCheck={false}
-          onChange={(e) => setEdited(e.target.value)}
-        />
-        <p className="muted small">
-          {range && t("notes.count", { n: items.length })}
-          {range?.truncated && ` · ${t("notes.truncated", { n: range.commits.length })}`}
-        </p>
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onClose}
+      className="notes"
+      label={t("notes.title")}
+      title={t("notes.title")}
+      actions={
+        <>
           <button onClick={p.onClose}>{t("common.close")}</button>
           <button className="primary" disabled={!range} onClick={() => copyText(text, p.onCopied)}>
             {t("notes.copy")}
           </button>
-        </div>
+        </>
+      }
+    >
+      <p className="muted small">{t("notes.hint")}</p>
+      <div className="notes-range">
+        <label className="field col">
+          <span>{t("notes.from")}</span>
+          <select value={start} onChange={(e) => reset(setFrom)(e.target.value)}>
+            <option value="">{t("notes.fromStart")}</option>
+            {tags.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="notes-arrow" aria-hidden>
+          →
+        </span>
+        <span className="mono">{p.to}</span>
       </div>
-    </div>
+      <label className="field col">
+        <span>{t("notes.heading")}</span>
+        <input className="text" value={title} onChange={(e) => reset(setTitle)(e.target.value)} />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={includeOther} onChange={(e) => reset(setIncludeOther)(e.target.checked)} />
+        <span>{t("notes.other")}</span>
+      </label>
+      {error && <p className="note warn">{error}</p>}
+      <textarea
+        className="notes-md mono"
+        aria-label={t("notes.title")}
+        value={range ? text : ""}
+        spellCheck={false}
+        onChange={(e) => setEdited(e.target.value)}
+      />
+      <p className="muted small">
+        {range && t("notes.count", { n: items.length })}
+        {range?.truncated && ` · ${t("notes.truncated", { n: range.commits.length })}`}
+      </p>
+    </Modal>
   );
 }

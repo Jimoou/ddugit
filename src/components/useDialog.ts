@@ -1,5 +1,5 @@
-import { type MouseEvent, useCallback, useEffect, useId, useRef, useState } from "react";
-import { isTypingTarget } from "../keys";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { isOnScreen, isTypingTarget } from "../keys";
 
 /**
  * Keyboard behaviour shared by every dialog, sheet and popup menu:
@@ -11,7 +11,7 @@ import { isTypingTarget } from "../keys";
  * - A non-modal layer (sheets beside the graph, menus) leaves focus alone and ignores
  *   Esc typed into a field outside it, so search and the commit message keep their own Esc.
  * - Whatever had focus before the layer opened gets it back when the layer goes away.
- * - A modal's scrim closes it on a click that started on the scrim (`closeOnScrim`).
+ * - A modal's scrim closes it on a click that started on the scrim (`Modal`).
  *
  * Spread the result on the layer's root; menus that have their own role take only `ref`.
  */
@@ -79,7 +79,7 @@ const FOCUSABLE = [
 ].join(",");
 
 function top(): Layer | undefined {
-  for (let i = layers.length - 1; i >= 0; i--) if (layers[i].el?.getClientRects().length) return layers[i];
+  for (let i = layers.length - 1; i >= 0; i--) if (isOnScreen(layers[i].el)) return layers[i];
 }
 
 /** A dialog, sheet or menu is on screen: Esc is its, not the graph's. */
@@ -93,7 +93,7 @@ function tabStops(el: HTMLElement) {
     !x.checked &&
     !!el.querySelector(`input[type=radio][name="${CSS.escape(x.name)}"]:checked`);
   return [...el.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-    (x) => x.tabIndex >= 0 && x.getClientRects().length && !skipped(x),
+    (x) => x.tabIndex >= 0 && isOnScreen(x) && !skipped(x),
   );
 }
 
@@ -122,25 +122,4 @@ function onKey(e: KeyboardEvent) {
 function onFocusIn(e: FocusEvent) {
   const l = top();
   if (l?.modal && l.el && e.target instanceof Node && !l.el.contains(e.target)) l.el.focus({ preventScroll: true });
-}
-
-/** The scrim a press started on; a press inside the dialog (a text selection dragged out) leaves it null. */
-let pressed: EventTarget | null = null;
-
-/**
- * Props for a dialog's scrim: a click on it closes the dialog, but only when the press started on the scrim too.
- * A selection dragged out of a field and released over the scrim "clicks" it, and must not throw the text away.
- */
-export function closeOnScrim(close: () => void) {
-  const self = (e: MouseEvent) => e.target === e.currentTarget;
-  return {
-    onPointerDown: (e: MouseEvent) => {
-      pressed = self(e) ? e.currentTarget : null;
-    },
-    onClick: (e: MouseEvent) => {
-      const on = pressed === e.currentTarget && self(e);
-      pressed = null;
-      if (on) close();
-    },
-  };
 }

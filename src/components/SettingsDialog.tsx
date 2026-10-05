@@ -8,7 +8,7 @@ import { ProfilesSection } from "./Identity";
 import { AboutSection } from "./Report";
 import { LicenseSection } from "./License";
 import { Segmented } from "./Segmented";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 /** The settings, one at a time beside a list of them. */
 const SETTINGS_SECTIONS = ["screen", "profiles", "license", "git", "shortcuts", "about"] as const;
@@ -41,7 +41,6 @@ const label = (text: string) => (isKey(text) ? t(text) : text);
 /** Settings plus the shortcut table (opened with ? or the ⚙ button). */
 export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Props) {
   const [section, setSection] = useState(at);
-  const dialog = useDialog(onClose);
   // Opened at a section on purpose ("?"): its content takes focus, so reading starts there.
   const pane = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -49,41 +48,34 @@ export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Pr
   }, [at]);
 
   return (
-    <div className="scrim" {...closeOnScrim(onClose)}>
-      <div
-        className="dialog settings"
-        aria-label={t("settings.title")}
-        onClick={(e) => e.stopPropagation()}
-        {...dialog}
-      >
-        <header className="settings-head">
-          <h2 className="dialog-title">{t("settings.title")}</h2>
-          <button className="icon" onClick={onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>
-            <Icon name="close" />
-          </button>
-        </header>
-        <div className="settings-body">
-          <Segmented
-            className="column settings-nav"
-            role="tablist"
-            label={t("settings.title")}
-            value={section}
-            onChange={setSection}
-            options={SETTINGS_SECTIONS.map((id) => ({ value: id, label: SECTION_LABEL[id]() }))}
-          />
-          <div className="settings-pane" ref={pane} role="tabpanel" tabIndex={-1} aria-label={SECTION_LABEL[section]()}>
-            {section === "screen" && <ScreenSection settings={settings} onChange={onChange} />}
-            {section === "profiles" && (
-              <ProfilesSection profiles={settings.profiles} onProfiles={(profiles) => onChange({ profiles })} />
-            )}
-            {section === "license" && <LicenseSection />}
-            {section === "git" && <GitSection settings={settings} onChange={onChange} />}
-            {section === "shortcuts" && <ShortcutsSection />}
-            {section === "about" && <AboutSection onReport={onReport} />}
-          </div>
+    <Modal onClose={onClose} className="settings" label={t("settings.title")}>
+      <header className="settings-head">
+        <h2 className="dialog-title">{t("settings.title")}</h2>
+        <button className="icon" onClick={onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>
+          <Icon name="close" />
+        </button>
+      </header>
+      <div className="settings-body">
+        <Segmented
+          className="column settings-nav"
+          role="tablist"
+          label={t("settings.title")}
+          value={section}
+          onChange={setSection}
+          options={SETTINGS_SECTIONS.map((id) => ({ value: id, label: SECTION_LABEL[id]() }))}
+        />
+        <div className="settings-pane" ref={pane} role="tabpanel" tabIndex={-1} aria-label={SECTION_LABEL[section]()}>
+          {section === "screen" && <ScreenSection settings={settings} onChange={onChange} />}
+          {section === "profiles" && (
+            <ProfilesSection profiles={settings.profiles} onProfiles={(profiles) => onChange({ profiles })} />
+          )}
+          {section === "license" && <LicenseSection />}
+          {section === "git" && <GitSection settings={settings} onChange={onChange} />}
+          {section === "shortcuts" && <ShortcutsSection />}
+          {section === "about" && <AboutSection onReport={onReport} />}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

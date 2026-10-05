@@ -4,7 +4,7 @@ import { useState } from "react";
 import { remoteNameFor, type Source } from "../forgeRepos";
 import { t } from "../i18n";
 import { ForgeRepoPicker, type Picked, SourceTabs } from "./ForgeRepoPicker";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 interface Props {
   path: string;
@@ -33,69 +33,66 @@ export function AddRemoteDialog(p: Props) {
       onChange={(e) => setTypedName(e.target.value.replace(/\s+/g, "-"))}
     />
   );
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <form
-        className="dialog add-remote"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ok) p.onSubmit(name.trim(), url.trim());
-        }}
-        {...dialog}
-      >
-        <h2 className="dialog-title">{t("remote.add.title")}</h2>
-        <div className="source-body">
-          <SourceTabs
-            value={source}
-            onChange={(s) => {
-              setSource(s);
-              setTypedName(null);
-              setPicked(null);
-            }}
-          />
-          <div className="source-pane">
-            {source !== "url" && (
-              <ForgeRepoPicker
-                key={source}
-                kind={source}
-                path={p.path}
-                picked={picked}
-                onPick={(pk) => {
-                  setPicked(pk);
-                  setTypedName(null);
-                }}
-              />
-            )}
-            <label className="field col">
-              {t("remote.add.name")}
-              {nameField}
-            </label>
-            {source === "url" ? (
-              <label className="field col">
-                {t("remote.add.urlLabel")}
-                <input
-                  className="text"
-                  placeholder={t("remote.add.url")}
-                  value={typedUrl}
-                  onChange={(e) => setTypedUrl(e.target.value)}
-                />
-              </label>
-            ) : (
-              picked && <p className="muted small add-remote-url">→ {picked.url}</p>
-            )}
-          </div>
-        </div>
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      className="add-remote"
+      title={t("remote.add.title")}
+      onSubmit={() => {
+        if (ok) p.onSubmit(name.trim(), url.trim());
+      }}
+      actions={
+        <>
           <button type="button" onClick={p.onCancel}>
             {t("common.cancel")}
           </button>
           <button className="primary" type="submit" disabled={!ok}>
             {t("remote.add.go")}
           </button>
+        </>
+      }
+    >
+      <div className="source-body">
+        <SourceTabs
+          value={source}
+          onChange={(s) => {
+            setSource(s);
+            setTypedName(null);
+            setPicked(null);
+          }}
+        />
+        <div className="source-pane">
+          {source !== "url" && (
+            <ForgeRepoPicker
+              key={source}
+              kind={source}
+              path={p.path}
+              picked={picked}
+              onPick={(pk) => {
+                setPicked(pk);
+                setTypedName(null);
+              }}
+            />
+          )}
+          <label className="field col">
+            {t("remote.add.name")}
+            {nameField}
+          </label>
+          {source === "url" ? (
+            <label className="field col">
+              {t("remote.add.urlLabel")}
+              <input
+                className="text"
+                placeholder={t("remote.add.url")}
+                value={typedUrl}
+                onChange={(e) => setTypedUrl(e.target.value)}
+              />
+            </label>
+          ) : (
+            picked && <p className="muted small add-remote-url">→ {picked.url}</p>
+          )}
         </div>
-      </form>
-    </div>
+      </div>
+    </Modal>
   );
 }

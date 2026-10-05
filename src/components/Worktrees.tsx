@@ -10,7 +10,7 @@ import type { WorktreeInfo, WorktreeOp } from "../types";
 import { Icon } from "./Icon";
 import { SideSection } from "./Sidebar";
 import { Segmented } from "./Segmented";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 export function WorktreeSection(p: {
   worktrees: WorktreeInfo[];
@@ -81,84 +81,81 @@ export function WorktreeDialog(p: {
     parent && chosen ? joinPath(parent, `${repoName(main?.path ?? "")}-${chosen.replace(/[\\/]+/g, "-")}`) : "";
   const dir = dirEdit ?? suggested;
   const ok = !!chosen && !!dir.trim() && !p.busy;
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <form
-        className="dialog worktree-dialog"
-        aria-label={t("wt.add")}
-        onClick={(e) => e.stopPropagation()}
-        {...dialog}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ok)
-            p.onAdd({
-              kind: "add",
-              dir: dir.trim(),
-              branch: fresh ? null : branch,
-              newBranch: fresh ? chosen : null,
-              at: null,
-            });
-        }}
-      >
-        <h2 className="dialog-title">{t("wt.add")}</h2>
-        <p className="muted small">{t("wt.explain")}</p>
-        <Segmented
-          label={t("wt.add")}
-          value={fresh ? "new" : "existing"}
-          onChange={(v) => setFresh(v === "new")}
-          options={[
-            { value: "existing", label: t("wt.existing"), disabled: p.free.length === 0 },
-            { value: "new", label: t("wt.newBranch") },
-          ]}
-        />
-        {fresh ? (
-          <input
-            className="text"
-            autoFocus
-            placeholder="feature/my-idea"
-            aria-label={t("wt.newBranch")}
-            value={name}
-            onChange={(e) => setName(e.target.value.replace(/\s+/g, "-"))}
-          />
-        ) : (
-          <select aria-label={t("wt.existing")} value={branch} onChange={(e) => setBranch(e.target.value)}>
-            {p.free.map((b) => (
-              <option key={b}>{b}</option>
-            ))}
-          </select>
-        )}
-        {!fresh && p.free.length === 0 && <p className="muted small">{t("wt.noFree")}</p>}
-        <div className="row">
-          <input
-            className="text grow"
-            aria-label={t("wt.folder")}
-            placeholder={t("wt.folder")}
-            value={dir}
-            onChange={(e) => setDirEdit(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() =>
-              void api.pickFolder(t("wt.folder")).then((d) => {
-                if (!d) return;
-                setParent(d);
-                setDirEdit(null);
-              })
-            }
-          >
-            {t("connect.clone.choose")}
-          </button>
-        </div>
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      className="worktree-dialog"
+      label={t("wt.add")}
+      title={t("wt.add")}
+      onSubmit={() => {
+        if (ok)
+          p.onAdd({
+            kind: "add",
+            dir: dir.trim(),
+            branch: fresh ? null : branch,
+            newBranch: fresh ? chosen : null,
+            at: null,
+          });
+      }}
+      actions={
+        <>
           <button type="button" onClick={p.onCancel}>
             {t("common.cancel")}
           </button>
           <button className="primary" type="submit" disabled={!ok}>
             {t("wt.go")}
           </button>
-        </div>
-      </form>
-    </div>
+        </>
+      }
+    >
+      <p className="muted small">{t("wt.explain")}</p>
+      <Segmented
+        label={t("wt.add")}
+        value={fresh ? "new" : "existing"}
+        onChange={(v) => setFresh(v === "new")}
+        options={[
+          { value: "existing", label: t("wt.existing"), disabled: p.free.length === 0 },
+          { value: "new", label: t("wt.newBranch") },
+        ]}
+      />
+      {fresh ? (
+        <input
+          className="text"
+          autoFocus
+          placeholder="feature/my-idea"
+          aria-label={t("wt.newBranch")}
+          value={name}
+          onChange={(e) => setName(e.target.value.replace(/\s+/g, "-"))}
+        />
+      ) : (
+        <select aria-label={t("wt.existing")} value={branch} onChange={(e) => setBranch(e.target.value)}>
+          {p.free.map((b) => (
+            <option key={b}>{b}</option>
+          ))}
+        </select>
+      )}
+      {!fresh && p.free.length === 0 && <p className="muted small">{t("wt.noFree")}</p>}
+      <div className="row">
+        <input
+          className="text grow"
+          aria-label={t("wt.folder")}
+          placeholder={t("wt.folder")}
+          value={dir}
+          onChange={(e) => setDirEdit(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={() =>
+            void api.pickFolder(t("wt.folder")).then((d) => {
+              if (!d) return;
+              setParent(d);
+              setDirEdit(null);
+            })
+          }
+        >
+          {t("connect.clone.choose")}
+        </button>
+      </div>
+    </Modal>
   );
 }

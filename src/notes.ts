@@ -5,10 +5,10 @@
 
 import type { NoteCommit } from "./types";
 
-export const NOTE_KINDS = ["breaking", "feat", "fix", "perf", "refactor", "docs", "other"] as const;
+const NOTE_KINDS = ["breaking", "feat", "fix", "perf", "refactor", "docs", "other"] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
 
-export interface NoteItem {
+interface NoteItem {
   id: string;
   kind: NoteKind;
   scope: string | null;
@@ -67,7 +67,7 @@ export function noteItems(commits: NoteCommit[]): NoteItem[] {
   });
 }
 
-export interface ForgeWeb {
+interface ForgeWeb {
   /** `https://host/owner/repo` */
   base: string;
   kind: "github" | "gitlab";
@@ -94,7 +94,7 @@ function refLink(item: NoteItem, web: ForgeWeb | null): string {
   return web ? `[${short}](${web.base}/${web.kind === "gitlab" ? "-/" : ""}commit/${item.id})` : short;
 }
 
-export interface NotesOptions {
+interface NotesOptions {
   title: string;
   items: NoteItem[];
   /** Section headings, and `empty` for a release with nothing to say. */

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { type Key, t } from "../i18n";
 import { copyText, openLink } from "../share";
 import { Rich } from "../i18n/Rich";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 import { safeHost, shellCommand, shellOf } from "../shell";
 
 interface Props {
@@ -135,38 +135,40 @@ export function AuthDialog({ url, output, repoPath, signIn, busy, onRetry, onClo
     </ol>
   );
 
-  const dialog = useDialog(onClose);
   return (
-    <div className="scrim" {...closeOnScrim(onClose)}>
-      <div className="dialog auth" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{t("auth.title")}</h2>
-        <p>
-          <Rich k={ssh ? "auth.bodySsh" : "auth.bodyHttps"} vars={{ host }} />
-        </p>
-        {url && <code className="url">{url}</code>}
-        {ssh && url && /Host key|publickey/i.test(output) ? (
-          // Set SSH up right here; the terminal route stays one click away.
-          <>
-            <SshSetup url={url} onOpenUrl={openLink} />
-            <details>
-              <summary className="muted">{t("ssh.terminal")}</summary>
-              {steps}
-            </details>
-          </>
-        ) : (
-          steps
-        )}
-        <details>
-          <summary className="muted">{t("auth.output")}</summary>
-          <pre className="raw">{output}</pre>
-        </details>
-        <div className="dialog-actions">
+    <Modal
+      onClose={onClose}
+      className="auth"
+      title={t("auth.title")}
+      actions={
+        <>
           <button onClick={onClose}>{t("common.close")}</button>
           <button className="primary" disabled={busy} onClick={onRetry}>
             {t("auth.retry")}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p>
+        <Rich k={ssh ? "auth.bodySsh" : "auth.bodyHttps"} vars={{ host }} />
+      </p>
+      {url && <code className="url">{url}</code>}
+      {ssh && url && /Host key|publickey/i.test(output) ? (
+        // Set SSH up right here; the terminal route stays one click away.
+        <>
+          <SshSetup url={url} onOpenUrl={openLink} />
+          <details>
+            <summary className="muted">{t("ssh.terminal")}</summary>
+            {steps}
+          </details>
+        </>
+      ) : (
+        steps
+      )}
+      <details>
+        <summary className="muted">{t("auth.output")}</summary>
+        <pre className="raw">{output}</pre>
+      </details>
+    </Modal>
   );
 }

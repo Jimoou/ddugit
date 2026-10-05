@@ -101,7 +101,7 @@ export function removeGroup(
   };
 }
 
-export interface Band {
+interface Band {
   /** null: the ungrouped ones. */
   group: RepoGroup | null;
   repos: RecentRepo[];
@@ -128,7 +128,7 @@ export function ownerOf(url: string | null): { host: string; owner: string } | n
   return { host: (m[1] ?? m[2]).toLowerCase(), owner: m[3] };
 }
 
-export interface Suggestion {
+interface Suggestion {
   /** Stable id, to remember a "no thanks". */
   key: string;
   name: string;

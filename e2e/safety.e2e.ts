@@ -14,7 +14,7 @@ base("a tab that crashes while rendering shows a notice, and the other tabs keep
   await page.locator(".tabbar .tab:not(.tab-home)").first().click();
 
   await page.evaluate(() => {
-    (window as unknown as { __ddugitDemo: { crashTab: boolean } }).__ddugitDemo.crashTab = true;
+    window.__ddugitDemo.crashTab = true;
     window.dispatchEvent(new Event("focus"));
   });
   const notice = page.locator(".crashed:not([hidden])");
@@ -33,7 +33,7 @@ base("a tab that crashes while rendering shows a notice, and the other tabs keep
 
   // Reloading the tab brings the repository back.
   await page.evaluate(() => {
-    (window as unknown as { __ddugitDemo: { crashTab: boolean } }).__ddugitDemo.crashTab = false;
+    window.__ddugitDemo.crashTab = false;
   });
   await notice.getByRole("button", { name: "탭 다시 불러오기" }).click();
   await expect(page.locator(".app:not([hidden]) .topbar")).toBeVisible();

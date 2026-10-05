@@ -1,10 +1,10 @@
 import { Icon } from "./Icon";
-import { useEffect, useState } from "react";
 import { api } from "../api";
 import { fmtTime } from "../format";
 import { t } from "../i18n";
-import type { Blame } from "../types";
+
 import { useDialog } from "./useDialog";
+import { useLoaded } from "./useLoaded";
 
 /** Star temperature for a line's age: old lines glow a cool, dim red; the newest a hot blue-white. */
 export function ageColor(time: number, oldest: number, newest: number): string {
@@ -33,22 +33,9 @@ export function BlameSheet(p: {
   onSelect(id: string): void;
   onClose(): void;
 }) {
-  const [loaded, setLoaded] = useState<{ key: string; blame: Blame | null; error: string | null } | null>(null);
   const { path, rev, file } = p;
-  const key = `${rev}:${file}`;
-  useEffect(() => {
-    let live = true;
-    api.blame(path, rev, file).then(
-      (blame) => live && setLoaded({ key, blame, error: null }),
-      (e) => live && setLoaded({ key, blame: null, error: String(e) }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, rev, file, key]);
+  const { data: blame, error } = useLoaded(`${path}\n${rev}:${file}`, () => api.blame(path, rev, file));
   const { onClose } = p;
-  const cur = loaded?.key === key ? loaded : null;
-  const blame = cur?.blame ?? null;
   const times = blame?.hunks.map((h) => h.time) ?? [];
   const oldest = Math.min(...times),
     newest = Math.max(...times);
@@ -68,8 +55,8 @@ export function BlameSheet(p: {
           <Icon name="close" />
         </button>
       </header>
-      {cur?.error && <p className="note warn pad">{cur.error}</p>}
-      {!cur && <p className="muted pad">{t("diff.loading")}</p>}
+      {error && <p className="note warn pad">{error}</p>}
+      {!blame && !error && <p className="muted pad">{t("diff.loading")}</p>}
       {blame && (
         <div className="blame-body">
           {blame.hunks.map((h) => {

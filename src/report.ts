@@ -6,13 +6,13 @@
 import { redact } from "./redact";
 
 /** Lines of the log a report carries. */
-export const REPORT_LINES = 50;
+const REPORT_LINES = 50;
 /** Entries kept; older ones fall off. */
 const KEEP = 200;
 /** A toast this soon after a command failed with the same text is that failure. */
 const FRESH_MS = 10_000;
 
-export interface LogEntry {
+interface LogEntry {
   at: number;
   /** `cmd:<name>` for a backend command, `window` for an uncaught error. */
   source: string;

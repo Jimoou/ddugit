@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import type { CommitEdit, CommitInfo, FileDiff } from "../types";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 export type EditMode = CommitEdit["kind"];
 
@@ -56,82 +56,79 @@ export function EditCommitDialog(p: {
     setFirst(next);
   };
 
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <form
-        className="dialog edit-commit"
-        aria-label={t(`edit.${p.mode}`)}
-        onClick={(e) => e.stopPropagation()}
-        {...dialog}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (edit && !p.busy) p.onSubmit(edit);
-        }}
-      >
-        <h2 className="dialog-title">{t(`edit.${p.mode}`)}</h2>
-        <p className="muted small">
-          <code>{commit.id.slice(0, 7)}</code> {commit.summary}
-        </p>
-        {p.mode === "reword" && (
-          <textarea
-            className="message"
-            autoFocus
-            rows={5}
-            aria-label={t("edit.message")}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-        )}
-        {p.mode === "author" && (
-          <>
-            <label className="field col">
-              {t("edit.name")}
-              <input className="text" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label className="field col">
-              {t("edit.email")}
-              <input className="text" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </label>
-          </>
-        )}
-        {p.mode === "split" && (
-          <>
-            <p className="small">{t("edit.split.pick")}</p>
-            {!p.files && <p className="muted">{t("diff.loading")}</p>}
-            {p.files && files.length < 2 && <p className="note warn">{t("edit.split.one")}</p>}
-            <ul className="split-files">
-              {files.map((f) => (
-                <li key={f.path}>
-                  <label className="check">
-                    <input type="checkbox" checked={first.has(f.path)} onChange={() => toggle(f.path)} />
-                    <span className={`chip k-${f.status}`}>{f.status[0].toUpperCase()}</span>
-                    <span className="path">{f.path}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-            <label className="field col">
-              {t("edit.split.first", { n: first.size })}
-              <input className="text" value={firstMessage} onChange={(e) => setFirstMessage(e.target.value)} />
-            </label>
-            <label className="field col">
-              {t("edit.split.second", { n: Math.max(files.length - first.size, 0) })}
-              <input className="text" value={secondMessage} onChange={(e) => setSecondMessage(e.target.value)} />
-            </label>
-          </>
-        )}
-        <p className="muted small">{t("edit.rewrites", { n: p.rewrites })}</p>
-        {p.pushed && <p className="note warn">{t("edit.pushed")}</p>}
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      className="edit-commit"
+      label={t(`edit.${p.mode}`)}
+      title={t(`edit.${p.mode}`)}
+      onSubmit={() => {
+        if (edit && !p.busy) p.onSubmit(edit);
+      }}
+      actions={
+        <>
           <button type="button" onClick={p.onCancel}>
             {t("common.cancel")}
           </button>
           <button className="primary" type="submit" disabled={!edit || p.busy}>
             {t("edit.go")}
           </button>
-        </div>
-      </form>
-    </div>
+        </>
+      }
+    >
+      <p className="muted small">
+        <code>{commit.id.slice(0, 7)}</code> {commit.summary}
+      </p>
+      {p.mode === "reword" && (
+        <textarea
+          className="message"
+          autoFocus
+          rows={5}
+          aria-label={t("edit.message")}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+      )}
+      {p.mode === "author" && (
+        <>
+          <label className="field col">
+            {t("edit.name")}
+            <input className="text" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="field col">
+            {t("edit.email")}
+            <input className="text" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+        </>
+      )}
+      {p.mode === "split" && (
+        <>
+          <p className="small">{t("edit.split.pick")}</p>
+          {!p.files && <p className="muted">{t("diff.loading")}</p>}
+          {p.files && files.length < 2 && <p className="note warn">{t("edit.split.one")}</p>}
+          <ul className="split-files">
+            {files.map((f) => (
+              <li key={f.path}>
+                <label className="check">
+                  <input type="checkbox" checked={first.has(f.path)} onChange={() => toggle(f.path)} />
+                  <span className={`chip k-${f.status}`}>{f.status[0].toUpperCase()}</span>
+                  <span className="path">{f.path}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <label className="field col">
+            {t("edit.split.first", { n: first.size })}
+            <input className="text" value={firstMessage} onChange={(e) => setFirstMessage(e.target.value)} />
+          </label>
+          <label className="field col">
+            {t("edit.split.second", { n: Math.max(files.length - first.size, 0) })}
+            <input className="text" value={secondMessage} onChange={(e) => setSecondMessage(e.target.value)} />
+          </label>
+        </>
+      )}
+      <p className="muted small">{t("edit.rewrites", { n: p.rewrites })}</p>
+      {p.pushed && <p className="note warn">{t("edit.pushed")}</p>}
+    </Modal>
   );
 }

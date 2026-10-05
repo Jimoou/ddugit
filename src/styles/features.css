@@ -1,0 +1,910 @@
+/* Pull requests, the tutorial, the preview card, SSH, window chrome, Pro, transfer, stacks, release notes, identity, new pull requests and reports. */
+
+/* ---------------------------------------------------------- pull requests */
+.pulls .pr-num {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: #c9b8ff;
+}
+.pulls .chip {
+  width: auto;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+.pr-connect {
+  padding: 2px 14px 8px;
+  font-size: 12px;
+}
+.pr-connect p {
+  margin: 0 0 6px;
+}
+.pr-empty,
+.pr-error {
+  margin: 0;
+  padding: 2px 14px 6px;
+  font-size: 12px;
+}
+.token-dialog {
+  width: min(460px, calc(100vw - 32px));
+}
+.token-dialog p {
+  margin: 0;
+  font-size: 13px;
+}
+.token-dialog .token-page {
+  align-self: flex-start;
+}
+.pulls .pr-ci {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c9b8ff;
+  opacity: 0.5;
+}
+.pulls .pr-ci.success {
+  background: var(--ok);
+  opacity: 1;
+}
+.pulls .pr-ci.failure {
+  background: var(--red);
+  opacity: 1;
+}
+.pulls .pr-ci.pending {
+  background: var(--amber);
+  opacity: 1;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.pulls .chip.review.approved {
+  color: var(--ok);
+}
+.pulls .chip.review.changes {
+  color: var(--amber);
+}
+/* Merged (violet, like GitHub) and closed (grey) pull requests, dimmed beside the open ones. */
+.pulls .pr-ci.merged {
+  background: #a371f7;
+  opacity: 1;
+}
+.pulls .pr-ci.closed {
+  background: var(--muted);
+  opacity: 0.8;
+}
+.pulls li.merged .name,
+.pulls li.closed .name {
+  color: var(--text-2);
+}
+.pulls .chip.pr-state.merged {
+  color: #a371f7;
+}
+.pulls .chip.pr-state.closed {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------- tutorial: the voyage log */
+.voyage {
+  position: absolute;
+  left: 14px;
+  bottom: 56px;
+  z-index: 6;
+  width: min(320px, calc(100% - 28px));
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--signal), 0.22);
+  background: var(--brackets), var(--scanlines), var(--surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  font-size: 12.5px;
+}
+.voyage header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.voyage header .eyebrow {
+  color: #ffd479;
+}
+.voyage header .spacer {
+  flex: 1;
+}
+.voyage ol {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.voyage li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 2px;
+  color: var(--muted);
+}
+.voyage li .mark {
+  flex: none;
+  width: 14px;
+  text-align: center;
+}
+.voyage li.done {
+  color: var(--text-2);
+}
+.voyage li.done .mark {
+  color: #ffd479;
+  text-shadow: 0 0 8px rgba(255, 212, 121, 0.8);
+}
+.voyage li.now {
+  color: var(--text);
+}
+.voyage li.now .mark {
+  color: #ffd479;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.voyage li .how {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.voyage li.just .mark {
+  animation: star-won 0.9s ease-out;
+}
+@keyframes star-won {
+  0% {
+    transform: scale(0.4) rotate(0deg);
+  }
+  50% {
+    transform: scale(2) rotate(144deg);
+    text-shadow: 0 0 16px #ffd479;
+  }
+  100% {
+    transform: scale(1) rotate(216deg);
+  }
+}
+.voyage-end {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.voyage-end p {
+  margin: 0 0 8px;
+  color: #fff1d0;
+}
+button.demo-pill {
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voyage li.now .mark,
+  .voyage li.just .mark {
+    animation: none;
+  }
+}
+
+/* ddugit's own icons (components/Icon.tsx) sit on the text baseline. */
+.icon-svg {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -0.15em;
+}
+
+/* ------------------------------------------------- commit preview card (hover) */
+.peek {
+  /* A message picked up from deep space: square signal frame, corner marks,
+     faint scanlines, unrolling top to bottom as it comes in. */
+  --signal: rgba(34, 232, 255, 0.75);
+  position: absolute;
+  z-index: 5;
+  padding: 10px 12px;
+  border: 1px solid rgba(34, 232, 255, 0.28);
+  background:
+    linear-gradient(var(--signal), var(--signal)) top left / 10px 1px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) top left / 1px 10px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) top right / 10px 1px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) top right / 1px 10px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) bottom left / 10px 1px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) bottom left / 1px 10px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) bottom right / 10px 1px no-repeat,
+    linear-gradient(var(--signal), var(--signal)) bottom right / 1px 10px no-repeat,
+    repeating-linear-gradient(0deg, rgba(34, 232, 255, 0.035) 0 1px, transparent 1px 3px),
+    rgba(2, 3, 10, 0.94);
+  box-shadow:
+    0 0 24px rgba(34, 232, 255, 0.12),
+    0 14px 34px rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  pointer-events: none;
+  animation: peek-in 0.24s steps(6, end);
+}
+@keyframes peek-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+.peek-signal {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  font: 600 9.5px var(--mono);
+  color: rgba(34, 232, 255, 0.85);
+}
+.peek-signal code {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.peek-signal .spacer {
+  flex: 1;
+}
+.peek-signal .beacon {
+  width: 5px;
+  height: 5px;
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+  animation: beacon 1.1s steps(2, jump-none) infinite;
+}
+@keyframes beacon {
+  50% {
+    opacity: 0.2;
+  }
+}
+.peek-summary {
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  text-shadow: 0 0 10px rgba(34, 232, 255, 0.25);
+}
+.peek-body {
+  margin-top: 4px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.peek-body div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.peek-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+.peek-pr {
+  margin-left: 6px;
+  color: #c9b8ff;
+}
+.peek-files {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--line);
+}
+.peek-files li {
+  display: grid;
+  grid-template-columns: 1fr 52px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0;
+}
+.peek-files .path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.peek-files .bar {
+  display: flex;
+  height: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.peek-files .bar .add {
+  background: var(--lime);
+}
+.peek-files .bar .del {
+  background: var(--red);
+}
+.peek-files .num {
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .peek,
+  .peek-signal .beacon {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------ remote work, before it runs */
+.sync-commits {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--scanlines), rgba(255, 255, 255, 0.02);
+  font-size: 12.5px;
+}
+.sync-commits li {
+  padding: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sync-commits code {
+  color: rgba(var(--signal), 0.85);
+  margin-right: 6px;
+}
+
+/* ------------------------------------------------ backport: how it works */
+.bp-guide {
+  margin: 8px 12px 0;
+  border: 1px solid rgba(var(--signal), 0.2);
+  background: var(--scanlines), rgba(var(--signal), 0.03);
+}
+.bp-guide-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  font: 600 12px var(--sans);
+  color: rgba(var(--signal), 0.85);
+}
+.bp-guide ol {
+  margin: 0;
+  padding: 0 14px 10px 32px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+/* ------------------------------------------------ SSH, set up in the app */
+.url-head {
+  align-items: center;
+}
+.ssh-ready summary {
+  cursor: pointer;
+  color: rgb(var(--signal));
+  font: 600 12px var(--sans);
+}
+.ssh-setup ol {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ssh-setup li {
+  counter-increment: step;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-left: 26px;
+  position: relative;
+}
+.ssh-setup li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  font: 600 10px var(--mono);
+  color: var(--muted);
+}
+.ssh-setup li.done::before {
+  content: "✓";
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.ssh-setup li.later {
+  opacity: 0.55;
+}
+.ssh-setup .what {
+  flex-basis: 100%;
+}
+.ssh-setup .host-key {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.ssh-setup .host-key code {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.ssh-setup .ok {
+  color: var(--ok);
+  font-size: 12px;
+}
+.dialog.settings .license-text {
+  width: 100%;
+  font: 11px var(--mono);
+  resize: vertical;
+  margin-top: 8px;
+}
+.dialog.settings .license-paste {
+  margin-top: 14px;
+}
+.dialog.settings .license-paste summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.dialog.settings .license .row {
+  margin-top: 8px;
+}
+
+/* The home tab: always first, set apart from the repository tabs. */
+.tab.tab-home {
+  padding-right: 12px;
+  margin-right: 4px;
+  color: var(--text-2);
+}
+.tab.tab-home .icon-svg {
+  color: var(--cyan);
+}
+
+/* The tab row as the title bar (desktop app). macOS: room for the traffic lights. */
+.tabrow.chrome-mac {
+  padding-left: 72px;
+}
+/* Windows: our own window buttons, flush with the top-right corner. */
+.win-controls {
+  display: flex;
+  align-self: stretch;
+}
+.win-controls button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text-2);
+}
+.win-controls button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.win-controls button.close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ Free / Pro */
+.pro-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border: 1px solid rgba(255, 197, 107, 0.6);
+  color: var(--brand-star);
+  font: 700 9px/15px var(--mono);
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+.dialog.pro-offer .pro-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+.dialog.pro-offer .pro-list li {
+  margin: 3px 0;
+}
+.license-plan {
+  margin: 0 0 6px;
+  color: var(--ui-text);
+}
+.world.locked .world-open {
+  opacity: 0.6;
+}
+.world.locked .world-unlock {
+  margin: 0 10px 10px;
+  align-self: flex-start;
+}
+.pr-locked .pro-badge {
+  margin-left: 6px;
+}
+
+/* ------------------------------------------------------------- air-gapped transfer */
+.dialog.transfer {
+  width: min(560px, calc(100vw - 32px));
+}
+.tr-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+}
+.tr-branches .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tr-branches .check .muted {
+  margin-left: auto;
+}
+.tr-heads {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+}
+.tr-history summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.tr-history ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* Stacked branches (components/Stacks.tsx). */
+.sidebar .stacks .stack-base {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.sidebar .stacks .stack-base .mono {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar .stacks .stack-restack {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 1px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sidebar .stacks .stack-restack.lit {
+  border-color: rgba(var(--signal), 0.6);
+  color: rgb(var(--signal));
+}
+.sidebar .stacks li {
+  gap: 6px;
+  color: var(--text-2);
+}
+.sidebar .stacks li.head .name {
+  color: var(--text);
+  font-weight: 600;
+}
+.sidebar .stacks .stack-tick {
+  color: var(--muted);
+  opacity: 0.6;
+}
+.sidebar .stacks .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar .stacks .stack-flag,
+.sidebar .stacks li .small {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+}
+/* A flag takes only the room the branch name leaves (its full text is in the title). */
+.sidebar .stacks .stack-flag {
+  flex: 1 1 0;
+  min-width: 1.5em;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar .stacks .stack-flag {
+  color: rgb(var(--signal));
+}
+.sidebar .stacks .stack-flag.warn {
+  color: var(--amber);
+}
+
+/* Release notes (components/ReleaseNotes.tsx). */
+.dialog.notes {
+  width: min(680px, calc(100vw - 32px));
+  /* Tall as the window allows: the notes take whatever the fields leave. */
+  height: min(760px, calc(100vh - 32px));
+}
+.notes-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.notes-range .field {
+  flex: 0 1 220px;
+}
+.notes-range select {
+  font: 13px var(--mono);
+  border: 1px solid var(--line);
+  padding: 7px 8px;
+}
+.notes-range .notes-arrow {
+  padding-bottom: 9px;
+  color: var(--muted);
+}
+.notes-range .mono {
+  padding-bottom: 9px;
+}
+/* Fills the dialog, and gives up height first when the window is short, so the buttons stay on screen. */
+.notes-md {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 120px;
+  padding: 10px;
+  resize: vertical;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+}
+
+/* ------------------------------------------- identity: who commits, signing */
+.identity-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 24px;
+  font-size: 12px;
+}
+.identity-line .who {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 6px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.identity-line .who:hover {
+  background: var(--ui-soft);
+  border-color: var(--line);
+}
+.identity-line .who .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.identity-line.missing .who {
+  color: var(--amber);
+}
+.identity-line .scope,
+.identity-line .signs,
+.dialog.settings .profiles .tag,
+.dialog.settings .profiles .signs {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.identity-line .signs,
+.dialog.settings .profiles .signs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.dialog.settings .profiles .global-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+.dialog.settings .profiles .offer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--ui-soft);
+  border: 1px solid var(--line);
+}
+.dialog.settings .profile-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+.dialog.settings .profile-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.dialog.settings .profile-list .who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialog.settings .profile-list .spacer {
+  flex: 1;
+}
+.dialog.settings .profile-form {
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+}
+.dialog.settings .profile-form .field {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 420px);
+}
+.dialog.settings .profile-form select {
+  justify-self: start;
+}
+.dialog.settings .profile-list button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.dialog.settings .profile-form .row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* A toast's one action (open the pull request just made). */
+.toast button {
+  pointer-events: auto;
+  margin-left: 10px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+/* ------------------------------------------------- create a pull request */
+.dialog.create-pr {
+  width: min(560px, calc(100vw - 32px));
+  gap: 12px;
+}
+.create-pr .pr-route {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.create-pr .pr-route label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 140px;
+}
+.create-pr .pr-route label > span {
+  font-size: 12px;
+}
+.create-pr .pr-route select {
+  width: 100%;
+}
+.create-pr .pr-arrow {
+  padding-bottom: 8px;
+  color: var(--text-2);
+}
+.create-pr .pr-body {
+  min-height: 90px;
+  resize: vertical;
+  font: 12.5px var(--mono);
+}
+.create-pr .pr-commits ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 6px;
+  max-height: 140px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.create-pr .pr-commits li {
+  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.create-pr .pr-commits code {
+  color: var(--text-2);
+}
+.create-pr .pr-problem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.create-pr .pr-connect {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.create-pr .pr-connect p {
+  margin: 0;
+}
+.create-pr .pr-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.create-pr .pr-fields:disabled {
+  opacity: 0.45;
+}
+
+/* Settings → About (components/Report.tsx). */
+.dialog.settings .about-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.dialog.settings .about-facts dt {
+  color: var(--muted);
+}
+.dialog.settings .about-facts dd {
+  margin: 0;
+  color: var(--text);
+}
+.dialog.settings .about .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Problem report / question: room for the diagnostics, which read as a log. */
+.dialog.report {
+  width: min(600px, calc(100vw - 32px));
+}
+.dialog.report .report-diag {
+  font: 11.5px/1.45 var(--mono);
+  color: var(--text-2);
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+.dialog.git-missing code {
+  word-break: break-word;
+}
+
+/* First run: the quieter ways in, under the main buttons. */
+.welcome-hints {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 16px;
+}
+.welcome-hints button.ghost {
+  padding: 2px 6px;
+  font-size: inherit;
+  color: var(--text-2);
+}

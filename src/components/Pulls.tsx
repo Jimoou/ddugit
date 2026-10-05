@@ -6,7 +6,7 @@ import { Rich } from "../i18n/Rich";
 import { offerPro } from "../pro";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../types";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
 /** What the forge calls a pull request. */
@@ -179,40 +179,14 @@ export function TokenDialog(p: {
   const [token, setToken] = useState("");
   const name = FORGE_NAME[p.forge.kind];
   const page = tokenPage(p.forge);
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <div
-        className="dialog token-dialog"
-        aria-label={t("pr.token.title", { forge: name })}
-        onClick={(e) => e.stopPropagation()}
-        {...dialog}
-      >
-        <h2 className="dialog-title">{t("pr.token.title", { forge: name })}</h2>
-        {!p.forge.public && (
-          // Only the remote URL says this host is a GitHub / GitLab: make sure before a token goes there.
-          <p className="note warn">
-            <Rich k="pr.token.foreign" vars={{ host: p.forge.host }} />
-          </p>
-        )}
-        <p>
-          <Rich k={p.forge.kind === "github" ? "pr.token.cli.gh" : "pr.token.cli.glab"} vars={{ host: p.forge.host }} />
-        </p>
-        <p className="muted">{t("pr.token.paste", { noun: prNoun(p.forge.kind) })}</p>
-        <button className="token-page" onClick={() => p.onOpenPage(page)}>
-          {t("pr.token.make")} <Icon name="external" size={12} />
-        </button>
-        <input
-          className="text"
-          type="password"
-          autoFocus
-          aria-label={t("pr.token.label")}
-          placeholder={p.forge.kind === "github" ? "ghp_… / github_pat_…" : "glpat-…"}
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && token.trim() && p.onSave(token.trim())}
-        />
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      className="token-dialog"
+      label={t("pr.token.title", { forge: name })}
+      title={<>{t("pr.token.title", { forge: name })}</>}
+      actions={
+        <>
           {p.forge.token === "keychain" && (
             <button className="danger" disabled={p.busy} onClick={() => p.onSave(null)}>
               {t("pr.token.forget")}
@@ -222,8 +196,32 @@ export function TokenDialog(p: {
           <button className="primary" disabled={p.busy || !token.trim()} onClick={() => p.onSave(token.trim())}>
             {t("pr.token.save")}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {!p.forge.public && (
+        // Only the remote URL says this host is a GitHub / GitLab: make sure before a token goes there.
+        <p className="note warn">
+          <Rich k="pr.token.foreign" vars={{ host: p.forge.host }} />
+        </p>
+      )}
+      <p>
+        <Rich k={p.forge.kind === "github" ? "pr.token.cli.gh" : "pr.token.cli.glab"} vars={{ host: p.forge.host }} />
+      </p>
+      <p className="muted">{t("pr.token.paste", { noun: prNoun(p.forge.kind) })}</p>
+      <button className="token-page" onClick={() => p.onOpenPage(page)}>
+        {t("pr.token.make")} <Icon name="external" size={12} />
+      </button>
+      <input
+        className="text"
+        type="password"
+        autoFocus
+        aria-label={t("pr.token.label")}
+        placeholder={p.forge.kind === "github" ? "ghp_… / github_pat_…" : "glpat-…"}
+        value={token}
+        onChange={(e) => setToken(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && token.trim() && p.onSave(token.trim())}
+      />
+    </Modal>
   );
 }

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { demoFlags, expect, test } from "./fixtures";
 
 test("creates a pull request from a branch menu, pushing the branch first", async ({ demo }) => {
   const { page } = demo;
@@ -57,9 +57,7 @@ test("creating a pull request asks for a token first, and offers Pro on Free", a
   await expect(dialog.getByRole("button", { name: "PR 만들기" })).toBeEnabled();
   await dialog.getByRole("button", { name: "취소" }).click();
 
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
-  });
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.reload();
   await page.locator(".sidebar li", { hasText: "feature/theme" }).first().click({ button: "right" });
   await page.click(".context-menu >> text=PR 만들기…");

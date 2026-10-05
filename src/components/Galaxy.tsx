@@ -20,6 +20,7 @@ import { NameDialog, type NameRequest } from "./NameDialog";
 import { Icon } from "./Icon";
 import { PlanetDot } from "./Planet";
 import { ProBadge } from "./ProOffer";
+import { readStored, writeStored } from "../storage";
 
 /** Grouping suggestions the user said no to. */
 const HINTS = "ddugit.groupHints";
@@ -63,13 +64,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const [picked, setPicked] = useState<string[]>([]);
   /** The band a card is being dragged over (group id, "" for ungrouped). */
   const [dropOn, setDropOn] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<string[]>(() => {
-    try {
-      return parseStringList(localStorage.getItem(HINTS));
-    } catch {
-      return [];
-    }
-  });
+  const [dismissed, setDismissed] = useState<string[]>(() => parseStringList(readStored(HINTS)));
   const byPath = loaded && loaded.key === key ? loaded.byPath : null;
 
   // Read every world now, and again whenever the window comes back to the front.
@@ -379,11 +374,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const dismiss = (key: string) => {
     const next = [...dismissed, key];
     setDismissed(next);
-    try {
-      localStorage.setItem(HINTS, JSON.stringify(next));
-    } catch {
-      /* storage unavailable */
-    }
+    writeStored(HINTS, JSON.stringify(next));
   };
   const moveTo = (paths: string[], id: string | null) => {
     recent.setGroup(paths, id);

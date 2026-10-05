@@ -5,10 +5,10 @@
 import type { RepoGlance } from "./types";
 
 /** Most urgent first: the order chips are shown in and the tally is read in. */
-export const SIGNALS = ["missing", "stopped", "changes", "behind", "ahead", "stash"] as const;
-export type Signal = (typeof SIGNALS)[number];
+const SIGNALS = ["missing", "stopped", "changes", "behind", "ahead", "stash"] as const;
+type Signal = (typeof SIGNALS)[number];
 
-export interface Lit {
+interface Lit {
   signal: Signal;
   /** Count to show next to it (files, commits, stashes); 0 for none. */
   n: number;

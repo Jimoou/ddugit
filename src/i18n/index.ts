@@ -14,7 +14,7 @@ export type LanguagePref = Locale | "system";
 const DICTS: Record<Locale, Record<Key, string>> = { ko, en };
 let current: Locale = "ko";
 
-export const systemLocale = (): Locale =>
+const systemLocale = (): Locale =>
   typeof navigator !== "undefined" && !navigator.language?.toLowerCase().startsWith("ko") ? "en" : "ko";
 
 export const resolveLocale = (pref: LanguagePref): Locale => (pref === "system" ? systemLocale() : pref);

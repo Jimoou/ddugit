@@ -13,24 +13,14 @@ import {
 import type { Identity, IdentityOp, Profile, SignFormat, SigningKeys } from "../types";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { Icon } from "./Icon";
+import { useLoaded } from "./useLoaded";
 
 /** Read the identity of `path` (`null`: global); `reload` reads it again after a change. */
 function useIdentity(path: string | null) {
-  const [loaded, setLoaded] = useState<{ key: string; id: Identity } | null>(null);
   const [tick, setTick] = useState(0);
-  const key = `${path}\n${tick}`;
-  useEffect(() => {
-    let live = true;
-    api.identity(path).then(
-      (id) => live && setLoaded({ key, id }),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, key]);
+  const { last } = useLoaded(`${path}\n${tick}`, () => api.identity(path));
   // Keep showing the last one while re-reading, so the line doesn't flicker.
-  return { identity: loaded?.id ?? null, reload: () => setTick((n) => n + 1) };
+  return { identity: last, reload: () => setTick((n) => n + 1) };
 }
 
 const signsTitle = (v: IdentityView, id: Identity) =>

@@ -29,9 +29,9 @@ const NO_TRAIL: string[] = [];
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
-import { Minimap } from "./Minimap";
+import { Minimap, type MinimapHandle } from "./Minimap";
 import { t } from "../i18n";
-import { isTypingTarget } from "../keys";
+import { isOnScreen, isTypingTarget } from "../keys";
 import { hasOpenLayer } from "../components/useDialog";
 
 export interface GraphHandle {
@@ -167,7 +167,17 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     known: null as Set<string> | null,
     anchor: null as { id: string; x: number } | null,
     initialized: false,
+    /** Something drawn changed since the last frame (see `wake`). */
+    dirty: true,
+    /** The drag hint last shown, so the frame sets state only when it changes. */
+    hint: null as DragHint | null,
   });
+  /**
+   * Draw on change: ask for a frame after anything drawn changes (props, camera, hover, size,
+   * fonts). Frames keep coming only while something moves (camera easing, sparkles, births).
+   */
+  const wake = useRef(() => {});
+  const minimap = useRef<MinimapHandle>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
   const sceneRef = useRef(scene);
@@ -243,10 +253,12 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       if (!node) return;
       const k = zoom ?? Math.max(st.current.view.k, 0.8);
       st.current.target = viewFor({ x: xOf(node.row, sc.layout.rowCount), y: yOf(node.lane) }, k);
+      wake.current();
     },
     centerOnHead() {
       const k = Math.max(st.current.view.k, 0.9);
       st.current.target = viewFor(headWorld(k), k);
+      wake.current();
     },
     fit() {
       const sc = sceneRef.current;
@@ -257,6 +269,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         Math.min((w - 160) / Math.max(box.right - box.left, 1), (h - 160) / Math.max(box.bottom - box.top, 1), 1.2),
       );
       st.current.target = viewFor({ x: (left + right) / 2, y: sc.height / 2 }, k);
+      wake.current();
     },
     zoomBy(f) {
       const { w, h } = st.current.size;
@@ -291,6 +304,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       s.view = next;
       s.target = null;
     }
+    wake.current();
   }
 
   // Resize + DPR handling.
@@ -320,6 +334,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         s.initialized = true;
         s.view = viewFor(headWorld(1), 1);
       }
+      wake.current();
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -344,15 +359,21 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     reportHover(true);
   }, [props.rotation]);
 
-  // Render loop.
+  // Render loop: a frame when woken, and the next one only while something moves.
   useEffect(() => {
     let raf = 0;
     const ctx = canvasRef.current!.getContext("2d")!;
+    const request = () => {
+      st.current.dirty = true;
+      if (!raf) raf = requestAnimationFrame(frame);
+    };
+    wake.current = request;
     const frame = () => {
-      raf = requestAnimationFrame(frame);
+      raf = 0;
       const s = st.current;
       const p = propsRef.current;
-      if (s.size.w === 0 || ctx.canvas.width === 0) return; // not laid out, or a hidden tab
+      // Not laid out, or a hidden tab: the resize observer wakes it when it shows.
+      if (s.size.w === 0 || ctx.canvas.width === 0) return;
       if (s.target) {
         const v = s.view,
           t = s.target;
@@ -374,6 +395,10 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         p.onZoomChange?.(s.view.k);
       }
       for (const [id, t0] of s.births) if (now() - t0 > 1.2) s.births.delete(id);
+      const moving = !!s.target || p.animate || s.births.size > 0;
+      if (moving) raf = requestAnimationFrame(frame);
+      if (!moving && !s.dirty) return;
+      s.dirty = false;
       draw(ctx, {
         scene: sceneRef.current,
         view: s.view,
@@ -409,12 +434,27 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         runOf: runsRef.current.runOf,
         runHover: s.runHover,
       });
+      minimap.current?.draw();
       const hint = !s.drag ? null : (`${s.drag.mode}:${s.drag.valid ? "ok" : s.drag.target ? "bad" : "idle"}` as const);
-      setDragHint((h) => (h === hint ? h : hint));
+      if (hint !== s.hint) {
+        s.hint = hint;
+        setDragHint(hint);
+      }
     };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    request();
+    // A web font that finishes loading changes how labels measure.
+    const fonts = document.fonts as FontFaceSet | undefined;
+    fonts?.addEventListener?.("loadingdone", request);
+    return () => {
+      cancelAnimationFrame(raf);
+      fonts?.removeEventListener?.("loadingdone", request);
+    };
   }, [refsByCommit]);
+
+  // Props changed (selection, focus, refs, settings…): draw them.
+  useEffect(() => {
+    wake.current();
+  });
 
   // --- hit testing ---------------------------------------------------------
   function nodeAt(p: Pt): string | null {
@@ -459,6 +499,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const [x0, x1] = [xOf(run.last, n), xOf(run.first, n)];
     const k = clampK(Math.max(ZOOM.fold * 1.3, Math.min(1, (timeSpan() - 200) / Math.max(x1 - x0, 1))));
     st.current.target = viewFor({ x: (x0 + x1) / 2, y: yOf(run.lane) }, k);
+    wake.current();
   }
   function stashAt(p: Pt): number | null {
     const v = st.current.view;
@@ -491,6 +532,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
 
   const onPointerDown = (e: React.PointerEvent) => {
     reportHover(true);
+    wake.current();
     if (e.button !== 0) return;
     const p = local(e);
     const s = st.current;
@@ -533,6 +575,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         dy = p.y - s.pan.y;
       if (Math.abs(dx) + Math.abs(dy) > 3) s.pan.moved = true;
       s.view = { ...s.view, tx: s.pan.tx + dx, ty: s.pan.ty + dy };
+      wake.current();
       return;
     }
     if (s.press && !s.drag && Math.hypot(p.x - s.press.x, p.y - s.press.y) > 6) {
@@ -545,12 +588,15 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       s.drag.mode = e.shiftKey ? "move" : e.altKey ? "pick" : "merge";
       s.drag.valid = !!s.drag.target && propsRef.current.canDropOn(s.drag.target, s.drag.from, s.drag.mode);
       setCursor(s.drag.valid ? "copy" : s.drag.target ? "not-allowed" : "crosshair");
+      wake.current();
       return;
     }
+    const was = [s.plusHover, s.stashHover, s.hovered, s.runHover];
     s.plusHover = onPlus(p);
     s.stashHover = s.plusHover ? null : stashAt(p);
     s.hovered = s.plusHover || s.stashHover !== null ? null : nodeAt(p);
     s.runHover = s.plusHover || s.hovered || s.stashHover !== null ? null : runAt(p);
+    if ([s.plusHover, s.stashHover, s.hovered, s.runHover].some((x, i) => x !== was[i])) wake.current();
     setCursor(s.plusHover || s.hovered || s.runHover || s.stashHover !== null ? "pointer" : "grab");
     reportHover();
   };
@@ -569,6 +615,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     s.press = null;
     s.pan = null;
     setCursor("grab");
+    wake.current();
   };
 
   // Wheel needs passive: false to preventDefault page zoom on pinch.
@@ -596,6 +643,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           s.view = e.shiftKey ? { ...s.view, ty: s.view.ty - d } : { ...s.view, tx: s.view.tx + along * d };
         }
       }
+      wake.current();
     };
     c.addEventListener("wheel", onWheel, { passive: false });
     return () => c.removeEventListener("wheel", onWheel);
@@ -608,7 +656,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       // Keys pressed in a modal dialog belong to it.
       if ((e.target as Element).closest?.("[aria-modal]")) return;
       // Every tab keeps its graph mounted; only the one on screen takes keys.
-      if (!canvasRef.current?.offsetParent) return;
+      if (!isOnScreen(canvasRef.current)) return;
       if (e.key === "=" || e.key === "+") api.zoomBy(1.25);
       else if (e.key === "-") api.zoomBy(0.8);
       else if (e.key === "0") api.fit();
@@ -618,6 +666,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         // Esc that closes a menu, sheet or dialog leaves the selection alone.
         if (hasOpenLayer()) return;
         st.current.drag = null;
+        wake.current();
         propsRef.current.onSelect(null);
       } else if (ARROWS[e.key] || e.key === "Enter" || e.key === "ContextMenu") {
         // Only when nothing else has focus: arrows must still scroll lists and sheets.
@@ -671,6 +720,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
             st.current.hovered = null;
             st.current.plusHover = false;
             reportHover(true);
+            wake.current();
           }}
         />
       </div>
@@ -682,6 +732,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         <div className={`drag-hint ${dragHint.split(":")[1]} ${dragHint.split(":")[0]}`}>{t(`drag.${dragHint}`)}</div>
       )}
       <Minimap
+        ref={minimap}
         scene={scene}
         rotation={props.rotation}
         getView={() => st.current.view}
@@ -689,6 +740,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         onJump={(world) => {
           st.current.target = null;
           st.current.view = viewFor(world, st.current.view.k);
+          wake.current();
         }}
       />
     </div>

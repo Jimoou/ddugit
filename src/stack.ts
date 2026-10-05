@@ -3,13 +3,13 @@
 
 import type { StackBranch } from "./types";
 
-export interface StackRow {
+interface StackRow {
   branch: StackBranch;
   /** 0 for the stack's lowest branch. */
   depth: number;
 }
 
-export interface StackGroup {
+interface StackGroup {
   /** What the stack is built on (e.g. `main`): the lowest branch's parent. */
   base: string;
   rows: StackRow[];

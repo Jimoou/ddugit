@@ -1,0 +1,454 @@
+/* The sidebar: refs, remotes, stashes, worktrees, submodules, LFS (components/Sidebar.tsx). */
+
+/* Several branches picked at once. */
+.sidebar .side-picked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 4px 6px 4px 8px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  border: 1px solid rgba(var(--signal), 0.35);
+}
+.sidebar .side-picked > span {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar .side-picked button {
+  flex-shrink: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* Fold per remote inside the remote section. */
+.sidebar .fetch-only {
+  flex-shrink: 0;
+  padding: 0 5px;
+  font: 600 10px/16px var(--sans);
+  white-space: nowrap;
+  color: var(--amber);
+  border: 1px solid rgba(255, 184, 77, 0.45);
+}
+.sync-target code {
+  font: 11px var(--mono);
+  word-break: break-all;
+}
+/* A remote's own fold: a row of its own (cloud, name, badge, count, ⋯), its branches on a guide line. */
+.sidebar section.sub {
+  margin: 2px 0 4px 8px;
+}
+.sidebar section.sub h3 {
+  margin: 0;
+  padding: 3px 0 3px 4px;
+  font: 600 12.5px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.035);
+}
+.sidebar section.sub h3 .fold {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.sidebar section.sub h3 .fold:hover {
+  color: var(--text);
+}
+.sidebar section.sub .remote-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+/* The name comes first; only a very long one is cut. */
+.sidebar section.sub .remote-name .nm {
+  flex-shrink: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar section.sub .remote-name svg {
+  flex-shrink: 0;
+  color: var(--cyan);
+}
+.sidebar section.sub ul,
+.sidebar section.sub .side-note {
+  margin-left: 11px;
+  border-left: 1px solid var(--line-strong);
+}
+.sidebar section.sub .side-note {
+  padding-left: 10px;
+}
+.sidebar section.sub li {
+  padding-left: 12px;
+}
+/* Make a local branch from a remote-only one: shown on hover. */
+.sidebar li .to-local {
+  margin: -4px 0 -4px auto;
+  padding: 2px;
+  height: 18px;
+  opacity: 0;
+}
+.sidebar li:hover .to-local,
+.sidebar li .to-local:focus-visible {
+  opacity: 1;
+}
+/* A branch checked out in another worktree. */
+.sidebar .elsewhere {
+  margin-left: auto;
+  color: var(--muted);
+  display: inline-flex;
+}
+.sidebar .worktrees li {
+  gap: 6px;
+  color: var(--text-2);
+}
+.sidebar .worktrees li.missing {
+  opacity: 0.55;
+}
+.sidebar .submodules li {
+  gap: 6px;
+  color: var(--text-2);
+}
+.sidebar .sub-state {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.sidebar .sub-uninitialized .sub-state,
+.sidebar .sub-moved .sub-state {
+  color: var(--cyan);
+}
+.sidebar .sub-dirty .sub-state {
+  color: var(--amber);
+}
+.sidebar .h3-add.lit {
+  color: var(--cyan);
+}
+.sidebar .side-note {
+  margin: 2px 10px 6px 24px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.sidebar .side-note.lit {
+  color: var(--cyan);
+}
+.sidebar .side-note button {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+.sidebar .lfs .name {
+  font-size: 12px;
+}
+.sidebar .lfs li .icon {
+  margin: -4px 0 -4px auto;
+  padding: 2px 4px;
+  opacity: 0;
+}
+.sidebar .lfs li:hover .icon,
+.sidebar .lfs li .icon:focus-visible {
+  opacity: 1;
+}
+.mono {
+  font-family: var(--mono);
+}
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-text);
+  text-decoration: underline;
+}
+.lfs-diff {
+  margin: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lfs-sides {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.lfs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.lfs-side b {
+  font-size: 15px;
+}
+.lfs-side code {
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+.worktree-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.worktree-dialog select,
+.create-pr select {
+  font: 13px var(--mono);
+  border: 1px solid var(--line);
+  padding: 7px 8px;
+}
+.worktree-dialog .row {
+  display: flex;
+  gap: 6px;
+}
+.worktree-dialog .grow {
+  flex: 1;
+  min-width: 0;
+}
+/* Small status labels (HEAD, a branch the commit is on, "signed"): one shape, the tone says what. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  flex-shrink: 0;
+  border: 1px solid currentColor;
+  font: 600 10.5px/1 var(--sans);
+  color: var(--text-2);
+  white-space: nowrap;
+  cursor: default;
+}
+.badge.head {
+  color: var(--ui-text);
+}
+.badge.ok {
+  color: var(--ok);
+}
+.badge.muted {
+  color: var(--muted);
+}
+.badge.danger {
+  color: var(--danger);
+}
+.sidebar li .badge.head,
+.worktrees .badge.head {
+  margin-left: auto;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, rgba(255, 77, 109, 0.18), rgba(255, 184, 77, 0.1));
+  border-bottom: 1px solid rgba(255, 77, 109, 0.4);
+  color: #ffd3dc;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ----------------------------------------------------------------- sidebar */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 12px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--chrome);
+}
+.sidebar .side-top {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.sidebar .side-top .search {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar .fold-side {
+  flex-shrink: 0;
+  padding: 0 7px;
+  color: var(--muted);
+}
+.sidebar h3 {
+  display: flex;
+  align-items: center;
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+.sidebar h3 .fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px 2px 2px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+.sidebar h3 .fold:hover {
+  color: var(--text);
+  background: none;
+}
+.sidebar h3 .chev {
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.sidebar section.shut .chev {
+  transform: none;
+}
+.sidebar h3 .h3-add {
+  margin-left: auto;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.sidebar h3 .h3-add:hover {
+  color: var(--text);
+}
+/* A remote's menu: framed so it reads as a button, not a stray mark. */
+.sidebar h3 .h3-add.h3-more {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.sidebar h3 .h3-add.h3-more:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+.sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sidebar li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sidebar li:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+/* The chosen ref in its own branch colour: a lit edge, a tint fading right, a brighter star. */
+.sidebar li.focused {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--ui-text)) 24%, transparent), transparent 90%);
+}
+.sidebar li.focused .name {
+  color: #fff;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c, var(--ui-text)) 70%, transparent);
+}
+/* The ring stays inside the row's padding (8px): 4px dot + 1.5px gap + 1.5px ring. */
+.sidebar li.focused .dot {
+  box-shadow:
+    0 0 0 1.5px #000,
+    0 0 0 3px var(--c, currentColor),
+    0 0 8px var(--c, currentColor);
+}
+/* Folding and unfolding slide the width; the content fades in after it (Sidebar `slide`). */
+.sidebar.slide {
+  overflow: hidden;
+  animation: side-open 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sidebar.slide > * {
+  animation: side-content 0.22s ease-out;
+}
+.sidebar.rail.slide {
+  animation-name: side-close;
+}
+@keyframes side-open {
+  from {
+    width: 48px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+@keyframes side-close {
+  from {
+    width: 220px;
+  }
+}
+@keyframes side-content {
+  0%,
+  40% {
+    opacity: 0;
+  }
+}
+/* Folded to a rail: one icon per section with its count. */
+.sidebar.rail {
+  width: 48px;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.sidebar .rail-btn {
+  position: relative;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+.sidebar .rail-btn:hover {
+  color: var(--text);
+}
+.sidebar .rail-btn:first-child {
+  margin-bottom: 6px;
+}
+.sidebar .rail-n {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  font: 700 9px var(--mono);
+  color: var(--text-2);
+}
+.sidebar li.head .name {
+  font-weight: 700;
+}
+.sidebar .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar .diamond {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--amber);
+  box-shadow: 0 0 6px var(--amber);
+}
+.sidebar .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}

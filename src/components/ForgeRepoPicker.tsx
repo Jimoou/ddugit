@@ -12,16 +12,11 @@ import type { ForgeKind, ForgeRepo, ForgeRepos } from "../types";
 import { Icon } from "./Icon";
 import { FORGE_NAME, TokenDialog } from "./Pulls";
 import { Segmented } from "./Segmented";
+import { readStored, writeStored } from "../storage";
 
 const PROTO = "ddugit.forgeProto";
 
-function readProto(): Proto {
-  try {
-    return localStorage.getItem(PROTO) === "ssh" ? "ssh" : "https";
-  } catch {
-    return "https";
-  }
-}
+const readProto = (): Proto => (readStored(PROTO) === "ssh" ? "ssh" : "https");
 
 /** URL, GitHub, GitLab: where the repository comes from. A column beside the form (a row in a narrow window). */
 export function SourceTabs(p: { value: Source; onChange(s: Source): void; disabled?: boolean }) {
@@ -117,11 +112,7 @@ export function ForgeRepoPicker(p: Props) {
   const pick = (repo: ForgeRepo, pr = proto) => p.onPick({ repo, url: repoUrl(repo, pr) });
   const switchProto = (pr: Proto) => {
     setProto(pr);
-    try {
-      localStorage.setItem(PROTO, pr);
-    } catch {
-      /* storage unavailable */
-    }
+    writeStored(PROTO, pr);
     if (p.picked) pick(p.picked.repo, pr);
   };
   const saveToken = (token: string | null) => {

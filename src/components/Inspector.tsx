@@ -1,5 +1,5 @@
 import { Icon } from "./Icon";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../api";
 import { fmtAgo, fmtTime } from "../format";
 import type { CommitInfo, FileDiff, RefInfo, Signature } from "../types";
@@ -7,6 +7,7 @@ import { ChangedFiles } from "./ChangedFiles";
 import type { MenuItem } from "./ContextMenu";
 import { t } from "../i18n";
 import { copyText } from "../share";
+import { useLoaded } from "./useLoaded";
 
 interface Props {
   path: string;
@@ -34,18 +35,7 @@ const SIG_TONE = { verified: "ok", unverified: "muted", bad: "danger" } as const
 
 /** The commit's signature, checked on demand (not part of the snapshot: it runs gpg / ssh-keygen). */
 function useSignature(path: string, id: string): Signature | null {
-  const [loaded, setLoaded] = useState<{ id: string; sig: Signature } | null>(null);
-  useEffect(() => {
-    let live = true;
-    api.signature(path, id).then(
-      (sig) => live && setLoaded({ id, sig }),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, id]);
-  return loaded && loaded.id === id ? loaded.sig : null;
+  return useLoaded(`${path}\n${id}`, () => api.signature(path, id)).data;
 }
 
 /** "Signed" and the like, with who signed on hover; nothing for an unsigned commit. */

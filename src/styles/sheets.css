@@ -1,0 +1,828 @@
+/* Sheets under the graph (diff, conflict, backport, rebase), with sync / auth dialogs, the context menu, search and hunk staging. */
+
+/* -------------------------------------------------------------- diff sheet */
+.add {
+  color: var(--lime);
+}
+.del {
+  color: var(--red);
+}
+.pad {
+  padding: 14px;
+}
+.path.link {
+  cursor: pointer;
+}
+.path.link:hover {
+  color: var(--ui-text);
+  text-decoration: underline;
+}
+
+.changed h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.changed h3 .total {
+  margin-left: auto;
+  font: 11px var(--mono);
+  letter-spacing: 0;
+}
+.changed li {
+  height: 24px;
+}
+/* Room kept for the rows of a long list that are not drawn (components/virtual.ts). */
+.changed li.gap,
+.file-list li.gap {
+  padding: 0;
+  pointer-events: none;
+}
+.changed li.dir {
+  height: 21px;
+  padding: 6px 6px 2px;
+  font: 11px var(--mono);
+  color: var(--muted);
+  cursor: default;
+}
+.changed li.dir:hover {
+  background: none;
+}
+.changed .bar {
+  display: flex;
+  width: 44px;
+  height: 5px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.changed .bar .add {
+  background: var(--lime);
+}
+.changed .bar .del {
+  background: var(--red);
+}
+.changed ul,
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.changed li,
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+.changed li:hover,
+.file-list li:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.changed .path,
+.file-list .path {
+  flex: 1;
+  min-width: 0;
+}
+.stat {
+  font: 11px var(--mono);
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.diff-sheet {
+  position: relative;
+  flex-shrink: 0;
+  /* However tall it is asked to be, the graph above keeps some sky. */
+  max-height: max(180px, calc(100% - 200px));
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+  animation: rise 0.18s ease-out;
+}
+@keyframes rise {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.diff-sheet .grip {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  z-index: 1;
+}
+.diff-sheet .grip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 44px;
+  height: 3px;
+  margin-left: -22px;
+  background: var(--line-strong);
+}
+.diff-sheet header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.diff-sheet .title {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* A narrow sheet trims the title's parts and the key hint instead of running under the tabs. */
+.diff-sheet .title > *,
+.diff-sheet .keys {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-sheet .title > .dialog-title,
+.diff-sheet header > :not(.title, .keys) {
+  flex-shrink: 0;
+}
+.diff-sheet .keys {
+  flex-shrink: 4;
+  font-size: 11px;
+}
+.diff-sheet .split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.file-list {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 6px;
+  border-right: 1px solid var(--line);
+}
+.diff-sheet .file-list li {
+  height: 24px;
+}
+.file-list li.on {
+  background: var(--ui-soft);
+  box-shadow: inset 2px 0 0 var(--ui-text);
+}
+.diff-body {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  user-select: text;
+}
+/* A narrow stage (small window with the composer or inspector beside it): the
+   file list goes on top so the diff, the conflict blocks and blame get the full
+   width. The panel stays usable, so staging lines and committing need no switching. */
+@container stage (max-width: 600px) {
+  .diff-sheet .split {
+    flex-direction: column;
+  }
+  .diff-sheet .file-list {
+    width: auto;
+    max-height: 30%;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .diff-sheet .split > .diff-body {
+    min-height: 0;
+  }
+  /* The key hint is the first thing to go: a word cut to a letter reads as noise. */
+  .diff-sheet .keys {
+    display: none;
+  }
+}
+/* Rows have fixed heights (DiffSheet's LINE_H, HEAD_H): a long diff draws only the rows on screen. */
+table.diff {
+  width: 100%;
+  border-collapse: collapse;
+  font: 12px/19px var(--mono);
+}
+table.diff tr {
+  height: 19px;
+}
+table.diff tr.gap td,
+table.diff tr.gap {
+  padding: 0;
+  border: none;
+}
+table.diff td {
+  padding: 0 8px;
+  white-space: pre;
+  vertical-align: top;
+}
+table.diff .no {
+  width: 1%;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.6;
+  user-select: none;
+}
+table.diff .sign {
+  width: 1%;
+  padding: 0 4px;
+  user-select: none;
+}
+table.diff tr.hunk {
+  height: 32px;
+}
+table.diff tr.hunk td {
+  padding: 0 12px;
+  vertical-align: middle;
+  color: #9b7bff;
+  background: rgba(155, 123, 255, 0.07);
+  /* Lines drawn inside the row, so no row height is shared with its neighbours. */
+  box-shadow:
+    inset 0 1px var(--line),
+    inset 0 -1px var(--line);
+}
+table.diff tr.ins {
+  background: rgba(166, 255, 77, 0.08);
+}
+table.diff tr.ins .sign,
+table.diff tr.ins .code {
+  color: #d6ffb0;
+}
+table.diff tr.ins .sign {
+  color: var(--lime);
+}
+table.diff tr.rem {
+  background: rgba(255, 77, 109, 0.09);
+}
+table.diff tr.rem .code {
+  color: #ffc2cf;
+}
+table.diff tr.rem .sign {
+  color: var(--red);
+}
+
+/* -------------------------------------------------------------- sync dialog */
+.fork {
+  width: 100%;
+  height: 80px;
+}
+.fork path {
+  fill: none;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choices button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  text-align: left;
+}
+.choices button:hover:not(:disabled) {
+  border-color: var(--focus);
+}
+.choices .muted {
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------- auth dialog */
+.dialog.auth {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+.url {
+  font: 12px var(--mono);
+  color: var(--ui-text);
+  word-break: break-all;
+}
+.steps {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.steps li::marker {
+  color: var(--ui-text);
+  font-weight: 700;
+}
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+}
+.cmd code {
+  flex: 1;
+  font: 12px var(--mono);
+  overflow-x: auto;
+  white-space: nowrap;
+  user-select: text;
+}
+.raw {
+  margin: 6px 0 0;
+  font: 11px/1.5 var(--mono);
+  white-space: pre-wrap;
+  color: var(--muted);
+  user-select: text;
+}
+
+/* ------------------------------------------------------------ stash + misc */
+.side-actions button {
+  flex: 1;
+  white-space: nowrap;
+}
+.confirm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.confirm-body ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 160px;
+  overflow-y: auto;
+  font: 12px var(--mono);
+}
+
+/* ------------------------------------------------------------ context menu */
+.context-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 220px;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 5px;
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  animation: slide-in 0.1s ease-out;
+}
+.context-menu .menu-title {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.context-menu hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 4px 2px;
+}
+.context-menu button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  text-align: left;
+}
+.context-menu button:hover:not(:disabled) {
+  background: var(--ui-soft);
+}
+.context-menu .danger-text {
+  color: #ffb3c1;
+}
+.drag-hint.pick.ok {
+  border-color: var(--amber);
+  color: #ffe2b8;
+}
+
+/* -------------------------------------------------------------- search bar */
+.search-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(460px, calc(100% - 32px));
+  padding: 4px 6px 4px 12px;
+  background: var(--brackets), var(--scanlines), var(--surface);
+  border: 1px solid rgba(var(--signal), 0.22);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
+  animation: slide-in 0.12s ease-out;
+}
+.search-bar .ico {
+  color: var(--text-2);
+}
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  padding: 6px 4px;
+  user-select: text;
+}
+.search-bar .count {
+  font: 11px var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ hunk staging */
+table.diff tr.hunk td {
+  position: relative;
+}
+.hunk-btn {
+  position: sticky;
+  float: right;
+  right: 8px;
+  padding: 1px 8px;
+  font: 11px var(--sans);
+  border-color: var(--line-strong);
+  background: var(--bg-2);
+}
+table.diff.pickable tr.ins td[title],
+table.diff.pickable tr.rem td[title] {
+  cursor: pointer;
+}
+table.diff tr.picked td:first-child {
+  box-shadow: inset 3px 0 0 var(--ui-text);
+}
+table.diff tr.picked {
+  outline: 1px solid rgba(143, 124, 255, 0.45);
+  outline-offset: -1px;
+}
+table.diff tr.picked .no {
+  color: var(--ui-text);
+  opacity: 1;
+}
+.chip.staged {
+  margin-left: -4px;
+  color: #fff;
+  background: var(--ui);
+}
+
+/* ---------------------------------------------------------- conflict sheet */
+.conflict-sheet {
+  border-top-color: rgba(229, 72, 95, 0.55);
+}
+.conflict-body {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.conflict-body pre {
+  margin: 0;
+  font: 12px/1.55 var(--mono);
+  white-space: pre-wrap;
+}
+.conflict-body .ctx {
+  color: var(--muted);
+  opacity: 0.7;
+}
+/* The body scrolls; a block keeps its height instead of being squeezed to its header. */
+.block {
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 77, 109, 0.45);
+  overflow: hidden;
+}
+.block.picked {
+  border-color: rgba(79, 209, 165, 0.5);
+}
+.block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 12px;
+  background: rgba(255, 77, 109, 0.08);
+}
+.block.picked .block-head {
+  background: rgba(79, 209, 165, 0.08);
+}
+.block-head button {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+.block-head button.on {
+  background: var(--ui-soft);
+  border-color: var(--focus);
+  font-weight: 600;
+}
+.sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.side {
+  padding: 8px 10px;
+  transition: opacity 0.15s;
+}
+.side em {
+  display: block;
+  font: 600 10px var(--sans);
+  font-style: normal;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.side.ours {
+  background: rgba(34, 232, 255, 0.06);
+  border-right: 1px solid var(--line);
+}
+.side.ours em {
+  color: #9be8ff;
+}
+.side.theirs {
+  background: rgba(255, 61, 242, 0.06);
+}
+.side.theirs em {
+  color: #f7aef3;
+}
+.side.keep {
+  box-shadow: inset 0 0 0 1px rgba(79, 209, 165, 0.55);
+}
+.side.drop {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+.block-edit {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 8px 10px;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  font: 12px/1.55 var(--mono);
+  color: var(--text);
+  background: rgba(143, 124, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(143, 124, 255, 0.4);
+}
+.conflict-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+}
+/* The note takes what is left (and wraps); the buttons keep one line. */
+.conflict-foot > span {
+  min-width: 0;
+}
+.conflict-foot > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------- backport sheet */
+/* Two branch pickers and the counts: on a narrow sheet the counts go to a second line. */
+.backport-sheet .title {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+.backport-sheet select {
+  font: 600 12px var(--mono);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  padding: 3px 6px;
+  max-width: 220px;
+}
+.bp-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.bp-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.bp-list th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font: 600 10px var(--sans);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--panel);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.bp-list td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+.bp-list th:first-child,
+.bp-list td:first-child {
+  width: 1%;
+}
+.bp-list tr.bp-applied,
+.bp-list tr.bp-picked,
+.bp-list tr.bp-ignored {
+  opacity: 0.55;
+}
+.bp-commit {
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0; /* let the summary column take the remaining width */
+  width: 100%;
+}
+.bp-commit:hover .summary {
+  color: var(--ui-text);
+}
+.bp-commit code {
+  color: var(--muted);
+}
+.bp-actions {
+  text-align: right;
+}
+.bp-actions button {
+  padding: 1px 8px;
+  font-size: 11px;
+}
+.chip.bp-missing,
+.chip.bp-applied,
+.chip.bp-picked,
+.chip.bp-ignored {
+  width: auto;
+  padding: 0 7px;
+  font: 600 10px/17px var(--sans);
+}
+.chip.bp-missing {
+  color: var(--amber);
+  background: rgba(255, 184, 77, 0.14);
+}
+.chip.bp-applied,
+.chip.bp-picked {
+  color: var(--lime);
+  background: rgba(166, 255, 77, 0.12);
+}
+.chip.bp-ignored {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+.bp-hint {
+  margin: 12px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.bp-hint code {
+  color: var(--text);
+}
+.bp-overview tbody tr {
+  cursor: pointer;
+}
+.bp-overview tbody tr:hover,
+.bp-overview tbody tr.on {
+  background: var(--ui-soft);
+}
+.bp-overview td:first-child,
+.bp-overview th:first-child {
+  width: auto;
+}
+.bp-overview td:not(:first-child),
+.bp-overview th:not(:first-child) {
+  width: 1%;
+  padding-left: 28px;
+  text-align: right;
+  white-space: nowrap;
+}
+b.bp-missing {
+  color: var(--amber);
+}
+
+/* ------------------------------------------------------------ rebase sheet */
+.rb-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  counter-reset: none;
+}
+.rb-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: grab;
+}
+.rb-list li.dragging {
+  opacity: 0.5;
+  border-color: var(--focus);
+}
+.rb-list li .summary {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rb-list li code {
+  color: var(--muted);
+}
+/* Author and date give way before the summary does. */
+.rb-list li > .muted {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container stage (max-width: 600px) {
+  .rb-list li > .muted {
+    display: none;
+  }
+}
+.rb-list li select {
+  font-size: 11px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  padding: 2px 4px;
+}
+.rb-grip {
+  color: var(--muted);
+  letter-spacing: -2px;
+}
+.rb-move button {
+  padding: 0 5px;
+  font-size: 11px;
+}
+/* Melded commits hang under the one they join; dropped ones are struck out. */
+.rb-list li.rb-squash,
+.rb-list li.rb-fixup {
+  margin-left: 28px;
+  border-style: dashed;
+}
+.rb-list li.rb-drop .summary {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+/* With merges: merges stay as they are (locked), lines start under a divider. */
+.rb-list li.rb-merge {
+  cursor: default;
+  color: var(--text-2);
+  border-style: dotted;
+  background: none;
+}
+.rb-list li.rb-line {
+  cursor: default;
+  min-height: 0;
+  padding: 2px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rb-list li.rb-line.side {
+  color: #a371f7;
+}
+.warn-text {
+  color: var(--amber);
+  font-size: 12px;
+}
+.danger-text {
+  color: var(--red);
+  font-size: 12px;
+}

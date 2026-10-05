@@ -8,9 +8,10 @@ import { getLocale, t } from "../i18n";
 import { openLink } from "../share";
 import { usePro } from "../pro";
 import { diagnostics, recentLog, reportText } from "../report";
-import type { AppInfo, ReportKind } from "../types";
+import type { ReportKind } from "../types";
 import { Segmented } from "./Segmented";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
+import { useLoaded } from "./useLoaded";
 
 const SITE_URL = "https://ddugit.com";
 const PRIVACY_URL = "https://ddugit.com/privacy";
@@ -19,17 +20,7 @@ const GIT_DOWNLOAD_URL = "https://git-scm.com/download";
 /** Settings → About: version, plan, and where to go next. */
 export function AboutSection({ onReport }: { onReport(): void }) {
   const pro = usePro();
-  const [info, setInfo] = useState<AppInfo | null>(null);
-  useEffect(() => {
-    let live = true;
-    api.appInfo().then(
-      (i) => live && setInfo(i),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, []);
+  const info = useLoaded("", api.appInfo).data;
   return (
     <section className="about">
       <h4>{t("about.title")}</h4>
@@ -85,7 +76,6 @@ const KINDS: ReportKind[] = ["bug", "question"];
  * address, and the diagnostics (shown and editable; on by default for a problem only).
  */
 export function ReportDialog({ lastError, onSent, onClose }: ReportProps) {
-  const dialog = useDialog(onClose);
   const [kind, setKind] = useState<ReportKind>("bug");
   const [what, setWhat] = useState("");
   const [email, setEmail] = useState("");
@@ -128,67 +118,12 @@ export function ReportDialog({ lastError, onSent, onClose }: ReportProps) {
   const ready = !!what.trim() && !(withDiag && diag === null) && !sending;
 
   return (
-    <div className="scrim" {...closeOnScrim(onClose)}>
-      <div className="dialog report" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{t(kind === "bug" ? "report.title" : "report.askTitle")}</h2>
-        <Segmented
-          label={t("report.kind")}
-          value={kind}
-          onChange={(k) => {
-            setKind(k);
-            setWithDiag(k === "bug");
-          }}
-          options={KINDS.map((k) => ({ value: k, label: t(k === "bug" ? "report.title" : "report.ask") }))}
-        />
-        <label className="field col">
-          {t(kind === "bug" ? "report.what" : "report.question")}
-          <textarea
-            rows={4}
-            autoFocus
-            placeholder={kind === "bug" ? t("report.whatHint") : undefined}
-            value={what}
-            onChange={(e) => setWhat(e.target.value)}
-          />
-        </label>
-        <label className="field col">
-          {t("report.email")}
-          <input
-            className="text"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={withDiag} onChange={(e) => setWithDiag(e.target.checked)} />
-          {t("report.withDiag")}
-        </label>
-        {withDiag && (
-          <>
-            <textarea
-              className="report-diag"
-              aria-label={t("report.diag")}
-              rows={8}
-              spellCheck={false}
-              value={diag ?? t("report.gathering")}
-              disabled={diag === null}
-              onChange={(e) => setDiag(e.target.value)}
-            />
-            <p className="muted small">{t("report.diagHint")}</p>
-          </>
-        )}
-        {error && (
-          <p className="note warn" role="alert">
-            {error}
-          </p>
-        )}
-        {copied && !error && (
-          <p className="note" role="status">
-            {t("report.copied")}
-          </p>
-        )}
-        <div className="dialog-actions">
+    <Modal
+      onClose={onClose}
+      className="report"
+      title={t(kind === "bug" ? "report.title" : "report.askTitle")}
+      actions={
+        <>
           <button onClick={onClose}>{t("common.close")}</button>
           <button disabled={!what.trim()} onClick={() => void copy()}>
             {t("report.copy")}
@@ -196,9 +131,67 @@ export function ReportDialog({ lastError, onSent, onClose }: ReportProps) {
           <button className="primary" disabled={!ready} onClick={() => void send()}>
             {sending ? t("report.sending") : t("report.send")}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <Segmented
+        label={t("report.kind")}
+        value={kind}
+        onChange={(k) => {
+          setKind(k);
+          setWithDiag(k === "bug");
+        }}
+        options={KINDS.map((k) => ({ value: k, label: t(k === "bug" ? "report.title" : "report.ask") }))}
+      />
+      <label className="field col">
+        {t(kind === "bug" ? "report.what" : "report.question")}
+        <textarea
+          rows={4}
+          autoFocus
+          placeholder={kind === "bug" ? t("report.whatHint") : undefined}
+          value={what}
+          onChange={(e) => setWhat(e.target.value)}
+        />
+      </label>
+      <label className="field col">
+        {t("report.email")}
+        <input
+          className="text"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={withDiag} onChange={(e) => setWithDiag(e.target.checked)} />
+        {t("report.withDiag")}
+      </label>
+      {withDiag && (
+        <>
+          <textarea
+            className="report-diag"
+            aria-label={t("report.diag")}
+            rows={8}
+            spellCheck={false}
+            value={diag ?? t("report.gathering")}
+            disabled={diag === null}
+            onChange={(e) => setDiag(e.target.value)}
+          />
+          <p className="muted small">{t("report.diagHint")}</p>
+        </>
+      )}
+      {error && (
+        <p className="note warn" role="alert">
+          {error}
+        </p>
+      )}
+      {copied && !error && (
+        <p className="note" role="status">
+          {t("report.copied")}
+        </p>
+      )}
+    </Modal>
   );
 }
 
@@ -212,24 +205,26 @@ interface GitMissingProps {
 
 /** Shown at startup when git can't be run: ddugit reads with libgit2 but writes with the git CLI. */
 export function GitMissing({ error, onRecheck, onSetPath, onClose }: GitMissingProps) {
-  const dialog = useDialog(onClose);
   return (
-    <div className="scrim" {...closeOnScrim(onClose)}>
-      <div className="dialog git-missing" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{t("gitMissing.title")}</h2>
-        <p>{t("gitMissing.body")}</p>
-        <p className="muted small">
-          <code>{error}</code>
-        </p>
-        <div className="dialog-actions">
+    <Modal
+      onClose={onClose}
+      className="git-missing"
+      title={t("gitMissing.title")}
+      actions={
+        <>
           <button onClick={onClose}>{t("common.close")}</button>
           <button onClick={onRecheck}>{t("gitMissing.recheck")}</button>
           <button onClick={onSetPath}>{t("gitMissing.setPath")}</button>
           <button className="primary" autoFocus onClick={() => openLink(GIT_DOWNLOAD_URL)}>
             {t("gitMissing.download")}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p>{t("gitMissing.body")}</p>
+      <p className="muted small">
+        <code>{error}</code>
+      </p>
+    </Modal>
   );
 }

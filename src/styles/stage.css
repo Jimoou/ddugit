@@ -1,0 +1,161 @@
+/* The graph stage: canvas, overview, zoom controls and hints. */
+
+/* ------------------------------------------------------------------- stage */
+.stage {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  container: stage / inline-size;
+}
+.stage-graph {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Both axes: the help line and the overview give way on a short graph too (a sheet open, a small window). */
+  container-type: size;
+}
+.graph {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.graph-area {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+.graph-area canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
+}
+.minimap {
+  display: block;
+  width: 100%;
+  border-top: 1px solid var(--line);
+  background: rgba(8, 7, 22, 0.88);
+  cursor: pointer;
+}
+/* Time runs down the screen: the overview stands along the right side. */
+.graph.upright {
+  flex-direction: row;
+}
+.graph.upright .minimap.tall {
+  width: auto;
+  height: auto;
+  border-top: none;
+  border-left: 1px solid var(--line);
+}
+.graph.upright ~ .hud {
+  right: 68px;
+  bottom: 16px;
+}
+.graph.upright ~ .hint {
+  bottom: 16px;
+  max-width: calc(100% - 340px);
+}
+
+.hud {
+  position: absolute;
+  right: 14px;
+  bottom: 70px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.hud button {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.hud button:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+.hud button.turn {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+}
+.hud .deg {
+  font: 10px var(--mono);
+  color: var(--muted);
+}
+.hud .zoom {
+  font: 11px var(--mono);
+  min-width: 42px;
+  text-align: center;
+  color: var(--muted);
+}
+.hint {
+  position: absolute;
+  left: 14px;
+  bottom: 70px;
+  /* Stops short of the zoom controls at the bottom right. */
+  max-width: calc(100% - 290px);
+  font-size: 11px;
+  color: var(--text-2);
+  pointer-events: none;
+  padding: 2px 8px;
+  background: rgba(5, 4, 14, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A narrow or short graph (panel or sheet open, small window) keeps the room for commits, not the help line. */
+@container (max-width: 640px) or (max-height: 420px) {
+  .hint {
+    display: none;
+  }
+}
+/* Too short for the overview strip as well: the zoom controls drop into its place. */
+@container (max-height: 260px) {
+  .minimap:not(.tall) {
+    display: none;
+  }
+  .graph:not(.upright) ~ .hud {
+    bottom: 14px;
+  }
+}
+.drag-hint {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  pointer-events: none;
+}
+.drag-hint.ok {
+  border-color: var(--ok);
+  color: #c9f5e6;
+}
+.drag-hint.bad {
+  border-color: var(--red);
+  color: #ffb3c1;
+}
+.empty-hint {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}

@@ -1,7 +1,7 @@
 // Collision-free placement of ref badges above graph nodes. Pure (screen
 // coordinates in, rectangles out) so it can be unit-tested.
 
-export interface BadgeGroup {
+interface BadgeGroup {
   /** Node centre x. */
   x: number;
   /** Bottom edge of the first badge when not lifted. */
@@ -12,7 +12,7 @@ export interface BadgeGroup {
   priority?: boolean;
 }
 
-export interface PlacedBadge {
+interface PlacedBadge {
   /** Index into the group's `widths`; -1 for the "+N" overflow chip. */
   index: number;
   x: number;

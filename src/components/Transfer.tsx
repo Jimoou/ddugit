@@ -7,7 +7,7 @@ import type { BundleCheck, OpResult, TransferSent } from "../types";
 import { guessName } from "../transfer";
 import { ProBadge } from "./ProOffer";
 import { Segmented } from "./Segmented";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 /**
  * Air-gapped transfer (Pro): write a bundle of what a destination doesn't have yet,
@@ -65,140 +65,141 @@ export function TransferDialog(p: {
     if (r.status === "ok") p.onClose();
   };
 
-  const dialog = useDialog(p.onClose);
   return (
-    <div className="scrim" {...closeOnScrim(p.onClose)}>
-      <div className="dialog transfer" aria-label={t("tr.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">
+    <Modal
+      onClose={p.onClose}
+      className="transfer"
+      label={t("tr.title")}
+      title={
+        <>
           {t("tr.title")} {!pro && <ProBadge />}
-        </h2>
-        <Segmented
-          role="tablist"
-          label={t("tr.title")}
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "out", label: t("tr.out") },
-            { value: "in", label: t("tr.in") },
-          ]}
-        />
+        </>
+      }
+    >
+      <Segmented
+        role="tablist"
+        label={t("tr.title")}
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "out", label: t("tr.out") },
+          { value: "in", label: t("tr.in") },
+        ]}
+      />
 
-        {tab === "out" ? (
-          <>
-            <p className="muted small">{t("tr.outHint")}</p>
-            <label className="field col">
-              <span>{t("tr.dest")}</span>
-              <input
-                className="text"
-                list="transfer-dests"
-                value={dest}
-                placeholder={t("tr.destPlaceholder")}
-                onChange={(e) => setDest(e.target.value)}
-              />
-              <datalist id="transfer-dests">
-                {dests.map((d) => (
-                  <option key={d} value={d} />
-                ))}
-              </datalist>
-            </label>
-            <div className="tr-branches" role="group" aria-label={t("tr.branches")}>
-              {p.branches.map((b) => {
-                const last = lastFor(b);
-                return (
-                  <label key={b} className="check">
-                    <input
-                      type="checkbox"
-                      checked={picked.includes(b)}
-                      onChange={() => setPicked((ps) => (ps.includes(b) ? ps.filter((x) => x !== b) : [...ps, b]))}
-                    />
-                    <span className="mono">{b}</span>
-                    <span className="muted small">
-                      {last && !full
-                        ? t("tr.since", { id: last.tip.slice(0, 7), ago: fmtAgo(last.time) })
-                        : t("tr.everything")}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-            <label className="check">
-              <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} />
-              <span>{t("tr.full")}</span>
-            </label>
-            <div className="dialog-actions">
-              <button onClick={p.onClose}>{t("common.close")}</button>
-              <button
-                className="primary"
-                disabled={p.busy || !dest.trim() || picked.length === 0}
-                onClick={() => void exportNow()}
-              >
-                {t("tr.export")} {!pro && <ProBadge />}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="muted small">{t("tr.inHint")}</p>
-            <div className="field col">
-              <span>{t("tr.pickIn")}</span>
-              <span className="row">
-                <code className="folder" title={file ?? undefined}>
-                  {file ?? t("tr.noFile")}
-                </code>
-                <button onClick={() => void pickBundle()}>{t("tr.pick")}</button>
-              </span>
-            </div>
-            {check && (
-              <div className="tr-check">
-                <p className={check.checksum === "mismatch" ? "note warn" : "muted small"}>
-                  {t(`tr.sum.${check.checksum}`)}
-                </p>
-                {check.missing.length > 0 && (
-                  <p className="note warn">{t("tr.missing", { n: check.missing.length })}</p>
-                )}
-                <ul className="tr-heads">
-                  {check.heads.map((h) => (
-                    <li key={h.name} className="mono small">
-                      {h.name.replace(/^refs\/heads\//, "")} <span className="muted">{h.id.slice(0, 7)}</span>
-                    </li>
-                  ))}
-                </ul>
-                <label className="field col">
-                  <span>{t("tr.as")}</span>
-                  <input className="text" value={name} onChange={(e) => setName(e.target.value)} />
-                </label>
-              </div>
-            )}
-            {error && <p className="note warn">{error}</p>}
-            <div className="dialog-actions">
-              <button onClick={p.onClose}>{t("common.close")}</button>
-              <button
-                className="primary"
-                disabled={p.busy || !check?.ok || !name.trim()}
-                onClick={() => void importNow()}
-              >
-                {t("tr.import")} {!pro && <ProBadge />}
-              </button>
-            </div>
-          </>
-        )}
-
-        {history.length > 0 && tab === "out" && (
-          <details className="tr-history">
-            <summary>{t("tr.history", { n: dests.length })}</summary>
-            <ul>
-              {history.map((h) => (
-                <li key={`${h.dest}:${h.branch}`} className="small">
-                  <b>{h.dest}</b> · <span className="mono">{h.branch}</span>{" "}
-                  <span className="muted">
-                    {h.tip.slice(0, 7)} · {fmtAgo(h.time)}
-                  </span>
-                </li>
+      {tab === "out" ? (
+        <>
+          <p className="muted small">{t("tr.outHint")}</p>
+          <label className="field col">
+            <span>{t("tr.dest")}</span>
+            <input
+              className="text"
+              list="transfer-dests"
+              value={dest}
+              placeholder={t("tr.destPlaceholder")}
+              onChange={(e) => setDest(e.target.value)}
+            />
+            <datalist id="transfer-dests">
+              {dests.map((d) => (
+                <option key={d} value={d} />
               ))}
-            </ul>
-          </details>
-        )}
-      </div>
-    </div>
+            </datalist>
+          </label>
+          <div className="tr-branches" role="group" aria-label={t("tr.branches")}>
+            {p.branches.map((b) => {
+              const last = lastFor(b);
+              return (
+                <label key={b} className="check">
+                  <input
+                    type="checkbox"
+                    checked={picked.includes(b)}
+                    onChange={() => setPicked((ps) => (ps.includes(b) ? ps.filter((x) => x !== b) : [...ps, b]))}
+                  />
+                  <span className="mono">{b}</span>
+                  <span className="muted small">
+                    {last && !full
+                      ? t("tr.since", { id: last.tip.slice(0, 7), ago: fmtAgo(last.time) })
+                      : t("tr.everything")}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} />
+            <span>{t("tr.full")}</span>
+          </label>
+          <div className="dialog-actions">
+            <button onClick={p.onClose}>{t("common.close")}</button>
+            <button
+              className="primary"
+              disabled={p.busy || !dest.trim() || picked.length === 0}
+              onClick={() => void exportNow()}
+            >
+              {t("tr.export")} {!pro && <ProBadge />}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="muted small">{t("tr.inHint")}</p>
+          <div className="field col">
+            <span>{t("tr.pickIn")}</span>
+            <span className="row">
+              <code className="folder" title={file ?? undefined}>
+                {file ?? t("tr.noFile")}
+              </code>
+              <button onClick={() => void pickBundle()}>{t("tr.pick")}</button>
+            </span>
+          </div>
+          {check && (
+            <div className="tr-check">
+              <p className={check.checksum === "mismatch" ? "note warn" : "muted small"}>
+                {t(`tr.sum.${check.checksum}`)}
+              </p>
+              {check.missing.length > 0 && <p className="note warn">{t("tr.missing", { n: check.missing.length })}</p>}
+              <ul className="tr-heads">
+                {check.heads.map((h) => (
+                  <li key={h.name} className="mono small">
+                    {h.name.replace(/^refs\/heads\//, "")} <span className="muted">{h.id.slice(0, 7)}</span>
+                  </li>
+                ))}
+              </ul>
+              <label className="field col">
+                <span>{t("tr.as")}</span>
+                <input className="text" value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+            </div>
+          )}
+          {error && <p className="note warn">{error}</p>}
+          <div className="dialog-actions">
+            <button onClick={p.onClose}>{t("common.close")}</button>
+            <button
+              className="primary"
+              disabled={p.busy || !check?.ok || !name.trim()}
+              onClick={() => void importNow()}
+            >
+              {t("tr.import")} {!pro && <ProBadge />}
+            </button>
+          </div>
+        </>
+      )}
+
+      {history.length > 0 && tab === "out" && (
+        <details className="tr-history">
+          <summary>{t("tr.history", { n: dests.length })}</summary>
+          <ul>
+            {history.map((h) => (
+              <li key={`${h.dest}:${h.branch}`} className="small">
+                <b>{h.dest}</b> · <span className="mono">{h.branch}</span>{" "}
+                <span className="muted">
+                  {h.tip.slice(0, 7)} · {fmtAgo(h.time)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </Modal>
   );
 }

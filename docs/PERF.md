@@ -110,6 +110,11 @@ What is left in the demo's load is the mock backend and React's development buil
   (`fractionAtX`, `sparklesIn`).
 - **Renderer**: visible edges from the row index instead of filtering every edge each frame, folded runs by binary
   search (`runsInRows`). The minimap's static layer strokes one path per colour.
+- **Draw on change** (`GraphCanvas` `wake`): the graph draws a frame only after something drawn changed (props,
+  camera, hover, size, a font loading) and keeps drawing only while something moves (camera easing, ✦ sparkles, new
+  commits' births). With ✦ off an idle tab schedules no frames, and a hidden tab none at all. The minimap draws
+  when the graph does and only if its viewport box moved. Label widths and cuts are remembered per font and text
+  (`renderer.ts` `textWidth`, `truncate`).
 - **Runs** (`graph/runs.ts`): counted in typed arrays by row.
 - **Selection**: "contained in" branches come from one pass over the newer rows (`descendantsOf`) instead of every
   branch tip's ancestry.

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { t } from "../i18n";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 export interface Confirm {
   title: string;
@@ -12,13 +12,13 @@ export interface Confirm {
 }
 
 export function ConfirmDialog({ confirm, busy, onCancel }: { confirm: Confirm; busy: boolean; onCancel(): void }) {
-  const dialog = useDialog(onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(onCancel)}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className={`dialog-title ${confirm.danger ? "danger" : ""}`}>{confirm.title}</h2>
-        <div className="confirm-body">{confirm.body}</div>
-        <div className="dialog-actions">
+    <Modal
+      onClose={onCancel}
+      title={confirm.title}
+      titleClass={confirm.danger ? "danger" : undefined}
+      actions={
+        <>
           <button onClick={onCancel}>{t("common.cancel")}</button>
           <button
             className={confirm.danger ? "danger" : "primary"}
@@ -28,8 +28,10 @@ export function ConfirmDialog({ confirm, busy, onCancel }: { confirm: Confirm; b
           >
             {confirm.confirmLabel}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <div className="confirm-body">{confirm.body}</div>
+    </Modal>
   );
 }

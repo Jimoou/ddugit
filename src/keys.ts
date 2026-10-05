@@ -10,3 +10,8 @@ export function isTypingTarget(t: EventTarget | null): boolean {
   const el = t as { tagName?: unknown; isContentEditable?: unknown } | null;
   return !!el && (el.isContentEditable === true || (typeof el.tagName === "string" && FIELDS.has(el.tagName)));
 }
+
+/** Laid out on screen: hidden tabs keep their panels mounted, and only the visible tab's take keys. */
+export function isOnScreen(el: Element | null | undefined): boolean {
+  return !!el?.getClientRects().length;
+}

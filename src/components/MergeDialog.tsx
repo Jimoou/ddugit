@@ -1,6 +1,6 @@
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import { closeOnScrim, useDialog } from "./useDialog";
+import { Modal } from "./Modal";
 
 interface Props {
   source: string;
@@ -15,34 +15,35 @@ interface Props {
 }
 
 export function MergeDialog(p: Props) {
-  const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" {...closeOnScrim(p.onCancel)}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
-        <h2 className="dialog-title">{t("merge.title")}</h2>
-        <div className="merge-flow">
-          <span className="chip-lg" style={{ ["--c" as string]: p.sourceColor }}>
-            {p.source}
-          </span>
-          <span className="flow-arrow" aria-hidden>
-            <i />
-          </span>
-          <span className="chip-lg" style={{ ["--c" as string]: p.targetColor }}>
-            {p.target}
-          </span>
-        </div>
-        <p>
-          <Rich k="merge.body" vars={{ source: p.source, target: p.target }} />
-        </p>
-        {p.switchesBranch && <p className="note">{t("merge.switch", { target: p.target })}</p>}
-        {p.dirty > 0 && <p className="note warn">{t("merge.dirty", { n: p.dirty })}</p>}
-        <div className="dialog-actions">
+    <Modal
+      onClose={p.onCancel}
+      title={t("merge.title")}
+      actions={
+        <>
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
           <button className="primary" autoFocus disabled={p.busy} onClick={p.onConfirm}>
             {p.busy ? t("merge.going") : t("merge.go")}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="merge-flow">
+        <span className="chip-lg" style={{ ["--c" as string]: p.sourceColor }}>
+          {p.source}
+        </span>
+        <span className="flow-arrow" aria-hidden>
+          <i />
+        </span>
+        <span className="chip-lg" style={{ ["--c" as string]: p.targetColor }}>
+          {p.target}
+        </span>
       </div>
-    </div>
+      <p>
+        <Rich k="merge.body" vars={{ source: p.source, target: p.target }} />
+      </p>
+      {p.switchesBranch && <p className="note">{t("merge.switch", { target: p.target })}</p>}
+      {p.dirty > 0 && <p className="note warn">{t("merge.dirty", { n: p.dirty })}</p>}
+    </Modal>
   );
 }
