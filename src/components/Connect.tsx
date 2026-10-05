@@ -306,7 +306,7 @@ export function CloneDialog(p: {
         }}
         {...dialog}
       >
-        <h2 className="dialog-title">{t("connect.clone")}</h2>
+        <h2 className="dialog-title">{t("connect.clone.title")}</h2>
         <div className="source-body">
           <SourceTabs value={source} onChange={chooseSource} disabled={running} />
           <div className="source-pane">

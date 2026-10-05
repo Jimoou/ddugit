@@ -267,7 +267,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 ### M16 · v1.0 출시
 
-- [ ] 첫 실행 안내·영문 문구 점검, 큰 저장소 성능 확인, 문제 신고 경로 (문제 신고·첫 실행: 2026-10-05)
+- [x] 첫 실행 안내·영문 문구 점검, 큰 저장소 성능 확인, 문제 신고 경로 (문제 신고·첫 실행: 2026-10-05) (영문 문구: 2026-10-05)
   - 큰 저장소 성능 확인(2026-10-05): 커밋 100,000개·참조 603개 합성 저장소로 측정하고 고침. 방법·전후 수치·다시 재는 법은 [docs/PERF.md](docs/PERF.md)
 - [ ] v1.0.0 출시
 - [ ] (출시 뒤) Windows 서명(Microsoft Store 또는 Certum)
@@ -397,3 +397,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-05 | v0.8.0 버전 올림: GitKraken 대비 기능(#109–#111), UI/UX 점검(#112–#115), 평생 라이선스·기기 3대·체험 제거(#116)                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 2026-10-05 | 문제 신고·문의: 설정 '정보'(버전·플랜·링크)와 예상 밖 오류 토스트의 '신고'에서 여는 창(`components/Report.tsx`), 진단 정보는 보내기 전에 보이고 고칠 수 있음(`redact.ts`: 경로·URL·이메일·토큰 가리기, `report.ts`: 세션 오류 로그·진단 정보), `report.rs`로 `ddugit.com/api/report`에 HTTPS 전송·복사. 첫 실행: `git_version` 확인과 'Git을 찾을 수 없어요' 안내, 환영 화면 힌트(끌어다 놓기·GitHub/GitLab 복제·`?` 단축키). `about.rs`, open_url은 https만. vitest +13, cargo test +5, e2e +5                           |
 | 2026-10-05 | 큰 저장소 성능(M3·M16): 합성 저장소(커밋 100k, `scripts/perf/gen.py`)로 측정(`#[ignore]` 벤치, `scripts/perf/bench.mjs`, 데모 `loadHistory`·`diffs`). 이력 읽기 시각 순 직접 걷기 + `children_first`(3k: 1.4초 → 0.07초, cargo test +1), 레이아웃 행 번호(100k 349 → 120ms), 장면은 경계 상자·행 색인만(838 → 7ms), 접힌 구간·스파클·미니맵·사이드바 행·포함 브랜치, diff·파일 목록 가상 스크롤(`components/virtual.ts`, 파일당 50,000줄). Worker·WebGL 보류. vitest +10, `docs/PERF.md`                                  |
+| 2026-10-05 | 영문 문구 다듬기: 복수형 도우미(`{n:commit\|commits}`·`{:file\|files}`, `(s)` 금지, vitest +4)로 "1 commits" 없앰, 대화상자를 여는 메뉴에 "…"(병합·cherry-pick·revert·백포트), clone 창 제목 키 분리, Git LFS·Settings 표기 통일, 반출입 Export/Import, 라이선스 해제는 Deactivate, 단축키 표 cherry-pick을 사전으로                                                                                                                                                                                                      |

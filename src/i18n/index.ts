@@ -73,18 +73,28 @@ export function josa(word: string, particle: string): string {
   return sound === 0 || (sound === 2 && pair[0] === "으로") ? pair[1] : pair[0];
 }
 
+/** The English noun form that fits a count: `forms` is "singular|plural". */
+export function plural(count: string, forms: string): string {
+  const [one, many] = forms.split("|");
+  return Number(count) === 1 ? one : many;
+}
+
 /**
  * Fill `{name}` placeholders. `{name:을}` adds the particle that fits the value;
  * `{:을}` adds only the particle, for the placeholder before it, when markup or
- * quotes sit between (`<b>{name}</b>{:을}`).
+ * quotes sit between (`<b>{name}</b>{:을}`). A suffix with a bar is an English
+ * plural instead: `{n:commit|commits}` gives "1 commit" or "2 commits", and
+ * `{:is|are}` only the word, for the count before it.
  */
 export function fill(text: string, vars: Record<string, string | number>): string {
   let last = "";
+  const suffix = (s: string) => (s.includes("|") ? plural(last, s) : josa(last, s));
   return text.replace(/\{(\w*)(?::([^}]+))?\}/g, (m, k: string, particle?: string) => {
-    if (!k) return particle ? josa(last, particle) : m;
+    if (!k) return particle ? suffix(particle) : m;
     if (!(k in vars)) return m;
     last = String(vars[k]);
-    return particle ? last + josa(last, particle) : last;
+    if (!particle) return last;
+    return particle.includes("|") ? `${last} ${plural(last, particle)}` : last + josa(last, particle);
   });
 }
 
