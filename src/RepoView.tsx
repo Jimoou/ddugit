@@ -641,12 +641,9 @@ export function RepoView({
       title: t("empty.title"),
       confirmLabel: t("empty.skip"),
       body: (
-        <>
-          <p>
-            <Rich k="empty.body" vars={{ branch: latest.current?.head.branch ?? "HEAD" }} />
-          </p>
-          <p className="muted small">{t("empty.later")}</p>
-        </>
+        <p>
+          <Rich k="empty.body" vars={{ branch: latest.current?.head.branch ?? "HEAD" }} />
+        </p>
       ),
       onConfirm: () => {
         setConfirm(null);
@@ -2228,7 +2225,7 @@ export function RepoView({
                 body: (
                   <>
                     <p>
-                      <Rich k="discard.body" /> <b>{t("discard.warn")}</b> {t("discard.hint")}
+                      <Rich k="discard.body" /> <b>{t("discard.warn")}</b>
                     </p>
                     <ul>
                       {paths.map((p) => (

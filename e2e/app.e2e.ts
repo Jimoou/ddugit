@@ -239,7 +239,7 @@ test("opens backport from the sidebar with a guide, into the current branch", as
   await expect(sheet.getByLabel("받는 쪽")).toHaveValue(snap.head.branch!);
   await expect(sheet.getByLabel("가져올 쪽")).not.toHaveValue(snap.head.branch!);
   const guide = sheet.locator(".bp-guide");
-  await expect(guide.locator("ol li")).toHaveCount(4);
+  await expect(guide.locator("ol li")).toHaveCount(3);
   // Folded once, it stays folded.
   await guide.locator(".bp-guide-head").click();
   await expect(guide.locator("ol")).toHaveCount(0);
@@ -444,7 +444,7 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   await page.keyboard.press("?");
   const dialog = page.getByRole("dialog", { name: "설정" });
   const lic = dialog.locator("section.license");
-  await expect(lic).toContainText("Free로도 Git 작업은 모두");
+  await expect(lic).toContainText("ddugit.com 계정으로 로그인해 활성화");
   await lic.getByLabel("라이선스 붙여 넣기").fill("not a license");
   await lic.getByRole("button", { name: "라이선스 적용" }).click();
   await expect(lic.locator(".note.warn")).toContainText("not a ddugit license");
@@ -453,7 +453,7 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   await expect(lic).toContainText("Demo Corp");
   await expect(lic).toContainText("2027-10-02까지 나온 버전");
   await lic.getByRole("button", { name: /라이선스 지우기/ }).click();
-  await expect(lic).toContainText("Free로도 Git 작업은 모두");
+  await expect(lic).toContainText("ddugit.com 계정으로 로그인해 활성화");
 });
 
 test("settings: Pro is activated by signing in on ddugit.com, and the wait can be cancelled", async ({ demo }) => {
