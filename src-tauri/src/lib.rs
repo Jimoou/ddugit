@@ -496,6 +496,35 @@ mod tests {
         }
     }
 
+    /// The release webview runs only the app's own scripts and talks only to the
+    /// backend; the platform files must not loosen that.
+    #[test]
+    fn the_release_window_runs_only_its_own_scripts() {
+        let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let security = &conf["app"]["security"];
+        assert_eq!(security["freezePrototype"], true);
+        let csp = security["csp"].as_str().unwrap();
+        let directive = |name: &str| {
+            csp.split(';')
+                .map(str::trim)
+                .find_map(|d| d.strip_prefix(name)?.strip_prefix(' '))
+                .unwrap_or_else(|| panic!("no {name} in {csp}"))
+                .to_string()
+        };
+        assert_eq!(directive("default-src"), "'self'");
+        assert_eq!(directive("script-src"), "'self'");
+        assert_eq!(directive("connect-src"), "ipc: http://ipc.localhost");
+        assert_eq!(directive("object-src"), "'none'");
+        assert_eq!(directive("frame-ancestors"), "'none'");
+        for platform in [
+            include_str!("../tauri.macos.conf.json"),
+            include_str!("../tauri.windows.conf.json"),
+        ] {
+            let conf: serde_json::Value = serde_json::from_str(platform).unwrap();
+            assert!(conf["app"]["security"].is_null(), "{platform}");
+        }
+    }
+
     #[test]
     fn the_first_plain_argument_is_the_repository_to_open() {
         let args = |a: &[&str]| repo_arg(a.iter().map(|s| s.to_string()));
