@@ -4,6 +4,7 @@ import { api, DEMO_PATH, isTauri } from "./api";
 import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
+import { Boundary, TabCrash } from "./components/Crash";
 import { Galaxy } from "./components/Galaxy";
 import { SettingsDialog, type SettingsSection } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
@@ -307,18 +308,30 @@ export default function App() {
       <UpdateNotice onError={(text) => toast("err", text)} />
       {tabs.list.map((tab) =>
         tab.path ? (
-          <RepoView
+          // One tab's crash leaves the others (and the window) working.
+          <Boundary
             key={tab.id}
-            path={tab.path}
-            active={!home && tab.id === tabs.active}
-            settings={settings}
-            page={page}
-            toast={toast}
-            onLoaded={onLoaded}
-            onChangeSettings={updateSettings}
-            onOpenPath={openPath}
-            onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
-          />
+            fallback={(error, reload) => (
+              <TabCrash
+                error={error}
+                active={!home && tab.id === tabs.active}
+                onReload={reload}
+                onReport={(text) => setReport({ error: text })}
+              />
+            )}
+          >
+            <RepoView
+              path={tab.path}
+              active={!home && tab.id === tabs.active}
+              settings={settings}
+              page={page}
+              toast={toast}
+              onLoaded={onLoaded}
+              onChangeSettings={updateSettings}
+              onOpenPath={openPath}
+              onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
+            />
+          </Boundary>
         ) : null,
       )}
       {welcome && (

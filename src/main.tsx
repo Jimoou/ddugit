@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { AppCrash, Boundary } from "./components/Crash";
 import { animatePopupsLeaving } from "./leaving";
 import { captureErrors } from "./report";
 
@@ -10,6 +11,8 @@ animatePopupsLeaving();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    <Boundary fallback={(error) => <AppCrash error={error} />}>
+      <App />
+    </Boundary>
   </React.StrictMode>,
 );

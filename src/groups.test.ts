@@ -9,6 +9,7 @@ import {
   ownerOf,
   suggestGroup,
   parseGroups,
+  parseStringList,
   removeGroup,
   updateGroup,
 } from "./groups";
@@ -96,5 +97,22 @@ describe("grouping suggestions", () => {
     const groups = addGroup([], "g", "G");
     expect(suggestGroup(assignGroup(list, ["/w/a", "/w/b", "/w/c"], "g"), origins, groups, [])).toBeNull();
     expect(suggestGroup([repo("/w/a"), repo("/w/b")], origins, [], [])).toBeNull();
+  });
+});
+
+describe("stored string lists", () => {
+  it.each([
+    ['["a","b"]', ["a", "b"]],
+    ['["a",1,null,"b"]', ["a", "b"]],
+    ["{}", []],
+    ['"x"', []],
+    ["null", []],
+    ["not json", []],
+    ["", []],
+  ])("%s", (raw, out) => {
+    expect(parseStringList(raw)).toEqual(out);
+  });
+  it("reads nothing as empty", () => {
+    expect(parseStringList(null)).toEqual([]);
   });
 });

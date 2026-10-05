@@ -9,7 +9,7 @@ import { fmtAgo } from "../format";
 import { fetchable, pullable, signals, switchable, tally } from "../galaxy";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import { bands, nextHue, type RepoGroup, suggestGroup } from "../groups";
+import { bands, nextHue, parseStringList, type RepoGroup, suggestGroup } from "../groups";
 import { FREE_DASHBOARD, offerPro, proOpen, usePro } from "../pro";
 import { repoName } from "../recent";
 import type { RepoGlance } from "../types";
@@ -65,7 +65,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
   const [dropOn, setDropOn] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem(HINTS) ?? "[]") as string[];
+      return parseStringList(localStorage.getItem(HINTS));
     } catch {
       return [];
     }
@@ -402,7 +402,7 @@ export function Galaxy({ recent, confirmFetch, onOpen, onOpenMany, toast }: Prop
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       setDropOn(null);
-      const paths = JSON.parse(e.dataTransfer.getData(DRAG) || "[]") as string[];
+      const paths = parseStringList(e.dataTransfer.getData(DRAG));
       if (paths.length) moveTo(paths, id);
     },
   });

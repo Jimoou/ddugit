@@ -1,6 +1,7 @@
 import { Icon } from "./components/Icon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH } from "./api";
+import { demoControls } from "./mock";
 import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
@@ -187,6 +188,7 @@ export function RepoView({
   onRepoMenu,
   onOpenPath,
 }: RepoViewProps) {
+  if (import.meta.env.DEV && path === DEMO_PATH && demoControls.crashTab) throw new Error("Demo tab crashed");
   const [snap, setSnap] = useState<RepoSnapshot | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
