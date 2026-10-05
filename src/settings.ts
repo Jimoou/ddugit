@@ -3,6 +3,8 @@
 
 import type { Turn } from "./graph/renderer";
 import type { Key, LanguagePref } from "./i18n";
+import { parseProfiles } from "./identity";
+import type { Profile } from "./types";
 
 export interface Settings {
   /** Sparkles flowing along edges and node birth bursts. */
@@ -27,6 +29,8 @@ export interface Settings {
   trustedForgeHosts: string[];
   /** Ask before each kind of remote work (fetch only reads, so it isn't asked by default). */
   confirmRemote: Record<"fetch" | "pull" | "push", boolean>;
+  /** Saved identities (name, email, signing key) to apply to repositories or globally. */
+  profiles: Profile[];
 }
 
 export const HISTORY_PAGES = [1000, 3000, 10000] as const;
@@ -45,6 +49,7 @@ export function defaults(reducedMotion = false): Settings {
     closedSections: [],
     trustedForgeHosts: [],
     confirmRemote: { fetch: false, pull: true, push: true },
+    profiles: [],
   };
 }
 
@@ -86,6 +91,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
         ? o.trustedForgeHosts
         : base.trustedForgeHosts,
     confirmRemote: parseConfirm(o.confirmRemote, base.confirmRemote),
+    profiles: parseProfiles(o.profiles) ?? base.profiles,
   };
 }
 

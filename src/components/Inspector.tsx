@@ -1,12 +1,14 @@
 import { Icon } from "./Icon";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api";
 import { fmtAgo, fmtTime } from "../format";
-import type { CommitInfo, FileDiff, RefInfo } from "../types";
+import type { CommitInfo, FileDiff, RefInfo, Signature } from "../types";
 import { ChangedFiles } from "./ChangedFiles";
 import type { MenuItem } from "./ContextMenu";
 import { t } from "../i18n";
 
 interface Props {
+  path: string;
   commit: CommitInfo;
   /** Refs on this commit (pull requests included, as graph labels). */
   refs: RefInfo[];
@@ -26,6 +28,39 @@ interface Props {
   onFileMenu?(path: string, x: number, y: number): void;
 }
 
+const SIG_LABEL = { verified: "sig.verified", unverified: "sig.unverified", bad: "sig.bad" } as const;
+
+/** The commit's signature, checked on demand (not part of the snapshot: it runs gpg / ssh-keygen). */
+function useSignature(path: string, id: string): Signature | null {
+  const [loaded, setLoaded] = useState<{ id: string; sig: Signature } | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.signature(path, id).then(
+      (sig) => live && setLoaded({ id, sig }),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [path, id]);
+  return loaded && loaded.id === id ? loaded.sig : null;
+}
+
+/** "Signed" and the like, with who signed on hover; nothing for an unsigned commit. */
+function SignatureBadge({ sig }: { sig: Signature | null }) {
+  if (!sig || sig.status === "none") return null;
+  const who = sig.signer || sig.key;
+  return (
+    <span
+      className={`sig sig-${sig.status}`}
+      title={who ? t("sig.title", { signer: sig.signer || "?", key: sig.key || "?" }) : t("sig.unknown")}
+    >
+      <Icon name={sig.status === "bad" ? "close" : "check"} size={10} />
+      {t(SIG_LABEL[sig.status])}
+    </span>
+  );
+}
+
 /** Up to this many containing branches are listed; the rest are counted. */
 const CONTAINED = 6;
 
@@ -37,6 +72,7 @@ const CONTAINED = 6;
 export function Inspector(props: Props) {
   const { commit, refs, containedIn, files, color, isHead, onClose, onSelect, onOpenFile } = props;
   const [copied, setCopied] = useState(false);
+  const signature = useSignature(props.path, commit.id);
   const body = commit.message.split("\n").slice(1).join("\n").trim();
   const tools = props.actions.filter((a): a is Exclude<MenuItem, "separator"> => a !== "separator" && !!a.icon);
   const copy = () => {
@@ -71,6 +107,7 @@ export function Inspector(props: Props) {
         <span className="muted" title={fmtTime(commit.time)}>
           · {fmtAgo(commit.time)}
         </span>
+        <SignatureBadge sig={signature} />
       </div>
       <div className="ids">
         <button className="sha" onClick={copy} title={t("inspector.copy")}>

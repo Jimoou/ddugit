@@ -3,6 +3,7 @@ import { api } from "../api";
 import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
+import { ProfilesSection } from "./Identity";
 import { LicenseSection } from "./License";
 
 interface Props {
@@ -109,6 +110,8 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
             </select>
           </label>
         </section>
+
+        <ProfilesSection profiles={settings.profiles} onProfiles={(profiles) => onChange({ profiles })} />
 
         <LicenseSection />
 

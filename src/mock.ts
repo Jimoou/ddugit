@@ -9,6 +9,8 @@ import type {
   CommitInfo,
   FileChange,
   FileDiff,
+  Identity,
+  IdentityOp,
   OpResult,
   OpStatus,
   PullRequest,
@@ -17,6 +19,7 @@ import type {
   ReflogEntry,
   RepoGlance,
   RepoSnapshot,
+  Signature,
   SubmoduleInfo,
   TodoItem,
 } from "./types";
@@ -37,6 +40,53 @@ const demoLfs = {
   missing: ["art/cover.psd", "assets/hero.png", "assets/nebula.png"],
 };
 const demoSsh = { keys: [] as { name: string; public: string }[], trusted: [] as string[] };
+
+/** The demo's git config for identity and signing: global, and each repository's own. */
+type DemoConfig = Partial<Record<"name" | "email" | "sign" | "format" | "key", string>>;
+const demoIdentity = {
+  global: { name: "Demo Pilot", email: "pilot@ddugit.dev" } as DemoConfig,
+  local: new Map<string, DemoConfig>(),
+};
+function demoReadIdentity(path: string | null): Identity {
+  const local = (path && demoIdentity.local.get(path)) || {};
+  const at = (k: keyof DemoConfig) => {
+    if (local[k] !== undefined) return { value: local[k], scope: "local" };
+    if (demoIdentity.global[k] !== undefined) return { value: demoIdentity.global[k], scope: "global" };
+    return null;
+  };
+  const sign = at("sign");
+  return {
+    name: at("name"),
+    email: at("email"),
+    sign: sign && { value: sign.value === "true", scope: sign.scope },
+    format: at("format"),
+    key: at("key"),
+  };
+}
+function demoSetIdentity(path: string | null, op: IdentityOp): OpResult | string {
+  if (op.scope === "local" && !path) return "No repository to set this for";
+  const cfg = op.scope === "global" ? demoIdentity.global : (demoIdentity.local.get(path!) ?? {});
+  if (op.kind === "apply") {
+    if (!op.profile.name.trim() || !op.profile.email.trim()) return "Name can't be empty or span lines";
+    Object.assign(cfg, { name: op.profile.name.trim(), email: op.profile.email.trim() });
+    if (op.profile.signing)
+      Object.assign(cfg, { sign: "true", format: op.profile.signing.format, key: op.profile.signing.key });
+    else for (const k of ["sign", "format", "key"] as const) delete cfg[k];
+  } else if (op.kind === "sign") cfg.sign = String(op.on);
+  else for (const k of Object.keys(cfg) as (keyof DemoConfig)[]) delete cfg[k];
+  if (op.scope === "local") demoIdentity.local.set(path!, cfg);
+  return { status: "ok", output: "" };
+}
+/** Signatures on seeded commits (by summary), and commits made while signing was on. */
+const DEMO_SIGNED: Record<string, Signature> = {
+  "Zoom to cursor": {
+    status: "verified",
+    signer: "Jimin <jimin@ddugit.dev>",
+    key: "SHA256:+i8Ls5u5p/tmc0Ro2eG4a2sKWA5KhHz2eKb14CYU8lU",
+  },
+  Minimap: { status: "unverified", signer: "", key: "4AEE18F83AFDEB23" },
+};
+const demoSigned = new Set<string>();
 
 /** Where the demo repository "is" on disk. */
 const DEMO_ROOT = "/demo/ddugit-demo";
@@ -695,6 +745,37 @@ function mockBisect() {
   return { bad: b.bad, good: b.good, skipped: b.skipped, current, culprit, candidates };
 }
 
+/** A commit in the demo (signing is noted by `git_commit`). */
+function demoCommit({ message, paths, amend, stagedOnly }: Args<"git_commit">): Promise<OpResult> {
+  if (!message.trim()) return fail("Commit message is empty");
+  if (repo.pending) {
+    // Concluding a merge: needs every conflict resolved, then a two-parent commit.
+    if (repo.changes.some((c) => c.conflicted))
+      return fail("Committing is not possible because you have unmerged files.");
+    repo.add(repo.head, message.split("\n")[0], [repo.pending.source]);
+    repo.pending = null;
+    repo.state = "clean";
+    repo.changes = repo.changes.filter((c) => c.unstaged && !c.staged);
+    return delay(res("ok"));
+  }
+  if (stagedOnly) {
+    if (!repo.changes.some((c) => c.staged)) return fail("nothing added to commit");
+    repo.add(repo.head, message.split("\n")[0]);
+    repo.changes = repo.changes.map((c) => ({ ...c, staged: null })).filter((c) => c.unstaged);
+    return delay(res("ok"));
+  }
+  const set = new Set(paths.length || amend ? paths : repo.changes.map((c) => c.path));
+  if (!amend && !repo.changes.some((c) => set.has(c.path))) return fail("Nothing to commit");
+  if (amend) {
+    // Replace the tip with a new commit that has the same parents.
+    const old = repo.commits.get(repo.branches.get(repo.head)!)!;
+    const id = repo.commit(old.parents, message.split("\n")[0], old.author);
+    repo.branches.set(repo.head, id);
+  } else repo.add(repo.head, message.split("\n")[0]);
+  repo.changes = repo.changes.filter((c) => !set.has(c.path));
+  return delay(res("ok", `[${repo.head}] ${message}`));
+}
+
 type Table = { [C in Command]: (args: Args<C>) => Promise<Ret<C>> };
 
 const mockTable: Table = {
@@ -720,34 +801,27 @@ const mockTable: Table = {
   repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
   repo_glance: ({ paths }) => delay(paths.map(demoGlance)),
 
-  git_commit({ message, paths, amend, stagedOnly }) {
-    if (!message.trim()) return fail("Commit message is empty");
-    if (repo.pending) {
-      // Concluding a merge: needs every conflict resolved, then a two-parent commit.
-      if (repo.changes.some((c) => c.conflicted))
-        return fail("Committing is not possible because you have unmerged files.");
-      repo.add(repo.head, message.split("\n")[0], [repo.pending.source]);
-      repo.pending = null;
-      repo.state = "clean";
-      repo.changes = repo.changes.filter((c) => c.unstaged && !c.staged);
-      return delay(res("ok"));
-    }
-    if (stagedOnly) {
-      if (!repo.changes.some((c) => c.staged)) return fail("nothing added to commit");
-      repo.add(repo.head, message.split("\n")[0]);
-      repo.changes = repo.changes.map((c) => ({ ...c, staged: null })).filter((c) => c.unstaged);
-      return delay(res("ok"));
-    }
-    const set = new Set(paths.length || amend ? paths : repo.changes.map((c) => c.path));
-    if (!amend && !repo.changes.some((c) => set.has(c.path))) return fail("Nothing to commit");
-    if (amend) {
-      // Replace the tip with a new commit that has the same parents.
-      const old = repo.commits.get(repo.branches.get(repo.head)!)!;
-      const id = repo.commit(old.parents, message.split("\n")[0], old.author);
-      repo.branches.set(repo.head, id);
-    } else repo.add(repo.head, message.split("\n")[0]);
-    repo.changes = repo.changes.filter((c) => !set.has(c.path));
-    return delay(res("ok", `[${repo.head}] ${message}`));
+  async git_commit(args) {
+    const r = await demoCommit(args);
+    const id = demoReadIdentity(args.path);
+    if (r.status === "ok" && id.sign?.value && id.key) demoSigned.add(repo.branches.get(repo.head)!);
+    return r;
+  },
+  identity_read: ({ path }) => delay(demoReadIdentity(path), 40),
+  git_identity({ path, op }) {
+    const r = demoSetIdentity(path, op);
+    return typeof r === "string" ? fail(r) : delay(r);
+  },
+  signing_keys: () =>
+    delay({
+      gpg: [{ id: "3AA5C34371567BD2", label: "Demo Pilot <pilot@ddugit.dev>" }],
+      ssh: [{ id: "/home/pilot/.ssh/id_ed25519.pub", label: "id_ed25519 · pilot@ddugit.dev" }],
+    }),
+  commit_signature({ id }) {
+    const c = repo.commits.get(id);
+    if (!c) return fail(`bad revision '${id}'`);
+    const own: Signature = { status: "verified", signer: demoIdentity.global.name ?? "", key: "SHA256:demo" };
+    return delay(DEMO_SIGNED[c.summary] ?? (demoSigned.has(id) ? own : { status: "none", signer: "", key: "" }), 30);
   },
 
   git_merge({ source, target }) {

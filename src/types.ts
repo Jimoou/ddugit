@@ -517,3 +517,56 @@ export interface LfsStatus {
 
 export type LfsOp =
   { kind: "install" } | { kind: "pull" } | { kind: "track"; pattern: string } | { kind: "untrack"; pattern: string };
+
+// --- identity and signing (git/identity.rs) ---
+
+/** Where git found a config value. */
+export type ConfigScope = "local" | "global" | "system" | "worktree" | "command" | (string & {});
+export interface Setting<T> {
+  value: T;
+  scope: ConfigScope;
+}
+/** The identity and signing setup commits use right now; `null` where nothing is set. */
+export interface Identity {
+  name: Setting<string> | null;
+  email: Setting<string> | null;
+  /** `commit.gpgsign`. */
+  sign: Setting<boolean> | null;
+  /** `gpg.format` (unset means openpgp). */
+  format: Setting<string> | null;
+  /** `user.signingkey`. */
+  key: Setting<string> | null;
+}
+export type SignFormat = "openpgp" | "ssh";
+export interface Signing {
+  format: SignFormat;
+  /** GPG: key id. SSH: path to a `.pub` file, or `key::ssh-ed25519 …`. */
+  key: string;
+}
+/** A saved identity, kept in the app's settings and applied to repositories or globally. */
+export interface Profile {
+  name: string;
+  email: string;
+  signing: Signing | null;
+}
+export type IdentityScope = "local" | "global";
+export type IdentityOp =
+  | { kind: "apply"; scope: IdentityScope; profile: Profile }
+  | { kind: "sign"; scope: IdentityScope; on: boolean }
+  | { kind: "clear"; scope: IdentityScope };
+/** A key that can sign; `id` is what goes in `user.signingkey`. */
+export interface SigningKey {
+  id: string;
+  label: string;
+}
+export interface SigningKeys {
+  /** `null` when gpg isn't installed. */
+  gpg: SigningKey[] | null;
+  ssh: SigningKey[];
+}
+export type SignatureStatus = "verified" | "unverified" | "bad" | "none";
+export interface Signature {
+  status: SignatureStatus;
+  signer: string;
+  key: string;
+}

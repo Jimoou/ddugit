@@ -1587,3 +1587,74 @@ test("on Free, batch pull and branch switching offer Pro", async ({ demo }) => {
     .click();
   await expect(page.locator(".dialog.pro-offer")).toContainText("여러 저장소");
 });
+
+test("identity: a profile made in settings is applied to the repository from the composer", async ({ demo }) => {
+  const { page } = demo;
+  await page.locator(".tabrow-settings").click();
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  const profiles = dialog.locator("section.profiles");
+  await expect(profiles.locator(".global-identity")).toContainText("Demo Pilot <pilot@ddugit.dev>");
+  // First use: offered to start from the global identity.
+  await expect(profiles.locator(".offer")).toContainText("첫 프로필");
+
+  await profiles.getByRole("button", { name: "+ 프로필 추가" }).click();
+  await profiles.getByPlaceholder("you@example.com").fill("kim.corp.example");
+  await profiles.getByPlaceholder("Hong Gildong").fill("Kim Work");
+  await profiles.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(profiles.locator(".note.warn")).toHaveText("이메일 형식이 아니에요");
+  await profiles.getByPlaceholder("you@example.com").fill("kim@corp.example");
+  await profiles.locator(".profile-form select").selectOption("ssh");
+  await profiles.getByPlaceholder(/공개 키 경로/).fill("/home/pilot/.ssh/id_ed25519.pub");
+  await profiles.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(profiles.locator(".profile-list li")).toContainText("Kim Work <kim@corp.example>");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).profiles)).toEqual([
+    { name: "Kim Work", email: "kim@corp.example", signing: { format: "ssh", key: "/home/pilot/.ssh/id_ed25519.pub" } },
+  ]);
+  await dialog.locator(".dialog-actions button.primary").click();
+
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  const line = page.locator(".composer .identity-line");
+  await expect(line.locator(".who")).toHaveText("Demo Pilot <pilot@ddugit.dev>");
+  await expect(line.locator(".scope")).toHaveText("전역");
+  await line.getByRole("button", { name: "커밋할 사람 바꾸기" }).click();
+  await page
+    .locator(".context-menu")
+    .getByRole("menuitem", { name: /Kim Work/ })
+    .click();
+  await demo.toast("이 저장소는 Kim Work(으)로 커밋해요");
+  await expect(line.locator(".who")).toHaveText("Kim Work <kim@corp.example>");
+  await expect(line.locator(".scope")).toHaveText("이 저장소");
+  await expect(line.locator(".signs")).toBeVisible();
+
+  // Commits made now are signed, and the inspector says so.
+  await page.fill("textarea.message", "Signed by the work profile");
+  await page.keyboard.press("Control+Enter");
+  await demo.toast("커밋했어요");
+  const head = (await demo.snapshot()).head.target!;
+  const at = (await demo.screenOf(head))!;
+  await page.mouse.click(at.x, at.y);
+  await expect(page.locator(".inspector .sig")).toHaveText("서명됨");
+
+  // Back to the global identity.
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await line.getByRole("button", { name: "커밋할 사람 바꾸기" }).click();
+  await page.locator(".context-menu").getByRole("menuitem", { name: "전역 설정 따르기" }).click();
+  await expect(line.locator(".who")).toHaveText("Demo Pilot <pilot@ddugit.dev>");
+  await expect(line.locator(".signs")).toHaveCount(0);
+});
+
+test("inspector: shows whether a commit is signed", async ({ demo }) => {
+  const { page } = demo;
+  const head = (await demo.snapshot()).head.target!;
+  const at = (await demo.screenOf(head))!;
+  await page.mouse.click(at.x, at.y);
+  const sig = page.locator(".inspector .sig");
+  await expect(sig).toHaveText("서명됨");
+  await expect(sig).toHaveAttribute("title", /Jimin <jimin@ddugit.dev>/);
+  await page.locator(".inspector .sha.parent").first().click();
+  await expect(page.locator(".inspector h2")).toHaveText("Minimap");
+  await expect(sig).toHaveText("서명됨 (확인 안 됨)");
+  await page.locator(".inspector .sha.parent").first().click();
+  await expect(page.locator(".inspector h2")).toHaveText("Semantic zoom levels");
+  await expect(sig).toHaveCount(0);
+});
