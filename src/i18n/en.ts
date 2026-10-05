@@ -313,6 +313,7 @@ export const en: Record<Key, string> = {
   "update.later": "Later",
   "update.failed": "Update failed: {error}",
   "app.gitPathError": "Can't use the configured git executable: {error}",
+  "app.busyRefused": "Another operation is running",
   "app.failed": "Failed: {label}",
   "app.tagline": "Git you can see and steer as a graph.",
   "app.open": "Open repository",

@@ -307,6 +307,7 @@ export const ko = {
   "update.later": "나중에",
   "update.failed": "업데이트하지 못했어요: {error}",
   "app.gitPathError": "설정한 git을 쓸 수 없어요: {error}",
+  "app.busyRefused": "다른 작업이 아직 진행 중이에요",
   "app.failed": "{label} 실패",
   "app.tagline": "그래프로 보고, 그래프로 다루는 Git.",
   "app.open": "저장소 열기",

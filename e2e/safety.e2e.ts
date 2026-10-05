@@ -50,3 +50,22 @@ test("a malformed stored list of dismissed hints doesn't break the dashboard", a
   await page.locator(".tab-home").click();
   await expect(page.locator(".welcome .galaxy .world")).toHaveCount(2);
 });
+
+test("a second git operation is refused while one is still running", async ({ demo }) => {
+  const { page } = demo;
+  const before = (await demo.snapshot()).head.branch;
+  expect(before).not.toBe("feature/theme");
+  await demo.mutateQuietly((d) => (d.slow = 2500));
+  await page.getByRole("button", { name: /Fetch/ }).click();
+  await expect(page.locator(".job-card")).toBeVisible();
+
+  // A checkout from the branch menu meanwhile: refused, and the fetch's progress card stays.
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.locator(".context-menu").getByRole("menuitem", { name: "체크아웃", exact: true }).click();
+  await demo.toast("다른 작업이 아직 진행 중이에요");
+  await expect(page.locator(".job-card")).toBeVisible();
+
+  await demo.toast("원격 커밋을 가져왔어요");
+  expect((await demo.snapshot()).head.branch).toBe(before);
+  await demo.mutateQuietly((d) => (d.slow = 0));
+});

@@ -321,36 +321,56 @@ export function RepoView({
     setSnap(s);
     setLoadError(null);
   }, []);
-  const refresh = useCallback(async () => {
-    await api.snapshot(path, limit).then(applySnapshot, (e) => setLoadError(String(e)));
-  }, [path, limit, applySnapshot]);
-
-  // First load for a repo / history size. A response for a repo we have since
-  // left is dropped.
-  useEffect(() => {
-    let live = true;
-    api.snapshot(path, limit).then(
-      (s) => {
-        if (!live) return;
-        applySnapshot(s);
-        onLoaded(path, s.name);
-      },
-      (e) => live && setLoadError(String(e)),
-    );
-    return () => {
-      live = false;
+  /**
+   * Snapshot reads overlap (the watcher, focus, ⌘R, after an operation): number them, and
+   * never let an answer replace one to a later request (it may show a state git has left).
+   */
+  const asked = useRef(0);
+  const answered = useRef(0);
+  /** The last read failure already shown, so a watcher burst doesn't repeat it. */
+  const shownError = useRef<string | null>(null);
+  const refresh = useCallback((): Promise<void> => {
+    const n = ++asked.current;
+    const newest = () => {
+      if (n < answered.current) return false;
+      answered.current = n;
+      return true;
     };
-  }, [path, limit, applySnapshot, onLoaded]);
+    return api.snapshot(path, limit).then(
+      (s) => {
+        if (!newest()) return;
+        if (!latest.current) onLoaded(path, s.name);
+        applySnapshot(s);
+        shownError.current = null;
+      },
+      (e) => {
+        if (!newest()) return;
+        const text = String(e);
+        setLoadError(text);
+        // Before the first load the error fills the tab; after it (the folder moved, say) the old graph stays up.
+        if (latest.current && shownError.current !== text) toast("err", text);
+        shownError.current = text;
+      },
+    );
+  }, [path, limit, applySnapshot, onLoaded, toast]);
+  const refreshNow = useRef(refresh);
+  useEffect(() => {
+    refreshNow.current = refresh;
+  });
+
+  // Read the repository when its tab shows, and again for a new history size ("load more").
+  useEffect(() => {
+    if (active) void refresh();
+  }, [active, refresh]);
 
   // Files and refs changed on disk (editor, terminal git) → refresh. Only the
-  // visible tab watches; switching to a tab refreshes it.
+  // visible tab watches; a new history size keeps the same watch.
   useEffect(() => {
     if (!active) return;
-    void refresh();
     let stop = () => {};
     let live = true;
     api
-      .watch(path, () => void refresh())
+      .watch(path, () => void refreshNow.current())
       .then(
         (un) => (live ? (stop = un) : un()),
         () => {}, // watching is a convenience; focus refresh still works
@@ -359,7 +379,7 @@ export function RepoView({
       live = false;
       stop();
     };
-  }, [path, active, refresh]);
+  }, [path, active]);
 
   // Pick up edits made in an editor when the user comes back to the window.
   useEffect(() => {
@@ -630,17 +650,28 @@ export function RepoView({
     return (refs.find((r) => r.kind === "local") ?? refs[0])?.name ?? id;
   };
 
+  /** A git operation is running here; another is refused until it ends (two git processes collide). */
+  const running = useRef(false);
+  /** True, after saying so, while another operation is still running. */
+  const refuseBusy = () => {
+    if (running.current) toast("err", t("app.busyRefused"));
+    return running.current;
+  };
+
   /**
-   * Every git write goes through here: busy state, toasts, refresh.
+   * Every git write goes through here, one at a time: busy state, toasts, refresh.
    * Statuses that need a follow-up dialog (diverged / rejected / auth) are left to the caller.
+   * `quiet` leaves the success toast to the caller too.
    */
-  async function run(label: string, op: () => Promise<OpResult>, after?: () => void): Promise<OpResult> {
+  async function run(label: string, op: () => Promise<OpResult>, after?: () => void, quiet = false): Promise<OpResult> {
+    if (refuseBusy()) return { status: "failed", output: t("app.busyRefused") };
     let r: OpResult = { status: "failed", output: "" };
+    running.current = true;
     setBusy(true);
     try {
       r = await op();
       if (r.status === "ok") {
-        toast("ok", label);
+        if (!quiet) toast("ok", label);
         after?.();
       } else if (r.status === "conflict") {
         // No toast: the sheet opens and the banner over it already says what happened.
@@ -650,6 +681,7 @@ export function RepoView({
     } catch (e) {
       toast("err", String(e));
     } finally {
+      running.current = false;
       setBusy(false);
       await refresh();
     }
@@ -677,6 +709,8 @@ export function RepoView({
    * `branch` defaults to the current one (another goes up before a pull request is opened from it).
    */
   const pushTo = async (name: string, branch: string | null = null) => {
+    // Before the progress card changes: it belongs to the operation still running.
+    if (refuseBusy()) return false;
     setRemoteBusy("push");
     setProgress(null);
     try {
@@ -695,12 +729,18 @@ export function RepoView({
   };
 
   const remote = async (op: RemoteOp): Promise<OpStatus> => {
+    if (refuseBusy()) return "failed";
     setRemoteBusy(op);
     setProgress(null);
     const pushing = op === "push" || op === "forcePush";
     const known = new Set(latest.current?.commits.map((c) => c.id));
     try {
-      const r = await run(t(REMOTE_DONE[op]), () => api.remote(path, op, setProgress));
+      const r = await run(t(REMOTE_DONE[op]), async () => {
+        const r = await api.remote(path, op, setProgress);
+        // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
+        if (r.status === "rejected") await api.remote(path, "fetch").catch(() => {});
+        return r;
+      });
       if (r.status === "ok") {
         setPrTick((n) => n + 1);
         if (pushing) tour.mission("push");
@@ -717,8 +757,6 @@ export function RepoView({
       }
       if (r.status === "auth") setAuth({ op, output: r.output });
       if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
-      // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
-      if (r.status === "rejected") await api.remote(path, "fetch").then(refresh, () => {});
       return r.status;
     } finally {
       setRemoteBusy(null);
@@ -1086,19 +1124,22 @@ export function RepoView({
 
   /** Fetch one remote with the progress card up, then say what came: its branch count. */
   const fetchOne = async (name: string) => {
+    if (refuseBusy()) return;
     setFetchingRemote(name);
     setProgress(null);
     try {
-      const r = await api.fetchRemote(path, name, setProgress);
-      await refresh();
+      // Quiet: what to say (how many branches came) is known only after the refresh.
+      const r = await run(
+        t("job.fetchRemote", { name }),
+        () => api.fetchRemote(path, name, setProgress),
+        undefined,
+        true,
+      );
       const n = latest.current?.refs.filter((x) => x.kind === "remote" && x.name.startsWith(`${name}/`)).length ?? 0;
       if (r.status === "ok") {
         setPrTick((k) => k + 1);
         toast("ok", n ? t("remote.fetched", { name, n }) : t("remote.fetchedNone", { name }));
       } else if (r.status === "auth") setAuth({ op: "fetch", output: r.output });
-      else toast("err", r.output || t("app.failed", { label: t("job.fetchRemote", { name }) }));
-    } catch (e) {
-      toast("err", String(e));
     } finally {
       setFetchingRemote(null);
       setProgress(null);
@@ -1135,12 +1176,13 @@ export function RepoView({
     // Added quietly; what the user waits for is the fetch, shown on the progress card.
     // Anything but `origin` is someone else's project (the original of a fork): fetch only.
     const fetchOnly = name !== "origin";
-    const r = await api.ref(path, { kind: "addRemote", name, url, fetchOnly }).catch((e) => ({
-      status: "failed" as const,
-      output: String(e),
-    }));
-    if (r.status !== "ok") return toast("err", r.output);
-    await refresh();
+    const r = await run(
+      t("remote.add.title"),
+      () => api.ref(path, { kind: "addRemote", name, url, fetchOnly }),
+      undefined,
+      true,
+    );
+    if (r.status !== "ok") return;
     if (fetchOnly) toast("ok", t("remote.addedFetchOnly", { name }));
     await fetchOne(name);
   };
