@@ -25,6 +25,7 @@ describe("parseSettings", () => {
       closedSections: [],
       trustedForgeHosts: [],
       confirmRemote: { fetch: false, pull: true, push: true },
+      profiles: [],
     });
     expect(parseSettings(JSON.stringify({ confirmRemote: { push: false, pull: "x" } }), base).confirmRemote).toEqual({
       fetch: false,

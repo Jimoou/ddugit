@@ -264,6 +264,12 @@ async fn license_refresh(app: tauri::AppHandle) -> Result<license::Refresh, Stri
 }
 
 command!(ssh_status() -> ssh::SshStatus => ssh::status());
+command!(identity_read(path: Option<String>) -> git::identity::Identity => git::identity::read(path.as_deref()));
+command!(git_identity(path: Option<String>, op: git::identity::IdentityOp) -> OpResult
+    => git::identity::apply(path.as_deref(), &op));
+command!(signing_keys() -> git::identity::SigningKeys => git::identity::signing_keys());
+command!(commit_signature(path: String, id: String) -> git::identity::Signature
+    => git::identity::signature(&path, &id));
 command!(ssh_keygen(comment: String) -> ssh::SshKey => ssh::keygen(&comment));
 command!(ssh_host_key(url: String) -> ssh::HostKey => ssh::host_key(&url));
 command!(ssh_trust_host(url: String, fingerprints: Vec<String>) -> () => ssh::trust_host(&url, &fingerprints));
@@ -408,6 +414,10 @@ pub fn run() {
             update_check,
             update_install,
             ssh_status,
+            identity_read,
+            git_identity,
+            signing_keys,
+            commit_signature,
             ssh_keygen,
             ssh_host_key,
             ssh_trust_host,

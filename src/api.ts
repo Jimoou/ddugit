@@ -15,6 +15,10 @@ import type {
   ForgeKind,
   ForgeRepos,
   HostKey,
+  Identity,
+  IdentityOp,
+  Signature,
+  SigningKeys,
   LfsOp,
   LfsStatus,
   LicenseRefresh,
@@ -98,6 +102,11 @@ export interface Commands {
   bisect_state: [{ path: string }, BisectState | null];
   pull_requests: [{ path: string; trusted: string[] }, PrReport];
   ssh_status: [Record<string, never>, SshStatus];
+  /** `path: null`: the global identity alone. */
+  identity_read: [{ path: string | null }, Identity];
+  git_identity: [{ path: string | null; op: IdentityOp }, OpResult];
+  signing_keys: [Record<string, never>, SigningKeys];
+  commit_signature: [{ path: string; id: string }, Signature];
   license_status: [Record<string, never>, LicenseStatus];
   license_install: [{ text: string }, LicenseStatus];
   license_remove: [Record<string, never>, LicenseStatus];
@@ -227,6 +236,14 @@ export const api = {
   /** `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used. */
   pullRequests: (path: string, trusted: string[]) => call("pull_requests", { path, trusted }),
   sshStatus: () => call("ssh_status", {}),
+  /** Who commits in `path` are made as (and how they are signed), with where each value comes from; `null`: global. */
+  identity: (path: string | null) => call("identity_read", { path }),
+  /** Apply a profile, switch signing or clear, in `path` (local scope) or globally. */
+  setIdentity: (path: string | null, op: IdentityOp) => call("git_identity", { path, op }),
+  /** GPG secret keys and SSH public keys that can sign commits. */
+  signingKeys: () => call("signing_keys", {}),
+  /** The commit's signature, checked now (not cached: trust can change). */
+  signature: (path: string, id: string) => call("commit_signature", { path, id }),
   licenseStatus: () => call("license_status", {}),
   licenseInstall: (text: string) => call("license_install", { text }),
   licenseRemove: () => call("license_remove", {}),

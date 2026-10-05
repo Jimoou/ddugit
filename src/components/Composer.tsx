@@ -1,9 +1,11 @@
 import { Icon } from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { FileChange } from "../types";
+import type { FileChange, IdentityOp, Profile } from "../types";
+import { IdentityLine } from "./Identity";
 import { t } from "../i18n";
 
 interface Props {
+  path: string;
   changes: FileChange[];
   branch: string | null;
   merging: boolean;
@@ -21,6 +23,10 @@ interface Props {
   onStash(message: string, paths: string[]): void;
   /** Throw the picked files' changes away (caller confirms). */
   onDiscard(paths: string[]): void;
+  /** Saved identities, to switch this repository's with. */
+  profiles: Profile[];
+  onProfiles(next: Profile[]): void;
+  onIdentity(label: string, op: IdentityOp): Promise<unknown>;
 }
 
 const LABEL: Record<string, string> = {
@@ -106,6 +112,13 @@ export function Composer(props: Props) {
           <Icon name="close" />
         </button>
       </header>
+
+      <IdentityLine
+        path={props.path}
+        profiles={props.profiles}
+        onProfiles={props.onProfiles}
+        onChange={props.onIdentity}
+      />
 
       {merging && <div className="note warn">{t("composer.merging")}</div>}
 

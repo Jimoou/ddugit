@@ -71,7 +71,7 @@ pub fn ssh_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(home).join(".ssh"))
 }
 
-fn tool(name: &str) -> Command {
+pub(crate) fn tool(name: &str) -> Command {
     let mut cmd = Command::new(name);
     cmd.stdin(Stdio::null());
     #[cfg(windows)]

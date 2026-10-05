@@ -40,6 +40,7 @@ import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { planMove, rebaseRange } from "./rebasePlan";
 import type { Settings } from "./settings";
+import { signingHint } from "./identity";
 import { isKey, type Key, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import type { Drag, NodeBadge, Turn } from "./graph/renderer";
@@ -2187,6 +2188,10 @@ export function RepoView({
 
         {composer && (
           <Composer
+            path={path}
+            profiles={settings.profiles}
+            onProfiles={(profiles) => onChangeSettings({ profiles })}
+            onIdentity={(label, op) => run(label, () => api.setIdentity(path, op))}
             changes={snap.changes}
             branch={snap.head.branch}
             merging={snap.state === "merge"}
@@ -2242,7 +2247,10 @@ export function RepoView({
                     const r = await api.createBranch(path, newBranch, null, true);
                     if (r.status !== "ok") return r;
                   }
-                  return api.commit(path, message, paths, amend, stagedOnly);
+                  const r = await api.commit(path, message, paths, amend, stagedOnly);
+                  // git ran without a terminal: say what signing needs instead of git's bare error.
+                  const hint = r.status === "failed" ? signingHint(r.output) : null;
+                  return hint ? { ...r, output: `${r.output}\n${t(hint)}` } : r;
                 },
                 () => {
                   setComposer(false);
@@ -2257,6 +2265,7 @@ export function RepoView({
 
         {!composer && selectedCommit && (
           <Inspector
+            path={path}
             commit={selectedCommit}
             refs={graphRefs.filter((r) => r.target === selectedCommit.id)}
             containedIn={snap.refs.filter(
