@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
+import { demoFlags, expect, test } from "./fixtures";
 
 /** Esc closes `layer` wherever focus is, and only that layer. */
 async function escCloses(page: Page, layer: Locator) {
@@ -162,9 +162,7 @@ test("Tab stays inside a modal dialog, and focus goes back to the opener", async
 
 test("on Free, the Pro offer over a dialog closes with Esc, then the dialog", async ({ demo }) => {
   const { page } = demo;
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
-  });
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.reload();
   await demo.branchTool("폐쇄망 반출입…");
   const transfer = page.locator(".dialog.transfer");

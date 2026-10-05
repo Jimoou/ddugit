@@ -9,7 +9,7 @@
 ### 1.1 범위
 
 - 앱: macOS(universal `.dmg`, 서명·공증)와 Windows(NSIS `.exe`, 서명 없음). Linux는 개발·CI용으로만 빌드한다
-- 데모: 브라우저에서 가상 저장소(`src/mock.ts`)로 도는 같은 화면. e2e의 대상
+- 데모: 브라우저에서 가상 저장소(`src/mock/`)로 도는 같은 화면. e2e의 대상
 - 사이트: ddugit.com(Next.js 16, Netlify) + Supabase(Auth, `licenses`·`devices`·`activations`·`reports` 테이블, Edge Functions)
 - 배포: `release.yml`(dmg·exe, Supabase Storage `releases/`, `downloads.json`, `latest.json`)
 
@@ -28,7 +28,7 @@
 
 알아둘 것:
 
-- e2e는 `reuseExistingServer`라서 이미 떠 있는 vite를 쓴다. `mock.ts`를 고쳤으면 `pkill -f "[v]ite --port 1420"` 후 다시 돈다.
+- e2e는 `reuseExistingServer`라서 이미 떠 있는 vite를 쓴다. `src/mock/`을 고쳤으면 `pkill -f "[v]ite --port 1420"` 후 다시 돈다.
 - 로컬 e2e "adds a remote from the GitHub tab, named after the owner"는 부하가 크면 시간 초과가 난다(단독·CI는 통과, NEXT.md). 실패하면 단독으로 다시 돌려 본다.
 - 일부 cargo 테스트는 도구가 없으면 **조용히 건너뛴다**: `ssh-keygen`(`ssh.rs` `makes_a_key_and_lists_it_with_its_public_half`), `git-lfs`(`lfs.rs` `tracks_patterns_and_finds_files_left_as_pointers`). 새 기계에서는 `which ssh-keygen git-lfs`를 먼저 본다.
 - Linux에서 Rust를 빌드하려면 `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev`가 필요하다.
@@ -38,7 +38,7 @@
 | 층               | 증명하는 것                                                                                                                                          | 증명 못 하는 것                                                                                                                                                                                             |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | vitest           | 순수 로직(레이아웃, 장면 색인, 검색, rebase 계획, 충돌 파싱, 설정·저장값 파싱, i18n 사전 일치, 가리기, 그룹, 스택, 노트 묶기 등)                     | 화면, Tauri 호출, 실제 git                                                                                                                                                                                  |
-| e2e(데모)        | 화면 흐름 전체: 클릭·끌기·키보드·대화상자·토스트, `api.ts` `Commands` 계약을 따르는 **가짜 백엔드**(`mock.ts`) 위의 상태 변화, 한국어·영어 문구      | 실제 git 동작(mock은 git을 흉내만 낸다), Rust 명령과 mock의 불일치, OS 창·파일 대화상자·키체인·클립보드 권한, 네트워크, 업데이터, 실제 성능                                                                 |
+| e2e(데모)        | 화면 흐름 전체: 클릭·끌기·키보드·대화상자·토스트, `api.ts` `Commands` 계약을 따르는 **가짜 백엔드**(`src/mock/`) 위의 상태 변화, 한국어·영어 문구    | 실제 git 동작(mock은 git을 흉내만 낸다), Rust 명령과 mock의 불일치, OS 창·파일 대화상자·키체인·클립보드 권한, 네트워크, 업데이터, 실제 성능                                                                 |
 | cargo            | 실제 git CLI/libgit2로 임시 저장소에서의 쓰기·읽기, 로컬 bare 원격의 fetch/pull/push, 인증 실패 분류, 라이선스 서명 확인, forge 응답 파싱(가짜 서버) | Tauri 명령 등록(`lib.rs`, Pro 잠금은 명령 본문을 직접 부른다)과 화면 연결, 실제 GitHub/GitLab API, 실제 SSH 서버·에이전트, GPG 에이전트, OS 키체인, macOS·Windows 경로 차이(CI는 ubuntu만, `all_os`는 수동) |
 | 사이트 node:test | 라이선스 형식·사용 가능 규칙, 활성화 대상 고르기, 웹훅 서명·주문 해석, 신고 검사·속도 제한, 관리자 필터, 전달 비밀·IP 규칙                           | 실제 Supabase(RLS·트리거·마이그레이션), OAuth 로그인, Lemon Squeezy, Netlify 헤더, 페이지 렌더링                                                                                                            |
 | 실기(사람)       | 설치·서명·SmartScreen·자동 업데이트, 실제 계정(GitHub·GitLab·Supabase·Lemon Squeezy), SSH·GPG, 키체인, 창 테두리, 큰 실제 저장소                     | —                                                                                                                                                                                                           |

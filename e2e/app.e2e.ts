@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { demoFlags, expect, test } from "./fixtures";
 
 test("adds a checkpoint from the + composer", async ({ demo }) => {
   const { page } = demo;
@@ -531,9 +531,7 @@ test("settings: a device-bound license is removed from this device and Pro close
 
 test("a device removed on ddugit.com loses its license at the next check", async ({ demo }) => {
   const { page } = demo;
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoLicense = { kind: "lifetime", deviceRemoved: true };
-  });
+  await demoFlags(page, { License: { kind: "lifetime", deviceRemoved: true } });
   await page.reload();
   await demo.toast("이 기기는 라이선스에서 해제됐어요");
   await page.keyboard.press("?");
@@ -574,11 +572,7 @@ test("switches branch from the top bar and re-reads the repository with Cmd/Ctrl
   // A commit made outside the app shows up on Cmd/Ctrl+R.
   await demo.mutateQuietly((d) => d.grow(1));
   const tip = (await demo.snapshot()).head.target!;
-  const drawn = () =>
-    page.evaluate(
-      (id) => (window as unknown as { __ddugit: { screenOf(id: string): unknown } }).__ddugit.screenOf(id),
-      tip,
-    );
+  const drawn = () => page.evaluate((id) => window.__ddugit.screenOf(id), tip);
   expect(await drawn()).toBeNull();
   await page.keyboard.press("Control+r");
   await expect.poll(drawn).not.toBeNull();
@@ -586,9 +580,7 @@ test("switches branch from the top bar and re-reads the repository with Cmd/Ctrl
 
 test("clones from a URL, remembers it in the repository menu and stars it", async ({ demo }) => {
   const { page } = demo;
-  await page.evaluate(
-    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work"),
-  );
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/work"));
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
@@ -642,9 +634,7 @@ test("sets up SSH for a clone inside the app: key, host trust, test", async ({ d
 
 test("clones one of my GitHub repositories by searching for it", async ({ demo }) => {
   const { page } = demo;
-  await page.evaluate(
-    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work"),
-  );
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/work"));
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
@@ -718,9 +708,7 @@ test("adds a remote from the GitHub tab, named after the owner", async ({ demo }
 
 test("creates a new repository in a plain folder", async ({ demo }) => {
   const { page } = demo;
-  await page.evaluate(
-    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/tmp/not-a-repo"),
-  );
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/tmp/not-a-repo"));
   await page.locator(".tab.on .tab-menu").click();
   await page
     .locator(".repo-menu")
@@ -746,9 +734,7 @@ test("opens repositories in tabs and keeps each tab's state", async ({ demo }) =
   await page.locator(".tab-new").click();
   await expect(tabs).toHaveCount(2);
   await expect(page.locator(".welcome")).toContainText("최근 저장소");
-  await page.evaluate(
-    () => ((window as unknown as { __ddugitDemo: { nextFolder: string } }).__ddugitDemo.nextFolder = "/work/second"),
-  );
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/work/second"));
   await page
     .locator(".welcome")
     .getByRole("button", { name: /폴더 열기/ })
@@ -829,7 +815,7 @@ test("folds sidebar sections and the whole sidebar, and keeps the layout", async
 test("cleans up merged and gone branches from the sidebar", async ({ demo }) => {
   const { page } = demo;
   await demo.mutate((d) => {
-    (d as unknown as { goneBranches: string[] }).goneBranches = ["feature/theme"];
+    d.goneBranches = ["feature/theme"];
   });
   await demo.branchTool("브랜치 정리…");
   const sheet = page.locator(".cleanup-sheet");
@@ -1339,7 +1325,7 @@ test("a backported commit that is already there stops as empty and is skipped, n
   demo,
 }) => {
   const { page } = demo;
-  await demo.mutateQuietly((d) => ((d as unknown as { emptyNext: boolean }).emptyNext = true));
+  await demo.mutateQuietly((d) => (d.emptyNext = true));
   await page.click(".sidebar li >> text=feature/theme", { button: "right" });
   await page.click(".context-menu >> text=에 없는 커밋 보기");
   const sheet = page.locator(".backport-sheet");
@@ -1425,9 +1411,7 @@ test("several branches can be picked in the sidebar, lighting their histories to
 test("a newer version shows an update notice that installs or waits", async ({ demo }) => {
   const { page } = demo;
   await expect(page.locator(".update-notice")).toHaveCount(0);
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoUpdate = { version: "9.9.9", notes: null };
-  });
+  await demoFlags(page, { Update: { version: "9.9.9", notes: null } });
   await page.reload();
   const notice = page.locator(".update-notice");
   await expect(notice).toContainText("9.9.9");
@@ -1449,9 +1433,7 @@ test("on Free, private pull requests and backport actions offer Pro instead", as
   await expect(page.locator(".license-plan")).toContainText("Pro 사용 중");
   await expect(page.locator("section.license")).not.toContainText("체험");
   await page.keyboard.press("Escape");
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
-  });
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.reload();
 
   // The demo repository is private: its pull requests stay closed on Free.
@@ -1503,9 +1485,7 @@ test("air-gapped transfer writes only what a destination lacks, and imports a bu
 
 test("on Free, air-gapped transfer offers Pro", async ({ demo }) => {
   const { page } = demo;
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
-  });
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.reload();
   await demo.branchTool("폐쇄망 반출입…");
   const dialog = page.locator(".dialog.transfer");
@@ -1548,9 +1528,7 @@ test("a stacked branch falls behind when the branch below moves, and restacking 
 
 test("on Free, stacking a branch offers Pro", async ({ demo }) => {
   const { page } = demo;
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
-  });
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.reload();
   await page.click(".sidebar li >> text=feature/theme", { button: "right" });
   await page.click(".context-menu >> text=이 브랜치 위에 새 브랜치 쌓기");
@@ -1586,9 +1564,7 @@ test("release notes group the commits since the previous tag by kind, and copy a
 
 test("on Free, release notes offer Pro", async ({ demo }) => {
   const { page } = demo;
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
-  });
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.reload();
   await page.click(".sidebar li >> text=v0.2.0", { button: "right" });
   await page.click(".context-menu >> text=여기까지 릴리스 노트 만들기");
@@ -1631,8 +1607,8 @@ test("the dashboard pulls picked repositories and puts them all on the same bran
 
 test("on Free, batch pull and branch switching offer Pro", async ({ demo }) => {
   const { page } = demo;
+  await demoFlags(page, { Pro: { pro: false, source: "free" } });
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
     localStorage.setItem("ddugit.recent", JSON.stringify([{ path: "/work/nova", starred: false, at: 0 }]));
   });
   await page.reload();

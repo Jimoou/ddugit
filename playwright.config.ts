@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // e2e runs against the browser demo (`npm run dev`), which implements the same
-// commands as the Rust backend over a virtual repository (src/mock.ts).
+// commands as the Rust backend over a virtual repository (src/mock/).
 export default defineConfig({
   testDir: "e2e",
   testMatch: "**/*.e2e.ts",

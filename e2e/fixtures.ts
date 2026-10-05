@@ -1,24 +1,22 @@
 import { test as base, expect, type Page } from "@playwright/test";
+import type { DemoControls, DemoFlags } from "../src/mock";
 import type { RepoSnapshot } from "../src/types";
 
-interface DemoWindow {
-  __ddugit: { screenOf(id: string): { x: number; y: number } | null };
-  __ddugitDemo: {
-    conflictNext: boolean;
-    forgeToken: "cli" | "keychain" | "none" | "unauthorized";
-    snapshot(): RepoSnapshot;
-    grow(n: number): void;
-    commitOn(branch: string, summary: string): void;
-    deviceRemoved: boolean;
-    offline: boolean;
-    setLicense(kind: "lifetime" | "site" | null): void;
-    failNext: string | null;
-    crashTab: boolean;
-    slow: number;
-    reportFail: null | "limited" | "offline";
-    sent: { kind: string; message: string; email: string | null; diagnostics: string | null }[];
-  };
+declare global {
+  interface Window {
+    /** The visible graph's screen positions (dev builds). */
+    __ddugit: { screenOf(id: string): { x: number; y: number } | null };
+    /** The demo's switches (src/mock/controls.ts). */
+    __ddugitDemo: DemoControls;
+  }
 }
+
+/** Set demo flags before the next load (`page.reload()` / `goto`), e.g. `{ Pro: { pro: false, source: "free" } }`. */
+export const demoFlags = (page: Page, flags: Partial<DemoFlags>) =>
+  page.addInitScript((flags) => {
+    for (const [name, value] of Object.entries(flags))
+      (window as unknown as Record<string, unknown>)[`__ddugitDemo${name}`] = value;
+  }, flags);
 
 /** Demo page with page errors collected; each test asserts there were none. */
 export const test = base.extend<{ demo: Demo }>({
@@ -44,7 +42,7 @@ export class Demo {
   constructor(readonly page: Page) {}
 
   snapshot(): Promise<RepoSnapshot> {
-    return this.page.evaluate(() => (window as unknown as DemoWindow).__ddugitDemo.snapshot());
+    return this.page.evaluate(() => window.__ddugitDemo.snapshot());
   }
 
   /** Open one of the branch tools (backport, transfer, cleanup) from the ⋯ on the sidebar's branches. */
@@ -59,18 +57,18 @@ export class Demo {
   }
 
   /** Change demo state outside the UI without telling the app (no refresh). */
-  async mutateQuietly(fn: (demo: DemoWindow["__ddugitDemo"]) => void) {
+  async mutateQuietly(fn: (demo: DemoControls) => void) {
     await this.page.evaluate(`(${fn.toString()})(window.__ddugitDemo)`);
   }
 
   /** Change demo state outside the UI, then refresh like returning to the window. */
-  async mutate(fn: (demo: DemoWindow["__ddugitDemo"]) => void) {
+  async mutate(fn: (demo: DemoControls) => void) {
     await this.page.evaluate(`(${fn.toString()})(window.__ddugitDemo)`);
     await this.page.evaluate(() => window.dispatchEvent(new Event("focus")));
   }
 
   private rawScreenOf(id: string) {
-    return this.page.evaluate((id) => (window as unknown as DemoWindow).__ddugit.screenOf(id), id);
+    return this.page.evaluate((id) => window.__ddugit.screenOf(id), id);
   }
 
   /** Screen position of a commit once the camera has stopped moving (it eases after loads). */

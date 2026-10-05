@@ -62,7 +62,7 @@ cd src-tauri && cargo test   # git 백엔드 (임시 저장소로 실제 commit/
 ```
 src/
   App.tsx               화면 구성, git 작업 연결
-  api.ts                Tauri 명령 호출 (브라우저에서는 mock.ts 데모 저장소)
+  api.ts                Tauri 명령 호출 (브라우저에서는 mock/ 데모 저장소)
   graph/layout.ts       커밋 DAG → 레인 배치 (trunk = 0번 레인)
   graph/scene.ts        레인 배치 → 월드 좌표 경로, 빛 입자용 샘플
   graph/renderer.ts     Canvas 2D 네온 렌더러 (가시 영역만 그림)
