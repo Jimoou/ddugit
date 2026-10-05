@@ -59,7 +59,8 @@ function demoCommit({ message, paths, amend, stagedOnly }: Args<"git_commit">): 
     // Concluding a merge: needs every conflict resolved, then a two-parent commit.
     if (repo.changes.some((c) => c.conflicted))
       return fail("Committing is not possible because you have unmerged files.");
-    repo.add(repo.head, message.split("\n")[0], [repo.pending.source]);
+    // A merge commit has two parents; a stopped cherry-pick or revert makes a plain commit.
+    repo.add(repo.head, message.split("\n")[0], repo.pending.summary ? [] : [repo.pending.source]);
     repo.pending = null;
     repo.state = "clean";
     repo.changes = repo.changes.filter((c) => c.unstaged && !c.staged);

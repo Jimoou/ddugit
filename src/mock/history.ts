@@ -102,23 +102,28 @@ const fileLog: Table["file_log"] = ({ rev, file }) => {
   return delay(repo.order.filter((id) => seen.has(id) && filesOf(id).includes(file)).map((id) => ({ id, path: file })));
 };
 
+/**
+ * Stop `state` (merge, cherry-pick, revert) on a conflict in two files, like `conflictNext` asks.
+ * A stopped pick or revert keeps the commit it will make (`summary`) for "continue".
+ */
+function stopOnConflict(state: string, source: string, label: string, summary?: string) {
+  demoControls.conflictNext = false;
+  const files = new Map([
+    ["src/App.css", DEMO_CONFLICT_CSS.replaceAll("{theirs}", label)],
+    ["src/graph/scene.ts", DEMO_CONFLICT_TS.replaceAll("{theirs}", label)],
+  ]);
+  repo.pending = { source, label, files, summary };
+  repo.state = state;
+  for (const path of files.keys()) repo.changes.push({ path, staged: null, unstaged: "modified", conflicted: true });
+  return delay(res("conflict", "CONFLICT (content): Merge conflict in src/App.css"));
+}
+
 export const historyCommands = {
   git_merge({ source, target }) {
     const t = target ?? repo.head;
     if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
-    if (demoControls.conflictNext) {
-      demoControls.conflictNext = false;
-      const files = new Map([
-        ["src/App.css", DEMO_CONFLICT_CSS.replaceAll("{theirs}", source)],
-        ["src/graph/scene.ts", DEMO_CONFLICT_TS.replaceAll("{theirs}", source)],
-      ]);
-      repo.pending = { source: repo.branches.get(source) ?? source, label: source, files };
-      repo.state = "merge";
-      for (const path of files.keys())
-        repo.changes.push({ path, staged: null, unstaged: "modified", conflicted: true });
-      return delay(res("conflict", "CONFLICT (content): Merge conflict in src/App.css"));
-    }
+    if (demoControls.conflictNext) return stopOnConflict("merge", repo.branches.get(source) ?? source, source);
     const named = repo.branches.has(source) || repo.remotes.has(source);
     repo.merge(source, t, `Merge ${named ? `branch '${source}'` : `commit ${source.slice(0, 7)}`} into ${t}`);
     return delay(res("ok", "Merge made by the 'ort' strategy."));
@@ -141,7 +146,10 @@ export const historyCommands = {
     const t = target ?? repo.head;
     if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
-    repo.add(t, op === "revert" ? `Revert "${c.summary}"` : c.summary);
+    const summary = op === "revert" ? `Revert "${c.summary}"` : c.summary;
+    if (demoControls.conflictNext)
+      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", id, id.slice(0, 7), summary);
+    repo.add(t, summary);
     return delay(res("ok"));
   },
 
@@ -154,6 +162,15 @@ export const historyCommands = {
   },
 
   git_continue() {
+    // Like `write::continue_op`: a merge is concluded by committing, not continued.
+    if (repo.state === "clean" || repo.state === "merge") return fail(`Nothing to continue (${repo.state})`);
+    // The real one stages tracked files first (`add -u`), so what is left in conflict goes in as it is.
+    const p = repo.pending;
+    if (p?.summary) {
+      repo.add(repo.head, p.summary);
+      repo.changes = repo.changes.filter((c) => !p.files.has(c.path));
+    }
+    repo.pending = null;
     repo.state = "clean";
     return delay(res("ok"));
   },
