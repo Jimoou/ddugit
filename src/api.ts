@@ -146,7 +146,7 @@ export interface Commands {
   git_blame: [{ path: string; rev: string; file: string }, Blame];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
-  git_stash: [{ path: string; op: StashOp; index: number }, OpResult];
+  git_stash: [{ path: string; op: StashOp; id: string }, OpResult];
   conflict_file: [{ path: string; file: string }, ConflictFile];
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
@@ -314,7 +314,8 @@ export const api = {
   blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
-  stash: (path: string, op: StashOp, index: number) => call("git_stash", { path, op, index }),
+  /** By the stash's commit id: positions shift when a stash is pushed elsewhere. */
+  stash: (path: string, op: StashOp, id: string) => call("git_stash", { path, op, id }),
   conflictFile: (path: string, file: string) => call("conflict_file", { path, file }),
   resolve: (path: string, file: string, how: Resolution) => call("git_resolve", { path, file, how }),
   worktreeDiff: (path: string, file: string | null = null, scope: DiffScope = "all") =>

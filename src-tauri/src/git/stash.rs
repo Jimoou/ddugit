@@ -120,8 +120,22 @@ pub fn stash_push(path: &str, message: &str, paths: &[String]) -> Result<OpResul
     Ok(git(&dir, &args)?.into())
 }
 
-pub fn stash(path: &str, op: StashOp, index: usize) -> Result<OpResult> {
-    let dir = workdir(&open(path)?)?;
+/// Apply, pop or drop the stash whose commit is `id`. Its position is looked up
+/// right before acting: a stash pushed or dropped meanwhile (a terminal, an IDE)
+/// shifts `stash@{n}`, and acting on a stale position would drop another one.
+pub fn stash(path: &str, op: StashOp, id: &str) -> Result<OpResult> {
+    let mut repo = open(path)?;
+    let dir = workdir(&repo)?;
+    let mut index = None;
+    repo.stash_foreach(|i, _, oid| {
+        let hit = oid.to_string() == id;
+        if hit {
+            index = Some(i);
+        }
+        !hit
+    })
+    .map_err(err)?;
+    let index = index.ok_or("That stash no longer exists; the list has been refreshed")?;
     let name = format!("stash@{{{index}}}");
     let o = git(&dir, &["stash", op.verb(), &name])?;
     // Apply/pop conflicts leave unmerged paths but no repository state to detect.
@@ -222,7 +236,10 @@ mod tests {
         let head = snapshot(s(d.path()), 1).unwrap().head.target.unwrap();
         assert_eq!(list[0].base, head);
 
-        assert_eq!(stash(s(d.path()), StashOp::Pop, 0).unwrap().status, OpStatus::Ok);
+        assert_eq!(
+            stash(s(d.path()), StashOp::Pop, &list[0].id).unwrap().status,
+            OpStatus::Ok
+        );
         assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "edit");
         assert!(read_stashes(s(d.path())).unwrap().is_empty());
     }
@@ -235,15 +252,40 @@ mod tests {
         fs::write(d.path().join("u.txt"), "u").unwrap();
         stash_push(s(d.path()), "", &[]).unwrap();
         assert!(changed(&d).is_empty());
+        let id = read_stashes(s(d.path())).unwrap()[0].id.clone();
 
         assert_eq!(
-            stash(s(d.path()), StashOp::Apply, 0).unwrap().status,
+            stash(s(d.path()), StashOp::Apply, &id).unwrap().status,
             OpStatus::Ok
         );
         assert!(d.path().join("u.txt").exists());
         assert_eq!(read_stashes(s(d.path())).unwrap().len(), 1); // apply keeps it
-        assert_eq!(stash(s(d.path()), StashOp::Drop, 0).unwrap().status, OpStatus::Ok);
+        assert_eq!(
+            stash(s(d.path()), StashOp::Drop, &id).unwrap().status,
+            OpStatus::Ok
+        );
         assert!(read_stashes(s(d.path())).unwrap().is_empty());
+        assert!(stash(s(d.path()), StashOp::Drop, &id).is_err());
+    }
+
+    /// A stash pushed from a terminal shifts `stash@{n}`; acting by id still hits the one shown.
+    #[test]
+    fn acts_on_the_stash_by_id_after_another_was_pushed() {
+        let d = repo();
+        commit_file(d.path(), "a.txt", "a", "base");
+        fs::write(d.path().join("a.txt"), "first").unwrap();
+        stash_push(s(d.path()), "first", &[]).unwrap();
+        let shown = read_stashes(s(d.path())).unwrap()[0].id.clone();
+        fs::write(d.path().join("a.txt"), "second").unwrap();
+        git_ok(d.path(), &["stash", "push", "-q", "-m", "second"]).unwrap();
+
+        let r = stash(s(d.path()), StashOp::Drop, &shown).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let left = read_stashes(s(d.path())).unwrap();
+        assert_eq!(left.len(), 1);
+        assert!(left[0].message.contains("second"));
+        assert!(stash(s(d.path()), StashOp::Pop, &shown).is_err());
+        assert!(stash(s(d.path()), StashOp::Pop, "not-an-id").is_err());
     }
 
     #[test]
@@ -254,7 +296,8 @@ mod tests {
         stash_push(s(d.path()), "x", &[]).unwrap();
         commit_file(d.path(), "a.txt", "committed", "other");
 
-        let r = stash(s(d.path()), StashOp::Pop, 0).unwrap();
+        let id = read_stashes(s(d.path())).unwrap()[0].id.clone();
+        let r = stash(s(d.path()), StashOp::Pop, &id).unwrap();
         assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
         assert_eq!(read_stashes(s(d.path())).unwrap().len(), 1);
     }

@@ -2337,11 +2337,11 @@ export function RepoView({
             onPop={() =>
               run(
                 t("stash.popped"),
-                () => api.stash(path, "pop", stashSel.index),
+                () => api.stash(path, "pop", stashSel.id),
                 () => show({}),
               )
             }
-            onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.index))}
+            onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.id))}
             onDrop={() =>
               setConfirm({
                 title: t("stash.delete.title"),
@@ -2352,7 +2352,7 @@ export function RepoView({
                   setConfirm(null);
                   void run(
                     t("stash.deleted"),
-                    () => api.stash(path, "drop", stashSel.index),
+                    () => api.stash(path, "drop", stashSel.id),
                     () => show({}),
                   );
                 },

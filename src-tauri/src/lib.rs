@@ -343,7 +343,7 @@ command!(git_blame(path: String, rev: String, file: String) -> git::history::Bla
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
 command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
     => git::stash::stash_push(&path, &message, &paths));
-command!(git_stash(path: String, op: StashOp, index: usize) -> OpResult => git::stash::stash(&path, op, index));
+command!(git_stash(path: String, op: StashOp, id: String) -> OpResult => git::stash::stash(&path, op, &id));
 command!(conflict_file(path: String, file: String) -> ConflictFile => git::conflict::conflict_file(&path, &file));
 command!(git_resolve(path: String, file: String, how: Resolution) -> OpResult
     => git::conflict::resolve(&path, &file, &how));

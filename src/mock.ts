@@ -1159,9 +1159,10 @@ const mockTable: Table = {
     return delay(res("ok", "Saved working directory and index state"));
   },
 
-  git_stash({ op, index }) {
+  git_stash({ op, id }) {
+    const index = repo.stashes.findIndex((s) => s.id === id);
     const st = repo.stashes[index];
-    if (!st) return fail(`stash@{${index}} does not exist`);
+    if (!st) return fail("That stash no longer exists; the list has been refreshed");
     if (op !== "drop") {
       const have = new Set(repo.changes.map((c) => c.path));
       repo.changes.push(...st.changes.filter((c) => !have.has(c.path)));
