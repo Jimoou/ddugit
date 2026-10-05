@@ -20,7 +20,7 @@
 | 웹 검사         | `npm run check`                                                                                                                 | `tsc`(앱 + `e2e/`), ESLint, Prettier `--check`, vitest(`src/**/*.test.ts` 41개 파일 + `scripts/downloads.test.mjs`)                                                             | `ci-web.yml` Web 잡(PR에서 `src/`·`e2e/`·설정이 바뀔 때) + `npm run build`    |
 | e2e             | `npm run e2e`                                                                                                                   | Playwright(Chromium)가 `npm run dev`(localhost:1420) 데모를 띄워 `e2e/*.e2e.ts`를 돈다. 페이지 오류·콘솔 오류가 하나라도 나면 실패(`fixtures.ts`)                               | `ci-web.yml` E2E 잡                                                           |
 | e2e(샌드박스)   | `PW_CHROMIUM=/opt/pw-browsers/chromium npm run e2e`                                                                             | 브라우저를 내려받을 수 없는 환경에서 미리 깔린 Chromium을 쓴다                                                                                                                  | —                                                                             |
-| Rust            | `cd src-tauri && mkdir -p ../dist && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`              | 모듈마다 `#[cfg(test)]`: 임시 저장소(`testutil`)에서 실제 git CLI·libgit2, 로컬 bare 원격, 가짜 HTTP 서버(forge), 가짜 키체인(device)                                           | `ci-rust.yml`(ubuntu, PR에서 `src-tauri/`가 바뀔 때). 릴리스 전 `all_os` 수동 |
+| Rust            | `cd src-tauri && mkdir -p ../dist && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`              | 모듈마다 `#[cfg(test)]`: 임시 저장소(`testutil`)에서 실제 git CLI·libgit2, 로컬 bare 원격, 가짜 HTTP 서버(forge, clone 인증 실패), 가짜 키체인(device)                          | `ci-rust.yml`(ubuntu, PR에서 `src-tauri/`가 바뀔 때). 릴리스 전 `all_os` 수동 |
 | Rust(벤치)      | `DDUGIT_BENCH_REPO=<경로> cargo test --release -- --ignored snapshot_bench` 등                                                  | `read.rs` `snapshot_bench`, `diff.rs` `diff_bench`(`#[ignore]`). 합성 저장소는 `scripts/perf/gen.py`, 화면 쪽은 `scripts/perf/bench.mjs`. 절차와 기준 수치는 [PERF.md](PERF.md) | —                                                                             |
 | Rust(상호 확인) | `DDUGIT_LICENSE_PUBKEY=<공개키> DDUGIT_TEST_LICENSE=<license.mjs sign 결과> cargo test installs_a_license_issued_by_the_script` | 발급 스크립트와 앱 검증이 같은 형식인지. 변수가 없으면 아무것도 안 하고 통과한다                                                                                                | —                                                                             |
 | 사이트 검사     | `cd ../ddugit-site && npm run check`                                                                                            | `tsc`, ESLint, Prettier, `node --test`(`src/lib/*.test.ts` 4개, `supabase/functions/_shared/*.test.ts` 4개)                                                                     | 사이트 저장소 CI                                                              |
@@ -35,13 +35,13 @@
 
 ### 1.3 각 층이 증명하는 것과 못 하는 것
 
-| 층               | 증명하는 것                                                                                                                                          | 증명 못 하는 것                                                                                                                                                         |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| vitest           | 순수 로직(레이아웃, 장면 색인, 검색, rebase 계획, 충돌 파싱, 설정·저장값 파싱, i18n 사전 일치, 가리기, 그룹, 스택, 노트 묶기 등)                     | 화면, Tauri 호출, 실제 git                                                                                                                                              |
-| e2e(데모)        | 화면 흐름 전체: 클릭·끌기·키보드·대화상자·토스트, `api.ts` `Commands` 계약을 따르는 **가짜 백엔드**(`mock.ts`) 위의 상태 변화, 한국어·영어 문구      | 실제 git 동작(mock은 git을 흉내만 낸다), Rust 명령과 mock의 불일치, OS 창·파일 대화상자·키체인·클립보드 권한, 네트워크, 업데이터, 실제 성능                             |
-| cargo            | 실제 git CLI/libgit2로 임시 저장소에서의 쓰기·읽기, 로컬 bare 원격의 fetch/pull/push, 인증 실패 분류, 라이선스 서명 확인, forge 응답 파싱(가짜 서버) | Tauri 명령 등록(`lib.rs`)과 화면 연결, 실제 GitHub/GitLab API, 실제 SSH 서버·에이전트, GPG 에이전트, OS 키체인, macOS·Windows 경로 차이(CI는 ubuntu만, `all_os`는 수동) |
-| 사이트 node:test | 라이선스 형식·사용 가능 규칙, 활성화 대상 고르기, 웹훅 서명·주문 해석, 신고 검사·속도 제한, 관리자 필터, 전달 비밀·IP 규칙                           | 실제 Supabase(RLS·트리거·마이그레이션), OAuth 로그인, Lemon Squeezy, Netlify 헤더, 페이지 렌더링                                                                        |
-| 실기(사람)       | 설치·서명·SmartScreen·자동 업데이트, 실제 계정(GitHub·GitLab·Supabase·Lemon Squeezy), SSH·GPG, 키체인, 창 테두리, 큰 실제 저장소                     | —                                                                                                                                                                       |
+| 층               | 증명하는 것                                                                                                                                          | 증명 못 하는 것                                                                                                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| vitest           | 순수 로직(레이아웃, 장면 색인, 검색, rebase 계획, 충돌 파싱, 설정·저장값 파싱, i18n 사전 일치, 가리기, 그룹, 스택, 노트 묶기 등)                     | 화면, Tauri 호출, 실제 git                                                                                                                                                                                  |
+| e2e(데모)        | 화면 흐름 전체: 클릭·끌기·키보드·대화상자·토스트, `api.ts` `Commands` 계약을 따르는 **가짜 백엔드**(`mock.ts`) 위의 상태 변화, 한국어·영어 문구      | 실제 git 동작(mock은 git을 흉내만 낸다), Rust 명령과 mock의 불일치, OS 창·파일 대화상자·키체인·클립보드 권한, 네트워크, 업데이터, 실제 성능                                                                 |
+| cargo            | 실제 git CLI/libgit2로 임시 저장소에서의 쓰기·읽기, 로컬 bare 원격의 fetch/pull/push, 인증 실패 분류, 라이선스 서명 확인, forge 응답 파싱(가짜 서버) | Tauri 명령 등록(`lib.rs`, Pro 잠금은 명령 본문을 직접 부른다)과 화면 연결, 실제 GitHub/GitLab API, 실제 SSH 서버·에이전트, GPG 에이전트, OS 키체인, macOS·Windows 경로 차이(CI는 ubuntu만, `all_os`는 수동) |
+| 사이트 node:test | 라이선스 형식·사용 가능 규칙, 활성화 대상 고르기, 웹훅 서명·주문 해석, 신고 검사·속도 제한, 관리자 필터, 전달 비밀·IP 규칙                           | 실제 Supabase(RLS·트리거·마이그레이션), OAuth 로그인, Lemon Squeezy, Netlify 헤더, 페이지 렌더링                                                                                                            |
+| 실기(사람)       | 설치·서명·SmartScreen·자동 업데이트, 실제 계정(GitHub·GitLab·Supabase·Lemon Squeezy), SSH·GPG, 키체인, 창 테두리, 큰 실제 저장소                     | —                                                                                                                                                                                                           |
 
 ## 2. 기능별 점검표
 
@@ -75,7 +75,7 @@
 | O. worktree                 | 3       | 2      | 1      | 0      | 0      |
 | P. 서브모듈                 | 2       | 1      | 1      | 0      | 0      |
 | Q. LFS                      | 3       | 2      | 1      | 0      | 0      |
-| R. 저장소 들어오기와 탭     | 7       | 3      | 2      | 2      | 4      |
+| R. 저장소 들어오기와 탭     | 7       | 3      | 4      | 0      | 4      |
 | S. 내 저장소(은하 대시보드) | 4       | 3      | 0      | 1      | 0      |
 | T. 백포트                   | 6       | 5      | 1      | 0      | 0      |
 | U. 폐쇄망 반출입(Pro)       | 3       | 2      | 1      | 0      | 0      |
@@ -86,16 +86,16 @@
 | Z. 커밋할 사람과 서명       | 4       | 2      | 2      | 0      | 3      |
 | AA. 설정 · 단축키 · 언어    | 4       | 4      | 0      | 0      | 1      |
 | AB. 앱 업데이트             | 1       | 0      | 1      | 0      | 1      |
-| AC. Free / Pro              | 3       | 2      | 0      | 1      | 0      |
+| AC. Free / Pro              | 3       | 3      | 0      | 0      | 0      |
 | AD. 라이선스                | 5       | 4      | 1      | 0      | 4      |
 | AE. 문제 신고               | 5       | 4      | 0      | 1      | 1      |
 | AF. 첫 실행과 Git 없음      | 2       | 2      | 0      | 0      | 1      |
-| AG. 오류 경계와 안전        | 3       | 2      | 0      | 1      | 1      |
+| AG. 오류 경계와 안전        | 3       | 2      | 1      | 0      | 1      |
 | AH. 키보드와 대화상자       | 4       | 3      | 0      | 1      | 0      |
 | AI. 창과 레이아웃           | 2       | 0      | 2      | 0      | 1      |
 | AJ. 큰 저장소 성능          | 1       | 0      | 1      | 0      | 1      |
 | AK. 설치와 배포             | 3       | 1      | 0      | 2      | 3      |
-| **합계**                    | **153** | **97** | **42** | **14** | **28** |
+| **합계**                    | **153** | **98** | **45** | **10** | **28** |
 
 `+실기`는 다른 판정과 겹쳐 센다(자동 테스트가 있어도 실기 확인이 필요한 항목). 사이트는 3장에 따로 센다.
 
@@ -396,7 +396,9 @@
   - cargo: `git/setup.rs` › `clones_a_local_repository_into_a_new_folder`, `clone_fails_cleanly_into_a_non_empty_folder_or_missing_parent`
   - vitest: `src/recent.test.ts` › "parses stored lists and drops broken entries", "moves a reopened repo to the front, keeps stars first and trims old ones", "names repositories from paths and URLs"
   - 실기: 실제 HTTPS 원격(GitHub 비공개 저장소)
-- **R2 clone 인증 실패** `없음` `+실기` — 인증 실패를 따로 알려 기존 안내 창을 띄운다.
+- **R2 clone 인증 실패** `부분` `+실기` — 인증 실패를 따로 알려 기존 안내 창을 띄운다.
+  - cargo: `git/setup.rs` › `clone_refused_by_the_server_is_classified_as_auth`(로컬 HTTP 서버: 401·403은 `Auth`, 404는 `Failed`, 폴더를 남기지 않음)
+  - 빈칸: 안내 창 화면(e2e 없음, 5장 1번)
 - **R3 새 저장소(init)** `자동` — `main`으로 시작.
   - e2e: `app.e2e.ts` › "creates a new repository in a plain folder"
   - cargo: `git/setup.rs` › `init_makes_an_empty_repository_on_main`
@@ -408,7 +410,9 @@
   - e2e: `app.e2e.ts` › "opens repositories in tabs and keeps each tab's state"; `safety.e2e.ts` › "a tab that crashes while rendering shows a notice, and the other tabs keep working"(Ctrl+T)
   - vitest: `src/tabs.test.ts` › "opens a path in its existing tab, the welcome tab, or a new one", "closes to the neighbour and never leaves zero tabs", "cycles with wrap-around and ignores out-of-range picks", "round-trips through storage without welcome tabs"; `src/planet.test.ts` › "is the same planet for the same repository, and varies between them"
   - 빈칸: W·1…9·Ctrl+Tab·0 키, 새로고침 후 탭 복원(e2e 없음)
-- **R6 `ddugit <경로>` 실행 인자** `없음` `+실기`
+- **R6 `ddugit <경로>` 실행 인자** `부분` `+실기`
+  - cargo: `lib.rs` › `the_first_plain_argument_is_the_repository_to_open`(옵션은 건너뛰고 첫 인자를 절대 경로로)
+  - 빈칸: 실제 앱이 그 저장소를 탭으로 여는지(Tauri 실행)
 - **R7 첫 화면** `자동` — 폴더 열기·clone·새 저장소·GitHub·GitLab, 단축키 버튼.
   - e2e: `report.e2e.ts` › "the first screen offers every way in, and the shortcuts"
 
@@ -487,7 +491,8 @@
   - 실기: 실제 GitHub·GitLab API 응답(가짜 서버로만 시험함)
 - **X2 토큰 출처와 호스트 신뢰** `부분` `+실기` — `gh`/`glab` 토큰 → OS 키체인, CLI 토큰은 github.com·gitlab.com 또는 믿기로 한 호스트에만, 토큰은 webview로 넘기지 않음.
   - cargo: `forge.rs` › `only_the_public_forges_get_a_cli_token_unasked`, `reads_the_hosts_gh_and_glab_are_signed_in_to`, `remote_hosts_must_be_plain_host_names`; `http.rs` › `error_statuses_come_back_with_their_body`, `encodes_query_values`
-  - 빈칸: `keychain.rs`(테스트 없음)
+  - cargo: `keychain.rs` › `only_the_device_id_inherits_the_legacy_device_id`
+  - 빈칸: 옛 `ddugit` 서비스에서 옮겨 오기 자체. macOS·Windows 밖에서 keyring의 대체 저장소는 항목마다 값을 따로 들고 있어(같은 서비스·계정이어도 나누지 않는다) 임시로도 재현할 수 없다. 실기로 본다
   - 실기: macOS 키체인·Windows 자격 증명 관리자에 저장되고 다시 켜도 남는지
 - **X3 PR·MR 만들기** `자동` `+실기` — 브랜치 메뉴·PR 섹션 머리, 받을 브랜치 = API의 기본 브랜치, 제목·설명 채우기, 초안, 안 올린 브랜치는 먼저 push, 이미 열림은 링크, 토큰 먼저.
   - e2e: `createPr.e2e.ts` › "creates a pull request from a branch menu, pushing the branch first", "creating a pull request asks for a token first, and offers Pro on Free"
@@ -553,7 +558,8 @@
 - **AB1 알림·설치·나중에** `부분` `+실기` — 시작할 때와 6시간마다 확인, 탑바 위 알림, '업데이트하고 다시 시작', 서명 확인, `requireSignedVersion`.
   - e2e: `app.e2e.ts` › "a newer version shows an update notice that installs or waits"
   - vitest: `scripts/downloads.test.mjs` › "lists the two installers", "refuses a release missing an installer", "points every platform at its signed update file", "is absent without the update files or their signatures"
-  - 빈칸: `update.rs`(테스트 없음)
+  - cargo: `update.rs` › `a_build_without_an_address_never_updates`, `updates_must_be_signed_by_the_release_key`(`tauri.conf.json`의 공개키·`requireSignedVersion`, 플랫폼 파일이 덮어쓰지 않음)
+  - 빈칸: 확인·내려받기·설치(`find`·`install`)는 `AppHandle`과 서명된 업데이트 서버가 있어야 해서 실기로
   - 실기: 0.8.0 → 새 버전 실제 업데이트(4장)
 
 ### AC. Free / Pro
@@ -563,7 +569,8 @@
 - **AC2 화면의 잠금과 Pro 안내** `자동` — PRO 표시, 안내 창(닫기·'이미 구매했어요' → 설정의 라이선스), 대화상자 위에서 Esc.
   - e2e: `app.e2e.ts` › "on Free, private pull requests and backport actions offer Pro instead", "on Free, air-gapped transfer offers Pro", "on Free, stacking a branch offers Pro", "on Free, release notes offer Pro", "on Free, batch pull and branch switching offer Pro"; `createPr.e2e.ts` › "creating a pull request asks for a token first, and offers Pro on Free"; `dialogs.e2e.ts` › "on Free, the Pro offer over a dialog closes with Esc, then the dialog"
   - 빈칸: 대시보드 3개 제한(S4)
-- **AC3 백엔드 잠금(`pro::require`)** `없음` — 화면을 거치지 않아도 백포트 실행·반출입·스택·일괄 전환 명령이 Free에서 거부된다(`lib.rs`). mock만 흉내 낸다.
+- **AC3 백엔드 잠금(`pro::require`)** `자동` — 화면을 거치지 않아도 백포트 실행·반출입·스택·일괄 전환 명령이 Free에서 거부된다(`lib.rs`).
+  - cargo: `lib.rs` › `pro_commands_are_refused_on_free_before_touching_anything`(Pro 명령 9가지: 거부 문구, 참조·HEAD·로컬 config·작업 트리·내보낼 폴더가 그대로), `pro_commands_work_with_a_license`(테스트 키로 서명한 사이트 라이선스), `taking_a_branch_out_of_its_stack_stays_free`. 명령 본문(`<명령>::run`)에 설정 폴더를 직접 넘긴다
 
 ### AD. 라이선스
 
@@ -616,7 +623,9 @@
 - **AG2 깨진 저장값** `자동` — localStorage가 깨져도 기본값으로.
   - e2e: `safety.e2e.ts` › "a malformed stored list of dismissed hints doesn't break the dashboard"
   - vitest: 각 `parse*` 테스트(settings·recent·groups·identity·missions)
-- **AG3 CSP·`freezePrototype`** `없음` `+실기` — `default-src 'self'`, IPC만 연결, 인라인 스크립트 없음. 실제 앱(Xvfb 또는 macOS·Windows)에서 콘솔에 CSP 위반이 없는지.
+- **AG3 CSP·`freezePrototype`** `부분` `+실기` — `default-src 'self'`, IPC만 연결, 인라인 스크립트 없음. 실제 앱(Xvfb 또는 macOS·Windows)에서 콘솔에 CSP 위반이 없는지.
+  - cargo: `lib.rs` › `the_release_window_runs_only_its_own_scripts`(설정값과 플랫폼 파일이 덮어쓰지 않음)
+  - 빈칸: 실제 앱 콘솔의 CSP 위반(실기)
 
 ### AH. 키보드와 대화상자
 
@@ -817,19 +826,17 @@
 3. **e2e stash** — 커밋 창에서 일부 파일 stash → 그래프 마름모 → stash 패널 적용·꺼내기·삭제(F1, F3)
 4. **e2e Free 대시보드 3개** — 최근 저장소 5개 + `__ddugitDemoPro = free` → 카드 3개만 열리고 나머지 잠김·Pro 안내(S4)
 5. **e2e 충돌 띠의 취소·계속** — `conflictNext`로 병합 충돌 → 띠 '취소' → `state`가 `clean`, 다시 충돌 → 해결 → '계속'(G6)
-6. **cargo `pro::require` 경계** — 잠금 검사를 `lib.rs`에서 시험 가능한 함수로 빼고, Free 상태로 백포트 실행·반출입·스택·일괄 전환이 거부되는지(AC3)
-7. **e2e revert와 Alt+끌기 cherry-pick** — 커밋 메뉴 되돌리기 → 새 커밋, Alt를 누른 채 끌어 놓기 → cherry-pick 확인 창(H2, H3)
-8. **e2e 태그·브랜치 관리** — 커밋 메뉴로 태그 만들기·지우기, 브랜치 이름 바꾸기, 병합 안 된 브랜치 삭제의 두 번째 확인(D4, D5)
-9. **e2e 커밋 검색** — ⌘/Ctrl+F → 입력 → 결과 수, Enter/Shift+Enter로 선택 이동, Esc로 닫기(A9)
-10. **e2e hunk 스테이지와 discard** — diff 시트에서 hunk 스테이지 → '스테이지됨' 탭에서 내리기, 커밋 창에서 변경 버리기 확인 창(B2, B6)
-11. **e2e 최소 창 900×560** — 지금 작은 창 테스트를 넓혀 탑바·사이드바·설정·대시보드·rebase 시트에 가로 스크롤·잘림이 없는지(AI1)
-12. **e2e 탭 단축키와 복원** — Ctrl+T·W·1…9·Ctrl+Tab·Ctrl+0, 새로고침 후 열린 탭 복원(R5)
-13. **e2e 이전 이력 더 불러오기** — 설정 historyPage 1000 + `grow`로 넘기기 → 버튼으로 더 불러오고 카메라가 제자리인지(A11, AA1)
-14. **e2e 반입 검사 실패** — mock `transfer_check`에 `checksum: "mismatch"`·`missing` 제어값을 더해 거부 화면 확인(U2)
-15. **cargo clone 인증 실패 분류** — forge 테스트처럼 401을 돌려주는 로컬 HTTP 서버로 clone → `OpStatus::Auth`(R2)
-16. **e2e 정리 중 충돌** — rebase 계획이 충돌하게 만들어 충돌 시트 → 계속/취소(I4)
-17. **e2e bisect 건너뛰기, 작성자 바꾸기, 패치 내보내기** — 이미 있는 흐름 테스트에 한 단계씩 덧붙인다(L2, J2, T6)
-18. **e2e worktree 강제 제거·서브모듈 sync·LFS 켜기** — mock 제어값으로 변경 남은 worktree, 초기화 안 된 LFS(O2, P2, Q2)
-19. **vitest `share.ts`** — `navigator.clipboard.writeText`가 거부되거나 없을 때 실패 콜백이 불리는지(AE5)
-20. **사이트 node:test 보안 헤더·다운로드** — `next.config.ts`의 `headers()` 결과가 모든 경로와 `/activate`에 기대한 값인지, `downloads.ts` 파싱(W-11, W-12)
-21. **사이트 RLS 시험** — `supabase db test`(pgTAP)로 authenticated·anon 역할의 `licenses`·`devices`·`reports` 권한과 `devices_within_limit` 트리거(W-5, W-13)
+6. **e2e revert와 Alt+끌기 cherry-pick** — 커밋 메뉴 되돌리기 → 새 커밋, Alt를 누른 채 끌어 놓기 → cherry-pick 확인 창(H2, H3)
+7. **e2e 태그·브랜치 관리** — 커밋 메뉴로 태그 만들기·지우기, 브랜치 이름 바꾸기, 병합 안 된 브랜치 삭제의 두 번째 확인(D4, D5)
+8. **e2e 커밋 검색** — ⌘/Ctrl+F → 입력 → 결과 수, Enter/Shift+Enter로 선택 이동, Esc로 닫기(A9)
+9. **e2e hunk 스테이지와 discard** — diff 시트에서 hunk 스테이지 → '스테이지됨' 탭에서 내리기, 커밋 창에서 변경 버리기 확인 창(B2, B6)
+10. **e2e 최소 창 900×560** — 지금 작은 창 테스트를 넓혀 탑바·사이드바·설정·대시보드·rebase 시트에 가로 스크롤·잘림이 없는지(AI1)
+11. **e2e 탭 단축키와 복원** — Ctrl+T·W·1…9·Ctrl+Tab·Ctrl+0, 새로고침 후 열린 탭 복원(R5)
+12. **e2e 이전 이력 더 불러오기** — 설정 historyPage 1000 + `grow`로 넘기기 → 버튼으로 더 불러오고 카메라가 제자리인지(A11, AA1)
+13. **e2e 반입 검사 실패** — mock `transfer_check`에 `checksum: "mismatch"`·`missing` 제어값을 더해 거부 화면 확인(U2)
+14. **e2e 정리 중 충돌** — rebase 계획이 충돌하게 만들어 충돌 시트 → 계속/취소(I4)
+15. **e2e bisect 건너뛰기, 작성자 바꾸기, 패치 내보내기** — 이미 있는 흐름 테스트에 한 단계씩 덧붙인다(L2, J2, T6)
+16. **e2e worktree 강제 제거·서브모듈 sync·LFS 켜기** — mock 제어값으로 변경 남은 worktree, 초기화 안 된 LFS(O2, P2, Q2)
+17. **vitest `share.ts`** — `navigator.clipboard.writeText`가 거부되거나 없을 때 실패 콜백이 불리는지(AE5)
+18. **사이트 node:test 보안 헤더·다운로드** — `next.config.ts`의 `headers()` 결과가 모든 경로와 `/activate`에 기대한 값인지, `downloads.ts` 파싱(W-11, W-12)
+19. **사이트 RLS 시험** — `supabase db test`(pgTAP)로 authenticated·anon 역할의 `licenses`·`devices`·`reports` 권한과 `devices_within_limit` 트리거(W-5, W-13)
