@@ -437,12 +437,11 @@ test("tabs follow the keyboard: new, by number, cycle, home and close, and come 
   await expect(tabs).toHaveCount(1);
   for (const name of ["second", "third"]) {
     await page.keyboard.press("Control+t");
-    await expect(page.locator(".welcome:not([hidden])")).toContainText("최근 저장소");
+    // The new tab's welcome screen: the recent list, or the dashboard once a repository is known.
+    const open = page.locator(".welcome:not([hidden])").getByRole("button", { name: /폴더 열기/ });
+    await expect(open).toBeVisible();
     await page.evaluate((name) => (window.__ddugitDemo.nextFolder = `/work/${name}`), name);
-    await page
-      .locator(".welcome")
-      .getByRole("button", { name: /폴더 열기/ })
-      .click();
+    await open.click();
     await expect(active).toHaveAttribute("title", `/work/${name}`);
   }
   await expect(tabs).toHaveCount(3);
