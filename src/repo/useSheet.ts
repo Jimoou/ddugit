@@ -11,6 +11,15 @@ import type { DiffSource, Sheet, Toast } from "./state";
 export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Map<string, CommitInfo>, toast: Toast) {
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [conflict, setConflict] = useState<{ file?: string } | null>(null);
+  // When the stopped operation ends (cancelled, finished, or outside the app) and nothing is left in
+  // conflict, the conflict sheet has nothing to say, and it would hide every sheet under it: close it.
+  // Only on that change: right after an operation stops, the sheet opens before the snapshot shows it.
+  const stopped = !!snap && (snap.state !== "clean" || snap.changes.some((c) => c.conflicted));
+  const [wasStopped, setWasStopped] = useState(stopped);
+  if (wasStopped !== stopped) {
+    setWasStopped(stopped);
+    if (!stopped) setConflict(null);
+  }
   const diffReq = useRef(0);
 
   /** Fetch the files for the open diff; only the latest request may land. */
