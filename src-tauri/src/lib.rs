@@ -1,9 +1,11 @@
+mod about;
 mod activate;
 mod device;
 mod forge;
 mod git;
 mod license;
 mod pro;
+mod report;
 mod ssh;
 mod update;
 
@@ -326,13 +328,14 @@ async fn pro_status(app: tauri::AppHandle) -> Result<pro::ProStatus, String> {
 command!(forge_repos(kind: forge::ForgeKind, host: String, trusted: Vec<String>) -> forge::repos::ForgeRepos
     => forge::repos::list(kind, &host, &trusted));
 command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
-// Open a pull request page in the browser (web links only).
+// Open a web page in the browser (https only).
 command!(open_url(url: String) -> () => {
-    if !url.starts_with("https://") {
-        return Err("Only https links can be opened".into());
-    }
+    about::openable(&url)?;
     tauri_plugin_opener::open_url(&url, None::<&str>).map_err(|e| e.to_string())
 });
+command!(app_info() -> about::AppInfo => Ok(about::app_info()));
+command!(git_version() -> String => git::version(None));
+command!(report_send(report: report::NewReport) -> String => report::send(&report));
 command!(file_log(path: String, rev: String, file: String) -> Vec<git::history::FileTouch>
     => git::history::file_log(&path, &rev, &file));
 command!(git_blame(path: String, rev: String, file: String) -> git::history::Blame
@@ -396,6 +399,9 @@ pub fn run() {
             git_commit,
             git_stage_hunks,
             set_git_path,
+            git_version,
+            app_info,
+            report_send,
             git_rebase,
             git_rebase_todo,
             backport_compare,

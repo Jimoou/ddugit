@@ -337,6 +337,9 @@ mod tests {
         assert!(version(None).unwrap().starts_with("git version"));
         // Something that runs but isn't git, and something that doesn't exist.
         assert!(set_program(Some("/no/such/git")).is_err());
+        assert!(version(Some("/no/such/git"))
+            .unwrap_err()
+            .starts_with("Can't run"));
         assert!(version(Some(if cfg!(windows) { "where" } else { "true" })).is_err());
         // Blank means PATH again; the global never held the bad value.
         assert!(set_program(Some("  ")).unwrap().starts_with("git version"));

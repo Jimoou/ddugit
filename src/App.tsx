@@ -10,6 +10,8 @@ import { SpaceBackdrop } from "./components/Planet";
 import { TabBar } from "./components/TabBar";
 import { UpdateNotice } from "./components/Update";
 import { ProOffer } from "./components/ProOffer";
+import { GitMissing, ReportDialog } from "./components/Report";
+import { isUnexpected } from "./report";
 import { refreshPro } from "./pro";
 import { useLicenseCheck } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
@@ -77,6 +79,10 @@ export default function App() {
   /** A folder is being dragged over the window. */
   const [dropping, setDropping] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  /** The problem report is open (with the error toast it came from). */
+  const [report, setReport] = useState<{ error: string | null } | null>(null);
+  /** git can't be run: why (the startup check). */
+  const [gitMissing, setGitMissing] = useState<string | null>(null);
   const toastId = useRef(0);
   const page = PAGE_OVERRIDE ?? settings.historyPage;
   const current = activeTab(tabs);
@@ -95,6 +101,9 @@ export default function App() {
 
   const toast = useCallback((kind: Toast["kind"], text: string, action?: ToastAction) => {
     const id = ++toastId.current;
+    // A backend failure (not git's own refusal) can be reported from its toast.
+    if (kind === "err" && !action && isUnexpected(text))
+      action = { label: t("report.action"), onClick: () => setReport({ error: text }) };
     setToasts((l) => [...l.slice(-3), { id, kind, text, action }]);
     // One with a button stays long enough to reach it.
     setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" || action ? 7000 : 3200);
@@ -135,12 +144,26 @@ export default function App() {
     void api.initialRepo().then((p) => p && openPath(p));
   }, [openPath]);
 
-  // A git executable chosen in settings applies from startup.
+  // A git executable chosen in settings applies from startup; then make sure there is a git at all.
   const startGitPath = useRef(settings.gitPath);
+  const checkGit = useCallback(
+    () =>
+      void api.gitVersion().then(
+        () => setGitMissing(null),
+        (e) => setGitMissing(String(e)),
+      ),
+    [],
+  );
   useEffect(() => {
-    if (startGitPath.current && isTauri)
-      api.setGitPath(startGitPath.current).catch((e) => toast("err", t("app.gitPathError", { error: String(e) })));
-  }, [toast]);
+    const chosen =
+      startGitPath.current && isTauri
+        ? api.setGitPath(startGitPath.current).then(
+            () => {},
+            (e) => toast("err", t("app.gitPathError", { error: String(e) })),
+          )
+        : Promise.resolve();
+    void chosen.then(checkGit);
+  }, [toast, checkGit]);
 
   // Window-wide keys: tabs and the settings screen.
   useEffect(() => {
@@ -306,6 +329,15 @@ export default function App() {
           </h1>
           <p>{t("app.tagline")}</p>
           <ConnectActions primary {...connect} />
+          <ul className="welcome-hints muted small">
+            {isTauri && <li>{t("welcome.drop")}</li>}
+            <li>{t("welcome.forges")}</li>
+            <li>
+              <button className="ghost" onClick={() => setSettingsAt("shortcuts")}>
+                <kbd>?</kbd> {t("welcome.shortcuts")}
+              </button>
+            </li>
+          </ul>
           {recent.list.some((r) => r.path !== DEMO_PATH) ? (
             <Galaxy
               recent={recent}
@@ -369,6 +401,28 @@ export default function App() {
           at={settingsAt}
           onChange={updateSettings}
           onClose={() => setSettingsAt(null)}
+          onReport={() => setReport({ error: null })}
+        />
+      )}
+      {report && (
+        <ReportDialog
+          lastError={report.error}
+          onSent={() => {
+            setReport(null);
+            toast("ok", t("report.sent"));
+          }}
+          onClose={() => setReport(null)}
+        />
+      )}
+      {gitMissing && (
+        <GitMissing
+          error={gitMissing}
+          onRecheck={checkGit}
+          onSetPath={() => {
+            setGitMissing(null);
+            setSettingsAt("git");
+          }}
+          onClose={() => setGitMissing(null)}
         />
       )}
       <ProOffer onLicense={() => setSettingsAt("license")} />

@@ -98,7 +98,7 @@ test("settings: the section list switches sections, by click and by arrow keys",
   await expect(tab("Git")).toBeFocused();
   await expect(dialog.getByRole("tabpanel", { name: "Git" })).toBeVisible();
   await page.keyboard.press("End");
-  await expect(tab("단축키")).toHaveAttribute("aria-selected", "true");
+  await expect(tab("정보")).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("ArrowDown");
   await expect(tab("화면")).toHaveAttribute("aria-selected", "true");
 

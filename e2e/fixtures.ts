@@ -12,6 +12,9 @@ interface DemoWindow {
     deviceRemoved: boolean;
     offline: boolean;
     setLicense(kind: "lifetime" | "site" | null): void;
+    failNext: string | null;
+    reportFail: null | "limited" | "offline";
+    sent: { kind: string; message: string; email: string | null; diagnostics: string | null }[];
   };
 }
 
