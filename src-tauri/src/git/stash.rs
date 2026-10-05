@@ -183,25 +183,24 @@ mod tests {
     /// file named `*` or `:(top)x` is just that file.
     #[test]
     fn discard_and_stash_take_paths_literally() {
+        // `[x]` is a pathspec glob that matches `x` and is a legal file name on every OS.
         let d = repo();
-        commit_file(d.path(), "t?.txt", "t", "base");
+        commit_file(d.path(), "t[x].txt", "t", "base");
         commit_file(d.path(), "tx.txt", "t", "base2");
-        let names = ["u?", "ux", "*", ":(top)x"];
-        for n in names
-            .iter()
-            .filter(|n| cfg!(unix) || !n.contains(['?', '*', ':']))
-        {
+        for n in ["u[x]", "ux"] {
             fs::write(d.path().join(n), "u").unwrap();
         }
-        fs::write(d.path().join("t?.txt"), "edit").unwrap();
+        fs::write(d.path().join("t[x].txt"), "edit").unwrap();
         fs::write(d.path().join("tx.txt"), "edit").unwrap();
+        discard(s(d.path()), &["u[x]".into()]).unwrap();
+        assert!(!d.path().join("u[x]").exists());
+        assert!(d.path().join("ux").exists());
+        discard(s(d.path()), &["t[x].txt".into()]).unwrap();
+        assert_eq!(fs::read_to_string(d.path().join("t[x].txt")).unwrap(), "t");
+        assert_eq!(fs::read_to_string(d.path().join("tx.txt")).unwrap(), "edit");
         if cfg!(unix) {
-            discard(s(d.path()), &["u?".into(), "*".into()]).unwrap();
-            assert!(!d.path().join("u?").exists() && !d.path().join("*").exists());
-            assert!(d.path().join("ux").exists() && d.path().join(":(top)x").exists());
-            discard(s(d.path()), &["t?.txt".into()]).unwrap();
-            assert_eq!(fs::read_to_string(d.path().join("t?.txt")).unwrap(), "t");
-            assert_eq!(fs::read_to_string(d.path().join("tx.txt")).unwrap(), "edit");
+            // Pathspec magic in a name: only possible where `:` is allowed in file names.
+            fs::write(d.path().join(":(top)x"), "u").unwrap();
             let r = stash_push(s(d.path()), "", &[":(top)x".into()]).unwrap();
             assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
             assert!(!d.path().join(":(top)x").exists());
