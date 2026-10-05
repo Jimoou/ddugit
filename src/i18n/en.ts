@@ -1140,7 +1140,8 @@ export const en: Record<Key, string> = {
   "report.whatHint": "What you were doing, and what went wrong.",
   "report.email": "Email for a reply (optional)",
   "report.diag": "Diagnostics",
-  "report.diagHint": "Paths, addresses, emails and tokens are hidden. You can edit or remove anything before sending.",
+  "report.diagHint":
+    "File and branch names, paths, addresses, emails and tokens are hidden. You can edit or remove anything before sending.",
   "report.gathering": "Gathering…",
   "report.copy": "Copy",
   "report.send": "Send",

@@ -1126,7 +1126,7 @@ export const ko = {
   "report.whatHint": "무엇을 하다가 어떻게 되었는지 적어 주세요.",
   "report.email": "답장 받을 이메일 (선택)",
   "report.diag": "진단 정보",
-  "report.diagHint": "경로, 주소, 이메일, 토큰은 가렸어요. 보내기 전에 고치거나 지울 수 있어요.",
+  "report.diagHint": "파일·브랜치 이름, 경로, 주소, 이메일, 토큰은 가렸어요. 보내기 전에 고치거나 지울 수 있어요.",
   "report.gathering": "모으는 중…",
   "report.copy": "복사",
   "report.send": "보내기",
