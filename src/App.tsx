@@ -11,7 +11,7 @@ import { TabBar } from "./components/TabBar";
 import { UpdateNotice } from "./components/Update";
 import { ProOffer } from "./components/ProOffer";
 import { refreshPro } from "./pro";
-import { useLicenseRenewal } from "./components/License";
+import { useLicenseCheck } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
@@ -102,7 +102,7 @@ export default function App() {
 
   useEffect(refreshPro, []);
   const remindLicense = useCallback((text: string) => toast("ok", text), [toast]);
-  useLicenseRenewal(remindLicense);
+  useLicenseCheck(remindLicense);
 
   const updateSettings = (patch: Partial<Settings>) => {
     const next = { ...settings, ...patch };

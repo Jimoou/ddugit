@@ -420,16 +420,25 @@ export interface LicenseInfo {
   id: string;
   name: string;
   email: string;
-  kind: "commercial" | "site" | string;
+  /** `personal` (bought, device-bound), `commercial` (older, per seat) or `site`. */
+  kind: "personal" | "commercial" | "site" | string;
   seats: number;
   issued: string;
+  /** `9999-12-31` = every update (`LIFETIME_UPDATES`). */
   updatesUntil: string;
-  /** Subscriptions: paid through + grace; after it the app only reminds. */
+  /** Old subscriptions only: paid through + grace. */
   expires?: string;
-  plan?: "monthly" | "yearly" | string;
+  plan?: "lifetime" | string;
+  /** The device it is signed for (hash); absent = any computer. */
+  device?: string;
 }
-/** What asking ddugit.com for a renewed license came to (`license::Refresh`). */
-export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown";
+/** What asking ddugit.com about the license came to (`license::Refresh`); removed / revoked drop it here. */
+export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown" | "removed" | "revoked";
+/** `activate::Deactivation`: the license is gone here; `confirmed` = ddugit.com freed this device too. */
+export interface Deactivation {
+  status: LicenseStatus;
+  confirmed: boolean;
+}
 /** Mirrors `git/transfer.rs`. */
 export interface TransferExport {
   dest: string;
@@ -493,9 +502,7 @@ export type StackOp =
 /** Free or Pro, and why (`pro.rs`). */
 export interface ProStatus {
   pro: boolean;
-  source: "license" | "site" | "trial" | "free";
-  /** Days of the 14-day trial left (0 once over); null while a license covers Pro. */
-  trialDaysLeft: number | null;
+  source: "license" | "site" | "free";
 }
 /** A newer app version than the one running (`update.rs`). */
 export interface UpdateInfo {
@@ -507,6 +514,8 @@ export interface LicenseStatus {
   newerThanLicense: boolean;
   checkable: boolean;
   expired: boolean;
+  /** Signed for another computer: Pro stays closed here. */
+  otherDevice: boolean;
 }
 
 /** Where one repository stands, read without its history (the galaxy dashboard, `git/glance.rs`). */

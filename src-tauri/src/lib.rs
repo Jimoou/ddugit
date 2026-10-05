@@ -1,4 +1,5 @@
 mod activate;
+mod device;
 mod forge;
 mod git;
 mod license;
@@ -257,6 +258,13 @@ fn license_activate_cancel() {
     activate::cancel();
 }
 
+/// Free this device's place on ddugit.com and remove the license here (even offline).
+#[tauri::command]
+async fn license_deactivate(app: tauri::AppHandle) -> Result<activate::Deactivation, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || activate::deactivate_in(&dir)).await
+}
+
 #[tauri::command]
 async fn license_refresh(app: tauri::AppHandle) -> Result<license::Refresh, String> {
     let dir = license_dir(&app)?;
@@ -428,6 +436,7 @@ pub fn run() {
             license_refresh,
             license_activate,
             license_activate_cancel,
+            license_deactivate,
             pro_status,
             transfer_export,
             transfer_import,

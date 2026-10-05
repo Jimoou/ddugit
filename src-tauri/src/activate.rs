@@ -1,12 +1,16 @@
 //! Pro activation by signing in on ddugit.com instead of pasting a license.
 //!
 //! The native-app sign-in pattern (RFC 8252, a loopback redirect): listen on a
-//! random port of 127.0.0.1, open `ddugit.com/activate?port=…&state=…` in the
-//! browser, and wait. After signing in, the site sends the browser back to
+//! random port of 127.0.0.1, open `ddugit.com/activate?port=…&state=…&device=…&name=…`
+//! in the browser, and wait. The site registers this device on the license (up to
+//! three; when full it lets the user remove one first). After signing in, the site sends the browser back to
 //! `http://127.0.0.1:<port>/callback?code=…&state=…` with a one-time code; the
-//! app trades the code for the license (`/api/license/activate`), keeps it like a
-//! pasted one, and sends the browser on to a "done" page. The license itself never
+//! app trades the code and its device id for the license signed for this device
+//! (`/api/license/activate`), keeps it like a pasted one, and sends the browser on to a "done" page. The license itself never
 //! travels in a URL. Pasting a license stays for air-gapped sites.
+//!
+//! `deactivate_in` is the way back: it frees this device's place on ddugit.com and
+//! removes the license here, even when the site can't be reached.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -14,8 +18,9 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
+use crate::device;
 use crate::license::{self, LicenseStatus};
 
 type Result<T> = std::result::Result<T, String>;
@@ -39,14 +44,28 @@ pub fn activate_in(dir: &Path, open: impl FnOnce(&str) -> Result<()>) -> Result<
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let state = token()?;
-    open(&format!("{SITE}/activate?port={port}&state={state}"))?;
+    let device = device::id_in(dir)?;
+    let name = encode(&device::name());
+    open(&format!(
+        "{SITE}/activate?port={port}&state={state}&device={device}&name={name}"
+    ))?;
 
     let live = || CURRENT.load(Ordering::SeqCst) == me;
     let (stream, code) = wait_for_code(&listener, &state, Instant::now() + WAIT, live)?;
-    let done = exchange(&code).and_then(|text| license::install_in(dir, &text));
+    let done = exchange(&code, &device).and_then(|text| license::install_in(dir, &text));
     let page = if done.is_ok() { "ok" } else { "failed" };
     redirect(stream, &format!("{SITE}/activate/done?result={page}"));
     done
+}
+
+/// Percent-encode a query value (UTF-8; unreserved characters stay).
+fn encode(s: &str) -> String {
+    s.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 /// 32 random bytes, base64url: the `state` that ties the browser's answer to this request.
@@ -134,27 +153,82 @@ fn redirect(mut stream: TcpStream, to: &str) {
 }
 
 #[derive(Deserialize)]
-struct ActivateReply {
+struct Reply {
     license: Option<String>,
+    #[serde(default)]
+    ok: bool,
     error: Option<String>,
 }
 
-/// Trade the one-time code for the license text.
-fn exchange(code: &str) -> Result<String> {
-    let reply: ActivateReply = ureq::post(&format!("{SITE}/api/license/activate"))
+/// POST `body` to the site; an error status still brings `{ error }` (a short English sentence).
+fn post(path: &str, body: serde_json::Value) -> Result<Reply> {
+    ureq::post(&format!("{SITE}{path}"))
         .config()
         .http_status_as_error(false)
         .build()
-        .send_json(serde_json::json!({ "code": code }))
+        .send_json(body)
         .map_err(|e| format!("Couldn't reach ddugit.com: {e}"))?
         .body_mut()
         .read_json()
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "ddugit.com gave an unexpected answer. Try again later.".into())
+}
+
+/// Trade the one-time code (and this device's id) for the license text.
+fn exchange(code: &str, device: &str) -> Result<String> {
+    let reply = post(
+        "/api/license/activate",
+        serde_json::json!({ "code": code, "device": device }),
+    )?;
     match (reply.license, reply.error) {
         (Some(text), _) => Ok(text),
         (None, Some(e)) => Err(e),
         (None, None) => Err("The license service gave no answer".into()),
     }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Deactivation {
+    pub status: LicenseStatus,
+    /// ddugit.com freed this device's place; if not (offline), the user removes it on the website.
+    pub confirmed: bool,
+}
+
+/// Free this device's place on the license at ddugit.com, then remove the license here
+/// whatever the site said.
+pub fn deactivate_in(dir: &Path) -> Result<Deactivation> {
+    let device = device::id_in(dir)?;
+    let held = license::status_in(dir).license.and_then(|l| l.device);
+    deactivate_with(dir, held.as_deref(), &device, |text| {
+        let reply = post(
+            "/api/license/deactivate",
+            serde_json::json!({ "license": text, "device": device }),
+        )?;
+        match reply.error {
+            Some(e) if !reply.ok => Err(e),
+            _ => Ok(reply.ok),
+        }
+    })
+}
+
+/// `bound`: the device the license here is signed for; `tell` asks the site to free it.
+fn deactivate_with(
+    dir: &Path,
+    bound: Option<&str>,
+    device: &str,
+    tell: impl FnOnce(&str) -> Result<bool>,
+) -> Result<Deactivation> {
+    let confirmed = match (bound, license::text_in(dir)) {
+        // Signed for this device: the site frees its place.
+        (Some(hash), Some(text)) if hash == device::hash(device) => tell(&text).unwrap_or(false),
+        // Not bound, or bound elsewhere: there is no place of ours to free.
+        (None, _) => true,
+        _ => false,
+    };
+    Ok(Deactivation {
+        status: license::remove_in(dir)?,
+        confirmed,
+    })
 }
 
 #[cfg(test)]
@@ -213,6 +287,45 @@ mod tests {
         let (l, _) = listen();
         let r = wait_for_code(&l, "S1", Instant::now() + Duration::from_millis(300), || true);
         assert_eq!(r.err().as_deref(), Some("Timed out waiting for the browser"));
+    }
+
+    #[test]
+    fn device_names_are_percent_encoded() {
+        assert_eq!(encode("Kim's Mac 맥"), "Kim%27s%20Mac%20%EB%A7%A5");
+        assert_eq!(encode("a-b_c.d~"), "a-b_c.d~");
+    }
+
+    #[test]
+    fn deactivating_removes_the_license_here_whatever_the_site_says() {
+        let dir = tempfile::tempdir().unwrap();
+        let lic = dir.path().join("license.txt");
+        let here = device::hash("dev");
+        let put = || std::fs::write(&lic, "DDUGIT1.x.y").unwrap();
+
+        // Offline (or refused): removed here anyway, not confirmed.
+        put();
+        let out = deactivate_with(dir.path(), Some(&here), "dev", |text| {
+            assert_eq!(text, "DDUGIT1.x.y");
+            Err("Couldn't reach ddugit.com".into())
+        })
+        .unwrap();
+        assert!(!out.confirmed && out.status.license.is_none() && !lic.exists());
+        // The site freed the place.
+        put();
+        let out = deactivate_with(dir.path(), Some(&here), "dev", |_| Ok(true)).unwrap();
+        assert!(out.confirmed && !lic.exists());
+        // Signed for another computer: the site isn't asked.
+        put();
+        let other = device::hash("other");
+        let out = deactivate_with(dir.path(), Some(&other), "dev", |_| panic!("not asked")).unwrap();
+        assert!(!out.confirmed && !lic.exists());
+        // Not bound to a device: nothing to free.
+        put();
+        assert!(
+            deactivate_with(dir.path(), None, "dev", |_| panic!())
+                .unwrap()
+                .confirmed
+        );
     }
 
     #[test]

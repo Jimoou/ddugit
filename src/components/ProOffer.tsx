@@ -1,17 +1,16 @@
 import { api } from "../api";
 import { t } from "../i18n";
-import { closeProOffer, FREE_DASHBOARD, type ProFeature, usePro, useProOffer } from "../pro";
+import { closeProOffer, FREE_DASHBOARD, type ProFeature, useProOffer } from "../pro";
 import { BUY_URL } from "./License";
 import { useDialog } from "./useDialog";
 
-/** "This is a Pro feature": what it unlocks, the trial, and where to get it. */
+/** "This is a Pro feature": what it unlocks, the price, and where to get it. */
 export function ProOffer({ onLicense }: { onLicense(): void }) {
   const feature = useProOffer();
   return feature ? <Offer feature={feature} onLicense={onLicense} /> : null;
 }
 
 function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void }) {
-  const status = usePro();
   const dialog = useDialog(closeProOffer);
   return (
     <div className="scrim" onClick={closeProOffer}>
@@ -30,7 +29,6 @@ function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void 
           <li>{t("pro.list.notes")}</li>
           <li>{t("pro.list.batch")}</li>
         </ul>
-        {status?.source === "free" && <p className="note">{t("pro.trialOver")}</p>}
         <div className="dialog-actions">
           <button onClick={closeProOffer}>{t("common.close")}</button>
           <button
