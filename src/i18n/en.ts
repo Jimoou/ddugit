@@ -122,6 +122,8 @@ export const en: Record<Key, string> = {
   "notes.truncated": "Too many changes; only the latest {n} are included",
   "notes.copy": "Copy Markdown",
   "notes.copied": "Copied release notes",
+  "share.copyFailed": "Couldn't copy to the clipboard",
+  "share.openFailed": "Couldn't open the link: {error}",
   "notes.kind.breaking": "Breaking changes",
   "notes.kind.feat": "Features",
   "notes.kind.fix": "Bug fixes",

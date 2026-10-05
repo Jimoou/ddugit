@@ -1,8 +1,8 @@
 import { Icon } from "./Icon";
 import { SshSetup } from "./SshSetup";
-import { api } from "../api";
 import { useState } from "react";
 import { type Key, t } from "../i18n";
+import { copyText, openLink } from "../share";
 import { Rich } from "../i18n/Rich";
 import { closeOnScrim, useDialog } from "./useDialog";
 import { safeHost, shellCommand, shellOf } from "../shell";
@@ -122,8 +122,7 @@ export function AuthDialog({ url, output, repoPath, signIn, busy, onRetry, onClo
                   className="icon"
                   title={t("auth.copy")}
                   onClick={() => {
-                    void navigator.clipboard?.writeText(cmd);
-                    setCopied(i);
+                    copyText(cmd, () => setCopied(i));
                   }}
                 >
                   <Icon name={copied === i ? "check" : "copy"} />
@@ -148,7 +147,7 @@ export function AuthDialog({ url, output, repoPath, signIn, busy, onRetry, onClo
         {ssh && url && /Host key|publickey/i.test(output) ? (
           // Set SSH up right here; the terminal route stays one click away.
           <>
-            <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
+            <SshSetup url={url} onOpenUrl={openLink} />
             <details>
               <summary className="muted">{t("ssh.terminal")}</summary>
               {steps}

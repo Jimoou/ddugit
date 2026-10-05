@@ -13,6 +13,7 @@ import { UpdateNotice } from "./components/Update";
 import { ProOffer } from "./components/ProOffer";
 import { GitMissing, ReportDialog } from "./components/Report";
 import { isUnexpected } from "./report";
+import { onShareFailure } from "./share";
 import { refreshPro } from "./pro";
 import { useLicenseCheck } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
@@ -111,6 +112,9 @@ export default function App() {
     setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" || action ? 7000 : 3200);
   }, []);
 
+  useEffect(() => {
+    onShareFailure((text) => toast("err", text));
+  }, [toast]);
   useEffect(refreshPro, []);
   const remindLicense = useCallback((text: string) => toast("ok", text), [toast]);
   useLicenseCheck(remindLicense);

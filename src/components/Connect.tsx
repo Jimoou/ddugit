@@ -10,6 +10,7 @@ import { ForgeRepoPicker, type Picked, ProtoSwitch, SourceTabs } from "./ForgeRe
 import { SOURCES, type Source } from "../forgeRepos";
 import { api } from "../api";
 import { t } from "../i18n";
+import { openLink } from "../share";
 import {
   forgetRecent,
   joinPath,
@@ -345,7 +346,7 @@ export function CloneDialog(p: {
             {ssh && url.includes(":") && (
               <details className="ssh-ready" open={sshOpen} onToggle={(e) => setSshOpen(e.currentTarget.open)}>
                 <summary>{t("ssh.title")}</summary>
-                <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
+                <SshSetup url={url} onOpenUrl={openLink} />
               </details>
             )}
             <div className="field col">

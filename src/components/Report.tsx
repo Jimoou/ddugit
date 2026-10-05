@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { getLocale, t } from "../i18n";
+import { openLink } from "../share";
 import { usePro } from "../pro";
 import { diagnostics, recentLog, reportText } from "../report";
 import type { AppInfo, ReportKind } from "../types";
@@ -14,8 +15,6 @@ import { closeOnScrim, useDialog } from "./useDialog";
 const SITE_URL = "https://ddugit.com";
 const PRIVACY_URL = "https://ddugit.com/privacy";
 const GIT_DOWNLOAD_URL = "https://git-scm.com/download";
-
-const open = (url: string) => void api.openUrl("", url);
 
 /** Settings → About: version, plan, and where to go next. */
 export function AboutSection({ onReport }: { onReport(): void }) {
@@ -44,8 +43,8 @@ export function AboutSection({ onReport }: { onReport(): void }) {
         <button className="primary" onClick={onReport}>
           {t("about.report")}
         </button>
-        <button onClick={() => open(SITE_URL)}>ddugit.com</button>
-        <button onClick={() => open(PRIVACY_URL)}>{t("about.privacy")}</button>
+        <button onClick={() => openLink(SITE_URL)}>ddugit.com</button>
+        <button onClick={() => openLink(PRIVACY_URL)}>{t("about.privacy")}</button>
       </div>
       <p className="muted small">{t("about.reportHint")}</p>
     </section>
@@ -226,7 +225,7 @@ export function GitMissing({ error, onRecheck, onSetPath, onClose }: GitMissingP
           <button onClick={onClose}>{t("common.close")}</button>
           <button onClick={onRecheck}>{t("gitMissing.recheck")}</button>
           <button onClick={onSetPath}>{t("gitMissing.setPath")}</button>
-          <button className="primary" autoFocus onClick={() => open(GIT_DOWNLOAD_URL)}>
+          <button className="primary" autoFocus onClick={() => openLink(GIT_DOWNLOAD_URL)}>
             {t("gitMissing.download")}
           </button>
         </div>

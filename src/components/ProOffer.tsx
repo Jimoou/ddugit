@@ -1,5 +1,5 @@
-import { api } from "../api";
 import { t } from "../i18n";
+import { openLink } from "../share";
 import { closeProOffer, FREE_DASHBOARD, type ProFeature, useProOffer } from "../pro";
 import { BUY_URL } from "./License";
 import { closeOnScrim, useDialog } from "./useDialog";
@@ -39,7 +39,7 @@ function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void 
           >
             {t("pro.haveLicense")}
           </button>
-          <button className="primary" onClick={() => void api.openUrl("", BUY_URL)}>
+          <button className="primary" onClick={() => openLink(BUY_URL)}>
             {t("pro.buy")}
           </button>
         </div>

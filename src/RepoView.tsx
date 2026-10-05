@@ -53,6 +53,7 @@ import { planMove, rebaseRange } from "./rebasePlan";
 import type { Settings } from "./settings";
 import { signingHint } from "./identity";
 import { isKey, type Key, t } from "./i18n";
+import { copyText, openLink } from "./share";
 import { Rich } from "./i18n/Rich";
 import type { Drag, NodeBadge, Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
@@ -917,7 +918,7 @@ export function RepoView({
 
   const worktreeMenu = (w: WorktreeInfo): MenuItem[] => [
     { label: t("wt.menu.open"), disabled: w.current || w.missing, onSelect: () => onOpenPath(w.path) },
-    { label: t("wt.menu.copy"), onSelect: () => void navigator.clipboard?.writeText(w.path) },
+    { label: t("wt.menu.copy"), onSelect: () => copyText(w.path) },
     "separator",
     ...(w.missing
       ? [
@@ -1073,7 +1074,7 @@ export function RepoView({
     {
       label: t("sub.menu.copyUrl"),
       disabled: !m.url,
-      onSelect: () => void navigator.clipboard?.writeText(m.url ?? ""),
+      onSelect: () => copyText(m.url ?? ""),
     },
     { label: t("sub.menu.sync"), onSelect: () => void submoduleRun(t("sub.synced"), { kind: "sync" }) },
   ];
@@ -1150,7 +1151,7 @@ export function RepoView({
     { label: t("remote.fetchOne", { name }), icon: "fetch", onSelect: () => void fetchOne(name) },
     {
       label: t("remote.copyUrl"),
-      onSelect: () => void navigator.clipboard?.writeText(snap?.remotes.find((x) => x.name === name)?.url ?? ""),
+      onSelect: () => copyText(snap?.remotes.find((x) => x.name === name)?.url ?? ""),
     },
     {
       label:
@@ -1363,7 +1364,7 @@ export function RepoView({
     graph.current?.centerOn(pr.sha);
   };
   /** Open a web page (a pull request, a token page) in the browser. */
-  const openUrl = (url: string) => void api.openUrl(path, url).catch((e) => toast("err", String(e)));
+  const openUrl = (url: string) => openLink(url, path);
   const prMenu = (pr: PullRequest): MenuItem[] => {
     const local = snap?.refs.find((x) => x.kind === "local" && x.name === pr.branch);
     const remote = snap?.refs.find((x) => x.kind === "remote" && x.name === `${pr.remote}/${pr.branch}`);
@@ -1599,7 +1600,7 @@ export function RepoView({
         },
       },
       "separator" as const,
-      { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => void navigator.clipboard?.writeText(id) },
+      { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => copyText(id) },
     ];
   };
 

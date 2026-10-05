@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
+import { copyText } from "../share";
 import { forgeWeb, noteItems, releaseMarkdown } from "../notes";
 import type { NoteRange } from "../types";
 import { closeOnScrim, useDialog } from "./useDialog";
@@ -126,11 +127,7 @@ export function ReleaseNotesDialog(p: {
         </p>
         <div className="dialog-actions">
           <button onClick={p.onClose}>{t("common.close")}</button>
-          <button
-            className="primary"
-            disabled={!range}
-            onClick={() => void navigator.clipboard?.writeText(text).then(p.onCopied)}
-          >
+          <button className="primary" disabled={!range} onClick={() => copyText(text, p.onCopied)}>
             {t("notes.copy")}
           </button>
         </div>

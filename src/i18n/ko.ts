@@ -119,6 +119,8 @@ export const ko = {
   "notes.truncated": "너무 많아서 최근 {n}개만 담았어요",
   "notes.copy": "Markdown 복사",
   "notes.copied": "릴리스 노트를 복사했어요",
+  "share.copyFailed": "클립보드에 복사하지 못했어요",
+  "share.openFailed": "링크를 열지 못했어요: {error}",
   "notes.kind.breaking": "호환성이 깨지는 변경",
   "notes.kind.feat": "새 기능",
   "notes.kind.fix": "버그 수정",
