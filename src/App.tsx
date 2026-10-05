@@ -62,7 +62,7 @@ const loadTabs = (): Tabs => (isTauri ? parseTabs(store(TABS), store(LAST_REPO))
  */
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsAt, setSettingsAt] = useState<"top" | "shortcuts" | null>(null);
   const [tabs, setTabsState] = useState(loadTabs);
   /** The galaxy dashboard is showing (the home tab), over whichever tab is active. */
   const [home, setHome] = useState(false);
@@ -164,7 +164,7 @@ export default function App() {
       } else if (mod && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         setTabs((tb) => selectAt(tb, Number(e.key) - 1));
-      } else if (e.key === "?" && !typing) setSettingsOpen(true);
+      } else if (e.key === "?" && !typing) setSettingsAt("shortcuts");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -262,7 +262,7 @@ export default function App() {
         onClose={(id) => setTabs((tb) => closeTab(tb, id), home)}
         onNew={() => setTabs(addEmpty)}
         onRepoMenu={(x) => setRepoMenu((o) => (o === null ? x : null))}
-        onSettings={() => setSettingsOpen(true)}
+        onSettings={() => setSettingsAt("top")}
         menu={
           repoMenu !== null && current.path
             ? {
@@ -363,10 +363,15 @@ export default function App() {
           <div>{t("connect.drop")}</div>
         </div>
       )}
-      {settingsOpen && (
-        <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
+      {settingsAt && (
+        <SettingsDialog
+          settings={settings}
+          focus={settingsAt === "top" ? undefined : settingsAt}
+          onChange={updateSettings}
+          onClose={() => setSettingsAt(null)}
+        />
       )}
-      <ProOffer onLicense={() => setSettingsOpen(true)} />
+      <ProOffer onLicense={() => setSettingsAt("top")} />
       <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
         {toasts.map((item) => (
           <div key={item.id} className={`toast ${item.kind}`}>

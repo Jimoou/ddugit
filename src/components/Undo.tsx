@@ -8,6 +8,7 @@ import { fmtTime } from "../format";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { ReflogEntry, ResetMode } from "../types";
+import { useDialog } from "./useDialog";
 
 const MODES: { mode: ResetMode; title: Key; hint: Key }[] = [
   { mode: "soft", title: "undo.soft", hint: "undo.soft.hint" },
@@ -31,15 +32,10 @@ export function ResetDialog(p: {
   onReset(mode: ResetMode): void;
 }) {
   const [mode, setMode] = useState<ResetMode>(p.initial ?? "mixed");
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
-      <div
-        className="dialog reset"
-        role="dialog"
-        aria-label={t("undo.title")}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
-      >
+      <div className="dialog reset" aria-label={t("undo.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">{t("undo.title")}</div>
         <p>
           {p.passed > 0 ? (
@@ -116,8 +112,9 @@ export function ReflogSheet(p: {
   }, [path, version]);
   const list = loaded ? loaded.list : null;
 
+  const sheet = useDialog(p.onClose, false);
   return (
-    <section className="diff-sheet reflog-sheet" style={{ height: "45vh" }}>
+    <section className="diff-sheet reflog-sheet" style={{ height: "45vh" }} {...sheet}>
       <header>
         <div className="title">
           <span className="eyebrow">{t("undo.log.title")}</span>

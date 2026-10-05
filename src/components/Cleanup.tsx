@@ -7,6 +7,7 @@ import { api } from "../api";
 import { fmtTime } from "../format";
 import { type Key, t } from "../i18n";
 import type { BranchHealth, BranchReport } from "../types";
+import { useDialog } from "./useDialog";
 
 /** No commit for this long counts as stale. */
 export const STALE_DAYS = 90;
@@ -71,8 +72,9 @@ export function CleanupSheet(p: {
   };
   const total = GROUPS.reduce((n, g) => n + grouped.get(g.id)!.length, 0);
 
+  const sheet = useDialog(p.onClose, false);
   return (
-    <section className="diff-sheet cleanup-sheet" style={{ height: "45vh" }}>
+    <section className="diff-sheet cleanup-sheet" style={{ height: "45vh" }} {...sheet}>
       <header>
         <div className="title">
           <span className="eyebrow">{t("clean.title")}</span>

@@ -1,5 +1,6 @@
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
+import { useDialog } from "./useDialog";
 
 interface Props {
   source: string;
@@ -14,13 +15,10 @@ interface Props {
 }
 
 export function MergeDialog(p: Props) {
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
-      <div
-        className="dialog"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
-      >
+      <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">{t("merge.title")}</div>
         <div className="merge-flow">
           <span className="chip-lg" style={{ ["--c" as string]: p.sourceColor }}>

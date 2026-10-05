@@ -10,6 +10,7 @@ import { commitsBetween, defaultBody, defaultTitle, pickBase, pushNeed, remoteBr
 import { FORGE_NAME } from "./Pulls";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrTarget, RepoSnapshot } from "../types";
+import { useDialog } from "./useDialog";
 
 /** What GitHub and GitLab call the thing. */
 export const prNoun = (kind: ForgeKind) => (kind === "gitlab" ? "MR" : "PR");
@@ -108,14 +109,14 @@ export function CreatePr(p: Props) {
     }
   };
 
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
       <form
         className="dialog create-pr"
-        role="dialog"
         aria-label={t("pr.new.title", { noun })}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
+        {...dialog}
         onSubmit={(e) => {
           e.preventDefault();
           void submit();

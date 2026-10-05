@@ -9,6 +9,7 @@ import { joinPath, parentDir, repoName } from "../recent";
 import type { WorktreeInfo, WorktreeOp } from "../types";
 import { Icon } from "./Icon";
 import { SideSection } from "./Sidebar";
+import { useDialog } from "./useDialog";
 
 export function WorktreeSection(p: {
   worktrees: WorktreeInfo[];
@@ -78,14 +79,14 @@ export function WorktreeDialog(p: {
     parent && chosen ? joinPath(parent, `${repoName(main?.path ?? "")}-${chosen.replace(/[\\/]+/g, "-")}`) : "";
   const dir = dirEdit ?? suggested;
   const ok = !!chosen && !!dir.trim() && !p.busy;
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
       <form
         className="dialog worktree-dialog"
-        role="dialog"
         aria-label={t("wt.add")}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
+        {...dialog}
         onSubmit={(e) => {
           e.preventDefault();
           if (ok)

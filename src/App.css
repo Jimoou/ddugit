@@ -135,6 +135,34 @@ input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+/* Dialogs take focus themselves when nothing inside asks for it (useDialog); that is not a control to ring. */
+[role="dialog"]:focus,
+.dialog.settings section:focus {
+  outline: none;
+}
+/* Compact controls keep their look; an invisible box of at least 24px around them takes the pointer. */
+.sidebar h3 .fold,
+.sidebar h3 .h3-add,
+.sidebar li .to-local,
+.sidebar .lfs li .icon,
+button.demo-pill,
+.rb-grip,
+.rb-move button,
+.bp-actions button {
+  position: relative;
+}
+.sidebar h3 .fold::before,
+.sidebar h3 .h3-add::before,
+.sidebar li .to-local::before,
+.sidebar .lfs li .icon::before,
+button.demo-pill::before,
+.rb-grip::before,
+.rb-move button::before,
+.bp-actions button::before {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc(50% - 12px));
+}
 button:disabled {
   opacity: 0.45;
   cursor: default;
@@ -713,7 +741,7 @@ textarea:focus {
 .tab-menu,
 .tab-new {
   padding: 0 6px;
-  height: 22px;
+  height: 24px;
   border: 0;
   background: none;
   color: inherit;

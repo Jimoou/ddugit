@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { t } from "../i18n";
 import type { CommitEdit, CommitInfo, FileDiff } from "../types";
+import { useDialog } from "./useDialog";
 
 export type EditMode = CommitEdit["kind"];
 
@@ -55,14 +56,14 @@ export function EditCommitDialog(p: {
     setFirst(next);
   };
 
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
       <form
         className="dialog edit-commit"
-        role="dialog"
         aria-label={t(`edit.${p.mode}`)}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
+        {...dialog}
         onSubmit={(e) => {
           e.preventDefault();
           if (edit && !p.busy) p.onSubmit(edit);

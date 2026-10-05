@@ -6,6 +6,7 @@ import { Rich } from "../i18n/Rich";
 import { offerPro } from "../pro";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../types";
+import { useDialog } from "./useDialog";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
 
@@ -166,14 +167,14 @@ export function TokenDialog(p: {
   const [token, setToken] = useState("");
   const name = FORGE_NAME[p.forge.kind];
   const page = tokenPage(p.forge);
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
       <div
         className="dialog token-dialog"
-        role="dialog"
         aria-label={t("pr.token.title", { forge: name })}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onCancel()}
+        {...dialog}
       >
         <div className="eyebrow">{t("pr.token.title", { forge: name })}</div>
         {!p.forge.public && (

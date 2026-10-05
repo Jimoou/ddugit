@@ -6,6 +6,7 @@ import { offerPro, proOpen, usePro } from "../pro";
 import type { BundleCheck, OpResult, TransferSent } from "../types";
 import { guessName } from "../transfer";
 import { ProBadge } from "./ProOffer";
+import { useDialog } from "./useDialog";
 
 /**
  * Air-gapped transfer (Pro): write a bundle of what a destination doesn't have yet,
@@ -63,15 +64,10 @@ export function TransferDialog(p: {
     if (r.status === "ok") p.onClose();
   };
 
+  const dialog = useDialog(p.onClose);
   return (
     <div className="scrim" onClick={p.onClose}>
-      <div
-        className="dialog transfer"
-        role="dialog"
-        aria-label={t("tr.title")}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onClose()}
-      >
+      <div className="dialog transfer" aria-label={t("tr.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">
           {t("tr.title")} {!pro && <ProBadge />}
         </div>

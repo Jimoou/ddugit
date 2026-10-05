@@ -1,6 +1,7 @@
 import { NEON } from "../graph/scene";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
+import { useDialog } from "./useDialog";
 
 interface Props {
   /** `diverged`: pull couldn't fast-forward. `rejected`: push refused. */
@@ -37,9 +38,10 @@ function Fork({ ahead, behind, color }: { ahead: number; behind: number; color: 
 
 export function SyncDialog(p: Props) {
   const andPush = p.kind === "rejected";
+  const dialog = useDialog(p.onCancel);
   return (
     <div className="scrim" onClick={p.onCancel}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">{andPush ? t("sync.rejected") : t("sync.diverged")}</div>
         <p>
           {p.kind === "rejected" ? (

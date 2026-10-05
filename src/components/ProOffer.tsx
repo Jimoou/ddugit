@@ -1,22 +1,21 @@
 import { api } from "../api";
 import { t } from "../i18n";
-import { closeProOffer, FREE_DASHBOARD, usePro, useProOffer } from "../pro";
+import { closeProOffer, FREE_DASHBOARD, type ProFeature, usePro, useProOffer } from "../pro";
 import { BUY_URL } from "./License";
+import { useDialog } from "./useDialog";
 
 /** "This is a Pro feature": what it unlocks, the trial, and where to get it. */
 export function ProOffer({ onLicense }: { onLicense(): void }) {
   const feature = useProOffer();
+  return feature ? <Offer feature={feature} onLicense={onLicense} /> : null;
+}
+
+function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void }) {
   const status = usePro();
-  if (!feature) return null;
+  const dialog = useDialog(closeProOffer);
   return (
     <div className="scrim" onClick={closeProOffer}>
-      <div
-        className="dialog pro-offer"
-        role="dialog"
-        aria-label={t("pro.title")}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && closeProOffer()}
-      >
+      <div className="dialog pro-offer" aria-label={t("pro.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">{t("pro.title")}</div>
         <p>
           <b>{t(`pro.feature.${feature}`, { n: FREE_DASHBOARD })}</b>

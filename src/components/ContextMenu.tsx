@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { IconName } from "../icons";
 import { Icon } from "./Icon";
+import { useDialog } from "./useDialog";
 
 /** A menu entry; one with an `icon` also shows in toolbars built from the same menu (the commit panel's). */
 export type MenuItem =
@@ -19,6 +20,15 @@ interface Props {
 export function ContextMenu({ x, y, title, items, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x, y });
+  // Esc goes through the layer stack so it closes the menu, not the sheet under it as well.
+  const { ref: layer } = useDialog(onClose, false);
+  const attach = useCallback(
+    (el: HTMLDivElement | null) => {
+      ref.current = el;
+      layer(el);
+    },
+    [layer],
+  );
 
   // Keep the menu inside the window.
   useLayoutEffect(() => {
@@ -31,24 +41,21 @@ export function ContextMenu({ x, y, title, items, onClose }: Props) {
 
   useEffect(() => {
     const close = (e: Event) => {
-      if (e instanceof KeyboardEvent && e.key !== "Escape") return;
       if (e.type === "pointerdown" && ref.current?.contains(e.target as Node)) return;
       onClose();
     };
     window.addEventListener("pointerdown", close, true);
-    window.addEventListener("keydown", close);
     window.addEventListener("wheel", close, true);
     window.addEventListener("blur", close);
     return () => {
       window.removeEventListener("pointerdown", close, true);
-      window.removeEventListener("keydown", close);
       window.removeEventListener("wheel", close, true);
       window.removeEventListener("blur", close);
     };
   }, [onClose]);
 
   return (
-    <div className="context-menu" ref={ref} style={{ left: pos.x, top: pos.y }} role="menu">
+    <div className="context-menu" ref={attach} style={{ left: pos.x, top: pos.y }} role="menu">
       {title && <div className="menu-title">{title}</div>}
       {items.map((it, i) =>
         it === "separator" ? (

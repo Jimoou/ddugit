@@ -4,6 +4,7 @@ import { api } from "../api";
 import { blockText, conflictCount, parseConflicts, type Pick, resolveText } from "../conflict";
 import type { ConflictFile, Resolution } from "../types";
 import { type Key, t } from "../i18n";
+import { useDialog } from "./useDialog";
 
 interface Props {
   path: string;
@@ -58,8 +59,9 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
   const chosen = picks.filter(Boolean).length;
   let blockNo = -1;
 
+  const sheet = useDialog(onClose, false);
   return (
-    <section className="diff-sheet conflict-sheet" style={{ height: "55vh" }}>
+    <section className="diff-sheet conflict-sheet" style={{ height: "55vh" }} {...sheet}>
       <header>
         <div className="title">
           <span className="eyebrow danger">{t("cf.title")}</span>

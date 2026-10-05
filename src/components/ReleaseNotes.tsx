@@ -6,6 +6,7 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { forgeWeb, noteItems, releaseMarkdown } from "../notes";
 import type { NoteRange } from "../types";
+import { useDialog } from "./useDialog";
 
 /** Section headings in the app's language. */
 const LABELS = () => ({
@@ -75,15 +76,10 @@ export function ReleaseNotesDialog(p: {
   const start = from === undefined ? (range?.from ?? "") : from;
   const tags = (range?.tags ?? []).filter((tag) => tag !== p.to);
 
+  const dialog = useDialog(p.onClose);
   return (
     <div className="scrim" onClick={p.onClose}>
-      <div
-        className="dialog notes"
-        role="dialog"
-        aria-label={t("notes.title")}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && p.onClose()}
-      >
+      <div className="dialog notes" aria-label={t("notes.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <div className="eyebrow">{t("notes.title")}</div>
         <p className="muted small">{t("notes.hint")}</p>
         <div className="notes-range">
