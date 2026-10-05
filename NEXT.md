@@ -7,29 +7,29 @@ _마지막 갱신: 2026-10-05_
 
 ## 방금 끝난 것
 
-- 수익 모델 변경: **$29 한 번 결제, 평생 사용 + 모든 업데이트, 라이선스당 기기 3대, 체험 없음**. 앱 #116(`device.rs`, 기기에 묶인 라이선스, 해제, 24시간마다 온라인 확인), 사이트 ddugit-site#21(가격·`devices` 표·활성화 때 기기 수 확인·`license-deactivate`·계정 페이지 기기 목록·refresh가 해제된 기기에 `removed`)
-- M18 GitKraken 대비 기능: 내 저장소에서 clone·원격 추가(#109), 커밋할 사람 프로필·커밋 서명(#110), 앱에서 PR·MR 만들기(#111)
-- M18 데스크톱 UI/UX 점검 4묶음: 작은 창 레이아웃(#112), 키보드·포커스 `useDialog`(#113), 문구·조사 처리(#114), 시각적 통일 `Segmented`·`.dialog-title`·설정 구역 메뉴(#115)
+- v1.0.0 버전 올림(이 PR) → merge 후 main에서 Release 수동 실행
+- v1 준비: 문제 신고·문의는 HTTPS(`ddugit.com/api/report`, 사이트 #23 관리자 대시보드 `/admin`), 첫 실행 안내(#119), 큰 저장소 성능(#120), 영문 문구(#121)
+- 점검: Rust(#122)·웹(#123)·사이트(ddugit-site #24) 보안·정확성, 구조 정리(#126)
+- 전체 기능 QA: `docs/QA.md`(#124) — 153항목 중 자동 139·부분 11·없음 3, 실기 28(4장 사용자 대본). Rust 빈칸(#125), e2e 빈칸(#127, 충돌 시트가 취소 뒤 남던 버그 고침)
 
-## 결정 (2026-10-05, 수익 모델)
+## 결정
 
-- 구독 없음. Pro = 평생 라이선스 $29(사이트 `PRO_PRICE`). 기기 = 앱의 기기 ID(키체인 + 설정 폴더), 서버에는 SHA-256만. 4번째 기기는 활성화 페이지에서 기존 기기를 해제해야 함
-- 해제된 기기·환불은 다음 온라인 확인 때 꺼짐. 계속 오프라인인 기기는 막지 않는다(의도한 빈틈)
-- 사이트 라이선스(붙여 넣기, 폐쇄망)는 기기 제한 없음. Free/Pro 기능 경계는 그대로
-- 앱·사이트 규약: 세션 scratchpad의 `lifetime/CONTRACT.md`가 원본이었고, 구현된 내용은 사이트 `supabase/functions/_shared/license.ts`와 앱 `license.rs`·`activate.rs`가 기준
+- 수익 모델: $29 한 번 결제, 평생 사용 + 모든 업데이트, 라이선스당 기기 3대, 체험 없음(#116, 사이트 #21)
+- 사이트 라이선스(붙여 넣기)의 `updatesUntil`은 지금 강제하지 않음 — 제품 결정 남음
 
-## 다음 단계
+## 다음 단계 (사용자)
 
-- v0.8.0 릴리스 진행 중(버전 올림 PR → merge → main에서 Release 수동 실행)
-- 사용자: Supabase 배포 workflow 성공 확인(마이그레이션 `20261005100000_lifetime_devices.sql`, `license-deactivate`), `licenses`에 시험 행(`kind='personal'`, `plan='lifetime'`, `status='active'`, `text=''`)으로 활성화 → 해제 → 재활성화 실제 확인
-- 사용자: Lemon Squeezy 상품을 Single payment $29로. 승인 나면 M15 웹훅(주문 → `licenses` 행 `store_order_id`, 환불 → `status='refunded'`), 사이트 구매 버튼(체크아웃 URL)
-- 실제 GitHub·GitLab API로 저장소 목록·PR·MR 만들기 확인(가짜 서버로만 시험함)
-- 로컬 e2e "adds a remote from the GitHub tab"이 부하에서 자주 시간 초과(단독·CI는 통과) — 기다리는 조건을 튼튼하게
-- M16: 첫 실행 안내, 영문 문구 점검, 문제 신고 경로, 큰 저장소 성능 → v1.0.0
+- Supabase 시크릿: `LEMONSQUEEZY_PRODUCT_ID`, `REPORT_SALT`, `REPORT_FORWARD_SECRET`(Netlify에도), 필요하면 `ALLOW_TEST_LICENSES`
+- Supabase Auth: Email 제공자를 끄거나, 이메일 확인·안전한 이메일 변경을 켠다
+- Lemon Squeezy: Single payment $29 상품, 웹훅, `NEXT_PUBLIC_LS_CHECKOUT_URL`
+- GitGuardian 사건 37879601을 오탐으로 닫기
+- `docs/QA.md` 4장 실기 대본(0.8.0 → 1.0.0 자동 업데이트 포함), Windows 실기
+- (출시 뒤) Windows 서명
 
 ## 막힌 것 / 결정 필요
 
 - 브랜치 보호 규칙(`main` 직접 push 금지, CI 필수)은 사용자가 GitHub 설정에서 켜야 한다.
+- 회사 서버(Enterprise·자체 GitLab)의 PR 연동은 `gh`/`glab` 설정에 로그인된 호스트이거나 붙여 넣은 토큰이 있어야 한다(#122)
 
 ## PR 운영 규칙 (중요)
 

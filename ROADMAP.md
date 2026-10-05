@@ -168,7 +168,7 @@
   - 2026-10-04: 사용자가 Apple Developer Program(1년) 가입. 인증서·시크릿 등록 대기(`docs/RELEASE.md`, Mac 없이 openssl로 만드는 법 추가)
   - 2026-10-04 결정: 오픈소스 아님, 저장소 비공개. 배포는 GitHub Release가 아니라 별도 사이트·파일 저장소(dmg·exe). Release 초안은 내부 보관용(`docs/RELEASE.md` 배포 위치)
   - [x] macOS 서명·공증(2026-10-04): Secrets 6개, 서명 테스트 빌드에서 공증 Accepted·스테이플, 빌드 뒤 dmg 안 앱을 codesign·spctl·stapler로 확인. `.p12`는 빌드 전에 OpenSSL로 열어 틀린 Secret을 알려 주고 macOS `security`가 읽는 형식(SHA-1 MAC·3DES)으로 다시 묶는다
-- [ ] (나중에) 자동 업데이트 (tauri-plugin-updater) — 2026-10-01 결정: 뒤로 미룸. 서명과 배포 위치를 정한 뒤에 한다(배포는 별도 사이트로 결정, 사이트 주소가 정해지면)
+- [x] (2026-10-04 완료, `update.rs`·`components/Update.tsx`) 자동 업데이트 (tauri-plugin-updater) — 2026-10-01 결정: 뒤로 미룸. 서명과 배포 위치를 정한 뒤에 한다(배포는 별도 사이트로 결정, 사이트 주소가 정해지면)
 - [x] 배포 파일: macOS `.dmg`, Windows `.exe`(NSIS 설치 파일). 2026-10-01 결정. Tauri 번들러가 둘 다 만든다. 태그를 push하면 Release에 올리는 워크플로를 만든다(서명 전에는 첫 실행 경고가 뜬다)
 - [x] 설정 화면 (테마, 애니메이션, git 경로), 단축키 표 — 반짝임, 한 번에 불러올 커밋 수, git 실행 파일(`--version`으로 확인 후 적용), 단축키 표, `?`/⚙로 열기
   - [ ] 테마 (지금은 네온 다크 하나) — 2026-10-01 결정: 밝은 테마는 만들지 않는다
@@ -269,7 +269,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 
 - [x] 첫 실행 안내·영문 문구 점검, 큰 저장소 성능 확인, 문제 신고 경로 (문제 신고·첫 실행: 2026-10-05) (영문 문구: 2026-10-05)
   - 큰 저장소 성능 확인(2026-10-05): 커밋 100,000개·참조 603개 합성 저장소로 측정하고 고침. 방법·전후 수치·다시 재는 법은 [docs/PERF.md](docs/PERF.md)
-- [ ] v1.0.0 출시
+- [x] v1.0.0 출시 (2026-10-05)
 - [ ] (출시 뒤) Windows 서명(Microsoft Store 또는 Certum)
 
 ---
@@ -403,3 +403,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-05 | Rust 테스트 빈칸 채우기(`test/rust-gaps`): Pro 명령 9가지가 Free에서 아무것도 바꾸지 않고 거부되고 테스트 키 라이선스로는 동작(`command!(… in dir)` 본문을 `<명령>::run`으로, AC3), 로컬 HTTP 서버의 401·403·404로 clone 인증 실패 분류(R2), `update.rs` 주소·서명 설정, `keychain.rs` 옮겨 오기 규칙, 실행 인자(R6), 릴리스 CSP(AG3). QA.md 없음 14 → 10(cargo test +9)                                                                                                                                                                                                                                                                                                                                                                   |
 | 2026-10-05 | 웹 구조 정리(동작 그대로): 공용 `Modal`·`useLoaded`·`storage.ts`, `RepoView`를 `src/repo/`로 나눔(2566 → 840줄: 스냅숏·`run`·원격 흐름 훅, 메뉴·배너·시트·창, 열린 시트/창은 판별 유니온 하나씩), `App.css`를 `src/styles/` 10개로(번들 CSS 바이트 동일·스크린숏 동일), `mock.ts`를 `src/mock/` 영역별로(`DemoControls`·`DemoFlags`, e2e `demoFlags`), `app.e2e.ts`를 기능별 8개로, 그래프·미니맵은 바뀔 때만 그리기·라벨 폭 캐시(C8), 안 쓰는 export 35개 정리                                                                                                                                                                                                                                                                            |
 | 2026-10-05 | 앱 자동화 빈칸 채우기(`test/e2e-gaps`, QA.md 5장): 인증 실패 창(HTTPS·SSH clone), Pull 갈라짐·Push 거부의 병합/리베이스, stash 흐름과 그래프 마름모, Free 대시보드 3개, 충돌 띠 취소·계속(병합·cherry-pick·정리·stash pop·바이너리), revert·Alt+끌기, 태그·브랜치 이름·병합 안 된 삭제, 검색, hunk·새 파일 스테이지·discard, 900×560, 탭 단축키·복원, 이전 이력, 반입 검사 실패, 원격·서브모듈·LFS·worktree 메뉴, 서명 실패, `share.ts`. 데모 제어값 추가(`binaryConflict`·`signFail`·`lfs`·`nextBundle`·`Tabs` 플래그), mock을 Rust에 맞춤(continue·https만 열기), 고친 버그: 취소한 뒤 남는 충돌 시트. GitHub 탭 원격 추가 e2e의 시간 초과 원인(진행 카드 시간) 해결. QA.md 자동 98 → 139, 부분 45 → 11, 없음 10 → 3(e2e +38, vitest +2) |
+| 2026-10-05 | v1.0.0 버전 올림: 문제 신고·첫 실행(#119), 큰 저장소 성능(#120), 영문 문구(#121), 코드·보안·응집도 점검과 반영(#122 #123 #126, 사이트 #24), 전체 기능 QA(`docs/QA.md`, #124 #125 #127: 153항목 중 자동 139·부분 11·없음 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
