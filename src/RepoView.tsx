@@ -2,96 +2,64 @@ import { Icon } from "./components/Icon";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH } from "./api";
 import { demoControls } from "./mock";
-import { BackportSheet } from "./components/BackportSheet";
 import { Composer } from "./components/Composer";
-import { ReflogSheet, ResetDialog } from "./components/Undo";
-import { BlameSheet } from "./components/History";
 import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
-import {
-  FORGE_NAME,
-  PullSection,
-  TokenDialog,
-  nounOf,
-  prNoun,
-  prOf,
-  prRefs,
-  type TokenForge,
-} from "./components/Pulls";
-import { CreatePr, prTag } from "./components/CreatePr";
+import { FORGE_NAME, PullSection, TokenDialog, prRefs, type TokenForge } from "./components/Pulls";
 import { MissionPanel, useVoyage } from "./components/Missions";
 import { PeekCard } from "./components/Peek";
-import { CleanupSheet } from "./components/Cleanup";
-import { EditCommitDialog, type EditMode } from "./components/EditCommit";
-import { RebaseSheet } from "./components/RebaseSheet";
-import { AuthDialog } from "./components/AuthDialog";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
-import { ConflictSheet } from "./components/ConflictSheet";
-import { ContextMenu, type MenuItem } from "./components/ContextMenu";
-import { NameDialog, type NameRequest } from "./components/NameDialog";
-import { AddRemoteDialog } from "./components/AddRemote";
-import { DiffSheet } from "./components/DiffSheet";
+import { ContextMenu } from "./components/ContextMenu";
 import { Inspector } from "./components/Inspector";
-import { MergeDialog } from "./components/MergeDialog";
 import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
-import { WorktreeDialog, WorktreeSection } from "./components/Worktrees";
+import { WorktreeSection } from "./components/Worktrees";
 import { SubmoduleSection } from "./components/Submodules";
-import { JobCard } from "./components/JobCard";
 import { LfsSection } from "./components/Lfs";
 import { joinPath } from "./recent";
 import { StashPanel } from "./components/StashPanel";
-import { SyncDialog } from "./components/SyncDialog";
-import { SyncConfirm } from "./components/SyncConfirm";
-import { type SyncOp, syncPlan } from "./sync";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, ancestorsOf, computeLayout, descendantsOf } from "./graph/layout";
 import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
-import { planMove, rebaseRange } from "./rebasePlan";
+import { planMove } from "./rebasePlan";
 import { useLoaded } from "./components/useLoaded";
 import type { Settings } from "./settings";
 import { signingHint } from "./identity";
-import { isKey, type Key, t } from "./i18n";
-import { copyText, openLink } from "./share";
+import { t } from "./i18n";
+import { openLink } from "./share";
 import { Rich } from "./i18n/Rich";
-import type { Drag, NodeBadge, Turn } from "./graph/renderer";
+import type { Drag, Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
-import { TransferDialog } from "./components/Transfer";
 import { StackSection } from "./components/Stacks";
-import { ReleaseNotesDialog } from "./components/ReleaseNotes";
-import { offerPro, proOpen, usePro } from "./pro";
-import type {
-  StackBranch,
-  StackOp,
-  BisectState,
-  CommitEdit,
-  CommitInfo,
-  FileDiff,
-  FileTouch,
-  LfsOp,
-  OpResult,
-  OpStatus,
-  Progress,
-  PullRequest,
-  RebaseStep,
-  RefInfo,
-  RefOp,
-  ReflogEntry,
-  RemoteOp,
-  RepoSnapshot,
-  ResetMode,
-  SubmoduleInfo,
-  SubmoduleOp,
-  TodoItem,
-  WorktreeInfo,
-  WorktreeOp,
-} from "./types";
+import { proOpen, usePro } from "./pro";
+import type { FileDiff, FileTouch, LfsOp, RefInfo, StackBranch, StackOp } from "./types";
+import { askName, askNewBranch, checkoutRef, confirmPick, confirmThen, showCommit } from "./repo/actions";
+import { BisectBanner, StateBanner, TrailBanner } from "./repo/Banners";
+import { RepoDialogs } from "./repo/Dialogs";
+import {
+  branchesMenu,
+  fileMenu,
+  nodeMenu,
+  openMenu,
+  prMenu,
+  refMenu,
+  remoteMenu,
+  showPr,
+  submoduleMenu,
+  submoduleRun,
+  worktreeMenu,
+} from "./repo/menus";
+import { RepoSheets } from "./repo/Sheets";
+import type { Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
+import { useBisect } from "./repo/useBisect";
+import { useRemote } from "./repo/useRemote";
+import { useRun } from "./repo/useRun";
+import { useSheet } from "./repo/useSheet";
+import { useSnapshot } from "./repo/useSnapshot";
 
-type MergeReq = { sourceId: string; targetId: string; source: string; target: string };
-type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
-type DiffState = { source: DiffSource; title: string; files: FileDiff[] | null; error: string | null; path?: string };
+export type { ToastAction } from "./repo/state";
 
 /** How long the pointer rests on a star before its preview card shows. */
 const PEEK_DELAY_MS = 350;
@@ -102,54 +70,6 @@ const PR_REFRESH_MS = 5 * 60_000;
 /** Longest wait for the camera to settle before an effect plays anyway. */
 const SETTLE_MAX_MS = 1500;
 
-const REMOTE_DONE: Record<RemoteOp, Key> = {
-  fetch: "remote.done.fetch",
-  pull: "remote.done.pull",
-  pullMerge: "remote.done.pullMerge",
-  pullRebase: "remote.done.pullRebase",
-  push: "remote.done.push",
-  forcePush: "remote.done.forcePush",
-};
-
-/** What the progress card says while a remote operation runs. */
-const JOB: Record<RemoteOp, Key> = {
-  fetch: "job.fetch",
-  pull: "job.pull",
-  pullMerge: "job.pull",
-  pullRebase: "job.pull",
-  push: "job.push",
-  forcePush: "job.push",
-};
-
-/** In-progress operations (`state.<name>` and `.hint` in the dictionary) and whether "continue" applies. */
-const IN_PROGRESS: Record<string, { canContinue: boolean }> = {
-  merge: { canContinue: false },
-  rebase: { canContinue: true },
-  "cherry-pick": { canContinue: true },
-  revert: { canContinue: true },
-};
-
-/** Banner name and hint for a repository state; unknown states show as-is. */
-const stateText = (state: string) => {
-  const name = `state.${state}`;
-  const hint = `state.${state}.hint`;
-  return { name: isKey(name) ? t(name) : state, hint: isKey(hint) ? t(hint) : "" };
-};
-
-/** URL of the remote behind HEAD's upstream (else `origin`, else the first remote). */
-function upstreamUrl(snap: RepoSnapshot): string | null {
-  const name = snap.head.upstream?.split("/")[0];
-  const r =
-    snap.remotes.find((x) => x.name === name) ?? snap.remotes.find((x) => x.name === "origin") ?? snap.remotes[0];
-  return r?.url ?? null;
-}
-
-/** A button on a toast (e.g. open the pull request just made). */
-export interface ToastAction {
-  label: string;
-  onClick(): void;
-}
-
 export interface RepoViewProps {
   path: string;
   /** The visible tab: only it listens to keys, watches files and draws. */
@@ -157,7 +77,7 @@ export interface RepoViewProps {
   settings: Settings;
   /** Commits per page (settings, or `?page=` in demos). */
   page: number;
-  toast(kind: "ok" | "err", text: string, action?: ToastAction): void;
+  toast: Toast;
   /** Loaded for the first time (recent list). */
   onLoaded(path: string, name: string): void;
   /** Change settings shared by every tab (sparkles, rotation, sidebar layout). */
@@ -166,14 +86,6 @@ export interface RepoViewProps {
   onRepoMenu(): void;
   /** Open another repository folder (a worktree) in a tab. */
   onOpenPath(path: string): void;
-}
-
-/** The remote branch a first branch starts from: a `main`/`master` (origin's first), else any. */
-function remoteBase(refs: RefInfo[]): string | null {
-  const remote = refs.filter((r) => r.kind === "remote" && !r.name.endsWith("/HEAD")).map((r) => r.name);
-  const rank = (n: string) =>
-    (n.startsWith("origin/") ? 0 : 2) + (/\/(main|master)$/.test(n) ? 0 : 4) + (n.endsWith("/master") ? 1 : 0);
-  return remote.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))[0] ?? null;
 }
 
 const NO_STACKS: StackBranch[] = [];
@@ -191,95 +103,43 @@ export function RepoView({
   onOpenPath,
 }: RepoViewProps) {
   if (import.meta.env.DEV && path === DEMO_PATH && demoControls.crashTab) throw new Error("Demo tab crashed");
-  const [snap, setSnap] = useState<RepoSnapshot | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [remoteBusy, setRemoteBusy] = useState<RemoteOp | null>(null);
+  const { snap, loadError, latest, refresh, loadMore } = useSnapshot(path, page, active, onLoaded, toast);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedStash, setSelectedStash] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
   const [composer, setComposer] = useState<false | { amend: boolean }>(false);
-  const [menu, setMenu] = useState<{ x: number; y: number; title?: string; items: MenuItem[] } | null>(null);
+  const [menu, setMenu] = useState<Menu | null>(null);
   // Where the last menu opened, for a follow-up menu in the same spot (picking a stack parent).
   const menuAt = useRef({ x: 0, y: 0 });
   useEffect(() => {
     if (menu) menuAt.current = { x: menu.x, y: menu.y };
   }, [menu]);
-  const [nameReq, setNameReq] = useState<NameRequest | null>(null);
-  const [mergeReq, setMergeReq] = useState<MergeReq | null>(null);
-  const [sync, setSync] = useState<"diverged" | "rejected" | null>(null);
-  /** Remote work waiting for the user's go-ahead (see `SyncConfirm`). */
-  const [syncAsk, setSyncAsk] = useState<SyncOp | null>(null);
-  const [auth, setAuth] = useState<{ op: RemoteOp; output: string } | null>(null);
-  const [progress, setProgress] = useState<Progress | null>(null);
-  /** A remote being fetched on its own (just added, or from its menu), shown on the progress card. */
-  const [fetchingRemote, setFetchingRemote] = useState<string | null>(null);
-  const [diff, setDiff] = useState<DiffState | null>(null);
-  const [conflictSheet, setConflictSheet] = useState<{ file?: string } | null>(null);
-  const [backport, setBackport] = useState<{ source: string; target: string } | null>(null);
-  /** Base commit of an interactive rebase being planned. */
-  const [rebaseFrom, setRebaseFrom] = useState<string | null>(null);
-  /** Starting plan for the sheet (from a Shift-drag); null starts with every commit picked in order. */
-  const [rebaseInit, setRebaseInit] = useState<RebaseStep[] | null>(null);
-  /** git's plan when merges are in the range (`--rebase-merges`); null for a straight range or while it loads. */
-  const [rebaseTodo, setRebaseTodo] = useState<TodoItem[] | null>(null);
-  /** "Go back to this commit": the target and what the dialog needs to explain it. */
-  const [resetReq, setResetReq] = useState<{
-    target: string;
-    summary: string;
-    passed: number;
-    pushed: boolean;
-    initial?: ResetMode;
-  } | null>(null);
-  const [reflogOpen, setReflogOpen] = useState(false);
-  const [transferOpen, setTransferOpen] = useState(false);
-  /** Release notes up to this ref, when open. */
-  const [notesTo, setNotesTo] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   /** Git LFS, read apart from the snapshot (it runs `git lfs`). */
   const [lfsTick, setLfsTick] = useState(0);
   const pro = proOpen(usePro());
-  /** Adding a worktree, maybe for a branch picked from its menu. */
-  const [worktreeReq, setWorktreeReq] = useState<{ branch?: string } | null>(null);
   /** Preview card: the commit the pointer has rested on, where its star was then. */
   const [peek, setPeek] = useState<{ id: string; at: Pt; width: number } | null>(null);
   const peekTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stageGraph = useRef<HTMLDivElement>(null);
   /** Open pull requests on the forge remotes; `prTick` re-reads them. */
   const [prTick, setPrTick] = useState(0);
+  const rereadPulls = useCallback(() => setPrTick((n) => n + 1), []);
   const [tokenFor, setTokenFor] = useState<TokenForge | null>(null);
-  /** Opening a pull request from this branch. */
-  const [prFrom, setPrFrom] = useState<string | null>(null);
-  const [addingRemote, setAddingRemote] = useState(false);
   /** File history: the commits that touched one file, drawn as a constellation. */
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
-  const [blameReq, setBlameReq] = useState<{ rev: string; file: string } | null>(null);
-  const closeBlame = useCallback(() => setBlameReq(null), []);
-  const [cleanupOpen, setCleanupOpen] = useState(false);
-  /** Touching up a past commit: which edit, and its files (loaded for splitting). */
-  const [editReq, setEditReq] = useState<{
-    mode: EditMode;
-    id: string;
-    files: FileDiff[] | null;
-    rewrites: number;
-    pushed: boolean;
-  } | null>(null);
-  /** Bisect: the ends picked before starting, and git's state once it runs (keyed by snapshot). */
-  const [bisectDraft, setBisectDraft] = useState<{ bad?: string; good?: string } | null>(null);
-  const [bisectLoaded, setBisectLoaded] = useState<{ snap: RepoSnapshot; state: BisectState | null } | null>(null);
-  const lastBisect = useRef<{ current: string | null; culprit: string | null }>({ current: null, culprit: null });
-  /** The snapshot last applied, for comparing before / after an operation outside render. */
-  const latest = useRef<RepoSnapshot | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [limit, setLimit] = useState(page);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
   // First-run tutorial, played on the demo repository only.
   const tour = useVoyage(path === DEMO_PATH);
-  const foundCulprit = useCallback(() => tour.mission("bisect"), [tour.mission]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { mission } = tour;
+  const foundCulprit = useCallback(() => mission("bisect"), [mission]);
   const { playing: fx, play } = useFx(animate);
+  const graph = useRef<GraphHandle>(null);
   /**
    * Play an effect once the new snapshot is drawn and the camera has come to rest
    * (an operation may also center on HEAD): `make` is asked for the effect on each
@@ -305,93 +165,41 @@ export function RepoView({
     // Let a camera move queued right after the operation (centering on HEAD) begin first.
     setTimeout(tick, 100);
   };
-  // A new page size from the settings applies to every open repository.
-  const [shownPage, setShownPage] = useState(page);
-  if (shownPage !== page) {
-    setShownPage(page);
-    setLimit(page);
-  }
-  const graph = useRef<GraphHandle>(null);
-  const diffReq = useRef(0);
 
-  const applySnapshot = useCallback((s: RepoSnapshot) => {
-    latest.current = s;
-    setSnap(s);
-    setLoadError(null);
-  }, []);
-  /**
-   * Snapshot reads overlap (the watcher, focus, ⌘R, after an operation): number them, and
-   * never let an answer replace one to a later request (it may show a state git has left).
-   */
-  const asked = useRef(0);
-  const answered = useRef(0);
-  /** The last read failure already shown, so a watcher burst doesn't repeat it. */
-  const shownError = useRef<string | null>(null);
-  const refresh = useCallback((): Promise<void> => {
-    const n = ++asked.current;
-    const newest = () => {
-      if (n < answered.current) return false;
-      answered.current = n;
-      return true;
-    };
-    return api.snapshot(path, limit).then(
-      (s) => {
-        if (!newest()) return;
-        if (!latest.current) onLoaded(path, s.name);
-        applySnapshot(s);
-        shownError.current = null;
-      },
-      (e) => {
-        if (!newest()) return;
-        const text = String(e);
-        setLoadError(text);
-        // Before the first load the error fills the tab; after it (the folder moved, say) the old graph stays up.
-        if (latest.current && shownError.current !== text) toast("err", text);
-        shownError.current = text;
-      },
-    );
-  }, [path, limit, applySnapshot, onLoaded, toast]);
-  const refreshNow = useRef(refresh);
-  useEffect(() => {
-    refreshNow.current = refresh;
+  const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
+  const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
+  const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
+
+  const { sheet, setSheet, conflict, setConflict, loadDiff, rebase } = useSheet(path, snap, commitById, toast);
+  const { busy, run, refuseBusy } = useRun({
+    path,
+    toast,
+    refresh,
+    latest,
+    onConflict: () => setConflict({}),
+    setConfirm,
   });
-
-  // Read the repository when its tab shows, and again for a new history size ("load more").
-  useEffect(() => {
-    if (active) void refresh();
-  }, [active, refresh]);
-
-  // Files and refs changed on disk (editor, terminal git) → refresh. Only the
-  // visible tab watches; a new history size keeps the same watch.
-  useEffect(() => {
-    if (!active) return;
-    let stop = () => {};
-    let live = true;
-    api
-      .watch(path, () => void refreshNow.current())
-      .then(
-        (un) => (live ? (stop = un) : un()),
-        () => {}, // watching is a convenience; focus refresh still works
-      );
-    return () => {
-      live = false;
-      stop();
-    };
-  }, [path, active]);
-
-  // Pick up edits made in an editor when the user comes back to the window.
-  useEffect(() => {
-    if (!active) return;
-    const onFocus = () => void refresh();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [active, refresh]);
+  const remote = useRemote({
+    path,
+    snap,
+    latest,
+    busy,
+    run,
+    refuseBusy,
+    toast,
+    settings,
+    onChangeSettings,
+    mission,
+    playAfterDraw,
+    onPulled: rereadPulls,
+  });
+  const bisect = useBisect(path, snap, graph, play, foundCulprit);
 
   const stashSel = selectedStash !== null ? snap?.stashes[selectedStash] : undefined;
   /** The right panel shows one thing: composer, a stash, or a commit. */
-  const show = (what: { commit?: string | null; stash?: number | null; composer?: boolean; amend?: boolean }) => {
+  const show: Repo["show"] = (what) => {
     setSelected(what.commit ?? null);
-    if (what.commit) tour.mission("inspect");
+    if (what.commit) mission("inspect");
     setSelectedStash(what.stash ?? null);
     setComposer(what.composer ? { amend: what.amend ?? false } : false);
   };
@@ -403,41 +211,6 @@ export function RepoView({
     api.commitDiff(path, panelId!).catch((): FileDiff[] => []),
   ).data;
 
-  /** Fetch the files for the open diff; only the latest request may land. */
-  const fetchDiff = useCallback(
-    (source: DiffSource) => {
-      if (!path) return;
-      const req = ++diffReq.current;
-      const load =
-        source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
-      load.then(
-        (files) => req === diffReq.current && setDiff((d) => d && { ...d, files }),
-        (e) => req === diffReq.current && setDiff((d) => d && { ...d, files: [], error: String(e) }),
-      );
-    },
-    [path],
-  );
-
-  const loadDiff = useCallback(
-    (source: DiffSource, title: string, file?: string) => {
-      setBackport(null);
-      setRebaseFrom(null);
-      setDiff((d) => ({ source, title, files: d?.title === title ? d.files : null, error: null, path: file }));
-      fetchDiff(source);
-    },
-    [fetchDiff],
-  );
-
-  // The working-tree diff follows the files on disk (only the files are refetched).
-  const worktreeSource = diff?.source.kind === "worktree" ? diff.source : null;
-  useEffect(() => {
-    if (worktreeSource) fetchDiff(worktreeSource);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snap]);
-
-  const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
-  const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
-  const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
   // Pull requests: read when the tab shows, then every few minutes (forges rate-limit, so not per snapshot).
   // Offline or no forge: the graph just has no PR labels.
   const pulls = useLoaded(active ? `${path}\n${prTick}` : null, () => api.pullRequests(path)).last;
@@ -450,134 +223,22 @@ export function RepoView({
     () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
     [snap, pulls, commitById],
   );
-  /**
-   * The backport sheet from the sidebar: into the current branch, from the
-   * branch most likely to have fixes it lacks (the original project first).
-   */
-  const openBackport = () => {
-    if (!snap) return;
-    const { branch, upstream } = snap.head;
-    const names = snap.refs
-      .filter((r) => (r.kind === "local" || r.kind === "remote") && !r.name.endsWith("/HEAD"))
-      .map((r) => r.name)
-      .filter((n) => n !== branch && n !== upstream);
-    const prefer = ["upstream/main", "upstream/master", "origin/main", "origin/master", "main", "master", "develop"];
-    const source = prefer.find((n) => names.includes(n)) ?? names[0];
-    if (!branch || !source) return toast("err", t("bp.needBranches"));
-    setDiff(null);
-    setRebaseFrom(null);
-    setBackport({ source, target: branch });
-  };
-  const backportTargets = useMemo(
-    () => (snap?.refs ?? []).filter((r) => r.kind === "local").map((r) => r.name),
-    [snap],
-  );
-  // A range with merges (or off the first-parent line) is planned over git's own todo.
-  const rebaseNeedsTodo =
-    !!rebaseFrom && !!snap?.head.target && typeof rebaseRange(commitById, snap.head.target, rebaseFrom) === "string";
-  useEffect(() => {
-    if (!rebaseNeedsTodo || !rebaseFrom) return;
-    let live = true;
-    api.rebaseTodo(path, rebaseFrom).then(
-      (todo) => live && setRebaseTodo(todo),
-      (e) => {
-        if (!live) return;
-        toast("err", String(e));
-        setRebaseFrom(null);
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [rebaseNeedsTodo, rebaseFrom, path, toast]);
-  // Commits the planned rebase rewrites (and git's todo when merges are in it); null when there is nothing to plan.
-  const rebase = useMemo(() => {
-    if (!rebaseFrom || !snap?.head.target) return null;
-    const r = rebaseRange(commitById, snap.head.target, rebaseFrom);
-    if (typeof r !== "string") return r.length ? { commits: r, todo: null } : null;
-    if (!rebaseTodo) return null;
-    const commits = rebaseTodo.flatMap((x): CommitInfo[] =>
-      x.kind === "pick"
-        ? [
-            commitById.get(x.id) ?? {
-              id: x.id,
-              parents: [],
-              summary: x.summary,
-              message: x.summary,
-              author: "",
-              email: "",
-              time: 0,
-            },
-          ]
-        : [],
-    );
-    return commits.length ? { commits, todo: rebaseTodo } : null;
-  }, [rebaseFrom, rebaseTodo, snap, commitById]);
+  const searchQuery = search?.query;
   const matches = useMemo(
-    () => (snap && search ? searchCommits(snap.commits, snap.refs, search.query) : []),
-    [snap, search?.query], // eslint-disable-line react-hooks/exhaustive-deps
-  );
-  // Search highlights its matches; otherwise a focused branch highlights its ancestry.
-  // Bisect state follows every snapshot; fly to each new commit to test, flare when the culprit shows.
-  useEffect(() => {
-    if (!snap) return;
-    let live = true;
-    api.bisectState(path).then(
-      (state) => {
-        if (!live) return;
-        setBisectLoaded({ snap, state });
-        const prev = lastBisect.current;
-        if (state?.culprit && state.culprit !== prev.culprit) {
-          const id = state.culprit;
-          foundCulprit();
-          setTimeout(() => {
-            graph.current?.centerOn(id);
-            setTimeout(() => {
-              const at = graph.current?.screenOf(id);
-              if (at) play({ kind: "nova", at, red: true });
-            }, 450);
-          }, 60);
-        } else if (state?.current && state.current !== prev.current) {
-          const id = state.current;
-          setTimeout(() => graph.current?.centerOn(id), 60);
-        }
-        lastBisect.current = { current: state?.current ?? null, culprit: state?.culprit ?? null };
-      },
-      () => live && setBisectLoaded({ snap, state: null }),
-    );
-    return () => {
-      live = false;
-    };
-  }, [path, snap, play, foundCulprit]);
-  const bisect = bisectLoaded && bisectLoaded.snap === snap ? bisectLoaded.state : null;
-  const badges = useMemo(() => {
-    const m = new Map<string, NodeBadge>();
-    if (bisectDraft?.bad) m.set(bisectDraft.bad, "bad");
-    if (bisectDraft?.good) m.set(bisectDraft.good, "good");
-    if (bisect) {
-      for (const g of bisect.good) m.set(g, "good");
-      if (bisect.bad) m.set(bisect.bad, "bad");
-      if (bisect.current) m.set(bisect.current, "probe");
-      if (bisect.culprit) m.set(bisect.culprit, "culprit");
-    }
-    return m;
-  }, [bisect, bisectDraft]);
-
-  /** While hunting, everything that can't be the culprit fades back. */
-  const bisectFocus = useMemo(
-    () => (bisect && !bisect.culprit ? new Set([...bisect.candidates, ...bisect.good]) : null),
-    [bisect],
+    () => (snap && searchQuery !== undefined ? searchCommits(snap.commits, snap.refs, searchQuery) : []),
+    [snap, searchQuery],
   );
 
   const trailIds = useMemo(() => trail?.touches.map((x) => x.id), [trail]);
   const trailFocus = useMemo(() => (trailIds ? new Set(trailIds) : null), [trailIds]);
+  // Search highlights its matches; otherwise a focused branch highlights its ancestry.
   const focus = useMemo(() => {
-    if (search?.query.trim()) return new Set(matches);
+    if (searchQuery?.trim()) return new Set(matches);
     if (!snap || !focusRefs.length) return null;
     const lit = new Set<string>();
     for (const r of focusRefs) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
     return lit;
-  }, [snap, focusRefs, search?.query, matches]);
+  }, [snap, focusRefs, searchQuery, matches]);
 
   /** Select match `i` (wrapping) and fly the camera to it. */
   const goToMatch = (i: number, list = matches) => {
@@ -616,7 +277,10 @@ export function RepoView({
     [snap],
   );
 
-  const isAncestor = (anc: string, of: string | null) => !!snap && !!of && ancestorsOf(snap.commits, of).has(anc);
+  const isAncestor = useCallback(
+    (anc: string, of: string | null) => !!snap && !!of && ancestorsOf(snap.commits, of).has(anc),
+    [snap],
+  );
   const canDropOn = useCallback(
     (target: string, source: string, mode: Drag["mode"]) => {
       if (!snap || snap.state !== "clean") return false;
@@ -624,170 +288,8 @@ export function RepoView({
       if (!branchAt(target)) return false;
       return !isAncestor(source, target); // already contained otherwise
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [snap, branchAt, commitById],
+    [snap, branchAt, commitById, isAncestor],
   );
-
-  const sourceName = (id: string, target: string): string => {
-    const refs = snap?.refs.filter((r) => r.target === id && r.kind !== "tag" && r.name !== target) ?? [];
-    return (refs.find((r) => r.kind === "local") ?? refs[0])?.name ?? id;
-  };
-
-  /** A git operation is running here; another is refused until it ends (two git processes collide). */
-  const running = useRef(false);
-  /** True, after saying so, while another operation is still running. */
-  const refuseBusy = () => {
-    if (running.current) toast("err", t("app.busyRefused"));
-    return running.current;
-  };
-
-  /**
-   * Every git write goes through here, one at a time: busy state, toasts, refresh.
-   * Statuses that need a follow-up dialog (diverged / rejected / auth) are left to the caller.
-   * `quiet` leaves the success toast to the caller too.
-   */
-  async function run(label: string, op: () => Promise<OpResult>, after?: () => void, quiet = false): Promise<OpResult> {
-    if (refuseBusy()) return { status: "failed", output: t("app.busyRefused") };
-    let r: OpResult = { status: "failed", output: "" };
-    running.current = true;
-    setBusy(true);
-    try {
-      r = await op();
-      if (r.status === "ok") {
-        if (!quiet) toast("ok", label);
-        after?.();
-      } else if (r.status === "conflict") {
-        // No toast: the sheet opens and the banner over it already says what happened.
-        setConflictSheet({});
-      } else if (r.status === "empty") askSkip();
-      else if (r.status === "failed") toast("err", r.output || t("app.failed", { label }));
-    } catch (e) {
-      toast("err", String(e));
-    } finally {
-      running.current = false;
-      setBusy(false);
-      await refresh();
-    }
-    return r;
-  }
-
-  /** A pick stopped with nothing to commit: its change is already here. Offer to skip it. */
-  const askSkip = () =>
-    setConfirm({
-      title: t("empty.title"),
-      confirmLabel: t("empty.skip"),
-      body: (
-        <p>
-          <Rich k="empty.body" vars={{ branch: latest.current?.head.branch ?? "HEAD" }} />
-        </p>
-      ),
-      onConfirm: () => {
-        setConfirm(null);
-        void run(t("empty.skipped"), () => api.skip(path));
-      },
-    });
-
-  /**
-   * Push to `name` (e.g. origin) instead of a fetch-only upstream, and follow it there from now on.
-   * `branch` defaults to the current one (another goes up before a pull request is opened from it).
-   */
-  const pushTo = async (name: string, branch: string | null = null) => {
-    // Before the progress card changes: it belongs to the operation still running.
-    if (refuseBusy()) return false;
-    setRemoteBusy("push");
-    setProgress(null);
-    try {
-      const r = await run(t("remote.pushedTo", { name }), () => api.pushTo(path, name, setProgress, branch));
-      if (r.status === "auth") setAuth({ op: "push", output: r.output });
-      // Another branch than HEAD: the pull-then-push dialog doesn't apply, so just say why.
-      if (r.status === "rejected") {
-        if (branch) toast("err", r.output);
-        else setSync("rejected");
-      }
-      return r.status === "ok";
-    } finally {
-      setRemoteBusy(null);
-      setProgress(null);
-    }
-  };
-
-  const remote = async (op: RemoteOp): Promise<OpStatus> => {
-    if (refuseBusy()) return "failed";
-    setRemoteBusy(op);
-    setProgress(null);
-    const pushing = op === "push" || op === "forcePush";
-    const known = new Set(latest.current?.commits.map((c) => c.id));
-    try {
-      const r = await run(t(REMOTE_DONE[op]), async () => {
-        const r = await api.remote(path, op, setProgress);
-        // A rejected push says nothing about how far behind we are; fetch so the dialog can show it.
-        if (r.status === "rejected") await api.remote(path, "fetch").catch(() => {});
-        return r;
-      });
-      if (r.status === "ok") {
-        setPrTick((n) => n + 1);
-        if (pushing) tour.mission("push");
-        const head = latest.current?.head.target;
-        const fresh = pushing ? [] : (latest.current?.commits ?? []).filter((c) => !known.has(c.id));
-        playAfterDraw((at) => {
-          if (pushing) {
-            const from = at(head);
-            return from && { kind: "launch", from };
-          }
-          const to = fresh.flatMap((c) => at(c.id) ?? []);
-          return to.length ? { kind: "meteors", to } : null;
-        });
-      }
-      if (r.status === "auth") setAuth({ op, output: r.output });
-      if (r.status === "diverged" || r.status === "rejected") setSync(r.status);
-      return r.status;
-    } finally {
-      setRemoteBusy(null);
-      setProgress(null);
-    }
-  };
-
-  /** Resolve a diverged pull or rejected push with merge/rebase (then push for the latter). */
-  const resolveSync = async (op: "pullMerge" | "pullRebase") => {
-    const wasRejected = sync === "rejected";
-    setSync(null);
-    if ((await remote(op)) === "ok" && wasRejected) await remote("push");
-  };
-
-  /** Copy commit `id` onto branch `target` (checked out first), after confirming. */
-  const confirmPick = (id: string, target: string) => {
-    const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
-    setConfirm({
-      title: "cherry-pick",
-      confirmLabel: t("pick.copy"),
-      body: (
-        <>
-          <p>
-            <Rich k="pick.body" vars={{ summary, target }} />
-          </p>
-          {snap?.head.branch !== target && <p className="note">{t("pick.switch", { target })}</p>}
-        </>
-      ),
-      onConfirm: () => {
-        setConfirm(null);
-        void run(
-          t("pick.done", { target }),
-          () => api.pick(path, "cherryPick", id, target),
-          () => setTimeout(() => graph.current?.centerOnHead(), 60),
-        ).then((r) => {
-          if (r.status !== "ok") return;
-          const copy = latest.current?.head.target;
-          playAfterDraw((at) => {
-            const from = at(id),
-              to = at(copy);
-            return from && to ? { kind: "comet", from, to } : null;
-          });
-        });
-      },
-    });
-  };
-
-  const refRun = (label: string, op: RefOp) => run(label, () => api.ref(path, op));
 
   /** Local branches checked out in another worktree → that folder. */
   const elsewhere = useMemo(
@@ -797,137 +299,6 @@ export function RepoView({
       ) as Record<string, string>,
     [snap],
   );
-
-  /** `upstream/feature/x` → remote `upstream`, branch `feature/x` (remote names may hold slashes too). */
-  const splitRemote = (name: string) => {
-    const remote = snap?.remotes.map((x) => x.name).find((n) => name.startsWith(`${n}/`)) ?? name.split("/")[0];
-    return { remote, branch: name.slice(remote.length + 1) };
-  };
-
-  /** A local branch following remote branch `r`, under a name the user picks (`suggest` prefilled). */
-  const askLocalFor = (r: RefInfo, why: string, suggest: string) =>
-    setNameReq({
-      title: why,
-      placeholder: "feature/my-idea",
-      confirmLabel: t("branch.fromRemote.go"),
-      value: suggest,
-      onSubmit: (name) => {
-        setNameReq(null);
-        void refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name, name });
-      },
-    });
-
-  const checkoutRef = (r: RefInfo) => {
-    // git can't check out a branch another worktree has; open that worktree instead.
-    if (r.kind === "local" && elsewhere[r.name]) {
-      onOpenPath(elsewhere[r.name]);
-      toast("ok", t("wt.checkedOut", { branch: r.name }));
-      return;
-    }
-    if (r.kind !== "remote") return void run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name));
-    const { remote, branch } = splitRemote(r.name);
-    const local = snap?.refs.find((x) => x.kind === "local" && x.name === branch);
-    // The same name already holds other work (e.g. `upstream/main` next to our `main`): don't
-    // silently switch to ours, follow theirs under a new name.
-    if (local && local.target !== r.target)
-      return askLocalFor(r, t("branch.fromRemote.taken", { local: branch, remote: r.name }), `${remote}-${branch}`);
-    void refRun(t("checkout.remote.done", { name: r.name }), { kind: "checkoutRemote", remoteRef: r.name });
-  };
-
-  const localNames = new Set(snap?.refs.filter((r) => r.kind === "local").map((r) => r.name));
-
-  /**
-   * Where a push goes: the upstream's remote (or the default one for a first push),
-   * whether that remote is fetch-only, and the alternative to offer instead.
-   */
-  const pushTarget = (() => {
-    if (!snap) return null;
-    const name = snap.head.upstream
-      ? splitRemote(snap.head.upstream).remote
-      : (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
-    const info = snap.remotes.find((r) => r.name === name);
-    if (!info) return null;
-    const alt = (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
-    return { remote: info.name, url: info.url, fetchOnly: !info.push, alt: alt && alt !== info.name ? alt : null };
-  })();
-
-  /** A new branch where HEAD is (also the first branch of an empty repository). */
-  const askNewBranch = () => {
-    const head = snap?.head;
-    // No commit yet (a fresh `init`, maybe with a remote fetched): a branch made here
-    // would stay empty and unseen, so start from a remote branch when there is one.
-    const base = head?.target ? null : remoteBase(snap?.refs ?? []);
-    const from = base ?? head?.branch ?? head?.target?.slice(0, 7);
-    setNameReq({
-      title: head?.target || base ? t("branch.newFromHead", { from: from ?? "" }) : t("branch.newFirst"),
-      hint: head?.target || base ? undefined : t("branch.newFirst.hint"),
-      placeholder: "feature/my-idea",
-      confirmLabel: t("branch.new.go"),
-      onSubmit: (name) => {
-        setNameReq(null);
-        const done = head?.target || base ? t("branch.new.done", { name }) : t("branch.newFirst.done", { name });
-        void run(done, () => api.createBranch(path, name, base, true));
-      },
-    });
-  };
-
-  const addWorktree = async (op: Extract<WorktreeOp, { kind: "add" }>) => {
-    const branch = op.newBranch ?? op.branch ?? "";
-    const r = await run(t("wt.added", { branch }), () => api.worktree(path, op));
-    if (r.status === "ok") {
-      setWorktreeReq(null);
-      onOpenPath(op.dir);
-    }
-  };
-
-  const removeWorktree = (w: WorktreeInfo, force = false) => {
-    setConfirm(null);
-    void run(t("wt.remove.done"), () => api.worktree(path, { kind: "remove", dir: w.path, force })).then((r) => {
-      if (r.status !== "unmerged") return;
-      setConfirm({
-        title: t("wt.dirty.title"),
-        danger: true,
-        confirmLabel: t("wt.dirty.go"),
-        body: (
-          <p>
-            <Rich k="wt.dirty.body" vars={{ path: w.path }} />
-          </p>
-        ),
-        onConfirm: () => removeWorktree(w, true),
-      });
-    });
-  };
-
-  const worktreeMenu = (w: WorktreeInfo): MenuItem[] => [
-    { label: t("wt.menu.open"), disabled: w.current || w.missing, onSelect: () => onOpenPath(w.path) },
-    { label: t("wt.menu.copy"), onSelect: () => copyText(w.path) },
-    "separator",
-    ...(w.missing
-      ? [
-          {
-            label: t("wt.menu.prune"),
-            onSelect: () => void run(t("wt.pruned"), () => api.worktree(path, { kind: "prune" })),
-          },
-        ]
-      : []),
-    {
-      label: t("wt.menu.remove"),
-      danger: true,
-      disabled: w.main || w.current || w.missing,
-      onSelect: () =>
-        setConfirm({
-          title: t("wt.remove.title"),
-          danger: true,
-          confirmLabel: t("wt.remove.go"),
-          body: (
-            <p>
-              <Rich k="wt.remove.body" vars={{ path: w.path, branch: w.branch ?? "HEAD" }} />
-            </p>
-          ),
-          onConfirm: () => removeWorktree(w),
-        }),
-    },
-  ];
 
   // Re-read LFS when the checkout moves (new files may be pointers) or after an LFS command.
   const lfsKey = `${path}\n${snap?.head.target ?? ""}\n${lfsTick}`;
@@ -947,625 +318,26 @@ export function RepoView({
     setStackTick((n) => n + 1);
   };
 
-  const notesItem = (to: string): MenuItem => ({
-    label: t("menu.notes"),
-    onSelect: () => (pro ? setNotesTo(to) : offerPro("notes")),
-  });
-
-  /** Branch menu entries for stacks: build on this one, move it, take it out. */
-  const stackItems = (name: string): MenuItem[] => {
-    const stacked = stacks.find((s) => s.name === name);
-    const locked = (go: () => void) => () => (pro ? go() : offerPro("stack"));
-    const others = (snap?.refs ?? []).filter(
-      (r) => r.kind === "local" && r.name !== name && r.name !== stacked?.parent,
-    );
-    return [
-      {
-        label: t("menu.stackOn"),
-        icon: "stack",
-        onSelect: locked(() =>
-          setNameReq({
-            title: t("stack.new.title", { parent: name }),
-            placeholder: `${name}-2`,
-            confirmLabel: t("stack.new.go"),
-            onSubmit: (child) => {
-              setNameReq(null);
-              void stackRun(t("stack.created", { name: child, parent: name }), {
-                kind: "create",
-                name: child,
-                parent: name,
-              });
-            },
-          }),
-        ),
-      },
-      {
-        label: t("menu.stackParent"),
-        disabled: !others.length,
-        onSelect: locked(() =>
-          setMenu({
-            x: menuAt.current.x,
-            y: menuAt.current.y,
-            title: t("stack.pickParent", { name }),
-            items: others.map((r) => ({
-              label: r.name,
-              icon: "branch" as const,
-              onSelect: () =>
-                void stackRun(t("stack.parentSet", { name, parent: r.name }), {
-                  kind: "setParent",
-                  branch: name,
-                  parent: r.name,
-                }),
-            })),
-          }),
-        ),
-      },
-      ...(stacked
-        ? [
-            {
-              label: t("menu.stackRemove"),
-              onSelect: () => void stackRun(t("stack.removed", { name }), { kind: "remove", branch: name }),
-            },
-          ]
-        : []),
-    ];
-  };
-
   const lfsRun = async (label: string, op: LfsOp) => {
     const r = await run(label, () => api.lfs(path, op));
     if (r.status === "auth") toast("err", t("lfs.auth"));
     setLfsTick((n) => n + 1);
   };
 
-  const submoduleRun = async (label: string, op: SubmoduleOp) => {
-    const r = await run(label, () => api.submodule(path, op));
-    if (r.status === "auth") toast("err", t("sub.auth"));
-  };
-
-  const submoduleMenu = (m: SubmoduleInfo): MenuItem[] => [
-    {
-      label: t("sub.menu.open"),
-      disabled: m.state === "uninitialized",
-      onSelect: () => snap && onOpenPath(joinPath(snap.path, m.path)),
-    },
-    {
-      label: t("sub.menu.update"),
-      disabled: m.state === "clean",
-      onSelect: () => void submoduleRun(t("sub.updated"), { kind: "update", path: m.path }),
-    },
-    "separator",
-    {
-      label: t("sub.menu.copyUrl"),
-      disabled: !m.url,
-      onSelect: () => copyText(m.url ?? ""),
-    },
-    { label: t("sub.menu.sync"), onSelect: () => void submoduleRun(t("sub.synced"), { kind: "sync" }) },
-  ];
-
-  const askBranchAt = (at: string) =>
-    setNameReq({
-      title: t("branch.new.title", { sha: at.slice(0, 7) }),
-      placeholder: "feature/my-idea",
-      confirmLabel: t("branch.new.go"),
-      onSubmit: (name) => {
-        setNameReq(null);
-        void run(t("branch.new.done", { name }), () => api.createBranch(path, name, at, true));
-      },
-    });
-
-  const askTagAt = (at: string) =>
-    setNameReq({
-      title: t("tag.new.title", { sha: at.slice(0, 7) }),
-      placeholder: "v1.0.0",
-      confirmLabel: t("tag.new.go"),
-      extra: { placeholder: t("tag.new.message") },
-      onSubmit: (name, message) => {
-        setNameReq(null);
-        void refRun(t("tag.new.done", { name }), { kind: "createTag", name, at, message });
-      },
-    });
-
-  /** Add another repository (e.g. the original project) as a remote and fetch it. */
-  const removeRemoteItem = (name: string): MenuItem => ({
-    label: t("remote.delete.menu", { name }),
-    danger: true,
-    onSelect: () =>
-      setConfirm({
-        title: t("remote.delete.title"),
-        danger: true,
-        confirmLabel: t("common.delete"),
-        body: (
-          <p>
-            <Rich k="remote.delete.body" vars={{ name }} />
-          </p>
-        ),
-        onConfirm: () => {
-          setConfirm(null);
-          void refRun(t("remote.delete.done", { name }), { kind: "removeRemote", name });
-        },
-      }),
-  });
-
-  /** Fetch one remote with the progress card up, then say what came: its branch count. */
-  const fetchOne = async (name: string) => {
-    if (refuseBusy()) return;
-    setFetchingRemote(name);
-    setProgress(null);
-    try {
-      // Quiet: what to say (how many branches came) is known only after the refresh.
-      const r = await run(
-        t("job.fetchRemote", { name }),
-        () => api.fetchRemote(path, name, setProgress),
-        undefined,
-        true,
-      );
-      const n = latest.current?.refs.filter((x) => x.kind === "remote" && x.name.startsWith(`${name}/`)).length ?? 0;
-      if (r.status === "ok") {
-        setPrTick((k) => k + 1);
-        toast("ok", n ? t("remote.fetched", { name, n }) : t("remote.fetchedNone", { name }));
-      } else if (r.status === "auth") setAuth({ op: "fetch", output: r.output });
-    } finally {
-      setFetchingRemote(null);
-      setProgress(null);
-    }
-  };
-
-  const remoteMenu = (name: string): MenuItem[] => [
-    { label: t("remote.fetchOne", { name }), icon: "fetch", onSelect: () => void fetchOne(name) },
-    {
-      label: t("remote.copyUrl"),
-      onSelect: () => copyText(snap?.remotes.find((x) => x.name === name)?.url ?? ""),
-    },
-    {
-      label:
-        snap?.remotes.find((x) => x.name === name)?.push === false
-          ? t("remote.allowPush", { name })
-          : t("remote.blockPush", { name }),
-      onSelect: () => {
-        const push = snap?.remotes.find((x) => x.name === name)?.push !== false;
-        void refRun(t(push ? "remote.pushBlocked" : "remote.pushAllowed", { name }), {
-          kind: "setPushable",
-          name,
-          pushable: !push,
-        });
-      },
-    },
-    "separator",
-    removeRemoteItem(name),
-  ];
-
-  const askRemote = () => setAddingRemote(true);
-  const addRemote = async (name: string, url: string) => {
-    setAddingRemote(false);
-    // Added quietly; what the user waits for is the fetch, shown on the progress card.
-    // Anything but `origin` is someone else's project (the original of a fork): fetch only.
-    const fetchOnly = name !== "origin";
-    const r = await run(
-      t("remote.add.title"),
-      () => api.ref(path, { kind: "addRemote", name, url, fetchOnly }),
-      undefined,
-      true,
-    );
-    if (r.status !== "ok") return;
-    if (fetchOnly) toast("ok", t("remote.addedFetchOnly", { name }));
-    await fetchOne(name);
-  };
-
-  /** Delete a local branch; if git says it's unmerged, ask again before forcing. */
-  const deleteBranch = (name: string) =>
-    setConfirm({
-      title: t("branch.delete.title"),
-      danger: true,
-      confirmLabel: t("common.delete"),
-      body: (
-        <p>
-          <Rich k="branch.delete.body" vars={{ name }} />
-        </p>
-      ),
-      onConfirm: async () => {
-        setConfirm(null);
-        const r = await refRun(t("branch.delete.done", { name }), { kind: "deleteBranch", name, force: false });
-        if (r.status !== "unmerged") return;
-        setConfirm({
-          title: t("branch.unmerged.title"),
-          danger: true,
-          confirmLabel: t("branch.unmerged.go"),
-          body: (
-            <p>
-              <Rich k="branch.unmerged.body" vars={{ name }} />
-            </p>
-          ),
-          onConfirm: () => {
-            setConfirm(null);
-            void refRun(t("branch.delete.done", { name }), { kind: "deleteBranch", name, force: true });
-          },
-        });
-      },
-    });
-
-  /** Pick a bisect end; with both picked, start (the bad one must come after the good one). */
-  const markBisect = (draft: { bad?: string; good?: string }) => {
-    if (!draft.bad || !draft.good) return setBisectDraft(draft);
-    if (!isAncestor(draft.good, draft.bad)) {
-      toast("err", t("bisect.order"));
-      return setBisectDraft({ bad: draft.bad });
-    }
-    setBisectDraft(null);
-    void run(t("bisect.started"), () => api.bisect(path, { kind: "start", bad: draft.bad!, good: draft.good! }));
-  };
-  const judge = (kind: "good" | "bad" | "skip") => run(t(`bisect.judged.${kind}`), () => api.bisect(path, { kind }));
-
-  /** Open the edit dialog for `id`; splitting needs its files. */
-  const openEdit = (mode: EditMode, id: string) => {
-    const parent = commitById.get(id)?.parents[0];
-    const rewrites = snap?.head.target
-      ? [...ancestors(snap.commits, snap.head.target)].filter((c) => !parent || !isAncestor(c, parent)).length
-      : 1;
-    setEditReq({ mode, id, files: null, rewrites, pushed: pushedCommit(id) });
-    if (mode === "split")
-      void api.commitDiff(path, id).then(
-        (files) => setEditReq((r) => (r && r.id === id ? { ...r, files } : r)),
-        () => setEditReq((r) => (r && r.id === id ? { ...r, files: [] } : r)),
-      );
-  };
-
-  const applyEdit = (id: string, edit: CommitEdit) => {
-    const at = graph.current?.screenOf(id) ?? null;
-    return run(
-      t(`edit.done.${edit.kind}`),
-      () => api.editCommit(path, id, edit),
-      () => {
-        setEditReq(null);
-        if (at) play({ kind: "nova", at });
-      },
-    );
-  };
-
-  /** Right-click on a commit's changed file: put it back as this commit (or its parent) had it. */
-  const fileMenu = (commit: CommitInfo, file: string, x: number, y: number) =>
-    setMenu({
-      x,
-      y,
-      title: file,
-      items: [
-        {
-          label: t("file.restore.here"),
-          onSelect: () => void run(t("file.restored", { file }), () => api.restoreFile(path, commit.id, file)),
-        },
-        {
-          label: t("file.restore.before"),
-          disabled: !commit.parents.length,
-          onSelect: () => void run(t("file.restored", { file }), () => api.restoreFile(path, commit.parents[0], file)),
-        },
-        { label: t("history.trail"), hint: "log", onSelect: () => void openTrail(commit, file) },
-        { label: t("history.blame"), hint: "blame", onSelect: () => setBlameReq({ rev: commit.id, file }) },
-      ],
-    });
-
-  /** Draw the file's path through history; from HEAD when it reaches this commit, so newer changes show too. */
-  const openTrail = async (commit: CommitInfo, file: string) => {
-    const rev = isAncestor(commit.id, snap?.head.target ?? null) ? "HEAD" : commit.id;
-    try {
-      const touches = await api.fileLog(path, rev, file);
-      setTrail({ file, touches });
-      setBisectDraft(null);
-    } catch (e) {
-      toast("err", String(e));
-    }
-  };
-
-  /** Step to the next older (+1) or newer (-1) commit on the file's trail. */
-  const stepTrail = (dir: 1 | -1) => {
-    if (!trail) return;
-    const ids = trail.touches.map((x) => x.id).filter((id) => commitById.has(id));
-    if (!ids.length) return;
-    const i = selected ? ids.indexOf(selected) : -1;
-    const id = i < 0 ? ids[0] : ids[Math.min(ids.length - 1, Math.max(0, i + dir))];
-    show({ commit: id });
-    graph.current?.centerOn(id);
-  };
-
-  /** Delete branches together; their tips scatter as stardust where they were drawn. */
-  const deleteBranches = (names: string[], tips: string[], force: boolean) => {
-    const at = tips.flatMap((id) => graph.current?.screenOf(id) ?? []);
-    return run(
-      t("clean.done", { n: names.length }),
-      () => api.deleteBranches(path, names, force),
-      () => play({ kind: "dust", at }),
-    );
-  };
-
-  /** Move the branch to `target` with `mode`, then play the rewind. */
-  const doReset = (target: string, mode: ResetMode, label = t("undo.done", { branch: snap?.head.branch ?? "HEAD" })) =>
-    run(
-      label,
-      () => api.reset(path, target, mode),
-      () => {
-        setResetReq(null);
-        play({ kind: "rewind" });
-        tour.mission("undo");
-        setTimeout(() => graph.current?.centerOnHead(), 60);
-      },
-    );
-
-  /** After a rebase onto `base`: the commits now on HEAD above it, oldest first. */
-  const replayedSince = (base: string) => {
-    const byId = new Map(latest.current?.commits.map((c) => [c.id, c]));
-    const out: string[] = [];
-    for (let id = latest.current?.head.target; id && id !== base && out.length < 200; id = byId.get(id)?.parents[0])
-      out.push(id);
-    return out.reverse();
-  };
-
-  /** Is `id` already on the upstream branch (so rewriting it needs a force push)? */
-  const pushedCommit = (id: string) => {
-    const up = snap?.refs.find((r) => r.kind === "remote" && r.name === snap.head.upstream);
-    return !!up && isAncestor(id, up.target);
-  };
-
-  /** Ask how to go back to `target` (a commit, maybe one only the reflog knows). */
-  const askReset = (target: string, initial?: ResetMode, summary?: string) => {
-    if (!snap?.head.target) return;
-    // Commits leaving the branch; unknown for a commit only the reflog has (it isn't loaded).
-    const passed = commitById.has(target)
-      ? [...ancestors(snap.commits, snap.head.target)].filter((c) => !isAncestor(c, target)).length
-      : 0;
-    setResetReq({
-      target,
-      summary: summary ?? commitById.get(target)?.summary ?? target.slice(0, 7),
-      passed,
-      // More commits leave the branch than are unpushed: some were pushed.
-      pushed: !!snap.head.upstream && passed > snap.head.ahead,
-      initial,
-    });
-  };
-
-  /** Right-click menu for a ref badge (graph) or a sidebar row. */
-  const showPr = (pr: PullRequest) => {
-    if (!commitById.has(pr.sha)) return;
-    show({ commit: pr.sha });
-    graph.current?.centerOn(pr.sha);
-  };
   /** Open a web page (a pull request, a token page) in the browser. */
   const openUrl = (url: string) => openLink(url, path);
-  const prMenu = (pr: PullRequest): MenuItem[] => {
-    const local = snap?.refs.find((x) => x.kind === "local" && x.name === pr.branch);
-    const remote = snap?.refs.find((x) => x.kind === "remote" && x.name === `${pr.remote}/${pr.branch}`);
-    const target = local ?? remote;
-    return [
-      { label: t("pr.open"), onSelect: () => openUrl(pr.url) },
-      { label: t("pr.show"), disabled: !commitById.has(pr.sha), onSelect: () => showPr(pr) },
-      {
-        label: target ? t("pr.checkout", { branch: pr.branch }) : t("pr.checkout.missing", { branch: pr.branch }),
-        disabled: !target || (local && local.name === snap?.head.branch),
-        onSelect: () => target && void checkoutRef(target),
-      },
-    ];
-  };
   const saveToken = (forge: TokenForge, token: string | null) =>
     api.setForgeToken(path, forge.host, token).then(
       () => {
         setTokenFor(null);
         toast("ok", token ? t("pr.token.saved", { forge: FORGE_NAME[forge.kind] }) : t("pr.token.forgotten"));
-        setPrTick((n) => n + 1);
+        rereadPulls();
       },
       (e) => toast("err", String(e)),
     );
 
-  const refMenu = (r: RefInfo): MenuItem[] => {
-    if (!snap) return [];
-    if (r.kind === "pr") {
-      const pr = prOf(pulls, r);
-      return pr ? prMenu(pr) : [];
-    }
-    const isHead = r.kind === "local" && r.name === snap.head.branch;
-    const canMerge =
-      !!snap.head.branch && !isHead && r.kind !== "tag" && canDropOn(snap.head.target ?? "", r.target, "merge");
-    const merge: MenuItem = {
-      label: snap.head.branch ? t("menu.mergeInto", { branch: snap.head.branch }) : t("menu.mergeIntoHead"),
-      disabled: !canMerge,
-      onSelect: () =>
-        setMergeReq({ sourceId: r.target, targetId: snap.head.target!, source: r.name, target: snap.head.branch! }),
-    };
-    const compare: MenuItem = {
-      label: snap.head.branch ? t("menu.compare", { branch: snap.head.branch }) : t("menu.compareHead"),
-      hint: t("menu.compare.hint"),
-      disabled: !snap.head.branch || isHead,
-      onSelect: () => {
-        setDiff(null);
-        setRebaseFrom(null);
-        setBackport({ source: r.name, target: snap.head.branch! });
-      },
-    };
-    if (r.kind === "tag")
-      return [
-        { label: t("menu.tag.goto"), onSelect: () => graph.current?.centerOn(r.target) },
-        notesItem(r.name),
-        "separator",
-        {
-          label: t("tag.delete.title"),
-          danger: true,
-          onSelect: () =>
-            setConfirm({
-              title: t("tag.delete.title"),
-              danger: true,
-              confirmLabel: t("common.delete"),
-              body: (
-                <p>
-                  <Rich k="tag.delete.body" vars={{ name: r.name }} />
-                </p>
-              ),
-              onConfirm: () => {
-                setConfirm(null);
-                void refRun(t("tag.delete.done", { name: r.name }), { kind: "deleteTag", name: r.name });
-              },
-            }),
-        },
-      ];
-    if (r.kind === "remote") {
-      const { remote: name, branch } = splitRemote(r.name);
-      return [
-        { label: t("menu.checkoutLocal"), hint: t("menu.checkoutLocal.hint"), onSelect: () => void checkoutRef(r) },
-        {
-          label: t("menu.checkoutLocalAs"),
-          onSelect: () => askLocalFor(r, t("branch.fromRemote", { remote: r.name }), `${name}-${branch}`),
-        },
-        merge,
-        compare,
-        "separator",
-        { label: t("menu.branchHere"), onSelect: () => askBranchAt(r.target) },
-        "separator",
-        removeRemoteItem(name),
-      ];
-    }
-    return [
-      { label: t("menu.checkout"), disabled: isHead, onSelect: () => void checkoutRef(r) },
-      {
-        label: t("menu.worktree"),
-        disabled: isHead || !!elsewhere[r.name],
-        onSelect: () => setWorktreeReq({ branch: r.name }),
-      },
-      merge,
-      compare,
-      {
-        label: t("pr.new", { noun: nounOf(pulls?.forges ?? []) }),
-        icon: "pull",
-        disabled: !pulls?.forges.length,
-        onSelect: () => setPrFrom(r.name),
-      },
-      "separator",
-      ...stackItems(r.name),
-      notesItem(r.name),
-      "separator",
-      {
-        label: t("menu.rename"),
-        onSelect: () =>
-          setNameReq({
-            title: t("branch.rename.title"),
-            placeholder: t("branch.rename.placeholder"),
-            confirmLabel: t("branch.rename.go"),
-            initial: r.name,
-            onSubmit: (to) => {
-              setNameReq(null);
-              void refRun(t("branch.rename.done", { name: to }), { kind: "renameBranch", from: r.name, to });
-            },
-          }),
-      },
-      { label: t("menu.tagHere"), onSelect: () => askTagAt(r.target) },
-      "separator",
-      { label: t("menu.deleteBranch"), danger: true, disabled: isHead, onSelect: () => deleteBranch(r.name) },
-    ];
-  };
-
-  /** Right-click menu for a commit node; entries that don't apply are disabled, not hidden. */
-  const nodeMenu = (id: string): MenuItem[] => {
-    if (!snap) return [];
-    const head = snap.head.target;
-    const isHead = id === head;
-    const onHead = isAncestor(id, head);
-    const clean = snap.state === "clean";
-    const locals = snap.refs.filter((r) => r.kind === "local" && r.target === id && r.name !== snap.head.branch);
-    const summary = commitById.get(id)?.summary ?? id.slice(0, 7);
-    const range = onHead && !isHead && head ? rebaseRange(commitById, head, id) : null;
-    // Past-commit edits replay everything after it: no merges on the way, not a merge itself.
-    const parentOf = commitById.get(id)?.parents ?? [];
-    const editable =
-      clean &&
-      onHead &&
-      parentOf.length <= 1 &&
-      (isHead || !parentOf.length || typeof rebaseRange(commitById, head!, parentOf[0]) !== "string");
-    return [
-      { label: t("menu.branchHere"), icon: "branch", onSelect: () => askBranchAt(id) },
-      { label: t("menu.tagHere"), icon: "tag", onSelect: () => askTagAt(id) },
-      ...locals.map((r) => ({
-        label: t("menu.checkoutName", { name: r.name }),
-        icon: "head" as const,
-        onSelect: () => void run(t("checkout.done", { name: r.name }), () => api.checkout(path, r.name)),
-      })),
-      "separator" as const,
-      {
-        label: snap.head.branch ? t("menu.pickInto", { branch: snap.head.branch }) : t("menu.pickIntoHead"),
-        hint: t("menu.pick.hint"),
-        icon: "cherry",
-        disabled: !clean || onHead || !snap.head.branch,
-        onSelect: () => confirmPick(id, snap.head.branch!),
-      },
-      {
-        label: t("menu.revert"),
-        icon: "undo",
-        disabled: !clean || !onHead,
-        onSelect: () =>
-          setConfirm({
-            title: "revert",
-            confirmLabel: t("revert.go"),
-            body: (
-              <p>
-                <Rich k="revert.body" vars={{ summary, branch: snap.head.branch ?? "HEAD" }} />
-              </p>
-            ),
-            onConfirm: () => {
-              setConfirm(null);
-              void run(t("revert.done"), () => api.pick(path, "revert", id, null));
-            },
-          }),
-      },
-      {
-        label: t("menu.amend"),
-        icon: "edit",
-        disabled: !isHead || !clean,
-        onSelect: () => show({ composer: true, amend: true }),
-      },
-      {
-        label: t("undo.lastCommit"),
-        disabled: !isHead || !clean || !commitById.get(id)?.parents.length,
-        onSelect: () => {
-          const parent = commitById.get(id)!.parents[0];
-          // Already pushed: explain the force push first; otherwise just do it.
-          if (snap.head.upstream && snap.head.ahead === 0) askReset(parent, "soft");
-          else void doReset(parent, "soft", t("undo.lastCommit.done"));
-        },
-      },
-      {
-        label: t("undo.toHere"),
-        icon: "history",
-        disabled: !clean || !onHead || isHead,
-        onSelect: () => askReset(id),
-      },
-      "separator" as const,
-      {
-        label: t("bisect.markBad"),
-        hint: "bisect",
-        disabled: !!bisect || !clean,
-        onSelect: () => markBisect({ ...bisectDraft, bad: id }),
-      },
-      {
-        label: t("bisect.markGood"),
-        hint: "bisect",
-        disabled: !!bisect || !clean,
-        onSelect: () => markBisect({ ...bisectDraft, good: id }),
-      },
-      "separator" as const,
-      ...(["reword", "author", "split"] as const).map((mode) => ({
-        label: t(`edit.${mode}.menu`),
-        disabled: !editable,
-        onSelect: () => openEdit(mode, id),
-      })),
-      {
-        label: t("menu.rebase"),
-        hint: typeof range === "string" ? t("menu.rebase.hasMerge") : undefined,
-        disabled: !clean || !snap.head.branch || !onHead || isHead,
-        onSelect: () => {
-          setDiff(null);
-          setBackport(null);
-          setRebaseInit(null);
-          setRebaseTodo(null);
-          setRebaseFrom(id);
-        },
-      },
-      "separator" as const,
-      { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => copyText(id) },
-    ];
-  };
+  /** Open a sheet, or close it when it is the one open (the top bar's and sidebar's toggles). */
+  const toggleSheet = (s: Sheet) => setSheet((open) => (open?.kind === s.kind ? null : s));
 
   // --- loading / error states -------------------------------------------------
   if (!snap && loadError)
@@ -1581,9 +353,69 @@ export function RepoView({
       </div>
     );
 
+  const repo: Repo = {
+    path,
+    snap,
+    latest: () => latest.current,
+    busy,
+    pro,
+    commitById,
+    pulls,
+    stacks,
+    bisect: bisect.bisect,
+    bisectDraft: bisect.draft,
+    elsewhere,
+    selected,
+    colorOf,
+    graph: () => graph.current,
+    toast,
+    run,
+    stackRun,
+    show,
+    setMenu,
+    menuAt: () => menuAt.current,
+    setConfirm,
+    setDialog,
+    setSheet,
+    setConflict,
+    setBisectDraft: bisect.setDraft,
+    setTrail,
+    play,
+    playAfterDraw,
+    mission,
+    onOpenPath,
+    openUrl,
+    fetchOne: remote.fetchOne,
+    canDropOn,
+    isAncestor,
+  };
+
+  /**
+   * The backport sheet from the sidebar: into the current branch, from the
+   * branch most likely to have fixes it lacks (the original project first).
+   */
+  const openBackport = () => {
+    const { branch, upstream } = snap.head;
+    const names = snap.refs
+      .filter((r) => (r.kind === "local" || r.kind === "remote") && !r.name.endsWith("/HEAD"))
+      .map((r) => r.name)
+      .filter((n) => n !== branch && n !== upstream);
+    const prefer = ["upstream/main", "upstream/master", "origin/main", "origin/master", "main", "master", "develop"];
+    const source = prefer.find((n) => names.includes(n)) ?? names[0];
+    if (!branch || !source) return toast("err", t("bp.needBranches"));
+    setSheet({ kind: "backport", source, target: branch });
+  };
+
+  /** The branch a dropped commit came from, for the merge dialog (else its id). */
+  const sourceName = (id: string, target: string): string => {
+    const refs = snap.refs.filter((r) => r.target === id && r.kind !== "tag" && r.name !== target);
+    return (refs.find((r) => r.kind === "local") ?? refs[0])?.name ?? id;
+  };
+
   const selectedCommit = selected ? commitById.get(selected) : undefined;
   const conflicts = snap.changes.filter((c) => c.conflicted).length;
   const headColor = colorOf(snap.head.target ?? "");
+  const closeWorktreeDiff = () => setSheet((s) => (s?.kind === "diff" && s.source.kind === "worktree" ? null : s));
 
   return (
     <div className="app" hidden={!active}>
@@ -1595,194 +427,18 @@ export function RepoView({
           headColor={headColor}
           changeCount={snap.changes.length}
           busy={busy}
-          remoteBusy={remoteBusy}
-          progress={progress}
-          onBranches={(x, y) =>
-            setMenu({
-              x,
-              y,
-              title: t("top.branches"),
-              items: [
-                { label: t("branch.newMenu"), icon: "plus" as const, onSelect: askNewBranch },
-                "separator" as const,
-                ...snap.refs
-                  .filter((r) => r.kind === "local")
-                  // Where HEAD is first, then the rest by name.
-                  .sort(
-                    (a, b) =>
-                      Number(b.name === snap.head.branch) - Number(a.name === snap.head.branch) ||
-                      a.name.localeCompare(b.name),
-                  )
-                  .map((r) => ({
-                    label: r.name,
-                    hint: r.name === snap.head.branch ? "HEAD" : undefined,
-                    disabled: r.name === snap.head.branch,
-                    onSelect: () => void checkoutRef(r),
-                  })),
-                // Remote branches with no local one yet: picking one makes it local.
-                ...snap.refs
-                  .filter((r) => r.kind === "remote" && !localNames.has(splitRemote(r.name).branch))
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((r) => ({
-                    label: r.name,
-                    icon: "cloud" as const,
-                    hint: t("top.remoteOnly"),
-                    onSelect: () => void checkoutRef(r),
-                  })),
-              ],
-            })
-          }
+          remoteBusy={remote.remoteBusy}
+          progress={remote.progress}
+          onBranches={(x, y) => openMenu(repo, x, y, t("top.branches"), branchesMenu(repo))}
           onCompose={() => show({ composer: true })}
-          onUndoHistory={() => {
-            setDiff(null);
-            setBackport(null);
-            setRebaseFrom(null);
-            setCleanupOpen(false);
-            setReflogOpen((o) => !o);
-          }}
-          onRemote={(op) =>
-            op === "fetch" || op === "pull" || op === "push"
-              ? settings.confirmRemote[op] || (op === "push" && pushTarget?.fetchOnly)
-                ? setSyncAsk(op)
-                : void remote(op)
-              : void remote(op)
-          }
+          onUndoHistory={() => toggleSheet({ kind: "reflog" })}
+          onRemote={remote.onRemote}
         />
       )}
 
-      {(bisect || bisectDraft) && (
-        <div className="banner bisect-banner">
-          <span>
-            <b className="bisect-eye">
-              <Icon name="telescope" /> bisect
-            </b>{" "}
-            {!bisect && bisectDraft && (
-              <>
-                {t("bisect.draft")} <span className={bisectDraft.bad ? "ok" : "muted"}>{t("bisect.draft.bad")}</span>
-                {" · "}
-                <span className={bisectDraft.good ? "ok" : "muted"}>{t("bisect.draft.good")}</span>
-              </>
-            )}
-            {bisect && bisect.culprit && (
-              <Rich
-                k="bisect.found"
-                vars={{
-                  sha: bisect.culprit.slice(0, 7),
-                  summary: commitById.get(bisect.culprit)?.summary ?? "",
-                }}
-              />
-            )}
-            {bisect && !bisect.culprit && (
-              <>
-                {t("bisect.left", {
-                  n: bisect.candidates.length,
-                  steps: Math.max(1, Math.ceil(Math.log2(Math.max(bisect.candidates.length, 2)))),
-                })}{" "}
-                {bisect.current && (
-                  <Rich
-                    k="bisect.test"
-                    vars={{
-                      sha: bisect.current.slice(0, 7),
-                      summary: commitById.get(bisect.current)?.summary ?? "",
-                    }}
-                  />
-                )}
-              </>
-            )}
-          </span>
-          <span className="row">
-            {bisect && !bisect.culprit && (
-              <>
-                <button className="good" disabled={busy} onClick={() => void judge("good")}>
-                  {t("bisect.good")}
-                </button>
-                <button className="bad" disabled={busy} onClick={() => void judge("bad")}>
-                  {t("bisect.bad")}
-                </button>
-                <button disabled={busy} onClick={() => void judge("skip")}>
-                  {t("bisect.skip")}
-                </button>
-              </>
-            )}
-            {bisect?.culprit && (
-              <button
-                onClick={() => {
-                  show({ commit: bisect.culprit });
-                  graph.current?.centerOn(bisect.culprit!);
-                }}
-              >
-                {t("bisect.show")}
-              </button>
-            )}
-            <button
-              disabled={busy}
-              onClick={() => (bisect ? void run(t("bisect.done"), () => api.abort(path)) : setBisectDraft(null))}
-            >
-              {bisect ? t("bisect.finish") : t("common.cancel")}
-            </button>
-          </span>
-        </div>
-      )}
-
-      {trail && (
-        <div className="banner trail-banner">
-          <span>
-            <b className="trail-eye">
-              <Icon name="sparkle" /> {t("history.trail.eyebrow")}
-            </b>{" "}
-            <Rich k="history.trail.count" vars={{ file: trail.file, n: trail.touches.length }} />
-          </span>
-          <span className="row">
-            <button onClick={() => stepTrail(-1)} title={t("history.trail.newer")}>
-              <Icon name="arrowLeft" /> {t("history.trail.newer")}
-            </button>
-            <button onClick={() => stepTrail(1)} title={t("history.trail.older")}>
-              {t("history.trail.older")} <Icon name="arrowRight" />
-            </button>
-            <button
-              onClick={() =>
-                setBlameReq({
-                  rev: selected && trailFocus?.has(selected) ? selected : (trail.touches[0]?.id ?? "HEAD"),
-                  file: trail.touches.find((x) => x.id === selected)?.path ?? trail.touches[0]?.path ?? trail.file,
-                })
-              }
-            >
-              {t("history.blame.short")}
-            </button>
-            <button onClick={() => setTrail(null)}>{t("common.close")}</button>
-          </span>
-        </div>
-      )}
-
-      {snap.state !== "clean" && snap.state !== "bisect" && (
-        <div className="banner">
-          <span>
-            {t("state.banner", { name: stateText(snap.state).name })}
-            {conflicts > 0 && t("state.conflicts", { n: conflicts })}.{" "}
-            {conflicts === 0 && IN_PROGRESS[snap.state]?.canContinue ? t("state.nothing") : stateText(snap.state).hint}
-          </span>
-          <span className="row">
-            {conflicts > 0 && <button onClick={() => setConflictSheet({})}>{t("state.resolve")}</button>}
-            {IN_PROGRESS[snap.state]?.canContinue && (
-              <button disabled={busy} onClick={() => run(t("state.continued"), () => api.continueOp(path))}>
-                {t("state.continue")}
-              </button>
-            )}
-            {IN_PROGRESS[snap.state]?.canContinue && (
-              <button
-                disabled={busy}
-                title={t("state.skip.hint")}
-                onClick={() => run(t("empty.skipped"), () => api.skip(path))}
-              >
-                {t("state.skip")}
-              </button>
-            )}
-            <button disabled={busy} onClick={() => run(t("state.aborted"), () => api.abort(path))}>
-              {t("common.cancel")}
-            </button>
-          </span>
-        </div>
-      )}
+      <BisectBanner repo={repo} />
+      {trail && <TrailBanner repo={repo} trail={trail} />}
+      <StateBanner repo={repo} />
 
       <div className="main">
         <Sidebar
@@ -1803,21 +459,15 @@ export function RepoView({
             if (next.some((x) => key(x) === key(r))) graph.current?.centerOn(r.target);
           }}
           onClearFocus={() => setFocusRefs([])}
-          onCheckout={checkoutRef}
-          onAddRemote={askRemote}
+          onCheckout={(r) => checkoutRef(repo, r)}
+          onAddRemote={remote.askRemote}
           remotes={snap.remotes}
-          onRemoteMenu={(name, x, y) => setMenu({ x, y, title: name, items: remoteMenu(name) })}
-          onNewBranch={askNewBranch}
+          onRemoteMenu={(name, x, y) => openMenu(repo, x, y, name, remoteMenu(repo, name))}
+          onNewBranch={() => askNewBranch(repo)}
           onBackport={openBackport}
-          onTransfer={() => setTransferOpen(true)}
-          onCleanup={() => {
-            setDiff(null);
-            setBackport(null);
-            setRebaseFrom(null);
-            setReflogOpen(false);
-            setCleanupOpen((o) => !o);
-          }}
-          onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
+          onTransfer={() => setDialog({ kind: "transfer" })}
+          onCleanup={() => toggleSheet({ kind: "cleanup" })}
+          onRefMenu={(r, x, y) => openMenu(repo, x, y, r.name, refMenu(repo, r))}
           stashes={snap.stashes}
           selectedStash={selectedStash}
           onStash={(i) => {
@@ -1839,37 +489,40 @@ export function RepoView({
                 }}
                 onMenu={(name, x, y) => {
                   const r = snap.refs.find((x) => x.kind === "local" && x.name === name);
-                  if (r) setMenu({ x, y, title: name, items: refMenu(r) });
+                  if (r) openMenu(repo, x, y, name, refMenu(repo, r));
                 }}
               />
               <PullSection
                 report={pulls}
-                onShow={showPr}
+                onShow={(pr) => showPr(repo, pr)}
                 onOpen={(pr) => openUrl(pr.url)}
-                onMenu={(pr, x, y) => setMenu({ x, y, title: pr.title, items: prMenu(pr) })}
+                onMenu={(pr, x, y) => openMenu(repo, x, y, pr.title, prMenu(repo, pr))}
                 onConnect={setTokenFor}
-                onCreate={() => setPrFrom(snap.head.branch ?? snap.refs.find((x) => x.kind === "local")?.name ?? null)}
+                onCreate={() => {
+                  const from = snap.head.branch ?? snap.refs.find((x) => x.kind === "local")?.name;
+                  if (from) setDialog({ kind: "pr", from });
+                }}
               />
               <SubmoduleSection
                 submodules={snap.submodules}
                 busy={busy}
                 onOpen={(m) => onOpenPath(joinPath(snap.path, m.path))}
-                onUpdateAll={() => void submoduleRun(t("sub.updated"), { kind: "update", path: null })}
-                onMenu={(m, x, y) => setMenu({ x, y, title: m.path, items: submoduleMenu(m) })}
+                onUpdateAll={() => void submoduleRun(repo, t("sub.updated"), { kind: "update", path: null })}
+                onMenu={(m, x, y) => openMenu(repo, x, y, m.path, submoduleMenu(repo, m))}
               />
               <LfsSection
                 status={lfs}
                 busy={busy}
                 onTrack={() =>
-                  setNameReq({
-                    title: t("lfs.track.title"),
-                    placeholder: t("lfs.track.placeholder"),
-                    confirmLabel: t("lfs.track.go"),
-                    onSubmit: (pattern) => {
-                      setNameReq(null);
-                      void lfsRun(t("lfs.tracked", { pattern }), { kind: "track", pattern });
+                  askName(
+                    repo,
+                    {
+                      title: t("lfs.track.title"),
+                      placeholder: t("lfs.track.placeholder"),
+                      confirmLabel: t("lfs.track.go"),
                     },
-                  })
+                    (pattern) => void lfsRun(t("lfs.tracked", { pattern }), { kind: "track", pattern }),
+                  )
                 }
                 onUntrack={(pattern) => void lfsRun(t("lfs.untracked", { pattern }), { kind: "untrack", pattern })}
                 onTurnOn={() => void lfsRun(t("lfs.turnedOn"), { kind: "install" })}
@@ -1879,8 +532,8 @@ export function RepoView({
               <WorktreeSection
                 worktrees={snap.worktrees}
                 onOpen={(w) => onOpenPath(w.path)}
-                onAdd={() => setWorktreeReq({})}
-                onMenu={(w, x, y) => setMenu({ x, y, title: w.path, items: worktreeMenu(w) })}
+                onAdd={() => setDialog({ kind: "worktree" })}
+                onMenu={(w, x, y) => openMenu(repo, x, y, w.path, worktreeMenu(repo, w))}
               />
             </>
           }
@@ -1895,7 +548,7 @@ export function RepoView({
                 index={search.index}
                 onQuery={(query) => {
                   setSearch({ query, index: 0 });
-                  if (snap) goToMatch(0, searchCommits(snap.commits, snap.refs, query));
+                  goToMatch(0, searchCommits(snap.commits, snap.refs, query));
                 }}
                 onStep={(d) => goToMatch(search.index + d)}
                 onClose={() => setSearch(null)}
@@ -1930,8 +583,8 @@ export function RepoView({
               headBranch={snap.head.branch}
               changeCount={snap.changes.length}
               selected={selected}
-              focus={trailFocus ?? bisectFocus ?? focus}
-              badges={badges}
+              focus={trailFocus ?? bisect.focus ?? focus}
+              badges={bisect.badges}
               trail={trailIds}
               animate={animate}
               space={settings.space}
@@ -1945,23 +598,19 @@ export function RepoView({
               onDrop={(sourceId, targetId, mode) => {
                 if (mode === "move") {
                   const plan = planMove(commitById, snap.head.target!, sourceId, targetId);
-                  if (!plan) return;
-                  setDiff(null);
-                  setBackport(null);
-                  setRebaseInit(plan.steps);
-                  setRebaseFrom(plan.base);
+                  if (plan) setSheet({ kind: "rebase", from: plan.base, init: plan.steps });
                   return;
                 }
                 const target = branchAt(targetId)!;
                 if (mode === "merge")
-                  return setMergeReq({ sourceId, targetId, target, source: sourceName(sourceId, target) });
-                confirmPick(sourceId, target);
+                  return setDialog({ kind: "merge", sourceId, targetId, target, source: sourceName(sourceId, target) });
+                confirmPick(repo, sourceId, target);
               }}
               incoming={snap.incoming}
               truncated={snap.truncated}
-              onLoadMore={() => setLimit((l) => l + page)}
-              onNodeMenu={(id, x, y) => setMenu({ x, y, title: commitById.get(id)?.summary, items: nodeMenu(id) })}
-              onRefMenu={(r, x, y) => setMenu({ x, y, title: r.name, items: refMenu(r) })}
+              onLoadMore={loadMore}
+              onNodeMenu={(id, x, y) => openMenu(repo, x, y, commitById.get(id)?.summary, nodeMenu(repo, id))}
+              onRefMenu={(r, x, y) => openMenu(repo, x, y, r.name, refMenu(repo, r))}
               onZoomChange={setZoom}
               rotation={settings.rotation}
               onRotate={rotate}
@@ -2012,219 +661,14 @@ export function RepoView({
             </div>
           </div>
 
-          {conflictSheet && (
-            <ConflictSheet
-              path={path}
-              files={snap.changes.filter((c) => c.conflicted).map((c) => c.path)}
-              state={snap.state}
-              initialFile={conflictSheet.file}
-              busy={busy}
-              onResolve={(file, how) => void run(t("conflict.resolved", { file }), () => api.resolve(path, file, how))}
-              onClose={() => setConflictSheet(null)}
-            />
-          )}
-
-          {rebase && !conflictSheet && (
-            <RebaseSheet
-              // Fresh plan whenever the history under it changes.
-              key={`${rebaseFrom}:${snap.head.target}:${rebaseInit?.map((x) => x.id).join() ?? ""}:${!!rebase.todo}`}
-              branch={snap.head.branch ?? "HEAD"}
-              base={commitById.get(rebaseFrom!)!}
-              commits={rebase.commits}
-              todo={rebase.todo}
-              initial={rebaseInit}
-              unpushed={snap.head.upstream ? snap.head.ahead : null}
-              busy={busy}
-              onApply={(steps) => {
-                const base = rebaseFrom!;
-                void run(
-                  t("rebase.done"),
-                  () => api.rebase(path, base, steps),
-                  () => setRebaseFrom(null),
-                ).then((r) => {
-                  if (r.status !== "ok") return;
-                  const replayed = replayedSince(base);
-                  playAfterDraw((at) => {
-                    const pts = replayed.flatMap((id) => at(id) ?? []);
-                    return pts.length ? { kind: "constellation", at: pts } : null;
-                  });
-                });
-              }}
-              onClose={() => setRebaseFrom(null)}
-            />
-          )}
-
-          {backport && !conflictSheet && (
-            <BackportSheet
-              path={path}
-              branches={snap.refs.filter((r) => r.kind !== "tag").map((r) => r.name)}
-              targets={backportTargets}
-              remoteCount={snap.remotes.length}
-              onAddRemote={askRemote}
-              source={backport.source}
-              target={backport.target}
-              version={snap}
-              busy={busy}
-              onPair={(source, target) => setBackport({ source, target })}
-              onSelect={(id) => {
-                show({ commit: id });
-                graph.current?.centerOn(id);
-              }}
-              onApply={(ids) =>
-                setConfirm({
-                  title: t("backport.confirm.title"),
-                  confirmLabel: t("backport.confirm.go", { n: ids.length }),
-                  body: (
-                    <p>
-                      <Rich
-                        k="backport.confirm.body"
-                        vars={{ source: backport.source, target: backport.target, n: ids.length }}
-                      />
-                      {snap.head.branch !== backport.target &&
-                        t("backport.confirm.switch", { target: backport.target })}
-                    </p>
-                  ),
-                  onConfirm: () => {
-                    setConfirm(null);
-                    void run(t("backport.done", { n: ids.length, target: backport.target }), () =>
-                      api.backportApply(path, ids, backport.target),
-                    );
-                  },
-                })
-              }
-              onExport={async (ids) => {
-                const dir = await api.pickFolder(t("backport.exportFolder"));
-                if (dir) void run(t("backport.exported", { n: ids.length }), () => api.backportExport(path, ids, dir));
-              }}
-              onClose={() => setBackport(null)}
-            />
-          )}
-
-          {cleanupOpen && !conflictSheet && !backport && !rebase && !reflogOpen && !blameReq && (
-            <CleanupSheet
-              path={path}
-              version={snap}
-              busy={busy}
-              colorOf={colorOf}
-              onSelect={(id) => {
-                show({ commit: id });
-                graph.current?.centerOn(id);
-              }}
-              onDelete={(branches, unmerged) => {
-                const names = branches.map((b) => b.name);
-                const go = () =>
-                  void deleteBranches(
-                    names,
-                    branches.map((b) => b.tip),
-                    unmerged,
-                  );
-                if (!unmerged) return go();
-                setConfirm({
-                  title: t("clean.force.title"),
-                  danger: true,
-                  confirmLabel: t("clean.force.go"),
-                  body: (
-                    <p>
-                      <Rich
-                        k="clean.force.body"
-                        vars={{
-                          names: branches
-                            .filter((b) => !b.merged)
-                            .map((b) => b.name)
-                            .join(", "),
-                        }}
-                      />
-                    </p>
-                  ),
-                  onConfirm: () => {
-                    setConfirm(null);
-                    go();
-                  },
-                });
-              }}
-              onClose={() => setCleanupOpen(false)}
-            />
-          )}
-
-          {reflogOpen && !conflictSheet && !backport && !rebase && !blameReq && (
-            <ReflogSheet
-              path={path}
-              version={snap}
-              head={snap.head.target}
-              busy={busy}
-              onSelect={(id) => {
-                if (!commitById.has(id)) return;
-                show({ commit: id });
-                graph.current?.centerOn(id);
-              }}
-              onResetTo={(e: ReflogEntry) => askReset(e.id, "mixed", e.summary)}
-              onRescue={(e: ReflogEntry) =>
-                setNameReq({
-                  title: t("undo.log.rescue.title", { sha: e.id.slice(0, 7) }),
-                  placeholder: `rescue/${e.id.slice(0, 7)}`,
-                  initial: "",
-                  confirmLabel: t("undo.log.rescue"),
-                  onSubmit: (name) => {
-                    setNameReq(null);
-                    void run(
-                      t("undo.log.rescued", { name }),
-                      () => api.createBranch(path, name, e.id, false),
-                      () => setTimeout(() => graph.current?.centerOn(e.id), 120),
-                    );
-                  },
-                })
-              }
-              onClose={() => setReflogOpen(false)}
-            />
-          )}
-
-          {blameReq && !conflictSheet && !backport && !rebase && (
-            <BlameSheet
-              path={path}
-              rev={blameReq.rev}
-              file={blameReq.file}
-              selected={selected}
-              onSelect={(id) => {
-                if (!commitById.has(id)) return;
-                show({ commit: id });
-                graph.current?.centerOn(id);
-              }}
-              onClose={closeBlame}
-            />
-          )}
-
-          {diff && !conflictSheet && !backport && !rebase && !reflogOpen && !cleanupOpen && !blameReq && (
-            <DiffSheet
-              title={diff.title}
-              files={diff.files}
-              error={diff.error}
-              initialPath={diff.path}
-              stage={
-                diff.source.kind === "worktree"
-                  ? {
-                      scope: diff.source.scope,
-                      busy,
-                      onScope: (scope) => loadDiff({ kind: "worktree", scope }, diff.title, diff.path),
-                      onHunk: (file, hunk, lines) =>
-                        void run(
-                          diff.source.kind === "worktree" && diff.source.scope === "staged"
-                            ? t("stage.unstaged")
-                            : t("stage.staged"),
-                          () =>
-                            api.stageHunks(
-                              path,
-                              file,
-                              [diff.files?.find((f) => f.path === file)?.hunks[hunk]?.key ?? ""],
-                              diff.source.kind === "worktree" && diff.source.scope === "staged",
-                              lines,
-                            ),
-                        ),
-                    }
-                  : undefined
-              }
-              onClose={() => setDiff(null)}
-            />
-          )}
+          <RepoSheets
+            repo={repo}
+            sheet={sheet}
+            conflict={conflict}
+            rebase={rebase}
+            loadDiff={loadDiff}
+            askRemote={remote.askRemote}
+          />
         </section>
 
         {composer && (
@@ -2243,7 +687,7 @@ export function RepoView({
             onClose={() => setComposer(false)}
             onOpenFile={(file) => {
               const c = snap.changes.find((x) => x.path === file);
-              if (c?.conflicted) return setConflictSheet({ file });
+              if (c?.conflicted) return setConflict({ file });
               // Fully staged files have nothing in the "unstaged" view.
               loadDiff({ kind: "worktree", scope: c?.unstaged ? "unstaged" : "staged" }, t("diff.worktree"), file);
             }}
@@ -2253,32 +697,32 @@ export function RepoView({
                 () => api.stashPush(path, message, paths),
                 () => {
                   show({});
-                  setDiff((d) => (d?.source.kind === "worktree" ? null : d));
+                  closeWorktreeDiff();
                 },
               )
             }
             onDiscard={(paths) =>
-              setConfirm({
-                title: t("discard.title"),
-                danger: true,
-                confirmLabel: t("discard.go", { n: paths.length }),
-                body: (
-                  <>
-                    <p>
-                      <Rich k="discard.body" /> <b>{t("discard.warn")}</b>
-                    </p>
-                    <ul>
-                      {paths.map((p) => (
-                        <li key={p}>{p}</li>
-                      ))}
-                    </ul>
-                  </>
-                ),
-                onConfirm: () => {
-                  setConfirm(null);
-                  void run(t("discard.done"), () => api.discard(path, paths));
+              confirmThen(
+                repo,
+                {
+                  title: t("discard.title"),
+                  danger: true,
+                  confirmLabel: t("discard.go", { n: paths.length }),
+                  body: (
+                    <>
+                      <p>
+                        <Rich k="discard.body" /> <b>{t("discard.warn")}</b>
+                      </p>
+                      <ul>
+                        {paths.map((p) => (
+                          <li key={p}>{p}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ),
                 },
-              })
+                () => void run(t("discard.done"), () => api.discard(path, paths)),
+              )
             }
             onCommit={(message, paths, newBranch, amend, stagedOnly) =>
               run(
@@ -2295,8 +739,8 @@ export function RepoView({
                 },
                 () => {
                   setComposer(false);
-                  if (!amend) tour.mission("commit");
-                  setDiff((d) => (d?.source.kind === "worktree" ? null : d));
+                  if (!amend) mission("commit");
+                  closeWorktreeDiff();
                   setTimeout(() => graph.current?.centerOnHead(), 60);
                 },
               )
@@ -2317,8 +761,10 @@ export function RepoView({
             files={panelFiles}
             color={colorOf(selectedCommit.id)}
             isHead={selectedCommit.id === snap.head.target}
-            actions={nodeMenu(selectedCommit.id)}
-            onMore={(x, y) => setMenu({ x, y, title: selectedCommit.summary, items: nodeMenu(selectedCommit.id) })}
+            // The menu only closes over `repo`'s ref readers; nothing reads them while it is built.
+            // eslint-disable-next-line react-hooks/refs
+            actions={nodeMenu(repo, selectedCommit.id)}
+            onMore={(x, y) => openMenu(repo, x, y, selectedCommit.summary, nodeMenu(repo, selectedCommit.id))}
             onClose={() => setSelected(null)}
             onSelect={(id) => {
               setSelected(id);
@@ -2327,7 +773,7 @@ export function RepoView({
             onOpenFile={(file) =>
               loadDiff({ kind: "commit", id: selectedCommit.id }, selectedCommit.summary || selectedCommit.id, file)
             }
-            onFileMenu={(file, x, y) => fileMenu(selectedCommit, file, x, y)}
+            onFileMenu={(file, x, y) => openMenu(repo, x, y, file, fileMenu(repo, selectedCommit, file))}
           />
         )}
         {stashSel && !composer && (
@@ -2336,10 +782,7 @@ export function RepoView({
             files={panelFiles}
             busy={busy}
             onClose={() => show({})}
-            onSelectBase={() => {
-              show({ commit: stashSel.base });
-              graph.current?.centerOn(stashSel.base);
-            }}
+            onSelectBase={() => showCommit(repo, stashSel.base)}
             onOpenFile={(file) => loadDiff({ kind: "commit", id: stashSel.id }, stashTitle(stashSel.message), file)}
             onPop={() =>
               run(
@@ -2350,20 +793,21 @@ export function RepoView({
             }
             onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.id))}
             onDrop={() =>
-              setConfirm({
-                title: t("stash.delete.title"),
-                danger: true,
-                confirmLabel: t("common.delete"),
-                body: <p>{t("stash.delete.body", { name: stashTitle(stashSel.message) })}</p>,
-                onConfirm: () => {
-                  setConfirm(null);
+              confirmThen(
+                repo,
+                {
+                  title: t("stash.delete.title"),
+                  danger: true,
+                  confirmLabel: t("common.delete"),
+                  body: <p>{t("stash.delete.body", { name: stashTitle(stashSel.message) })}</p>,
+                },
+                () =>
                   void run(
                     t("stash.deleted"),
                     () => api.stash(path, "drop", stashSel.id),
                     () => show({}),
-                  );
-                },
-              })
+                  ),
+              )
             }
           />
         )}
@@ -2373,131 +817,14 @@ export function RepoView({
         <ContextMenu x={menu.x} y={menu.y} title={menu.title} items={menu.items} onClose={() => setMenu(null)} />
       )}
 
-      {(fetchingRemote || remoteBusy) && (
-        <JobCard
-          title={fetchingRemote ? t("job.fetchRemote", { name: fetchingRemote }) : t(JOB[remoteBusy!])}
-          progress={progress}
-        />
-      )}
-      {worktreeReq && (
-        <WorktreeDialog
-          worktrees={snap.worktrees}
-          free={snap.refs
-            .filter((r) => r.kind === "local" && r.name !== snap.head.branch && !elsewhere[r.name])
-            .map((r) => r.name)
-            .sort()}
-          branch={worktreeReq.branch}
-          busy={busy}
-          onCancel={() => setWorktreeReq(null)}
-          onAdd={(op) => void addWorktree(op)}
-        />
-      )}
-      {nameReq && <NameDialog req={nameReq} busy={busy} onCancel={() => setNameReq(null)} />}
-      {addingRemote && (
-        <AddRemoteDialog
-          path={path}
-          remotes={snap?.remotes.map((r) => r.name) ?? []}
-          busy={busy}
-          onSubmit={(name, url) => void addRemote(name, url)}
-          onCancel={() => setAddingRemote(false)}
-        />
-      )}
-
-      {notesTo && (
-        <ReleaseNotesDialog
-          path={path}
-          to={notesTo}
-          remoteUrl={(snap.remotes.find((r) => r.name === "origin") ?? snap.remotes[0])?.url ?? null}
-          onCopied={() => toast("ok", t("notes.copied"))}
-          onClose={() => setNotesTo(null)}
-        />
-      )}
-      {transferOpen && (
-        <TransferDialog
-          path={path}
-          branches={snap.refs.filter((r) => r.kind === "local").map((r) => r.name)}
-          head={snap.head.branch}
-          busy={busy}
-          run={run}
-          onClose={() => setTransferOpen(false)}
-        />
-      )}
+      {remote.jobCard}
+      <RepoDialogs
+        repo={repo}
+        dialog={dialog}
+        pulls={{ retry: prTick, reread: rereadPulls, pushTo: remote.pushTo, connect: setTokenFor }}
+      />
+      {remote.dialogs(headColor)}
       {confirm && <ConfirmDialog confirm={confirm} busy={busy} onCancel={() => setConfirm(null)} />}
-
-      {editReq && commitById.get(editReq.id) && (
-        <EditCommitDialog
-          mode={editReq.mode}
-          commit={commitById.get(editReq.id)!}
-          files={editReq.files}
-          rewrites={editReq.rewrites}
-          pushed={editReq.pushed}
-          busy={busy}
-          onCancel={() => setEditReq(null)}
-          onSubmit={(edit) => void applyEdit(editReq.id, edit)}
-        />
-      )}
-
-      {resetReq && (
-        <ResetDialog
-          branch={snap.head.branch ?? "HEAD"}
-          summary={resetReq.summary}
-          passed={resetReq.passed}
-          pushed={resetReq.pushed}
-          dirty={snap.changes.length}
-          initial={resetReq.initial}
-          busy={busy}
-          onCancel={() => setResetReq(null)}
-          onReset={(mode) => void doReset(resetReq.target, mode)}
-        />
-      )}
-
-      {mergeReq && (
-        <MergeDialog
-          source={mergeReq.source.length === 40 ? mergeReq.source.slice(0, 7) : mergeReq.source}
-          target={mergeReq.target}
-          sourceColor={colorOf(mergeReq.sourceId)}
-          targetColor={colorOf(mergeReq.targetId)}
-          switchesBranch={snap.head.branch !== mergeReq.target}
-          dirty={snap.changes.length}
-          busy={busy}
-          onCancel={() => setMergeReq(null)}
-          onConfirm={() =>
-            run(t("merge.done", { source: mergeReq.source, target: mergeReq.target }), () =>
-              api.merge(path, mergeReq.source, mergeReq.target),
-            ).then((r) => {
-              setMergeReq(null);
-              setTimeout(() => graph.current?.centerOnHead(), 60);
-              if (r.status !== "ok") return;
-              tour.mission("merge");
-              const merged = latest.current?.head.target;
-              playAfterDraw((at) => {
-                const p = at(merged);
-                return p && { kind: "fusion", at: p };
-              });
-            })
-          }
-        />
-      )}
-
-      {prFrom && pulls?.forges.length ? (
-        <CreatePr
-          path={path}
-          snap={snap}
-          forges={pulls.forges}
-          branch={prFrom}
-          retry={prTick}
-          onPush={(name, branch) => pushTo(name, branch)}
-          onCreated={(kind, number, url) => {
-            setPrFrom(null);
-            setPrTick((n) => n + 1);
-            const label = `${prNoun(kind)} ${prTag(kind, number)}`;
-            toast("ok", t("pr.new.done", { label }), { label: t("pr.new.view"), onClick: () => openUrl(url) });
-          }}
-          onConnect={setTokenFor}
-          onOpenUrl={openUrl}
-          onCancel={() => setPrFrom(null)}
-        />
-      ) : null}
 
       {tokenFor && (
         <TokenDialog
@@ -2506,59 +833,6 @@ export function RepoView({
           onSave={(token) => void saveToken(tokenFor, token)}
           onOpenPage={openUrl}
           onCancel={() => setTokenFor(null)}
-        />
-      )}
-
-      {syncAsk && (
-        <SyncConfirm
-          plan={syncPlan(snap, syncAsk)}
-          branch={snap.head.branch}
-          target={syncAsk === "push" ? pushTarget : null}
-          onPushTo={(name) => {
-            setSyncAsk(null);
-            void pushTo(name);
-          }}
-          busy={busy}
-          onGo={() => {
-            setSyncAsk(null);
-            void remote(syncAsk);
-          }}
-          onNeverAsk={() => onChangeSettings({ confirmRemote: { ...settings.confirmRemote, [syncAsk]: false } })}
-          onCancel={() => setSyncAsk(null)}
-        />
-      )}
-
-      {sync && snap.head.branch && snap.head.upstream && (
-        <SyncDialog
-          kind={sync}
-          branch={snap.head.branch}
-          upstream={snap.head.upstream}
-          ahead={snap.head.ahead}
-          behind={snap.head.behind}
-          color={headColor}
-          busy={busy}
-          onMerge={() => void resolveSync("pullMerge")}
-          onForce={() => {
-            setSync(null);
-            void remote("forcePush");
-          }}
-          onRebase={() => void resolveSync("pullRebase")}
-          onCancel={() => setSync(null)}
-        />
-      )}
-
-      {auth && (
-        <AuthDialog
-          url={upstreamUrl(snap)}
-          output={auth.output}
-          repoPath={snap.path}
-          busy={busy}
-          onClose={() => setAuth(null)}
-          onRetry={() => {
-            const op = auth.op;
-            setAuth(null);
-            void remote(op);
-          }}
         />
       )}
     </div>

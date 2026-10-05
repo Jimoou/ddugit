@@ -57,7 +57,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `glance.rs`: 여러 저장소를 이력 없이 한 번에 훑기(브랜치·upstream 거리·변경·멈춘 작업·보관함·마지막 커밋). 새 탭의 은하 대시보드(`components/Galaxy.tsx`, 순수 로직 `galaxy.ts`)가 쓴다. 대시보드 일괄 작업(Pro): 고른 카드·그룹을 한 번에 Pull(`--ff-only`)·같은 이름 브랜치로(`write::switch_or_create`), 대상 고르기는 `galaxy.ts`의 `pullable`·`switchable`
   - `backport.rs`: 두 브랜치(예: `upstream/main` ↔ 고객사 `main`) 사이 미반영 커밋 비교(`--cherry-mark` + `-x` 트레일러), 제외 표시(받는 쪽별 로컬 config), 대상별 요약, 일괄 cherry-pick, 패치 내보내기
   - `transfer.rs`: 폐쇄망 반출입(Pro). 받는 곳별로 지난 반출 이후만 담은 `git bundle` + `.sha256`, 반출 기록은 로컬 config `ddugit-transfer.<받는 곳>.sent`. 반입은 검사(체크섬·빠진 선행 커밋) 후 `refs/remotes/<이름>/`으로 가져온다. 화면은 `components/Transfer.tsx`(사이드바 로컬 브랜치 머리의 버튼), 순수 로직 `transfer.ts`
-  - `stack.rs`: 스택 브랜치(Pro). 부모와 base(마지막으로 쌓은 부모 끝)를 로컬 config `branch.<이름>.ddugit-parent`·`ddugit-base`에 두고, 다시 쌓기는 스택 맨 아래부터 `rebase --onto <부모> <base> <브랜치>`(amend·squash된 부모의 옛 커밋을 다시 얹지 않는다). 화면은 `components/Stacks.tsx`(사이드바 섹션)와 브랜치 메뉴(`RepoView`의 `stackItems`), 순수 로직 `stack.ts`
+  - `stack.rs`: 스택 브랜치(Pro). 부모와 base(마지막으로 쌓은 부모 끝)를 로컬 config `branch.<이름>.ddugit-parent`·`ddugit-base`에 두고, 다시 쌓기는 스택 맨 아래부터 `rebase --onto <부모> <base> <브랜치>`(amend·squash된 부모의 옛 커밋을 다시 얹지 않는다). 화면은 `components/Stacks.tsx`(사이드바 섹션)와 브랜치 메뉴(`repo/menus.tsx`의 `stackItems`), 순수 로직 `stack.ts`
   - `changelog.rs`: 릴리스 노트(Pro, 화면에서 잠금). 두 리비전 사이 첫 번째 부모 줄의 커밋(PR당 하나)과, 병합마다 들여온 커밋(`inner`, PR 번호 없는 병합에 씀). 시작을 안 주면 직전 태그(`describe --tags <to>^`), 빈 문자열이면 첫 커밋부터. 묶기·Markdown은 순수 로직 `notes.ts`, 화면은 `components/ReleaseNotes.tsx`(태그·로컬 브랜치 메뉴)
 - `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). github.com·gitlab.com 밖의 호스트는 그 CLI 설정(`hosts.yml`·`config.yml`)에 로그인된 호스트일 때만 CLI 토큰을 쓴다(webview가 정하지 않는다). 원격 URL의 호스트는 `normalize_host`로 검사한다. 키체인 서비스는 `keychain.rs`(forge 토큰 `ddugit-forge`, 기기 ID `ddugit-device`, 옛 `ddugit`에서 옮겨 온다). 토큰은 webview로 넘기지 않는다. `forge/repos.rs`: 로그인한 사용자의 저장소 목록(clone·원격 추가에서 고르기, `components/ForgeRepoPicker.tsx`, 순수 로직 `forgeRepos.ts`의 `FORGE_SOURCES`·검색). `forge/create.rs`: PR·MR 만들기(REST, 기본 브랜치·비공개 확인 후 POST, 이미 열림은 기존 링크). 화면은 `components/CreatePr.tsx`(브랜치 메뉴·PR 섹션 머리), 순수 로직 `prDraft.ts`
 - `src-tauri/src/ssh.rs`: SSH 준비(키 목록·생성, 호스트 키 지문을 GitHub·GitLab 공개 지문과 비교해 known_hosts에 추가, 연결 확인). 시스템 OpenSSH, 프롬프트 없음
@@ -76,7 +76,10 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `e2e/`: Playwright e2e (`*.e2e.ts`). 데모 모드를 대상으로 돌리고, `fixtures.ts`의 `demo`로 데모 상태를 읽거나 바꾼다(`window.__ddugitDemo`). 페이지 오류가 하나라도 나면 실패한다
 - 창 테두리: `src/chrome.ts`가 데스크톱 앱의 OS를 보고 정한다. macOS는 `tauri.macos.conf.json`(신호등을 탭 줄 위에 겹침), Windows는 `tauri.windows.conf.json`(`decorations: false`, 탭 줄 끝 `components/WindowControls.tsx`), Linux·데모는 시스템 제목 표시줄. 탭 줄의 빈 곳은 `data-tauri-drag-region`(창 끌기·더블클릭 최대화). 플랫폼 설정 파일은 창 객체 전체를 다시 적는다(배열은 통째로 바뀐다)
 - `src/App.tsx`: 창(탭 셸). 탭(`tabs.ts`, 순수 함수), 설정, 저장소 연결(clone·init·끌어다 놓기), 알림. 탭마다 `RepoView`를 띄워 두고 안 보이는 탭은 `hidden`으로 숨긴다(상태 유지). 단축키 중 창 전체 것(탭, `?`)은 여기서 처리한다
-- `src/RepoView.tsx`: 저장소 하나의 화면 조립과 git 작업 흐름. 모든 작업은 `run()`을 거친다. 보이는 탭(`active`)만 키 입력·파일 감시·탑바를 갖는다
+- `src/RepoView.tsx`: 저장소 하나의 화면 조립(탑바·사이드바·그래프·오른쪽 패널). 보이는 탭(`active`)만 키 입력·파일 감시·탑바를 갖는다. 조각은 `src/repo/`에 있고, 모두 `state.ts`의 `Repo`(스냅숏·`run`·열린 시트/창 setter 등을 묶은 값)를 받는다
+  - `useSnapshot.ts`(스냅숏 읽기·순서 번호·감시·포커스), `useRun.tsx`(모든 git 작업이 거치는 `run()`: 한 번에 하나, 바쁨·토스트·새로고침), `useRemote.tsx`(fetch/pull/push·원격 추가와 그 확인·인증·갈라짐 창, 진행 카드)
+  - 열린 것은 판별 유니온 하나씩: 그래프 아래 시트 `Sheet`(`useSheet.ts`: diff 파일·rebase todo 읽기, 충돌 시트는 그 위에 따로), 저장소 창 `Dialog`(`Dialogs.tsx`), 원격 창(`useRemote` 안). 그리기는 `Sheets.tsx`·`Dialogs.tsx`
+  - `actions.tsx`: 메뉴·배너·시트가 시작하는 흐름(이름 묻기 `askName`, 확인 `confirmThen`, 체크아웃·cherry-pick·reset·커밋 손보기·worktree 등). `menus.tsx`: 오른쪽 클릭 메뉴(참조·커밋·파일·원격·PR·worktree·서브모듈, 탑바 브랜치 목록). `Banners.tsx`: bisect·파일 이력·진행 중 작업 배너. `useBisect.ts`: bisect 상태·배지
 
 ## Git 워크플로우
 
