@@ -1,4 +1,4 @@
-import { FILLED, ICONS, type IconName } from "../icons";
+import { BRAND, FILLED, ICONS, type IconName } from "../icons";
 
 /** One of ddugit's own icons, sized to the text around it and colored by it. */
 export function Icon({
@@ -22,7 +22,7 @@ export function Icon({
       height={size}
       viewBox="0 0 24 24"
       fill={fill ? "currentColor" : "none"}
-      stroke="currentColor"
+      stroke={BRAND.has(name) ? "none" : "currentColor"}
       strokeWidth={stroke}
       strokeLinecap="round"
       strokeLinejoin="round"

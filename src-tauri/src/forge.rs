@@ -10,9 +10,11 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+pub mod repos;
+
 pub type Result<T> = std::result::Result<T, String>;
 
-#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ForgeKind {
     Github,
@@ -713,6 +715,34 @@ mod tests {
             (prs.len(), prs[2].number, prs[2].state, prs[2].checks),
             (3, 5, PrState::Merged, None)
         );
+    }
+
+    #[test]
+    fn lists_the_users_repositories_with_one_query() {
+        let body = r#"{"data":{"viewer":{"login":"jimin","repositories":{"nodes":[
+            {"nameWithOwner":"jimin/rocket","description":"Fast","isPrivate":false,
+             "url":"https://github.com/jimin/rocket","sshUrl":"git@github.com:jimin/rocket.git",
+             "updatedAt":"2026-10-01T09:00:00Z"}]}}}}"#;
+        let (url, server) = serve_once("200 OK", body);
+        let Ok((user, list)) = repos::fetch(&url, ForgeKind::Github, "t0ken") else {
+            panic!("fetch failed")
+        };
+        let request = server.join().unwrap();
+        assert!(request
+            .to_ascii_lowercase()
+            .contains("authorization: bearer t0ken"));
+        assert!(
+            request.contains("viewer") && request.contains("ORGANIZATION_MEMBER"),
+            "{request}"
+        );
+        assert_eq!((user.as_deref(), list.len()), (Some("jimin"), 1));
+
+        let (url, server) = serve_once("401 Unauthorized", "{}");
+        assert!(matches!(
+            repos::fetch(&url, ForgeKind::Gitlab, "old"),
+            Err(FetchError::Unauthorized)
+        ));
+        server.join().unwrap();
     }
 
     #[test]

@@ -2913,6 +2913,173 @@ kbd {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--line);
 }
+/* Clone / add remote: where the repository comes from (components/ForgeRepoPicker.tsx). */
+.dialog.clone {
+  width: min(720px, calc(100vw - 32px));
+}
+.dialog.add-remote {
+  width: min(560px, calc(100vw - 32px));
+}
+.clone-body {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 18px;
+}
+.clone-source {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.source-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+}
+.clone-body .source-tabs {
+  flex-direction: column;
+  align-self: start;
+}
+.source-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  background: none;
+  color: var(--text-2);
+}
+.add-remote .source-tabs button {
+  flex: 1;
+  justify-content: center;
+}
+.source-tabs button.on {
+  background: var(--ui-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+.forge-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.forge-picker .field .row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.forge-picker .forge-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+.forge-connect {
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+}
+.forge-connect button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.forge-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.forge-search .search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--muted);
+}
+.forge-search .search-box:focus-within {
+  border-color: var(--focus);
+}
+.forge-search .search-box input.text {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+.forge-repos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+}
+.forge-repos li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.forge-repos li:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.forge-repos li.on {
+  background: var(--ui-soft);
+}
+.forge-repos li.empty {
+  cursor: default;
+  border: none;
+}
+.forge-repo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.forge-repo-head b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.forge-repo-head .when {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.forge-private {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 0 6px;
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+}
+.forge-repos .desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.add-remote-url {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .clone-body {
+    grid-template-columns: 1fr;
+  }
+  .clone-body .source-tabs {
+    flex-direction: row;
+  }
+}
 .clone-progress {
   display: flex;
   flex-direction: column;

@@ -117,6 +117,34 @@ export interface PrReport {
   prs: PullRequest[];
 }
 
+/** One of the signed-in user's repositories on a forge. */
+export interface ForgeRepo {
+  /** `owner/repo` (GitHub) or the full project path (GitLab). */
+  fullName: string;
+  description: string | null;
+  /** Anything but public (GitLab's internal included). */
+  private: boolean;
+  httpsUrl: string;
+  sshUrl: string;
+  /** RFC 3339; empty when the forge didn't say. */
+  updated: string;
+}
+
+/** The user's repositories on a forge host, or that a token is needed first. */
+export interface ForgeRepos {
+  kind: ForgeKind;
+  /** Normalized host (`https://GitHub.com/` → `github.com`). */
+  host: string;
+  token: "cli" | "keychain" | "none";
+  public: boolean;
+  /** No token, or it was refused (`unauthorized`). */
+  needsToken: boolean;
+  unauthorized: boolean;
+  user: string | null;
+  /** Most recently updated first. */
+  repos: ForgeRepo[];
+}
+
 /** A commit that changed a file, and the file's path in it (renames are followed). */
 export interface FileTouch {
   id: string;

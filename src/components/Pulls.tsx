@@ -143,7 +143,8 @@ export function PullSection(p: {
 
 /** Paste a token for a forge (kept in the OS keychain); or forget the saved one. */
 export function TokenDialog(p: {
-  forge: ForgeStatus;
+  /** A pull request forge, or the host the repository picker lists. */
+  forge: Pick<ForgeStatus, "kind" | "host" | "public" | "token">;
   busy: boolean;
   onSave(token: string | null): void;
   onOpenPage(url: string): void;

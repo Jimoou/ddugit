@@ -448,6 +448,20 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
   return res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`);
 }
 
+/** Forge hosts the demo has a token for (pasted in this session). */
+const demoForgeHosts = new Set<string>();
+/** The demo user's repositories on a forge: name, description, private, days since the last update. */
+const DEMO_FORGE_REPOS: [string, string | null, boolean, number][] = [
+  ["stella/ddugit-demo", "The demo repository you're looking at", false, 0],
+  ["stella/dotfiles", "Shell, editor and terminal settings", false, 2],
+  ["orbit-labs/launchpad", "Mission control web app", true, 3],
+  ["orbit-labs/telemetry", "Ingest and chart rocket sensor data", true, 6],
+  ["stella/rocket-notes", null, false, 9],
+  ["orbit-labs/design-system", "Shared UI components and tokens", false, 15],
+  ["orbit-labs/infra", "Terraform for the ground station", true, 40],
+  ["stella/starfield", "A tiny canvas starfield", false, 120],
+];
+
 /** Dev/e2e hooks, exposed as `window.__ddugitDemo`. */
 export const demoControls = {
   /** Make the next remote call fail authentication. */
@@ -1521,9 +1535,42 @@ const mockTable: Table = {
       prs,
     });
   },
-  set_forge_token({ token }) {
+  set_forge_token({ host, token }) {
     demoControls.forgeToken = token ? "keychain" : "none";
+    if (token) demoForgeHosts.add(host);
+    else demoForgeHosts.delete(host);
     return delay(null);
+  },
+  forge_repos({ kind, host, trusted }) {
+    host = host
+      .trim()
+      .replace(/^[a-z]+:\/\//i, "")
+      .replace(/\/.*$/, "")
+      .toLowerCase();
+    if (!host) return fail("Not a host name");
+    // github.com answers through the demo's `gh` login; any other host needs a token pasted (or trusted) first.
+    const signedIn = host === "github.com" || demoForgeHosts.has(host) || trusted.includes(host);
+    const day = 86_400_000;
+    const repos = signedIn
+      ? DEMO_FORGE_REPOS.map(([fullName, description, isPrivate, days]) => ({
+          fullName,
+          description,
+          private: isPrivate,
+          httpsUrl: `https://${host}/${fullName}.git`,
+          sshUrl: `git@${host}:${fullName}.git`,
+          updated: new Date(Date.now() - days * day).toISOString(),
+        }))
+      : [];
+    return delay({
+      kind,
+      host,
+      token: host === "github.com" ? ("cli" as const) : signedIn ? ("keychain" as const) : ("none" as const),
+      public: host === "github.com" || host === "gitlab.com",
+      needsToken: !signedIn,
+      unauthorized: false,
+      user: signedIn ? "stella" : null,
+      repos,
+    });
   },
   open_url({ url }) {
     window.open(url, "_blank", "noopener");

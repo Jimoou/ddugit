@@ -12,6 +12,8 @@ import type {
   DiffScope,
   FileDiff,
   FileTouch,
+  ForgeKind,
+  ForgeRepos,
   HostKey,
   LfsOp,
   LfsStatus,
@@ -119,6 +121,7 @@ export interface Commands {
   ssh_test: [{ url: string }, SshTest];
   // `path` only routes the demo; the backend keys tokens by host.
   set_forge_token: [{ path: string; host: string; token: string | null }, null];
+  forge_repos: [{ path: string; kind: ForgeKind; host: string; trusted: string[] }, ForgeRepos];
   open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
@@ -258,6 +261,9 @@ export const api = {
   sshTest: (url: string) => call("ssh_test", { url }),
   /** Keep a forge token in the keychain (`null` forgets it). */
   setForgeToken: (path: string, host: string, token: string | null) => call("set_forge_token", { path, host, token }),
+  /** The signed-in user's repositories on a forge host (`path` only routes the demo). */
+  forgeRepos: (path: string, kind: ForgeKind, host: string, trusted: string[]) =>
+    call("forge_repos", { path, kind, host, trusted }),
   openUrl: (path: string, url: string) => call("open_url", { path, url }),
   /** Commits reachable from `rev` that changed `file` (following renames), newest first. */
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
