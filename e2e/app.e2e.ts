@@ -499,30 +499,49 @@ test("settings: Pro is activated by signing in on ddugit.com, and the wait can b
 
   await lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" }).click();
   await expect(lic.locator(".license-plan")).toContainText("Pro 사용 중");
-  await expect(lic).toContainText("월간 구독");
+  await expect(lic).toContainText("평생 라이선스");
+  await expect(lic).toContainText("평생 업데이트");
+  await expect(lic.locator(".license-devices")).toContainText("기기 3대까지 · ddugit.com/account에서 기기 관리");
+  await expect(lic).not.toContainText(/구독|체험/);
 });
 
-test("settings: a lapsed subscription only reminds, and renews once paid", async ({ demo }) => {
+test("settings: a device-bound license is removed from this device and Pro closes", async ({ demo }) => {
   const { page } = demo;
   await demo.mutateQuietly((d) => {
-    d.setLicense("lapsedMonthly");
-    d.subscription = "lapsed";
+    d.setLicense("lifetime");
+    d.offline = true;
   });
   await page.locator(".tabrow-settings").click();
   await page.getByRole("dialog", { name: "설정" }).getByRole("tab", { name: "라이선스" }).click();
   const lic = page.getByRole("dialog", { name: "설정" }).locator("section.license");
-  await expect(lic).toContainText("월간 구독");
-  await expect(lic.locator(".license-lapsed")).toContainText("기능은 그대로 쓸 수 있어요");
-  await lic.getByRole("button", { name: "갱신 확인" }).click();
-  await expect(lic.locator(".license-renewal")).toContainText("구독이 끝난 상태");
-  await expect(lic.locator(".license-lapsed")).toBeVisible();
-  await demo.mutateQuietly((d) => {
-    d.subscription = "paid";
+  await expect(lic.locator(".license-plan")).toContainText("Pro 사용 중");
+  // Device-bound: no plain "remove", a confirmed "remove from this device" instead.
+  await expect(lic.getByRole("button", { name: /라이선스 지우기/ })).toHaveCount(0);
+  await lic.getByRole("button", { name: "이 기기에서 해제" }).click();
+  await expect(lic.locator(".license-ask")).toContainText("해제할까요");
+  await lic.getByRole("button", { name: "그만두기" }).click();
+  await expect(lic.locator(".license-ask")).toHaveCount(0);
+  await lic.getByRole("button", { name: "이 기기에서 해제" }).click();
+  await lic.getByRole("button", { name: "해제", exact: true }).click();
+  // Offline: removed here anyway, and told to remove it on the website too.
+  await expect(lic.locator(".license-notice")).toContainText("ddugit.com/account에서도");
+  await expect(lic.locator(".license-plan")).toContainText("Free");
+  await expect(lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" })).toBeVisible();
+});
+
+test("a device removed on ddugit.com loses its license at the next check", async ({ demo }) => {
+  const { page } = demo;
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__ddugitDemoLicense = { kind: "lifetime", deviceRemoved: true };
   });
-  await lic.getByRole("button", { name: "갱신 확인" }).click();
-  await expect(lic.locator(".license-renewal")).toContainText("새 기간으로 갱신");
-  await expect(lic).toContainText("2099-12-31까지");
-  await expect(lic.locator(".license-lapsed")).toHaveCount(0);
+  await page.reload();
+  await demo.toast("이 기기는 라이선스에서 해제됐어요");
+  await page.keyboard.press("?");
+  const settings = page.getByRole("dialog", { name: "설정" });
+  await settings.getByRole("tab", { name: "라이선스" }).click();
+  const lic = settings.locator("section.license");
+  await expect(lic.locator(".license-plan")).toContainText("Free");
+  await expect(lic.getByRole("button", { name: "ddugit.com 계정으로 활성화" })).toBeVisible();
 });
 
 test("settings: switching to English relabels the app and is remembered", async ({ demo }) => {
@@ -1427,10 +1446,11 @@ test("on Free, private pull requests and backport actions offer Pro instead", as
   const { page } = demo;
   await page.locator(".tabrow-settings").click();
   await page.getByRole("dialog", { name: "설정" }).getByRole("tab", { name: "라이선스" }).click();
-  await expect(page.locator(".license-plan")).toContainText("Pro 체험 중 · 12일 남음");
+  await expect(page.locator(".license-plan")).toContainText("Pro 사용 중");
+  await expect(page.locator("section.license")).not.toContainText("체험");
   await page.keyboard.press("Escape");
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
   });
   await page.reload();
 
@@ -1484,7 +1504,7 @@ test("air-gapped transfer writes only what a destination lacks, and imports a bu
 test("on Free, air-gapped transfer offers Pro", async ({ demo }) => {
   const { page } = demo;
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
   });
   await page.reload();
   await demo.branchTool("폐쇄망 반출입…");
@@ -1529,7 +1549,7 @@ test("a stacked branch falls behind when the branch below moves, and restacking 
 test("on Free, stacking a branch offers Pro", async ({ demo }) => {
   const { page } = demo;
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
   });
   await page.reload();
   await page.click(".sidebar li >> text=feature/theme", { button: "right" });
@@ -1567,7 +1587,7 @@ test("release notes group the commits since the previous tag by kind, and copy a
 test("on Free, release notes offer Pro", async ({ demo }) => {
   const { page } = demo;
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
   });
   await page.reload();
   await page.click(".sidebar li >> text=v0.2.0", { button: "right" });
@@ -1612,7 +1632,7 @@ test("the dashboard pulls picked repositories and puts them all on the same bran
 test("on Free, batch pull and branch switching offer Pro", async ({ demo }) => {
   const { page } = demo;
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
     localStorage.setItem("ddugit.recent", JSON.stringify([{ path: "/work/nova", starred: false, at: 0 }]));
   });
   await page.reload();

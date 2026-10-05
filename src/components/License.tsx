@@ -1,52 +1,87 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { t } from "../i18n";
+import { type Key, t } from "../i18n";
 import { refreshPro, usePro } from "../pro";
-import type { LicenseRefresh, LicenseStatus } from "../types";
+import type { LicenseStatus } from "../types";
 
 /** Where to buy Pro: the pricing page (it links to the store once it opens). */
 export const BUY_URL = "https://ddugit.com/pricing";
 
-/** The account page, where subscriptions are bought and renewed. */
+/** The account page, where the devices of a license are managed. */
 const ACCOUNT_URL = "https://ddugit.com/account";
 
+/** `updatesUntil` of a lifetime license: every update. */
+export const LIFETIME_UPDATES = "9999-12-31";
+
+/** How often a running app asks ddugit.com about its license again. */
+const CHECK_EVERY = 24 * 3_600_000;
+
 /**
- * At startup: a subscription license near or past its expiry asks ddugit.com
- * for a renewed one, quietly. Offline or lapsed changes nothing but a reminder;
- * nothing is ever locked.
+ * At startup and about once a day: a device-bound license asks ddugit.com whether
+ * it still holds, so a device removed on the website (or a refunded license) stops
+ * here too; an old subscription near its expiry asks for a renewal. Offline changes
+ * nothing.
  */
-export function useLicenseRenewal(remind: (text: string) => void) {
+export function useLicenseCheck(remind: (text: string) => void) {
   useEffect(() => {
     let live = true;
-    void (async () => {
+    const check = async () => {
       const s = await api.licenseStatus().catch(() => null);
-      const expires = s?.license?.expires;
-      if (!expires || !live) return;
+      const lic = s?.license;
+      if (!lic || !live) return;
       const soon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
-      if (!s.expired && expires > soon) return;
+      const bound = !!lic.device || lic.plan === "lifetime";
+      if (!bound && !(lic.expires && (s.expired || lic.expires <= soon))) return;
       const r = await api.licenseRefresh().catch(() => null);
-      if (live && s.expired && r !== "renewed") remind(t("license.lapsedToast", { date: expires }));
-    })();
+      if (!live) return;
+      if (r === "removed" || r === "revoked" || r === "renewed") refreshPro();
+      if (r === "removed") remind(t("license.removedToast"));
+      else if (r === "revoked") remind(t("license.revokedToast"));
+      else if (lic.expires && s.expired && r !== "renewed") remind(t("license.lapsedToast", { date: lic.expires }));
+    };
+    void check();
+    const timer = setInterval(() => void check(), CHECK_EVERY);
     return () => {
       live = false;
+      clearInterval(timer);
     };
   }, [remind]);
 }
 
+/** Server answers (short English sentences) that have a clearer text here; others are shown as they come. */
+const KNOWN: [RegExp, Key][] = [
+  [/already on \d+ devices/, "license.full"],
+  [/belongs to another computer/, "license.otherDevice"],
+];
+const explain = (e: unknown) => {
+  const text = String(e);
+  const known = KNOWN.find(([m]) => m.test(text));
+  return known ? t(known[1]) : text;
+};
+
+const KIND: Record<string, Key> = {
+  personal: "license.kind.personal",
+  commercial: "license.kind.commercial",
+  site: "license.kind.site",
+};
+
 /**
- * Settings → license. A Pro subscriber signs in on ddugit.com from here (the
- * browser hands the license back, `activate.rs`); an air-gapped or site license
- * is pasted. Either way it is then checked on this computer only.
+ * Settings → license. A buyer signs in on ddugit.com from here (the browser hands
+ * back a license signed for this device, `activate.rs`) and can remove this device
+ * again; an air-gapped or site license is pasted. Either way it is then checked on
+ * this computer only.
  */
 export function LicenseSection() {
   const pro = usePro();
   const [status, setStatus] = useState<LicenseStatus | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [renewal, setRenewal] = useState<LicenseRefresh | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [asking, setAsking] = useState(false);
 
+  // Read again whenever Pro changes (e.g. the daily check removed the license).
   useEffect(() => {
     let live = true;
     api.licenseStatus().then(
@@ -56,17 +91,18 @@ export function LicenseSection() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [pro]);
 
   const act = async (f: () => Promise<LicenseStatus>) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       setStatus(await f());
       refreshPro();
       setText("");
     } catch (e) {
-      setError(String(e));
+      setError(explain(e));
     } finally {
       setBusy(false);
     }
@@ -74,73 +110,71 @@ export function LicenseSection() {
   const signIn = async () => {
     setSigningIn(true);
     setError(null);
+    setNotice(null);
     try {
       setStatus(await api.licenseActivate());
       refreshPro();
     } catch (e) {
-      if (String(e) !== "Cancelled") setError(String(e));
+      if (String(e) !== "Cancelled") setError(explain(e));
     } finally {
       setSigningIn(false);
     }
   };
+  const deactivate = () =>
+    act(async () => {
+      const d = await api.licenseDeactivate();
+      setAsking(false);
+      setNotice(t(d.confirmed ? "license.deactivated" : "license.deactivatedOffline"));
+      return d.status;
+    });
   const lic = status?.license;
-  const renew = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      setRenewal(await api.licenseRefresh());
-      refreshPro();
-      setStatus(await api.licenseStatus());
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <section className="license">
       <h4>{t("license.title")}</h4>
-      {pro && (
-        <p className="license-plan">
-          {pro.source === "trial"
-            ? t("pro.plan.trial", { n: pro.trialDaysLeft ?? 0 })
-            : pro.pro
-              ? t("pro.plan.pro")
-              : t("pro.plan.free")}
-        </p>
-      )}
+      {pro && <p className="license-plan">{pro.pro ? t("pro.plan.pro") : t("pro.plan.free")}</p>}
       {lic ? (
         <>
           <p>
-            <b>{lic.name}</b> · {t(lic.kind === "site" ? "license.kind.site" : "license.kind.commercial")} ·{" "}
-            {t("license.seats", { n: lic.seats })}
+            <b>{lic.name}</b> · {t(KIND[lic.kind] ?? "license.kind.commercial")}
+            {lic.kind !== "personal" && <> · {t("license.seats", { n: lic.seats })}</>}
           </p>
-          {lic.expires ? (
-            <p className="muted small">
-              {t(lic.plan === "yearly" ? "license.plan.yearly" : "license.plan.monthly")} ·{" "}
-              {t("license.until", { date: lic.expires, email: lic.email })}
-            </p>
-          ) : (
-            <p className="muted small">{t("license.updates", { date: lic.updatesUntil, email: lic.email })}</p>
-          )}
+          <p className="muted small">
+            {lic.expires
+              ? t("license.until", { date: lic.expires, email: lic.email })
+              : lic.updatesUntil === LIFETIME_UPDATES
+                ? t("license.updatesLifetime", { email: lic.email })
+                : t("license.updates", { date: lic.updatesUntil, email: lic.email })}
+          </p>
+          {lic.device && <p className="muted small license-devices">{t("license.devices")}</p>}
+          {status?.otherDevice && <p className="note warn license-other">{t("license.otherDevice")}</p>}
           {status?.expired && <p className="note license-lapsed">{t("license.lapsed", { date: lic.expires ?? "" })}</p>}
           {!lic.expires && status?.newerThanLicense && (
             <p className="note">{t("license.newer", { date: lic.updatesUntil })}</p>
           )}
-          {renewal && <p className="muted small license-renewal">{t(`license.refresh.${renewal}`)}</p>}
+          {asking && <p className="note license-ask">{t("license.deactivateAsk")}</p>}
           <div className="row">
-            {lic.expires && (
-              <button disabled={busy} onClick={() => void renew()}>
-                {t("license.refresh")}
+            {!lic.device ? (
+              <button className="danger" disabled={busy} onClick={() => void act(() => api.licenseRemove())}>
+                {t("license.remove")}
               </button>
+            ) : asking ? (
+              <>
+                <button className="danger" disabled={busy} onClick={() => void deactivate()}>
+                  {t("license.deactivateYes")}
+                </button>
+                <button disabled={busy} onClick={() => setAsking(false)}>
+                  {t("license.cancel")}
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="danger" disabled={busy} onClick={() => setAsking(true)}>
+                  {t("license.deactivate")}
+                </button>
+                <button onClick={() => void api.openUrl("", ACCOUNT_URL)}>{t("license.account")}</button>
+              </>
             )}
-            {status?.expired && (
-              <button onClick={() => void api.openUrl("", ACCOUNT_URL)}>{t("license.account")}</button>
-            )}
-            <button className="danger" disabled={busy} onClick={() => void act(() => api.licenseRemove())}>
-              {t("license.remove")}
-            </button>
           </div>
         </>
       ) : (
@@ -190,6 +224,7 @@ export function LicenseSection() {
           )}
         </>
       )}
+      {notice && <p className="note license-notice">{notice}</p>}
       {error && <p className="note warn">{error}</p>}
     </section>
   );

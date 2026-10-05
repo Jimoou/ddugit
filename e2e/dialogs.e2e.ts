@@ -163,7 +163,7 @@ test("Tab stays inside a modal dialog, and focus goes back to the opener", async
 test("on Free, the Pro offer over a dialog closes with Esc, then the dialog", async ({ demo }) => {
   const { page } = demo;
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
   });
   await page.reload();
   await demo.branchTool("폐쇄망 반출입…");

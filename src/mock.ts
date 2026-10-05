@@ -29,9 +29,33 @@ import { applyPlan } from "./rebasePlan";
 /** Bumped by cancelling, so a pending demo sign-in ends as "Cancelled". */
 const demoActivation = { n: 0 };
 const demoLicense = { current: null as import("./types").LicenseInfo | null };
-const demoLicenseExpired = () => {
-  const e = demoLicense.current?.expires;
-  return !!e && new Date().toISOString().slice(0, 10) > e;
+/** The demo license as `license_status` reports it (demo licenses never lapse or sit on another computer). */
+const demoLicenseStatus = (): import("./types").LicenseStatus => ({
+  license: demoLicense.current,
+  newerThanLicense: false,
+  checkable: true,
+  expired: false,
+  otherDevice: false,
+});
+/** Put `license` on the demo computer (null removes it) and follow it with Pro. */
+function putDemoLicense(license: import("./types").LicenseInfo | null) {
+  demoLicense.current = license;
+  demoControls.pro = license
+    ? { pro: true, source: license.kind === "site" ? "site" : "license" }
+    : { pro: false, source: "free" };
+  return demoLicenseStatus();
+}
+/** What ddugit.com signs for a purchase activated on the demo computer. */
+const DEMO_LIFETIME: import("./types").LicenseInfo = {
+  id: "lic_demo_life",
+  name: "Demo User",
+  email: "me@demo.example",
+  kind: "personal",
+  seats: 1,
+  issued: "2026-10-05",
+  updatesUntil: "9999-12-31",
+  plan: "lifetime",
+  device: "5f0c…demo",
 };
 /** The demo's LFS: two patterns, three files whose content isn't downloaded yet. */
 const demoLfs = {
@@ -534,31 +558,33 @@ export const demoControls = {
   emptyNext: false,
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
-  /** Free or Pro in the demo (Pro by default, like the trial). Set `window.__ddugitDemoPro` before load to change it. */
+  /** Free or Pro in the demo (Pro by default, so every feature shows). Set `window.__ddugitDemoPro` before load to change it. */
   pro: (((typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoPro) as
     import("./types").ProStatus | undefined) ?? {
     pro: true,
-    source: "trial",
-    trialDaysLeft: 12,
+    source: "license",
   }) as import("./types").ProStatus,
-  /** What the demo's license service answers for a subscription license. */
-  subscription: "paid" as "paid" | "lapsed",
-  /** Install a demo license (e2e): a monthly subscription that ended yesterday, or a site license. */
-  setLicense(kind: "lapsedMonthly" | "site" | null) {
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-    demoLicense.current =
-      kind === null
-        ? null
-        : {
-            id: "lic_demo",
-            name: "Demo Corp",
-            email: "it@demo.example",
-            kind: kind === "site" ? "site" : "commercial",
-            seats: kind === "site" ? 50 : 1,
-            issued: "2026-10-02",
-            updatesUntil: kind === "site" ? "2027-10-02" : yesterday,
-            ...(kind === "lapsedMonthly" ? { expires: yesterday, plan: "monthly" } : {}),
-          };
+  /** ddugit.com has this device removed from the license: the next check drops it. */
+  deviceRemoved: false,
+  /** ddugit.com can't be reached when removing this device. */
+  offline: false,
+  /** Install a demo license (e2e): a lifetime license on this device, or a site license. */
+  setLicense(kind: "lifetime" | "site" | null) {
+    putDemoLicense(
+      kind === "lifetime"
+        ? { ...DEMO_LIFETIME }
+        : kind === "site"
+          ? {
+              id: "lic_demo",
+              name: "Demo Corp",
+              email: "it@demo.example",
+              kind: "site",
+              seats: 50,
+              issued: "2026-10-02",
+              updatesUntil: "2027-10-02",
+            }
+          : null,
+    );
   },
   /** A newer version the demo announces (the update notice). Set `window.__ddugitDemoUpdate` before load to see it at startup. */
   update: ((typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoUpdate) ??
@@ -574,6 +600,14 @@ export const demoControls = {
     repo.add(branch, summary);
   },
 };
+/** A license on the demo computer from the start (e2e): set `window.__ddugitDemoLicense` before load. */
+const initialLicense = (typeof window !== "undefined" &&
+  (window as unknown as Record<string, unknown>).__ddugitDemoLicense) as
+  { kind: "lifetime" | "site"; deviceRemoved?: boolean } | undefined;
+if (initialLicense) {
+  demoControls.setLicense(initialLicense.kind);
+  demoControls.deviceRemoved = !!initialLicense.deviceRemoved;
+}
 if (import.meta.env.DEV && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__ddugitDemo = demoControls;
 }
@@ -1348,66 +1382,42 @@ const mockTable: Table = {
   },
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
-  license_status() {
-    return Promise.resolve({
-      license: demoLicense.current,
-      newerThanLicense: false,
-      checkable: true,
-      expired: demoLicenseExpired(),
-    });
-  },
+  license_status: () => Promise.resolve(demoLicenseStatus()),
   license_install({ text }) {
     if (!text.trim().startsWith("DDUGIT1.")) return Promise.reject("This is not a ddugit license");
-    demoLicense.current = {
-      id: "lic_demo",
-      name: "Demo Corp",
-      email: "it@demo.example",
-      kind: "commercial",
-      seats: 5,
-      issued: "2026-10-02",
-      updatesUntil: "2027-10-02",
-    };
-    return Promise.resolve({
-      license: demoLicense.current,
-      newerThanLicense: false,
-      checkable: true,
-      expired: demoLicenseExpired(),
-    });
+    return Promise.resolve(
+      putDemoLicense({
+        id: "lic_demo",
+        name: "Demo Corp",
+        email: "it@demo.example",
+        kind: "commercial",
+        seats: 5,
+        issued: "2026-10-02",
+        updatesUntil: "2027-10-02",
+      }),
+    );
   },
   async license_activate() {
     const ticket = ++demoActivation.n;
     await delay(null, 900);
     if (ticket !== demoActivation.n) return Promise.reject("Cancelled");
-    demoLicense.current = {
-      id: "lic_demo_sub",
-      name: "Demo User",
-      email: "me@demo.example",
-      kind: "commercial",
-      seats: 1,
-      issued: "2026-10-04",
-      updatesUntil: "2026-11-11",
-      expires: "2026-11-11",
-      plan: "monthly",
-    };
-    demoControls.pro = { pro: true, source: "license", trialDaysLeft: null };
-    return { license: demoLicense.current, newerThanLicense: false, checkable: true, expired: false };
+    return putDemoLicense({ ...DEMO_LIFETIME });
   },
   license_activate_cancel() {
     demoActivation.n++;
     return delay(undefined, 0);
   },
+  license_deactivate() {
+    return delay({ status: putDemoLicense(null), confirmed: !demoControls.offline });
+  },
   license_refresh() {
     const lic = demoLicense.current;
     if (!lic) return Promise.reject("No license on this computer");
-    if (!lic.expires) return delay("current" as const);
-    if (demoControls.subscription === "lapsed") return delay("lapsed" as const);
-    lic.expires = lic.updatesUntil = "2099-12-31";
-    return delay("renewed" as const);
+    if (!lic.device || !demoControls.deviceRemoved) return delay("current" as const);
+    putDemoLicense(null);
+    return delay("removed" as const);
   },
-  license_remove() {
-    demoLicense.current = null;
-    return Promise.resolve({ license: null, newerThanLicense: false, checkable: true, expired: demoLicenseExpired() });
-  },
+  license_remove: () => Promise.resolve(putDemoLicense(null)),
   update_check: () => delay(demoControls.update),
   update_install() {
     demoControls.update = null;

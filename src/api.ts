@@ -21,6 +21,7 @@ import type {
   SigningKeys,
   LfsOp,
   LfsStatus,
+  Deactivation,
   LicenseRefresh,
   LicenseStatus,
   ProStatus,
@@ -118,6 +119,7 @@ export interface Commands {
   license_refresh: [Record<string, never>, LicenseRefresh];
   license_activate: [Record<string, never>, LicenseStatus];
   license_activate_cancel: [Record<string, never>, void];
+  license_deactivate: [Record<string, never>, Deactivation];
   pro_status: [Record<string, never>, ProStatus];
   transfer_export: [{ path: string; req: TransferExport }, OpResult];
   transfer_import: [{ path: string; file: string; name: string }, OpResult];
@@ -257,12 +259,14 @@ export const api = {
   licenseStatus: () => call("license_status", {}),
   licenseInstall: (text: string) => call("license_install", { text }),
   licenseRemove: () => call("license_remove", {}),
-  /** Swap in a renewed subscription license from ddugit.com (the license is the only credential). */
+  /** Ask ddugit.com whether the license still holds (device removed or refunded → dropped here). */
   licenseRefresh: () => call("license_refresh", {}),
   /** Sign in on ddugit.com in the browser; resolves with the license it sends back (or "Cancelled"). */
   licenseActivate: () => call("license_activate", {}),
   licenseActivateCancel: () => call("license_activate_cancel", {}),
-  /** Free or Pro (license, site license or the 14-day trial). */
+  /** Free this device's place on ddugit.com and remove the license here, even offline. */
+  licenseDeactivate: () => call("license_deactivate", {}),
+  /** Free or Pro (a license on this device, or a site license). */
   proStatus: () => call("pro_status", {}),
   /** Write a bundle of what `req.dest` doesn't have yet (and its .sha256); the output is its path. */
   transferExport: (path: string, req: TransferExport) => call("transfer_export", { path, req }),

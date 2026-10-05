@@ -58,7 +58,7 @@ test("creating a pull request asks for a token first, and offers Pro on Free", a
   await dialog.getByRole("button", { name: "취소" }).click();
 
   await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free", trialDaysLeft: 0 };
+    (window as unknown as Record<string, unknown>).__ddugitDemoPro = { pro: false, source: "free" };
   });
   await page.reload();
   await page.locator(".sidebar li", { hasText: "feature/theme" }).first().click({ button: "right" });

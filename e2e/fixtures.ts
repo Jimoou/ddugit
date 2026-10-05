@@ -9,8 +9,9 @@ interface DemoWindow {
     snapshot(): RepoSnapshot;
     grow(n: number): void;
     commitOn(branch: string, summary: string): void;
-    subscription: "paid" | "lapsed";
-    setLicense(kind: "lapsedMonthly" | "site" | null): void;
+    deviceRemoved: boolean;
+    offline: boolean;
+    setLicense(kind: "lifetime" | "site" | null): void;
   };
 }
 
