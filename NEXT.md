@@ -7,29 +7,25 @@ _마지막 갱신: 2026-10-05_
 
 ## 방금 끝난 것
 
-- 내 GitHub·GitLab 저장소에서 clone·원격 추가(브랜치 `feat/forge-repos`, 로컬 커밋, 아직 PR 없음): clone 창 출처 목록(URL / GitHub / GitLab), 원격 추가 창 탭, Enterprise·자체 운영 서버, 토큰 없으면 기존 연결 창. Free
-- 그 전: v0.7.1 버전 올림. 계정으로 Pro 활성화(#105), 흰색 글자(#106)
-- 사이트: 달러 가격·`/activate`(ddugit-site#16), 흰색 글자(#17)
-- 사용자: Lemon Squeezy 상품 'ddugit Pro'(Monthly $5 / Yearly $50, 스토어 체험·라이선스 키 끔)
-- 다음 forge: Bitbucket·Azure DevOps는 `forgeRepos.ts`의 `FORGE_SOURCES`에 한 줄 + 토큰·목록 백엔드(`ForgeKind`)
+- 수익 모델 변경: **$29 한 번 결제, 평생 사용 + 모든 업데이트, 라이선스당 기기 3대, 체험 없음**. 앱 #116(`device.rs`, 기기에 묶인 라이선스, 해제, 24시간마다 온라인 확인), 사이트 ddugit-site#21(가격·`devices` 표·활성화 때 기기 수 확인·`license-deactivate`·계정 페이지 기기 목록·refresh가 해제된 기기에 `removed`)
+- M18 GitKraken 대비 기능: 내 저장소에서 clone·원격 추가(#109), 커밋할 사람 프로필·커밋 서명(#110), 앱에서 PR·MR 만들기(#111)
+- M18 데스크톱 UI/UX 점검 4묶음: 작은 창 레이아웃(#112), 키보드·포커스 `useDialog`(#113), 문구·조사 처리(#114), 시각적 통일 `Segmented`·`.dialog-title`·설정 구역 메뉴(#115)
 
-## 결정 (2026-10-04, 수익 모델)
+## 결정 (2026-10-05, 수익 모델)
 
-- Free / Pro. Pro: 비공개·회사 서버 PR 연동, 백포트 실행(보기는 Free), 대시보드 3개 초과. 14일 체험. 구독이 끝나면 Pro만 잠김. 앱 쪽은 이 PR(`pro.rs`, 잠금 UI)
-- 다음: 사이트 가격 페이지 Free / Pro 비교표·약관, 그다음 M15 결제(Lemon Squeezy 상품 이름 "ddugit Pro"), M17 새 Pro 기능(폐쇄망 반출입, 스택 브랜치, 릴리스 노트, 여러 저장소 일괄 작업)
+- 구독 없음. Pro = 평생 라이선스 $29(사이트 `PRO_PRICE`). 기기 = 앱의 기기 ID(키체인 + 설정 폴더), 서버에는 SHA-256만. 4번째 기기는 활성화 페이지에서 기존 기기를 해제해야 함
+- 해제된 기기·환불은 다음 온라인 확인 때 꺼짐. 계속 오프라인인 기기는 막지 않는다(의도한 빈틈)
+- 사이트 라이선스(붙여 넣기, 폐쇄망)는 기기 제한 없음. Free/Pro 기능 경계는 그대로
+- 앱·사이트 규약: 세션 scratchpad의 `lifetime/CONTRACT.md`가 원본이었고, 구현된 내용은 사이트 `supabase/functions/_shared/license.ts`와 앱 `license.rs`·`activate.rs`가 기준
 
 ## 다음 단계
 
-- 사용자: v0.6.1 → v0.7.0 자동 업데이트 확인(macOS), Windows 실기 점검
-- M15 마지막: Lemon Squeezy 웹훅 Edge Function(구독 생성·갱신·해지 → `licenses` 행, 라이선스 서명은 `currentText`), 사이트 가격 페이지 구매 버튼(체크아웃 URL), 결제 → 앱에서 '계정으로 활성화'까지 확인. 라이선스 메일은 보내지 않는다(로그인 활성화)
-- 사용자: 라이선스 발급 키 → Supabase Edge Functions Secrets(`DDUGIT_LICENSE_PRIVATE_KEY`, `DDUGIT_LICENSE_PUBKEY`) + ddugit Variables `DDUGIT_LICENSE_PUBKEY`
-- 사용자: Windows 실기 점검, 세무(사업자등록·통신판매업), 오늘 끝나면 두 저장소 비공개로
+- 릴리스 v0.8.0(평생 라이선스가 들어간 첫 버전, 사용자 확인 후)
+- 사용자: Supabase 배포 workflow 성공 확인(마이그레이션 `20261005100000_lifetime_devices.sql`, `license-deactivate`), `licenses`에 시험 행(`kind='personal'`, `plan='lifetime'`, `status='active'`, `text=''`)으로 활성화 → 해제 → 재활성화 실제 확인
+- 사용자: Lemon Squeezy 상품을 Single payment $29로. 승인 나면 M15 웹훅(주문 → `licenses` 행 `store_order_id`, 환불 → `status='refunded'`), 사이트 구매 버튼(체크아웃 URL)
+- 실제 GitHub·GitLab API로 저장소 목록·PR·MR 만들기 확인(가짜 서버로만 시험함)
+- 로컬 e2e "adds a remote from the GitHub tab"이 부하에서 자주 시간 초과(단독·CI는 통과) — 기다리는 조건을 튼튼하게
 - M16: 첫 실행 안내, 영문 문구 점검, 문제 신고 경로, 큰 저장소 성능 → v1.0.0
-- 나중: 사이트 "문서" 메뉴(사용법·변경 내역)
-
-## 결정 (2026-10-04)
-
-- 오픈소스 아님, 저장소 비공개. GitHub Release를 만들지 않는다(배포는 ddugit.com, 파일은 Supabase Storage). Windows는 서명 없이. 다운로드·앱 사용에 로그인 없음, 구매·라이선스에만 로그인.
 
 ## 막힌 것 / 결정 필요
 
