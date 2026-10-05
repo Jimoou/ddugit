@@ -1,7 +1,17 @@
 import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icon";
 import type { IconName } from "../icons";
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  type RefObject,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Settings } from "../settings";
 import { stashTitle } from "../format";
 import type { RefInfo, RemoteInfo, StashInfo } from "../types";
@@ -99,6 +109,63 @@ export function SideSection(p: {
   );
 }
 
+interface RowHandlers {
+  onFocus(ref: RefInfo): void;
+  onCheckout(ref: RefInfo): void;
+  onRefMenu(ref: RefInfo, x: number, y: number): void;
+}
+
+const RefRow = memo(function RefRow(p: {
+  r: RefInfo;
+  label: string;
+  color: string;
+  isFocused: boolean;
+  isHead: boolean;
+  remoteOnly: boolean;
+  /** Checked out in another worktree at this folder. */
+  elsewhere?: string;
+  /** Latest handlers, read on events (they change on every render of the view). */
+  on: RefObject<RowHandlers>;
+}) {
+  const { r, color, on } = p;
+  return (
+    <li
+      className={`${p.isFocused ? "focused" : ""} ${p.isHead ? "head" : ""}`}
+      aria-selected={p.isFocused}
+      style={{ ["--c" as string]: color }}
+      title={`${r.name}\n${r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}`}
+      onClick={() => on.current.onFocus(r)}
+      onDoubleClick={() => r.kind !== "tag" && on.current.onCheckout(r)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        on.current.onRefMenu(r, e.clientX, e.clientY);
+      }}
+    >
+      <span className="dot" style={{ background: color, color }} />
+      <span className="name">{p.label}</span>
+      {p.isHead && <span className="badge head">HEAD</span>}
+      {p.remoteOnly && (
+        <button
+          className="icon to-local"
+          title={t("side.toLocal")}
+          aria-label={`${t("side.toLocal")}: ${r.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            on.current.onCheckout(r);
+          }}
+        >
+          <Icon name="plus" size={11} />
+        </button>
+      )}
+      {p.elsewhere && (
+        <span className="elsewhere" title={t("wt.elsewhere", { path: p.elsewhere })}>
+          <Icon name="folder" size={11} />
+        </span>
+      )}
+    </li>
+  );
+});
+
 export function Sidebar(props: Props) {
   const { refs, headBranch, colorOf, focused, onFocus, onCheckout, onRefMenu, stashes, selectedStash, onStash } = props;
   const { collapsed, closed, onLayout, active } = props;
@@ -120,47 +187,27 @@ export function Sidebar(props: Props) {
   };
   const remotes = props.remotes;
 
+  // Rows only re-render when their own ref changes: a big repository lists
+  // hundreds of refs, and the view re-renders on every selection.
+  const latest = useRef({ onFocus, onCheckout, onRefMenu });
+  useEffect(() => {
+    latest.current = { onFocus, onCheckout, onRefMenu };
+  });
   const row = (r: RefInfo, label: string) => {
     const key = `${r.kind}:${r.name}`;
-    // A remote branch with no local branch of its name yet.
-    const remoteOnly = r.kind === "remote" && !localNames.has(branchOf(r.name));
-    const isHead = r.kind === "local" && r.name === headBranch;
     return (
-      <li
+      <RefRow
         key={key}
-        className={`${focused.includes(key) ? "focused" : ""} ${isHead ? "head" : ""}`}
-        aria-selected={focused.includes(key)}
-        style={{ ["--c" as string]: colorOf(r.target) }}
-        title={`${r.name}\n${r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}`}
-        onClick={() => onFocus(r)}
-        onDoubleClick={() => r.kind !== "tag" && onCheckout(r)}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          onRefMenu(r, e.clientX, e.clientY);
-        }}
-      >
-        <span className="dot" style={{ background: colorOf(r.target), color: colorOf(r.target) }} />
-        <span className="name">{label}</span>
-        {isHead && <span className="badge head">HEAD</span>}
-        {remoteOnly && (
-          <button
-            className="icon to-local"
-            title={t("side.toLocal")}
-            aria-label={`${t("side.toLocal")}: ${r.name}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onCheckout(r);
-            }}
-          >
-            <Icon name="plus" size={11} />
-          </button>
-        )}
-        {r.kind === "local" && props.elsewhere[r.name] && (
-          <span className="elsewhere" title={t("wt.elsewhere", { path: props.elsewhere[r.name] })}>
-            <Icon name="folder" size={11} />
-          </span>
-        )}
-      </li>
+        r={r}
+        label={label}
+        color={colorOf(r.target)}
+        isFocused={focused.includes(key)}
+        isHead={r.kind === "local" && r.name === headBranch}
+        // A remote branch with no local branch of its name yet.
+        remoteOnly={r.kind === "remote" && !localNames.has(branchOf(r.name))}
+        elsewhere={r.kind === "local" ? props.elsewhere[r.name] : undefined}
+        on={latest}
+      />
     );
   };
 

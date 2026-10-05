@@ -33,7 +33,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 ## 구조
 
 - `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다)
-  - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태)
+  - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태). 이력은 libgit2 정렬 revwalk(전체 이력을 먼저 읽는다) 대신 커밋 시각 순으로 직접 걷다가(`TimeWalk`) 페이지 크기에서 멈추고, `children_first`로 자식이 부모보다 앞에 오게 고친다
   - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃)
   - `pick.rs`: cherry-pick / revert
   - `rebase.rs`: interactive rebase (UI가 만든 todo를 `sequence.editor`로 넣는다. 편집기 없음). 병합이 섞이면 `--rebase-merges`: git의 todo를 먼저 받아(`todo`, 사본만 남기고 실패하는 편집기) 처리·갈래 안 순서만 바꿔(`apply_plan`) 넣는다. 화면의 같은 로직은 `rebasePlan.ts`의 `todoRuns`·`applyPlan`
@@ -71,8 +71,8 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.
 - `src/recent.ts`: 최근 저장소·즐겨찾기 목록(순수 함수). 저장소 그룹은 `src/groups.ts`(폴더형: 저장소마다 그룹 하나, 대시보드 띠 `bands`). `components/Connect.tsx`가 저장(`useRecent`)과 화면(저장소 메뉴, 첫 화면 목록, clone 창)을 맡는다
 - `src/settings.ts`: 사용자 설정(localStorage, 파싱은 순수 함수)과 단축키 표. 단축키를 바꾸면 `SHORTCUTS`도 고친다.
-- `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`. 화면 회전은 `View.r`(90° 단위) 하나로, 월드 ↔ 화면 변환은 늘 `toScreen`/`toWorld`/`viewAt`을 거친다(좌표를 직접 `* k + tx`로 계산하지 않는다)
-- `src/components/`: 패널과 다이얼로그. `Pulls.tsx`는 PR을 그래프 라벨용 가짜 ref(`kind: "pr"`)로 바꾸고 사이드바 섹션·토큰 창을 맡는다. `Fx.tsx`는 결과 순간의 우주 연출(효과 큐, 충돌 성운)
+- `src/graph/`: `layout`(DAG → 레인) → `scene`(월드 경로) → `renderer`(그리기) → `GraphCanvas`(입력·카메라), `Minimap`. `scene`은 간선의 경계 상자와 행 묶음 색인(`edgesInRows`)만 미리 만들고, 경로(`Path2D`)는 처음 그릴 때 만든다(`shapeOf`). 렌더러는 화면에 걸친 행의 간선·노드·접힌 구간만 그린다. 큰 저장소 측정과 다시 재는 법은 [docs/PERF.md](docs/PERF.md). 화면 회전은 `View.r`(90° 단위) 하나로, 월드 ↔ 화면 변환은 늘 `toScreen`/`toWorld`/`viewAt`을 거친다(좌표를 직접 `* k + tx`로 계산하지 않는다)
+- `src/components/`: 패널과 다이얼로그. 긴 목록(diff 줄, 시트·인스펙터의 파일 목록)은 줄 높이를 CSS로 고정하고 `virtual.ts`(`useVisibleRows`)로 화면 근처 줄만 그린다. `Pulls.tsx`는 PR을 그래프 라벨용 가짜 ref(`kind: "pr"`)로 바꾸고 사이드바 섹션·토큰 창을 맡는다. `Fx.tsx`는 결과 순간의 우주 연출(효과 큐, 충돌 성운)
 - `e2e/`: Playwright e2e (`*.e2e.ts`). 데모 모드를 대상으로 돌리고, `fixtures.ts`의 `demo`로 데모 상태를 읽거나 바꾼다(`window.__ddugitDemo`). 페이지 오류가 하나라도 나면 실패한다
 - 창 테두리: `src/chrome.ts`가 데스크톱 앱의 OS를 보고 정한다. macOS는 `tauri.macos.conf.json`(신호등을 탭 줄 위에 겹침), Windows는 `tauri.windows.conf.json`(`decorations: false`, 탭 줄 끝 `components/WindowControls.tsx`), Linux·데모는 시스템 제목 표시줄. 탭 줄의 빈 곳은 `data-tauri-drag-region`(창 끌기·더블클릭 최대화). 플랫폼 설정 파일은 창 객체 전체를 다시 적는다(배열은 통째로 바뀐다)
 - `src/App.tsx`: 창(탭 셸). 탭(`tabs.ts`, 순수 함수), 설정, 저장소 연결(clone·init·끌어다 놓기), 알림. 탭마다 `RepoView`를 띄워 두고 안 보이는 탭은 `hidden`으로 숨긴다(상태 유지). 단축키 중 창 전체 것(탭, `?`)은 여기서 처리한다

@@ -27,7 +27,7 @@ import type { NodeBadge } from "./renderer";
 const NO_BADGES = new Map<string, NodeBadge>();
 const NO_TRAIL: string[] = [];
 import { type Run, runIndex, straightRuns } from "./runs";
-import { buildScene, COL, LANE, type Pt, xOf, yOf } from "./scene";
+import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap } from "./Minimap";
 import { t } from "../i18n";
@@ -276,6 +276,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         const p = toScreen(st.current.view, { x: xOf(node.row, sc.layout.rowCount), y: yOf(node.lane) });
         return { x: p.x + r.left, y: p.y + r.top };
       },
+      centerOn: (id: string, zoom?: number) => api.centerOn(id, zoom),
     };
   });
 
@@ -423,7 +424,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const lane = Math.round(w.y / LANE);
     const r = nodeRadius(s.view.k) + 6;
     for (const dr of [0, -1, 1]) {
-      const id = sc.grid.get(`${row + dr}:${lane}`);
+      const id = nodeAtCell(sc.layout, row + dr, lane);
       if (!id || foldedRun(foldState(), id)) continue;
       const node = sc.layout.byId.get(id)!;
       const sp = toScreen(s.view, { x: xOf(node.row, n), y: yOf(node.lane) });

@@ -1,9 +1,24 @@
 import { stashTitle } from "../format";
 import { inlineBadges, placeBadges, type PlacedGroup } from "./labels";
 import { drawSpace, PLAIN_SKY } from "./space";
-import type { Run } from "./runs";
+import { type Run, runsInRows } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
-import { COL, LANE, NEON, pointAt, type Pt, type Scene, xOf, yOf, ALERT } from "./scene";
+import {
+  ALERT,
+  COL,
+  edgesInRows,
+  fractionAtX,
+  LANE,
+  NEON,
+  nodeAtCell,
+  pointAt,
+  type Pt,
+  type Scene,
+  shapeOf,
+  sparklesIn,
+  xOf,
+  yOf,
+} from "./scene";
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
 import { type Box, CAPTION_H, laneReach, placeCaptions } from "./captions";
@@ -211,7 +226,7 @@ export function plusPosition(scene: Scene, headId: string | null): Pt {
   const node = headId ? scene.layout.byId.get(headId) : undefined;
   if (!node) return { x: 0, y: 0 };
   const n = scene.layout.rowCount;
-  const free = !scene.grid.has(`${node.row - 1}:${node.lane}`);
+  const free = !nodeAtCell(scene.layout, node.row - 1, node.lane);
   return {
     x: xOf(node.row, n) + COL,
     y: free ? yOf(node.lane) : yOf(scene.layout.laneCount),
@@ -283,7 +298,10 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   ctx.setTransform(dpr * k * e1.x, dpr * k * e1.y, dpr * k * e2.x, dpr * k * e2.y, dpr * view.tx, dpr * view.ty);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  const visible = scene.edges.filter((e) => e.maxX >= vx0 && e.minX <= vx1 && e.maxY >= vy0 && e.minY <= vy1);
+  // Rows on screen: time runs along world x, newest (row 0) on the right.
+  const firstCol = Math.max(0, Math.floor(n - 1 - vx1 / COL));
+  const lastCol = Math.min(n - 1, Math.ceil(n - 1 - vx0 / COL));
+  const visible = edgesInRows(scene, firstCol, lastCol).filter((e) => e.maxY >= vy0 && e.minY <= vy1);
 
   ctx.globalCompositeOperation = "lighter";
   for (const e of s.glow ? visible : []) {
@@ -291,10 +309,11 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = alpha(c, d ? 0.03 : 0.16);
     ctx.lineWidth = 9 / k;
-    ctx.stroke(e.path);
+    const { path } = shapeOf(scene, e);
+    ctx.stroke(path);
     ctx.strokeStyle = alpha(c, d ? 0.05 : 0.28);
     ctx.lineWidth = 4.5 / k;
-    ctx.stroke(e.path);
+    ctx.stroke(path);
   }
   ctx.globalCompositeOperation = "source-over";
   for (const e of visible) {
@@ -302,7 +321,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = d ? alpha(c, 0.2) : c;
     ctx.lineWidth = (e.edge.isMergeEdge ? 1.6 : 2.2) / Math.max(k, 0.5);
-    ctx.stroke(e.path);
+    ctx.stroke(shapeOf(scene, e).path);
   }
 
   // --- sparkles flowing along edges (parent → child, i.e. forward in time) --
@@ -312,11 +331,13 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const speed = 70; // world px / s
     for (const e of visible) {
       if (dim(e.edge.child)) continue;
-      const count = Math.max(1, Math.round(e.length / (COL * 2.2)));
+      const shape = shapeOf(scene, e);
+      const count = Math.max(1, Math.round(shape.length / (COL * 2.2)));
       const c = NEON[e.edge.color];
-      for (let i = 0; i < count; i++) {
-        const t = ((((time * speed) / e.length + i / count + e.seed) % 1) + 1) % 1;
-        const p = toScreen(view, pointAt(e, t));
+      const from = fractionAtX(shape, vx0),
+        to = fractionAtX(shape, vx1);
+      for (const t of sparklesIn(count, (time * speed) / shape.length + shape.seed, from, to)) {
+        const p = toScreen(view, pointAt(shape, t));
         if (offscreen(p, 20)) continue;
         const fade = Math.sin(t * Math.PI); // fade in/out at the ends
         const r = Math.max(2, 4.5 * Math.min(k, 1.4));
@@ -390,8 +411,6 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
   // --- nodes ------------------------------------------------------------------
   const r = nodeRadius(k);
-  const firstCol = Math.max(0, Math.floor(n - 1 - vx1 / COL));
-  const lastCol = Math.min(n - 1, Math.ceil(n - 1 - vx0 / COL));
   const nodes = scene.layout.nodes;
   const labelQueue: { x: number; y: number; id: string; color: string; d: boolean }[] = [];
 
@@ -469,8 +488,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.font = `600 10px ${SANS}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    for (const run of s.runs) {
-      if (run.last < firstCol || run.first > lastCol || !foldedRun(s, run.ids[0])) continue;
+    for (const run of runsInRows(s.runs, firstCol, lastCol)) {
+      if (!foldedRun(s, run.ids[0])) continue;
       const a = toScreen(view, { x: xOf(run.last, n), y: yOf(run.lane) });
       const b = toScreen(view, { x: xOf(run.first, n), y: yOf(run.lane) });
       const x = Math.min(a.x, b.x) - rr,

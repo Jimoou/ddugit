@@ -274,7 +274,13 @@ class MockRepo {
     const [ahead, behind] = this.aheadBehind();
     // Like git, only list commits reachable from a ref (rebased-away ones vanish).
     const reachable = new Set<string>();
-    for (const r of refs) for (const id of this.ancestors(r.target)) reachable.add(id);
+    const stack = refs.map((r) => r.target);
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (reachable.has(id) || !this.commits.has(id)) continue;
+      reachable.add(id);
+      stack.push(...this.commits.get(id)!.parents);
+    }
     const all = this.order.filter((id) => reachable.has(id));
     return {
       path: DEMO_ROOT,
@@ -606,6 +612,20 @@ export const demoControls = {
   grow(n: number) {
     for (let i = 0; i < n; i++) repo.add(repo.head, `Step ${i + 1} of ${n}`);
   },
+  /** Swap in another history, e.g. a big repository's snapshot (performance checks, docs/PERF.md). */
+  loadHistory(snap: Pick<RepoSnapshot, "commits" | "refs" | "head">) {
+    repo.commits = new Map(snap.commits.map((c) => [c.id, c]));
+    repo.order = snap.commits.map((c) => c.id);
+    const of = (kind: RefInfo["kind"]) =>
+      new Map(snap.refs.filter((r) => r.kind === kind).map((r) => [r.name, r.target] as const));
+    repo.branches = of("local");
+    repo.remotes = of("remote");
+    repo.tags = of("tag");
+    repo.stashes = [];
+    if (snap.head.branch) repo.head = snap.head.branch;
+  },
+  /** Files every commit diff returns instead of the made-up ones (performance checks). */
+  diffs: null as FileDiff[] | null,
   /** A new commit on `branch` (e.g. the bottom of a stack moving on). */
   commitOn(branch: string, summary: string) {
     repo.add(branch, summary);
@@ -1169,6 +1189,7 @@ const mockTable: Table = {
     const st = repo.stashes.find((x) => x.id === id);
     if (st)
       return delay(st.changes.map((c) => fakeFile(c.path, hash(c.path), st.message, c.unstaged ?? c.staged ?? "")));
+    if (demoControls.diffs) return delay(demoControls.diffs);
     const c = repo.commits.get(id);
     if (!c) return fail(`Unknown commit ${id}`);
     const h = hash(id);

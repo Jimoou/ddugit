@@ -1,7 +1,8 @@
 import { Icon } from "./Icon";
 import { LfsDiff } from "./Lfs";
 import { lfsChange } from "../lfs";
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { offsets, useVisibleRows } from "./virtual";
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
 import { Segmented } from "./Segmented";
@@ -39,6 +40,8 @@ const STATUS: Record<string, string> = {
 };
 
 const MIN_H = 160;
+/** File list row height, px (fixed in CSS). */
+const FILE_H = 24;
 
 /** Bottom sheet under the graph: file list on the left, unified diff on the right. */
 export function DiffSheet({ title, files, error, initialPath, stage, onClose }: Props) {
@@ -46,6 +49,9 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
   const [height, setHeight] = useState(() => Math.round(window.innerHeight * 0.45));
   const drag = useRef<{ y: number; h: number } | null>(null);
   const body = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const fileTops = useMemo(() => offsets((files ?? []).map(() => FILE_H)), [files]);
+  const fileRows = useVisibleRows(list, fileTops);
 
   // A new file asked for from outside (e.g. the composer) wins over the user's pick.
   const [askedPath, setAskedPath] = useState(initialPath);
@@ -128,10 +134,11 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
       </header>
 
       <div className="split">
-        <ul className="file-list">
+        <ul className="file-list" ref={list}>
           {!files && !error && <li className="muted pad">{t("diff.loading")}</li>}
           {files?.length === 0 && <li className="muted pad">{t("diff.none")}</li>}
-          {files?.map((f) => (
+          {fileRows.start > 0 && <li className="gap" style={{ height: fileTops[fileRows.start] }} aria-hidden />}
+          {files?.slice(fileRows.start, fileRows.end).map((f) => (
             <li
               key={f.path}
               className={f === current ? "on" : ""}
@@ -146,6 +153,9 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
               </span>
             </li>
           ))}
+          {files && fileRows.end < files.length && (
+            <li className="gap" style={{ height: fileTops[files.length] - fileTops[fileRows.end] }} aria-hidden />
+          )}
         </ul>
 
         <div className="diff-body" ref={body}>
@@ -165,12 +175,38 @@ interface LinePick {
   anchor: number;
 }
 
+/** Row heights, px (fixed in CSS, so long diffs can draw only the rows on screen). */
+const LINE_H = 19;
+const HEAD_H = 32;
+
+/** One table row: a note (rename, cut short), a hunk header, or a line of a hunk. */
+type Row =
+  | { kind: "rename" }
+  | { kind: "truncated" }
+  | { kind: "hunk"; hunk: number }
+  | { kind: "line"; hunk: number; line: number };
+
+function rowsOf(file: FileDiff): Row[] {
+  const rows: Row[] = file.oldPath ? [{ kind: "rename" }] : [];
+  file.hunks.forEach((h, hunk) => {
+    rows.push({ kind: "hunk", hunk });
+    for (let line = 0; line < h.lines.length; line++) rows.push({ kind: "line", hunk, line });
+  });
+  if (file.truncated) rows.push({ kind: "truncated" });
+  return rows;
+}
+
 function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
   // Picks belong to the diff they were made on; a reloaded diff starts clean.
   const [picked, setPicked] = useState<{ file: FileDiff; pick: LinePick | null }>({ file, pick: null });
   const pick = picked.file === file ? picked.pick : null;
   const setPick = (next: (p: LinePick | null) => LinePick | null) =>
     setPicked((cur) => ({ file, pick: next(cur.file === file ? cur.pick : null) }));
+  const rows = useMemo(() => rowsOf(file), [file]);
+  const tops = useMemo(() => offsets(rows.map((r) => (r.kind === "line" ? LINE_H : HEAD_H))), [rows]);
+  const table = useRef<HTMLTableElement>(null);
+  const { start, end } = useVisibleRows(table, tops, ".diff-body");
+  const pickedSet = useMemo(() => new Set(pick?.lines), [pick]);
 
   if (file.binary) return <p className="muted pad">{t("diff.binary")}</p>;
   if (lfsChange(file)) return <LfsDiff file={file} />;
@@ -189,104 +225,76 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
       return next.length ? { hunk, lines: next, anchor: line } : null;
     });
 
+  const staging = stage?.scope === "unstaged";
+  const row = (r: Row, i: number) => {
+    if (r.kind === "rename")
+      return (
+        <tr key={i} className="hunk">
+          <td colSpan={4}>
+            {file.oldPath} → {file.path}
+          </td>
+        </tr>
+      );
+    if (r.kind === "truncated")
+      return (
+        <tr key={i} className="hunk">
+          <td colSpan={4}>{t("diff.truncated")}</td>
+        </tr>
+      );
+    const lines = pick && pick.hunk === r.hunk ? pick.lines : [];
+    if (r.kind === "hunk")
+      return (
+        <tr key={i} className="hunk">
+          <td colSpan={4}>
+            <span>{file.hunks[r.hunk].header}</span>
+            {stage && (
+              <button
+                className="hunk-btn"
+                disabled={stage.busy}
+                onClick={() =>
+                  stage.onHunk(file.path, r.hunk, lines.length ? [...lines].sort((a, b) => a - b) : undefined)
+                }
+              >
+                <Icon name={stage.scope === "unstaged" ? "plus" : "minus"} size={12} />{" "}
+                {lines.length
+                  ? t(staging ? "diff.stageLines" : "diff.unstageLines", { n: lines.length })
+                  : t(staging ? "diff.stageHunk" : "diff.unstageHunk")}
+              </button>
+            )}
+          </td>
+        </tr>
+      );
+    const l = file.hunks[r.hunk].lines[r.line];
+    const change = l.kind !== " ";
+    // Click a changed line's gutter to pick it (Shift: range).
+    const pickProps =
+      stage && change
+        ? { onClick: (e: MouseEvent) => toggle(r.hunk, r.line, e.shiftKey), title: t("diff.pickLine") }
+        : {};
+    const isPicked = pick?.hunk === r.hunk && pickedSet.has(r.line);
+    return (
+      <tr key={i} className={`${l.kind === "+" ? "ins" : l.kind === "-" ? "rem" : ""} ${isPicked ? "picked" : ""}`}>
+        <td className="no" {...pickProps}>
+          {l.old ?? ""}
+        </td>
+        <td className="no" {...pickProps}>
+          {l.new ?? ""}
+        </td>
+        <td className="sign" {...pickProps}>
+          {l.kind === " " ? "" : l.kind === "-" ? "−" : "+"}
+        </td>
+        <td className="code">{l.text}</td>
+      </tr>
+    );
+  };
+
   return (
-    <table className={`diff ${stage ? "pickable" : ""}`}>
+    <table className={`diff ${stage ? "pickable" : ""}`} ref={table}>
       <tbody>
-        {file.oldPath && (
-          <tr className="hunk">
-            <td colSpan={4}>
-              {file.oldPath} → {file.path}
-            </td>
-          </tr>
-        )}
-        {file.hunks.map((h, i) => {
-          const picked = pick?.hunk === i ? pick.lines : [];
-          const staging = stage?.scope === "unstaged";
-          return (
-            <HunkRows
-              key={i}
-              header={h.header}
-              lines={h.lines}
-              picked={picked}
-              onPick={stage && ((line, range) => toggle(i, line, range))}
-              action={
-                stage && (
-                  <button
-                    className="hunk-btn"
-                    disabled={stage.busy}
-                    onClick={() =>
-                      stage.onHunk(file.path, i, picked.length ? [...picked].sort((a, b) => a - b) : undefined)
-                    }
-                  >
-                    <Icon name={stage.scope === "unstaged" ? "plus" : "minus"} size={12} />{" "}
-                    {picked.length
-                      ? t(staging ? "diff.stageLines" : "diff.unstageLines", { n: picked.length })
-                      : t(staging ? "diff.stageHunk" : "diff.unstageHunk")}
-                  </button>
-                )
-              }
-            />
-          );
-        })}
-        {file.truncated && (
-          <tr className="hunk">
-            <td colSpan={4}>{t("diff.truncated")}</td>
-          </tr>
-        )}
+        {start > 0 && <tr className="gap" style={{ height: tops[start] }} aria-hidden />}
+        {rows.slice(start, end).map((r, i) => row(r, start + i))}
+        {end < rows.length && <tr className="gap" style={{ height: tops[rows.length] - tops[end] }} aria-hidden />}
       </tbody>
     </table>
-  );
-}
-
-function HunkRows({
-  header,
-  lines,
-  action,
-  picked = [],
-  onPick,
-}: {
-  header: string;
-  lines: FileDiff["hunks"][number]["lines"];
-  action?: ReactNode;
-  picked?: number[];
-  /** Click a changed line's gutter to pick it (Shift: range). */
-  onPick?(line: number, range: boolean): void;
-}) {
-  return (
-    <>
-      <tr className="hunk">
-        <td colSpan={4}>
-          <span>{header}</span>
-          {action}
-        </td>
-      </tr>
-      {lines.map((l, i) => {
-        const change = l.kind !== " ";
-        const pick =
-          onPick && change
-            ? {
-                onClick: (e: MouseEvent) => onPick(i, e.shiftKey),
-                title: t("diff.pickLine"),
-              }
-            : {};
-        return (
-          <tr
-            key={i}
-            className={`${l.kind === "+" ? "ins" : l.kind === "-" ? "rem" : ""} ${picked.includes(i) ? "picked" : ""}`}
-          >
-            <td className="no" {...pick}>
-              {l.old ?? ""}
-            </td>
-            <td className="no" {...pick}>
-              {l.new ?? ""}
-            </td>
-            <td className="sign" {...pick}>
-              {l.kind === " " ? "" : l.kind === "-" ? "−" : "+"}
-            </td>
-            <td className="code">{l.text}</td>
-          </tr>
-        );
-      })}
-    </>
   );
 }
