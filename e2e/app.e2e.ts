@@ -52,7 +52,7 @@ test("resolves a conflict block by editing it by hand", async ({ demo }) => {
 
   // Resolving the last file clears the nebula.
   await page
-    .getByRole("button", { name: /파일 전체:/ })
+    .getByRole("button", { name: /^모두 (현재|들어오는)/ })
     .first()
     .click();
   await expect(nebula).not.toHaveClass(/\bon\b/);
@@ -535,7 +535,7 @@ test("settings: switching to English relabels the app and is remembered", async 
   await page.keyboard.press("Escape");
 
   await page.reload();
-  await expect(page.locator(".topbar")).toContainText("Demo mode");
+  await expect(page.locator(".topbar")).toContainText("Demo");
   expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
 });
 
@@ -576,7 +576,7 @@ test("clones from a URL, remembers it in the repository menu and stars it", asyn
   await dialog.getByRole("button", { name: "고르기…" }).click();
   await expect(dialog).toContainText("→ /work/rocket");
   await dialog.getByRole("button", { name: "복제" }).click();
-  await demo.toast("rocket을(를) 복제했어요");
+  await demo.toast("rocket을 복제했어요");
 
   await page.locator(".tab.on .tab-menu").click();
   const row = page.locator(".repo-menu .recent-list li").filter({ hasText: "/work/rocket" });
@@ -610,7 +610,7 @@ test("sets up SSH for a clone inside the app: key, host trust, test", async ({ d
   await ssh.getByRole("button", { name: "이 서버 신뢰" }).click();
   await expect(ssh).toContainText("이미 신뢰한 서버예요");
   await ssh.getByRole("button", { name: "연결 확인" }).click();
-  await expect(ssh).toContainText("demo(으)로 인증됐어요");
+  await expect(ssh).toContainText("demo로 인증됐어요");
 
   // Back to HTTPS: the same repository.
   await dialog.getByRole("radio", { name: "HTTPS" }).click();
@@ -631,7 +631,7 @@ test("clones one of my GitHub repositories by searching for it", async ({ demo }
   await dialog.getByRole("tab", { name: "GitHub" }).click();
   const list = dialog.getByRole("listbox", { name: "GitHub 저장소" });
   await expect(list.getByRole("option")).toHaveCount(8);
-  await expect(dialog).toContainText("github.com에 stella(으)로 로그인돼 있어요");
+  await expect(dialog).toContainText("github.com에 stella로 로그인돼 있어요");
 
   await dialog.getByPlaceholder("내 저장소 검색").fill("tele");
   await expect(list.getByRole("option")).toHaveCount(1);
@@ -643,7 +643,7 @@ test("clones one of my GitHub repositories by searching for it", async ({ demo }
   await dialog.getByRole("button", { name: "고르기…" }).click();
   await expect(dialog).toContainText("→ /work/telemetry");
   await dialog.getByRole("button", { name: "복제", exact: true }).click();
-  await demo.toast("telemetry을(를) 복제했어요");
+  await demo.toast("telemetry를 복제했어요");
   // The source and the protocol are remembered for next time.
   expect(
     await page.evaluate(() => [localStorage.getItem("ddugit.cloneSource"), localStorage.getItem("ddugit.forgeProto")]),
@@ -761,16 +761,16 @@ test("undoes the last commit, goes back hard, then rescues the lost commit from 
   // Go back one more, discarding everything.
   at = (await demo.screenOf(grand))!;
   await page.mouse.click(at.x, at.y, { button: "right" });
-  await page.click(".context-menu >> text=이 커밋으로 되돌리기");
-  const dialog = page.getByRole("dialog", { name: "되돌리기" });
+  await page.click(".context-menu >> text=여기로 리셋…");
+  const dialog = page.getByRole("dialog", { name: "리셋" });
   await dialog.getByText("변경까지 모두 버리기 (hard)").click();
   await expect(dialog).toContainText("커밋하지 않은 변경");
-  await dialog.getByRole("button", { name: "되돌리기" }).click();
+  await dialog.getByRole("button", { name: "리셋" }).click();
   await expect.poll(async () => (await demo.snapshot()).head.target).toBe(grand);
   expect((await demo.snapshot()).changes).toEqual([]);
 
   // The undone commit is only in the reflog now: rescue it as a branch.
-  await page.getByRole("button", { name: "되돌리기 기록 (reflog)" }).click();
+  await page.getByRole("button", { name: "작업 기록 (reflog)" }).click();
   const row = page.locator(".reflog-list li.lost").filter({ hasText: head.slice(0, 7) });
   await row.getByRole("button", { name: "브랜치로 살리기" }).click();
   await page.locator(".dialog input").fill("rescued");
@@ -864,7 +864,7 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
   const file = page.locator(".inspector .changed li:not(.dir)").first();
   await file.click({ button: "right" });
   await page.click(".context-menu >> text=이 커밋 이전 상태로");
-  await expect(page.locator(".toast").filter({ hasText: "되돌렸어요" })).toBeVisible();
+  await expect(page.locator(".toast").filter({ hasText: "복원했어요" })).toBeVisible();
   expect((await demo.snapshot()).changes.some((c) => c.staged)).toBe(true);
 });
 
@@ -895,7 +895,7 @@ test("hunts down the commit that broke something with bisect", async ({ demo }) 
   await demo.toast("버그 찾기를 시작했어요");
 
   const banner = page.locator(".bisect-banner");
-  for (let i = 0; i < 6 && !(await banner.textContent())?.includes("범인을 찾았어요"); i++) {
+  for (let i = 0; i < 6 && !(await banner.textContent())?.includes("원인 커밋:"); i++) {
     const text = (await banner.textContent()) ?? "";
     const sha = /지금 (\w{7})/.exec(text)![1];
     const idx = line.findIndex((c) => c.startsWith(sha));
@@ -903,7 +903,7 @@ test("hunts down the commit that broke something with bisect", async ({ demo }) 
     await banner.getByRole("button", { name: idx <= 4 ? "버그 있음" : "버그 없음" }).click();
     await expect(banner).not.toContainText(`지금 ${sha}`);
   }
-  await expect(banner).toContainText(`범인을 찾았어요: ${culprit.slice(0, 7)}`);
+  await expect(banner).toContainText(`원인 커밋: ${culprit.slice(0, 7)}`);
   await banner.getByRole("button", { name: "끝내기" }).click();
   await expect(banner).toHaveCount(0);
 });
@@ -918,7 +918,7 @@ test("traces a file through history and shows who changed each line", async ({ d
   await page.click(".context-menu >> text=이 파일이 지나온 커밋 보기");
 
   const banner = page.locator(".trail-banner");
-  await expect(banner).toContainText("별자리로 이었어요");
+  await expect(banner).toContainText("바꾼 커밋");
   const n = Number(/커밋 (\d+)개/.exec((await banner.textContent()) ?? "")![1]);
   expect(n).toBeGreaterThan(0);
 
@@ -1033,16 +1033,16 @@ test("the tutorial voyage ticks off missions as they are done, and can be closed
   const { page } = demo;
   await page.evaluate(() => localStorage.setItem("ddugit.voyage", JSON.stringify({ done: [], dismissed: false })));
   await page.reload();
-  const log = page.getByRole("complementary", { name: "항해 일지" });
+  const log = page.getByRole("complementary", { name: "튜토리얼" });
   await expect(log).toContainText("0 / 6");
-  await expect(log.locator("li.now")).toContainText("별 하나 살펴보기");
+  await expect(log.locator("li.now")).toContainText("커밋 살펴보기");
 
   // Mission 1: look at a commit.
   const snap = await demo.snapshot();
   const at = (await demo.screenOf(snap.head.target!))!;
   await page.mouse.click(at.x, at.y);
   await expect(log).toContainText("1 / 6");
-  await expect(log.locator("li.now")).toContainText("새 별 띄우기");
+  await expect(log.locator("li.now")).toContainText("커밋하기");
 
   // Mission 6 out of order: push.
   await page.getByRole("button", { name: /Push/ }).click();
@@ -1057,7 +1057,7 @@ test("the tutorial voyage ticks off missions as they are done, and can be closed
   await page.reload();
   await expect(page.locator(".tab.on")).toContainText("ddugit-demo");
   await expect(log).toHaveCount(0);
-  await page.getByRole("button", { name: /데모 모드/ }).click();
+  await page.getByRole("button", { name: /데모/ }).click();
   await expect(log).toContainText("2 / 6");
 });
 
@@ -1114,13 +1114,13 @@ test("adds a worktree for a new branch, opens it in a tab, and removes it", asyn
   const { page } = demo;
   const section = page.locator(".app:not([hidden]) .sidebar .worktrees");
   await expect(section.locator("li")).toHaveCount(1);
-  await section.getByRole("button", { name: "worktree 추가" }).click();
+  await section.getByRole("button", { name: "워크트리 추가" }).click();
   const dialog = page.locator(".worktree-dialog");
   await dialog.getByRole("radio", { name: "새 브랜치" }).click();
   await dialog.getByLabel("새 브랜치").fill("hotfix");
-  await expect(dialog.getByLabel("worktree 폴더")).toHaveValue("/demo/ddugit-demo-hotfix");
+  await expect(dialog.getByLabel("워크트리 폴더")).toHaveValue("/demo/ddugit-demo-hotfix");
   await dialog.getByRole("button", { name: "추가하고 탭으로 열기" }).click();
-  await demo.toast("hotfix을(를) 새 worktree에 꺼냈어요");
+  await demo.toast("hotfix를 새 워크트리에 체크아웃했어요");
   await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 
   // Back in the first tab: the branch is out elsewhere, so checking it out opens that tab.
@@ -1129,15 +1129,15 @@ test("adds a worktree for a new branch, opens it in a tab, and removes it", asyn
   const branch = page.locator(".app:not([hidden]) .sidebar li").filter({ hasText: /^hotfix$/ });
   await expect(branch.locator(".elsewhere")).toBeVisible();
   await branch.dblclick();
-  await demo.toast(/다른 worktree에 꺼내져 있어서/);
+  await demo.toast(/다른 워크트리에 체크아웃돼 있어서/);
   await expect(page.locator(".tab.on")).toHaveCount(1);
   await expect(page.locator(".tabbar .tab:not(.tab-home)").nth(1)).toHaveClass(/on/);
 
   await page.locator(".tabbar .tab:not(.tab-home)").nth(0).click();
   await section.locator("li").filter({ hasText: "ddugit-demo-hotfix" }).click({ button: "right" });
-  await page.getByRole("menuitem", { name: "worktree 제거…" }).click();
+  await page.getByRole("menuitem", { name: "워크트리 제거…" }).click();
   await page.locator(".dialog").getByRole("button", { name: "제거" }).click();
-  await demo.toast("worktree를 제거했어요");
+  await demo.toast("워크트리를 제거했어요");
   await expect(section.locator("li")).toHaveCount(1);
 });
 
@@ -1165,7 +1165,7 @@ test("LFS: downloads files left as pointers and tracks a new file type", async (
   await section.getByRole("button", { name: "LFS로 관리할 파일 형식 추가" }).click();
   await page.locator(".dialog input.text").fill("*.mp4");
   await page.locator(".dialog").getByRole("button", { name: "추적" }).click();
-  await demo.toast(/\*\.mp4을\(를\) LFS로 관리해요/);
+  await demo.toast(/\*\.mp4를 LFS로 관리해요/);
   await expect(section.locator("li")).toHaveCount(3);
   expect((await demo.snapshot()).changes.some((c) => c.path === ".gitattributes")).toBe(true);
 });
@@ -1175,7 +1175,7 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   // The branch switcher lists the remote-only branch; picking it makes it local and tracking.
   await page.locator(".topbar .branch-now").click();
   await page.getByRole("menuitem", { name: /origin\/feature\/orbit-sync/ }).click();
-  await demo.toast("origin/feature/orbit-sync을(를) 로컬로 가져와 이동했어요");
+  await demo.toast("origin/feature/orbit-sync를 로컬로 가져와 이동했어요");
   expect((await demo.snapshot()).head.branch).toBe("feature/orbit-sync");
 
   // New branch from the sidebar's +.
@@ -1197,7 +1197,7 @@ test("makes local branches: from a remote-only branch, a new one at HEAD, and un
   const name = page.locator(".dialog input.text");
   await expect(name).toHaveValue("origin-main");
   await page.locator(".dialog").getByRole("button", { name: "만들고 이동" }).click();
-  await demo.toast("origin/main을(를) 로컬로 가져와 이동했어요");
+  await demo.toast("origin/main을 로컬로 가져와 이동했어요");
   expect((await demo.snapshot()).head.branch).toBe("origin-main");
 });
 
@@ -1223,7 +1223,7 @@ test("groups repositories on the dashboard: create, move in, open all, ungroup",
 
   for (const name of ["api-gateway", "payments"]) {
     await galaxy.locator(".world").filter({ hasText: name }).getByRole("button", { name: "그룹으로 옮기기" }).click();
-    await page.getByRole("menuitem", { name: "결제 플랫폼(으)로 옮기기" }).click();
+    await page.getByRole("menuitem", { name: "결제 플랫폼으로 옮기기" }).click();
   }
   await expect(band.locator(".world")).toHaveCount(2);
   await expect(galaxy.locator(".band.ungrouped .world")).toHaveCount(1);
@@ -1277,7 +1277,7 @@ test("groups: a suggestion by owner, picking several cards, and dragging between
       .locator(".world-open")
       .click({ modifiers: ["Control"] });
   await expect(galaxy.locator(".pick-bar")).toContainText("2개 선택");
-  await galaxy.locator(".pick-bar").getByRole("button", { name: "acme(으)로 옮기기" }).click();
+  await galaxy.locator(".pick-bar").getByRole("button", { name: "acme로 옮기기" }).click();
   await expect(acme.locator(".world")).toHaveCount(4);
   await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 
@@ -1339,7 +1339,7 @@ test("the original project added as a remote is fetch-only: a push offers origin
   await page.fill(".dialog input >> nth=0", "upstream");
   await page.fill(".dialog input >> nth=1", "https://example.com/original.git");
   await page.click(".dialog button.primary");
-  await demo.toast("upstream은(는) 가져오기 전용으로 추가했어요. 그쪽으로는 올리지 않아요");
+  await demo.toast("upstream을 가져오기 전용으로 추가했어요. 이 원격에는 push하지 않아요");
   const upstream = page.locator(".sidebar section.remote-sub").filter({ hasText: "upstream" });
   await expect(upstream.locator(".fetch-only")).toBeVisible();
 
@@ -1349,7 +1349,7 @@ test("the original project added as a remote is fetch-only: a push offers origin
     .filter({ hasText: /^main$/ })
     .dblclick();
   await page.locator(".dialog").getByRole("button", { name: "만들고 이동" }).click();
-  await demo.toast(/upstream\/main을\(를\) 로컬로/);
+  await demo.toast(/upstream\/main을 로컬로/);
   expect((await demo.snapshot()).head.upstream).toBe("upstream/main");
 
   await page.locator(".topbar").getByRole("button", { name: /Push/ }).click();
@@ -1365,9 +1365,9 @@ test("a remote can be disconnected from its menu, even the only one", async ({ d
   const { page } = demo;
   const origin = page.locator(".sidebar section.remote-sub").filter({ hasText: "origin" });
   await origin.getByRole("button", { name: "origin 메뉴" }).click();
-  await page.getByRole("menuitem", { name: "origin 연결 끊기 (원격 삭제)…" }).click();
+  await page.getByRole("menuitem", { name: "원격 origin 삭제…" }).click();
   await page.locator(".dialog").getByRole("button", { name: "삭제" }).click();
-  await demo.toast("origin 연결을 끊었어요");
+  await demo.toast("원격 origin을 삭제했어요");
   await expect(page.locator(".sidebar section.remote-sub")).toHaveCount(0);
   expect((await demo.snapshot()).remotes).toEqual([]);
 });
@@ -1386,7 +1386,7 @@ test("several branches can be picked in the sidebar, lighting their histories to
   await branch("hotfix/crash").click();
   await branch("feature/theme").click();
   await expect(side.locator("li.focused")).toHaveCount(3);
-  await expect(side.locator(".side-picked")).toContainText("브랜치 3개 선택");
+  await expect(side.locator(".side-picked")).toContainText("브랜치 3개의 이력 강조 중");
   await branch("hotfix/crash").click();
   await expect(side.locator("li.focused")).toHaveCount(2);
   await expect(branch("feature/login")).toHaveClass(/focused/);
@@ -1445,7 +1445,7 @@ test("on Free, private pull requests and backport actions offer Pro instead", as
   await sheet.locator("tbody tr").first().locator("input[type=checkbox]").check();
   await sheet.getByRole("button", { name: /cherry-pick/ }).click();
   await expect(offer).toContainText("백포트 실행");
-  await offer.getByRole("button", { name: "Pro 활성화" }).click();
+  await offer.getByRole("button", { name: "이미 구매했어요" }).click();
   await expect(page.locator(".license-plan")).toContainText("Free");
 });
 
@@ -1471,7 +1471,7 @@ test("air-gapped transfer writes only what a destination lacks, and imports a bu
   await expect(dialog.locator(".tr-heads")).toContainText("feature/theme");
   await expect(dialog.locator("input.text")).toHaveValue("acme");
   await dialog.getByRole("button", { name: /^반입/ }).click();
-  await demo.toast("번들을 acme(으)로 반입했어요");
+  await demo.toast("번들을 acme로 반입했어요");
   await expect(dialog).toHaveCount(0);
   expect((await demo.snapshot()).refs.some((r) => r.name === "acme/main")).toBe(true);
 });
@@ -1497,7 +1497,7 @@ test("a stacked branch falls behind when the branch below moves, and restacking 
   await page.click(".context-menu >> text=이 브랜치 위에 새 브랜치 쌓기");
   await page.locator(".dialog input.text").fill("feature/theme-ui");
   await page.keyboard.press("Enter");
-  await demo.toast("feature/theme-ui을(를) feature/theme 위에 쌓았어요");
+  await demo.toast("feature/theme-ui를 feature/theme 위에 쌓았어요");
 
   const stacks = page.locator(".sidebar section.stacks");
   const row = stacks.locator("li", { hasText: "feature/theme-ui" });
@@ -1599,7 +1599,7 @@ test("the dashboard pulls picked repositories and puts them all on the same bran
   await bar.getByRole("button", { name: /브랜치…/ }).click();
   await page.locator(".dialog input.text").fill("release/3.0");
   await page.keyboard.press("Enter");
-  await demo.toast("저장소 2개를 release/3.0(으)로 옮겼어요");
+  await demo.toast("저장소 2개를 release/3.0으로 전환했어요");
   for (const name of ["nova", "comet"]) await expect(world(name).locator(".world-branch")).toContainText("release/3.0");
   await expect(world("rocket").locator(".world-branch")).not.toContainText("release/3.0");
 });
@@ -1653,7 +1653,7 @@ test("identity: a profile made in settings is applied to the repository from the
     .locator(".context-menu")
     .getByRole("menuitem", { name: /Kim Work/ })
     .click();
-  await demo.toast("이 저장소는 Kim Work(으)로 커밋해요");
+  await demo.toast("이 저장소는 Kim Work로 커밋해요");
   await expect(line.locator(".who")).toHaveText("Kim Work <kim@corp.example>");
   await expect(line.locator(".scope")).toHaveText("이 저장소");
   await expect(line.locator(".signs")).toBeVisible();

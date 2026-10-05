@@ -24,7 +24,7 @@ function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void 
         <ul className="pro-list">
           <li>{t("pro.list.pulls")}</li>
           <li>{t("pro.list.backport")}</li>
-          <li>{t("pro.list.dashboard")}</li>
+          <li>{t("pro.list.dashboard", { n: FREE_DASHBOARD })}</li>
           <li>{t("pro.list.transfer")}</li>
           <li>{t("pro.list.stack")}</li>
           <li>{t("pro.list.notes")}</li>

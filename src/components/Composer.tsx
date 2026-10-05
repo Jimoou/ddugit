@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FileChange, IdentityOp, Profile } from "../types";
 import { IdentityLine } from "./Identity";
 import { t } from "../i18n";
+import { Rich } from "../i18n/Rich";
 
 interface Props {
   path: string;
@@ -104,8 +105,10 @@ export function Composer(props: Props) {
         <div>
           <div className="eyebrow">{amend ? t("composer.amend") : t("composer.new")}</div>
           <h2>
-            {!amend && useBranch && newBranch ? newBranch : (branch ?? "detached HEAD")}
-            <span className="muted">{amend ? t("composer.onAmend") : t("composer.onCommit")}</span>
+            <Rich
+              k={amend ? "composer.onAmend" : "composer.onCommit"}
+              vars={{ branch: !amend && useBranch && newBranch ? newBranch : (branch ?? "detached HEAD") }}
+            />
           </h2>
         </div>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
@@ -191,14 +194,14 @@ export function Composer(props: Props) {
       />
 
       {!merging && anyStaged && (
-        <label className="check">
+        <label className="check" title={t("composer.stagedOnly.title")}>
           <input type="checkbox" checked={stagedOnly} onChange={(e) => setStagedOnly(e.target.checked)} />
           <span>{t("composer.stagedOnly")}</span>
         </label>
       )}
 
       {!merging && headMessage !== null && (
-        <label className="check">
+        <label className="check" title={t("composer.amendOpt.title")}>
           <input
             type="checkbox"
             checked={amend}

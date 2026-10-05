@@ -7,13 +7,11 @@ import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { offerPro } from "../pro";
 import { commitsBetween, defaultBody, defaultTitle, pickBase, pushNeed, remoteBranches } from "../prDraft";
-import { FORGE_NAME } from "./Pulls";
+import { FORGE_NAME, prNoun } from "./Pulls";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrTarget, RepoSnapshot } from "../types";
 import { useDialog } from "./useDialog";
 
-/** What GitHub and GitLab call the thing. */
-export const prNoun = (kind: ForgeKind) => (kind === "gitlab" ? "MR" : "PR");
 /** `#12` / `!12`. */
 export const prTag = (kind: ForgeKind, n: number) => `${kind === "gitlab" ? "!" : "#"}${n}`;
 

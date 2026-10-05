@@ -131,7 +131,7 @@ export function ForgeRepoPicker(p: Props) {
       <label className="field col">
         <span className="row">
           {t("forge.host")}
-          <span className="muted small">{t("forge.host.hint")}</span>
+          <span className="muted small">{t(`forge.host.hint.${p.kind}`)}</span>
         </span>
         <input
           className="text"

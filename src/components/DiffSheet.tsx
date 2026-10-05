@@ -5,6 +5,7 @@ import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState }
 import type { FileDiff } from "../types";
 import { t } from "../i18n";
 import { useDialog } from "./useDialog";
+import { Rich } from "../i18n/Rich";
 
 interface Props {
   title: string;
@@ -120,7 +121,9 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
             ))}
           </div>
         )}
-        <span className="muted keys">{t("diff.keys")}</span>
+        <span className="muted keys">
+          <Rich k="diff.keys" />
+        </span>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")}>
           <Icon name="close" />
         </button>

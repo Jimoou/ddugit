@@ -58,9 +58,13 @@ export function ResetDialog(p: {
             </label>
           ))}
         </div>
-        {mode === "hard" && p.dirty > 0 && <p className="note warn">{t("undo.hard.dirty", { n: p.dirty })}</p>}
+        {/* One note about what can be recovered: a hard reset over uncommitted changes can't be undone. */}
+        {mode === "hard" && p.dirty > 0 ? (
+          <p className="note warn">{t("undo.hard.dirty", { n: p.dirty })}</p>
+        ) : (
+          <p className="muted small">{t("undo.safety")}</p>
+        )}
         {p.pushed && <p className="note warn">{t("undo.pushed")}</p>}
-        <p className="muted small">{t("undo.safety")}</p>
         <div className="dialog-actions">
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
           <button
