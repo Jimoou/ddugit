@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+pub mod create;
 pub mod repos;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -617,43 +618,61 @@ mod tests {
         assert_eq!(review_of(""), None);
     }
 
-    /// Serve one canned HTTP response and hand back the request (headers and body) it got.
-    fn serve_once(status: &str, body: &str) -> (String, std::thread::JoinHandle<String>) {
+    /// Serve canned HTTP responses, one per connection in order, and hand back
+    /// the requests (headers and body) they answered. The URL has no path.
+    pub(super) fn serve(replies: Vec<(&str, &str)>) -> (String, std::thread::JoinHandle<Vec<String>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let url = format!("http://{}/graphql", listener.local_addr().unwrap());
-        let reply = format!(
-            "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            body.len()
-        );
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let replies: Vec<String> = replies
+            .into_iter()
+            .map(|(status, body)| {
+                format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+            })
+            .collect();
         let handle = std::thread::spawn(move || {
-            let (mut sock, _) = listener.accept().unwrap();
-            let mut got = Vec::new();
-            let mut buf = [0u8; 4096];
-            // Read the headers, then as much body as they announce.
-            loop {
-                let n = sock.read(&mut buf).unwrap();
-                got.extend_from_slice(&buf[..n]);
-                let text = String::from_utf8_lossy(&got).to_string();
-                if let Some(end) = text.find("\r\n\r\n") {
-                    let len = text
-                        .lines()
-                        .find_map(|l| {
-                            l.to_ascii_lowercase()
-                                .strip_prefix("content-length:")
-                                .map(|v| v.trim().parse::<usize>().unwrap_or(0))
-                        })
-                        .unwrap_or(0);
-                    if got.len() >= end + 4 + len || n == 0 {
-                        break;
+            replies
+                .iter()
+                .map(|reply| {
+                    let (mut sock, _) = listener.accept().unwrap();
+                    let mut got = Vec::new();
+                    let mut buf = [0u8; 4096];
+                    // Read the headers, then as much body as they announce.
+                    loop {
+                        let n = sock.read(&mut buf).unwrap();
+                        got.extend_from_slice(&buf[..n]);
+                        let text = String::from_utf8_lossy(&got).to_string();
+                        if let Some(end) = text.find("\r\n\r\n") {
+                            let len = text
+                                .lines()
+                                .find_map(|l| {
+                                    l.to_ascii_lowercase()
+                                        .strip_prefix("content-length:")
+                                        .map(|v| v.trim().parse::<usize>().unwrap_or(0))
+                                })
+                                .unwrap_or(0);
+                            if got.len() >= end + 4 + len || n == 0 {
+                                break;
+                            }
+                        } else if n == 0 {
+                            break;
+                        }
                     }
-                } else if n == 0 {
-                    break;
-                }
-            }
-            sock.write_all(reply.as_bytes()).unwrap();
-            String::from_utf8_lossy(&got).to_string()
+                    sock.write_all(reply.as_bytes()).unwrap();
+                    String::from_utf8_lossy(&got).to_string()
+                })
+                .collect()
         });
         (url, handle)
+    }
+
+    /// One canned response at `/graphql`.
+    fn serve_once(status: &str, body: &str) -> (String, std::thread::JoinHandle<String>) {
+        let (url, handle) = serve(vec![(status, body)]);
+        let first = std::thread::spawn(move || handle.join().unwrap().remove(0));
+        (format!("{url}/graphql"), first)
     }
 
     #[test]

@@ -259,7 +259,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 - [x] 내 GitHub·GitLab 저장소에서 고르기(2026-10-05, GitKraken 비교 요청): clone 창 왼쪽 출처 목록(URL / GitHub / GitLab)과 원격 추가 창 탭, 서버 주소를 바꾸면 GitHub Enterprise·자체 운영 GitLab. 검색·비공개 표시·HTTPS/SSH, 토큰이 없으면 기존 연결 창. Free
 - [x] Git 사용자 프로필(저장소마다 이름·이메일 바꾸기): 설정의 프로필, 커밋 창 이름 줄 메뉴로 이 저장소·전역에 적용. Free
 - [x] 커밋 서명(GPG/SSH) 설정과 서명 표시: 프로필에 서명 방식·키(기기의 키 제안), 서명 실패 안내, 인스펙터 서명 배지. Free
-- [ ] 앱에서 PR·MR 만들기
+- [x] 앱에서 PR·MR 만들기: 로컬 브랜치 메뉴(사이드바·그래프)와 PR 섹션 머리의 버튼. 원격·받을 브랜치(API의 기본 브랜치)·제목·설명(커밋에서 채움)·초안, 들어갈 커밋 목록. 원격에 없거나 앞선 브랜치는 먼저 올리고 만든다. 이미 열린 것은 링크로 알린다. GitHub·Enterprise·GitLab(자체 운영 포함). Free, 비공개·회사 서버는 PR 목록처럼 Pro
 - [ ] 기능 추가 후 데스크톱 앱 UI/UX 점검
 
 ### M16 · v1.0 출시
@@ -384,3 +384,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-05 | v0.7.1 게시(Release run 37262488469). 사이트 개편(ddugit-site#18: 헤더·footer·첫 화면·가격 카드·FAQ). 앱 다듬기: 작은 창 레이아웃 결함 12곳(시트 머리·바닥, 창 높이 넘는 대화상자, 탭 줄 축소, 메뉴 정렬 등), 안내 문구 7개 삭제·46개 축약                                                                                                                                                                                                                                                                                |
 | 2026-10-05 | 내 저장소에서 clone·원격 추가: `forge/repos.rs`(GitHub `viewer.repositories`·GitLab `projects(membership)` GraphQL, 호스트 정규화, 토큰 없음·거절은 `needsToken`, cargo test +5), `forge_repos` 명령(Free), `components/ForgeRepoPicker.tsx`(출처 탭·서버·검색 목록·HTTPS/SSH, 토큰 창 재사용), `components/AddRemote.tsx`(URL / GitHub / GitLab 탭, 이름은 소유자), `forgeRepos.ts`(검색 순위·원격 이름, vitest +6), GitHub·GitLab 로고 아이콘. Bitbucket·Azure DevOps는 `FORGE_SOURCES`에 한 줄 + 백엔드로 추가. e2e +3 |
 | 2026-10-05 | 커밋할 사람 프로필과 서명(GitKraken 비교, Free): `git/identity.rs`(값의 scope 읽기, local·global 적용·서명 켜고 끄기·지우기, GPG·SSH 키 목록, 커밋 서명 상태, cargo test +6), `identity.ts`(프로필 파싱·검사·표시·서명 실패 안내, vitest +9), 커밋 창 이름 줄·메뉴, 설정 프로필, 인스펙터 서명 배지. e2e +2                                                                                                                                                                                                               |
+| 2026-10-05 | 앱에서 PR·MR 만들기: `forge/create.rs`(GitHub `POST /repos/{o}/{r}/pulls`·Enterprise `/api/v3`, GitLab `merge_requests`·초안은 `Draft: `, 이미 열림 422/409는 기존 링크, 거절은 토큰 창, cargo test +7), `pr_target`·`pr_create`(Pro 경계는 PR 목록과 같음), `push_to` 브랜치 인자, `prDraft.ts`(vitest +4), `components/CreatePr.tsx`, 링크 토스트. GitLab 토큰 `api`. e2e +2                                                                                                                                            |

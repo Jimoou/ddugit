@@ -75,6 +75,6 @@ describe("connecting a forge", () => {
     expect(tokenPage({ kind: "github", host: "github.com" })).toBe(
       "https://github.com/settings/tokens/new?scopes=repo&description=ddugit",
     );
-    expect(tokenPage({ kind: "gitlab", host: "gitlab.example.com" })).toContain("scopes=read_api");
+    expect(tokenPage({ kind: "gitlab", host: "gitlab.example.com" })).toContain("scopes=api");
   });
 });

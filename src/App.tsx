@@ -16,12 +16,12 @@ import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import { repoName } from "./recent";
-import { RepoView } from "./RepoView";
+import { RepoView, type ToastAction } from "./RepoView";
 import { defaults, parseSettings, type Settings } from "./settings";
 import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
 import "./App.css";
 
-type Toast = { id: number; kind: "ok" | "err"; text: string };
+type Toast = { id: number; kind: "ok" | "err"; text: string; action?: ToastAction };
 
 /** `?page=N` overrides the history page size for demos and e2e. */
 const PAGE_OVERRIDE = Number(new URLSearchParams(window.location.search).get("page")) || null;
@@ -93,10 +93,11 @@ export default function App() {
     setRepoMenu(null);
   }, []);
 
-  const toast = useCallback((kind: Toast["kind"], text: string) => {
+  const toast = useCallback((kind: Toast["kind"], text: string, action?: ToastAction) => {
     const id = ++toastId.current;
-    setToasts((l) => [...l.slice(-3), { id, kind, text }]);
-    setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" ? 7000 : 3200);
+    setToasts((l) => [...l.slice(-3), { id, kind, text, action }]);
+    // One with a button stays long enough to reach it.
+    setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" || action ? 7000 : 3200);
   }, []);
 
   useEffect(refreshPro, []);
@@ -370,6 +371,16 @@ export default function App() {
         {toasts.map((item) => (
           <div key={item.id} className={`toast ${item.kind}`}>
             {item.text}
+            {item.action && (
+              <button
+                onClick={() => {
+                  item.action!.onClick();
+                  setToasts((l) => l.filter((x) => x.id !== item.id));
+                }}
+              >
+                {item.action.label}
+              </button>
+            )}
           </div>
         ))}
       </div>
