@@ -40,11 +40,11 @@ export function needsToken(report: PrReport | null): ForgeStatus | undefined {
   return report?.forges.find((f) => f.token === "none" || f.unauthorized);
 }
 
-/** Where to make a token with just enough access to read pull requests. */
+/** Where to make a token that can read and open pull / merge requests (GitLab: `api`, as `read_api` can't write). */
 export function tokenPage(f: Pick<ForgeStatus, "kind" | "host">): string {
   return f.kind === "github"
     ? `https://${f.host}/settings/tokens/new?scopes=repo&description=ddugit`
-    : `https://${f.host}/-/user_settings/personal_access_tokens?name=ddugit&scopes=read_api`;
+    : `https://${f.host}/-/user_settings/personal_access_tokens?name=ddugit&scopes=api`;
 }
 
 /** Sidebar section: open pull requests (the merged and closed ones in a fold below), or a way to connect the forge. */
@@ -54,6 +54,8 @@ export function PullSection(p: {
   onMenu(pr: PullRequest, x: number, y: number): void;
   onOpen(pr: PullRequest): void;
   onConnect(forge: ForgeStatus): void;
+  /** Open a new pull request from the current branch. */
+  onCreate(): void;
 }) {
   const { report } = p;
   if (!report?.forges.length) return null;
@@ -97,18 +99,24 @@ export function PullSection(p: {
       title={t("pr.section")}
       count={open.length}
       actions={
-        // A saved token can be replaced or forgotten; a CLI login is managed by `gh` / `glab` itself.
-        saved &&
-        !blocked && (
-          <button
-            className="h3-add"
-            title={t("pr.token.manage")}
-            aria-label={t("pr.token.manage")}
-            onClick={() => p.onConnect(saved)}
-          >
-            <Icon name="key" />
+        <>
+          {
+            // A saved token can be replaced or forgotten; a CLI login is managed by `gh` / `glab` itself.
+            saved && !blocked && (
+              <button
+                className="h3-add"
+                title={t("pr.token.manage")}
+                aria-label={t("pr.token.manage")}
+                onClick={() => p.onConnect(saved)}
+              >
+                <Icon name="key" />
+              </button>
+            )
+          }
+          <button className="h3-add" title={t("pr.new.button")} aria-label={t("pr.new.button")} onClick={p.onCreate}>
+            <Icon name="plus" size={12} />
           </button>
-        )
+        </>
       }
     >
       {blocked && (
@@ -141,10 +149,13 @@ export function PullSection(p: {
   );
 }
 
+/** What the token dialog needs to know about a forge. */
+export type TokenForge = Pick<ForgeStatus, "kind" | "host" | "public" | "token">;
+
 /** Paste a token for a forge (kept in the OS keychain); or forget the saved one. */
 export function TokenDialog(p: {
   /** A pull request forge, or the host the repository picker lists. */
-  forge: Pick<ForgeStatus, "kind" | "host" | "public" | "token">;
+  forge: TokenForge;
   busy: boolean;
   onSave(token: string | null): void;
   onOpenPage(url: string): void;

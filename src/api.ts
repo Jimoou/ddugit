@@ -35,6 +35,9 @@ import type {
   OpResult,
   PickOp,
   PrReport,
+  PrOutcome,
+  PrTarget,
+  NewPr,
   Progress,
   RebaseStep,
   RefOp,
@@ -90,7 +93,7 @@ export interface Commands {
   git_lfs: [{ path: string; op: LfsOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_fetch_remote: [{ path: string; name: string; onProgress: Sink<Progress> }, OpResult];
-  git_push_to: [{ path: string; remote: string; onProgress: Sink<Progress> }, OpResult];
+  git_push_to: [{ path: string; remote: string; branch: string | null; onProgress: Sink<Progress> }, OpResult];
   git_skip: [{ path: string }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
@@ -101,6 +104,8 @@ export interface Commands {
   git_bisect: [{ path: string; op: BisectOp }, OpResult];
   bisect_state: [{ path: string }, BisectState | null];
   pull_requests: [{ path: string; trusted: string[] }, PrReport];
+  pr_target: [{ path: string; remote: string; trusted: string[] }, PrTarget];
+  pr_create: [{ path: string; remote: string; trusted: string[]; req: NewPr }, PrOutcome];
   ssh_status: [Record<string, never>, SshStatus];
   /** `path: null`: the global identity alone. */
   identity_read: [{ path: string | null }, Identity];
@@ -210,9 +215,9 @@ export const api = {
   fetchRemote(path: string, name: string, onProgress: (p: Progress) => void = () => {}) {
     return call("git_fetch_remote", { path, name, onProgress: progressSink(onProgress, path) });
   },
-  /** Push the current branch to `remote` and track it there from now on. */
-  pushTo(path: string, remote: string, onProgress: (p: Progress) => void = () => {}) {
-    return call("git_push_to", { path, remote, onProgress: progressSink(onProgress, path) });
+  /** Push `branch` (default: the current one) to `remote` and track it there from now on. */
+  pushTo(path: string, remote: string, onProgress: (p: Progress) => void = () => {}, branch: string | null = null) {
+    return call("git_push_to", { path, remote, branch, onProgress: progressSink(onProgress, path) });
   },
   /** Drop the cherry-pick / revert / rebase step that stopped, and go on. */
   skip: (path: string) => call("git_skip", { path }),
@@ -235,6 +240,11 @@ export const api = {
   /** Open pull / merge requests on the repository's forge remotes (GitHub, GitLab). */
   /** `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used. */
   pullRequests: (path: string, trusted: string[]) => call("pull_requests", { path, trusted }),
+  /** Where a pull request from `remote` would go: token state, Pro line, default branch. */
+  prTarget: (path: string, remote: string, trusted: string[]) => call("pr_target", { path, remote, trusted }),
+  /** Open a pull / merge request on `remote`'s project (the head branch is already pushed there). */
+  createPr: (path: string, remote: string, trusted: string[], req: NewPr) =>
+    call("pr_create", { path, remote, trusted, req }),
   sshStatus: () => call("ssh_status", {}),
   /** Who commits in `path` are made as (and how they are signed), with where each value comes from; `null`: global. */
   identity: (path: string | null) => call("identity_read", { path }),

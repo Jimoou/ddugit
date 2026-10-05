@@ -187,8 +187,8 @@ command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) 
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
 command!(git_fetch_remote(path: String, name: String, on_progress: Channel<Progress>) -> OpResult
     => git::remote::fetch_one(&path, &name, |p| { let _ = on_progress.send(p); }));
-command!(git_push_to(path: String, remote: String, on_progress: Channel<Progress>) -> OpResult
-    => git::remote::push_to(&path, &remote, |p| { let _ = on_progress.send(p); }));
+command!(git_push_to(path: String, remote: String, branch: Option<String>, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::push_to(&path, &remote, branch.as_deref(), |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));
 command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
     => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
@@ -283,6 +283,30 @@ async fn pull_requests(
 ) -> Result<forge::PrReport, String> {
     let dir = license_dir(&app)?;
     blocking(move || forge::report(&path, &trusted, pro::status_in(&dir).pro)).await
+}
+
+/// Opening a pull request follows the same Free / Pro line as reading them.
+#[tauri::command]
+async fn pr_target(
+    app: tauri::AppHandle,
+    path: String,
+    remote: String,
+    trusted: Vec<String>,
+) -> Result<forge::create::PrTarget, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || forge::create::target(&path, &remote, &trusted, pro::status_in(&dir).pro)).await
+}
+
+#[tauri::command]
+async fn pr_create(
+    app: tauri::AppHandle,
+    path: String,
+    remote: String,
+    trusted: Vec<String>,
+    req: forge::create::NewPr,
+) -> Result<forge::create::PrOutcome, String> {
+    let dir = license_dir(&app)?;
+    blocking(move || forge::create::create(&path, &remote, &trusted, pro::status_in(&dir).pro, &req)).await
 }
 
 #[tauri::command]
@@ -396,6 +420,8 @@ pub fn run() {
             bisect_state,
             file_log,
             pull_requests,
+            pr_target,
+            pr_create,
             license_status,
             license_install,
             license_remove,

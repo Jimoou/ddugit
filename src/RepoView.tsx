@@ -6,7 +6,8 @@ import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
 import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
-import { FORGE_NAME, PullSection, TokenDialog, prOf, prRefs } from "./components/Pulls";
+import { FORGE_NAME, PullSection, TokenDialog, prOf, prRefs, type TokenForge } from "./components/Pulls";
+import { CreatePr, prNoun, prTag } from "./components/CreatePr";
 import { MissionPanel, useVoyage } from "./components/Missions";
 import { PeekCard } from "./components/Peek";
 import { CleanupSheet } from "./components/Cleanup";
@@ -57,7 +58,6 @@ import type {
   CommitInfo,
   FileDiff,
   FileTouch,
-  ForgeStatus,
   LfsOp,
   LfsStatus,
   OpResult,
@@ -134,6 +134,12 @@ function upstreamUrl(snap: RepoSnapshot): string | null {
   return r?.url ?? null;
 }
 
+/** A button on a toast (e.g. open the pull request just made). */
+export interface ToastAction {
+  label: string;
+  onClick(): void;
+}
+
 export interface RepoViewProps {
   path: string;
   /** The visible tab: only it listens to keys, watches files and draws. */
@@ -141,7 +147,7 @@ export interface RepoViewProps {
   settings: Settings;
   /** Commits per page (settings, or `?page=` in demos). */
   page: number;
-  toast(kind: "ok" | "err", text: string): void;
+  toast(kind: "ok" | "err", text: string, action?: ToastAction): void;
   /** Loaded for the first time (recent list). */
   onLoaded(path: string, name: string): void;
   /** Change settings shared by every tab (sparkles, rotation, sidebar layout). */
@@ -233,7 +239,9 @@ export function RepoView({
   /** Open pull requests on the forge remotes; `prTick` re-reads them. */
   const [pulls, setPulls] = useState<PrReport | null>(null);
   const [prTick, setPrTick] = useState(0);
-  const [tokenFor, setTokenFor] = useState<ForgeStatus | null>(null);
+  const [tokenFor, setTokenFor] = useState<TokenForge | null>(null);
+  /** Opening a pull request from this branch. */
+  const [prFrom, setPrFrom] = useState<string | null>(null);
   const [addingRemote, setAddingRemote] = useState(false);
   /** File history: the commits that touched one file, drawn as a constellation. */
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
@@ -654,14 +662,22 @@ export function RepoView({
       },
     });
 
-  /** Push to `name` (e.g. origin) instead of a fetch-only upstream, and follow it there from now on. */
-  const pushTo = async (name: string) => {
+  /**
+   * Push to `name` (e.g. origin) instead of a fetch-only upstream, and follow it there from now on.
+   * `branch` defaults to the current one (another goes up before a pull request is opened from it).
+   */
+  const pushTo = async (name: string, branch: string | null = null) => {
     setRemoteBusy("push");
     setProgress(null);
     try {
-      const r = await run(t("remote.pushedTo", { name }), () => api.pushTo(path, name, setProgress));
+      const r = await run(t("remote.pushedTo", { name }), () => api.pushTo(path, name, setProgress, branch));
       if (r.status === "auth") setAuth({ op: "push", output: r.output });
-      if (r.status === "rejected") setSync("rejected");
+      // Another branch than HEAD: the pull-then-push dialog doesn't apply, so just say why.
+      if (r.status === "rejected") {
+        if (branch) toast("err", r.output);
+        else setSync("rejected");
+      }
+      return r.status === "ok";
     } finally {
       setRemoteBusy(null);
       setProgress(null);
@@ -1294,12 +1310,14 @@ export function RepoView({
     show({ commit: pr.sha });
     graph.current?.centerOn(pr.sha);
   };
+  /** Open a web page (a pull request, a token page) in the browser. */
+  const openUrl = (url: string) => void api.openUrl(path, url).catch((e) => toast("err", String(e)));
   const prMenu = (pr: PullRequest): MenuItem[] => {
     const local = snap?.refs.find((x) => x.kind === "local" && x.name === pr.branch);
     const remote = snap?.refs.find((x) => x.kind === "remote" && x.name === `${pr.remote}/${pr.branch}`);
     const target = local ?? remote;
     return [
-      { label: t("pr.open"), onSelect: () => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e))) },
+      { label: t("pr.open"), onSelect: () => openUrl(pr.url) },
       { label: t("pr.show"), disabled: !commitById.has(pr.sha), onSelect: () => showPr(pr) },
       {
         label: target ? t("pr.checkout", { branch: pr.branch }) : t("pr.checkout.missing", { branch: pr.branch }),
@@ -1308,7 +1326,7 @@ export function RepoView({
       },
     ];
   };
-  const saveToken = (forge: ForgeStatus, token: string | null) =>
+  const saveToken = (forge: TokenForge, token: string | null) =>
     api.setForgeToken(path, forge.host, token).then(
       () => {
         setTokenFor(null);
@@ -1393,6 +1411,12 @@ export function RepoView({
       },
       merge,
       compare,
+      {
+        label: t("pr.new"),
+        icon: "pull",
+        disabled: !pulls?.forges.length,
+        onSelect: () => setPrFrom(r.name),
+      },
       "separator",
       ...stackItems(r.name),
       notesItem(r.name),
@@ -1805,9 +1829,10 @@ export function RepoView({
               <PullSection
                 report={pulls}
                 onShow={showPr}
-                onOpen={(pr) => void api.openUrl(path, pr.url).catch((e) => toast("err", String(e)))}
+                onOpen={(pr) => openUrl(pr.url)}
                 onMenu={(pr, x, y) => setMenu({ x, y, title: pr.title, items: prMenu(pr) })}
                 onConnect={setTokenFor}
+                onCreate={() => setPrFrom(snap.head.branch ?? snap.refs.find((x) => x.kind === "local")?.name ?? null)}
               />
               <SubmoduleSection
                 submodules={snap.submodules}
@@ -1833,7 +1858,7 @@ export function RepoView({
                 onUntrack={(pattern) => void lfsRun(t("lfs.untracked", { pattern }), { kind: "untrack", pattern })}
                 onTurnOn={() => void lfsRun(t("lfs.turnedOn"), { kind: "install" })}
                 onPull={() => void lfsRun(t("lfs.pulled"), { kind: "pull" })}
-                onOpenUrl={(url) => void api.openUrl(path, url).catch((e) => toast("err", String(e)))}
+                onOpenUrl={openUrl}
               />
               <WorktreeSection
                 worktrees={snap.worktrees}
@@ -2438,12 +2463,33 @@ export function RepoView({
         />
       )}
 
+      {prFrom && pulls?.forges.length ? (
+        <CreatePr
+          path={path}
+          snap={snap}
+          forges={pulls.forges}
+          branch={prFrom}
+          trusted={trustedHosts}
+          retry={prTick}
+          onPush={(name, branch) => pushTo(name, branch)}
+          onCreated={(kind, number, url) => {
+            setPrFrom(null);
+            setPrTick((n) => n + 1);
+            const label = `${prNoun(kind)} ${prTag(kind, number)}`;
+            toast("ok", t("pr.new.done", { label }), { label: t("pr.new.view"), onClick: () => openUrl(url) });
+          }}
+          onConnect={setTokenFor}
+          onOpenUrl={openUrl}
+          onCancel={() => setPrFrom(null)}
+        />
+      ) : null}
+
       {tokenFor && (
         <TokenDialog
           forge={tokenFor}
           busy={busy}
           onSave={(token) => void saveToken(tokenFor, token)}
-          onOpenPage={(url) => void api.openUrl(path, url).catch((e) => toast("err", String(e)))}
+          onOpenPage={openUrl}
           onTrustCli={() => {
             onChangeSettings({ trustedForgeHosts: [...trustedHosts, tokenFor.host] });
             setTokenFor(null);

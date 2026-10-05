@@ -184,14 +184,23 @@ fn upstream_remote(repo: &Repository, upstream: &str) -> Option<String> {
     found
 }
 
-/// Push the current branch to `remote` and make it the branch's upstream
-/// (e.g. `origin`, when it followed the original project's branch).
-pub fn push_to(path: &str, remote: &str, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+/// Push `branch` (default: the current one) to `remote` and make it the
+/// branch's upstream (e.g. `origin`, when it followed the original project's
+/// branch, or before opening a pull request from it).
+pub fn push_to(
+    path: &str,
+    remote: &str,
+    branch: Option<&str>,
+    mut on_progress: impl FnMut(Progress),
+) -> Result<OpResult> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
-    let branch = read_head(&repo)
-        .branch
-        .ok_or("HEAD is detached; check out a branch first")?;
+    let branch = match branch {
+        Some(b) => b.to_string(),
+        None => read_head(&repo)
+            .branch
+            .ok_or("HEAD is detached; check out a branch first")?,
+    };
     if !pushable(&repo, super::operand(remote)?) {
         return Err(format!("{remote} is fetch-only"));
     }
@@ -491,20 +500,33 @@ mod tests {
         let r = remote(pb, RemoteOp::Push, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Failed);
         assert!(r.output.contains("fetch-only"), "{}", r.output);
-        assert!(push_to(pb, "upstream", |_| {}).is_err());
+        assert!(push_to(pb, "upstream", None, |_| {}).is_err());
         // The original project never got the commit.
         assert_ne!(
             git_ok(a.path(), &["rev-parse", "main"]).unwrap(),
             git_ok(b.path(), &["rev-parse", "HEAD"]).unwrap()
         );
 
-        let r = push_to(pb, "origin", |_| {}).unwrap();
+        let r = push_to(pb, "origin", None, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
         assert_eq!(
             git_ok(origin.path(), &["rev-parse", "main"]).unwrap(),
             git_ok(b.path(), &["rev-parse", "HEAD"]).unwrap()
         );
+
+        // A branch that isn't checked out goes up too, and follows its new remote copy.
+        git_ok(b.path(), &["branch", "-q", "topic"]).unwrap();
+        let r = push_to(pb, "origin", Some("topic"), |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(
+            git_ok(b.path(), &["rev-parse", "--abbrev-ref", "topic@{upstream}"])
+                .unwrap()
+                .trim(),
+            "origin/topic"
+        );
+        assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
+        assert!(push_to(pb, "origin", Some("--all"), |_| {}).is_err());
 
         // Pushing can be allowed again.
         let allow = RefOp::SetPushable {

@@ -112,6 +112,33 @@ export interface ForgeStatus {
   error: string | null;
 }
 
+/** Where a new pull request would go (`forge/create.rs`). */
+export interface PrTarget {
+  remote: string;
+  kind: ForgeKind;
+  host: string;
+  slug: string;
+  token: ForgeStatus["token"];
+  public: boolean;
+  needsToken: boolean;
+  unauthorized: boolean;
+  locked: boolean;
+  defaultBranch: string | null;
+}
+
+export interface NewPr {
+  base: string;
+  head: string;
+  title: string;
+  body: string;
+  draft: boolean;
+}
+
+export type PrOutcome =
+  | { kind: "created"; number: number; url: string }
+  | { kind: "exists"; number: number; url: string }
+  | { kind: "refused"; message: string };
+
 export interface PrReport {
   forges: ForgeStatus[];
   prs: PullRequest[];

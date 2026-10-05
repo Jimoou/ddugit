@@ -498,6 +498,14 @@ function pull(mode: "ff" | "merge" | "rebase"): OpResult | string {
   return res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`);
 }
 
+/** Pull requests opened in the demo (they join the two it starts with). */
+const demoNewPrs: { number: number; branch: string; title: string; draft: boolean }[] = [];
+/** Open demo pull requests by branch, to answer "already exists". */
+const demoOpenPr = (branch: string) =>
+  [{ number: 12, branch: "feature/theme" }, { number: 15, branch: "hotfix/crash" }, ...demoNewPrs].find(
+    (p) => p.branch === branch && repo.branches.has(p.branch),
+  );
+
 /** Forge hosts the demo has a token for (pasted in this session). */
 const demoForgeHosts = new Set<string>();
 /** The demo user's repositories on a forge: name, description, private, days since the last update. */
@@ -933,15 +941,17 @@ const mockTable: Table = {
     return delay(res("ok"));
   },
 
-  async git_push_to({ remote: name, onProgress }) {
+  async git_push_to({ remote: name, branch, onProgress }) {
     if (repo.fetchOnly.has(name)) return fail(`${name} is fetch-only`);
+    const b = branch ?? repo.head;
+    if (!repo.branches.has(b)) return fail(`Unknown branch '${b}'`);
     for (let pct = 0; pct <= 100; pct += 25) {
       onProgress.onmessage({ phase: "Writing objects", percent: pct });
       await delay(null, 40);
     }
-    repo.remotes.set(`${name}/${repo.head}`, repo.branches.get(repo.head)!);
-    repo.tracking.set(repo.head, `${name}/${repo.head}`);
-    return res("ok", `branch '${repo.head}' set up to track '${name}/${repo.head}'.`);
+    repo.remotes.set(`${name}/${b}`, repo.branches.get(b)!);
+    repo.tracking.set(b, `${name}/${b}`);
+    return res("ok", `branch '${b}' set up to track '${name}/${b}'.`);
   },
 
   git_continue() {
@@ -1546,27 +1556,31 @@ const mockTable: Table = {
     const locked = !demoControls.pro.pro;
     const ok = !locked && (token === "cli" || token === "keychain");
     const tip = (b: string) => repo.branches.get(b)!;
+    type Open = Pick<PullRequest, "number" | "branch" | "title" | "draft" | "author" | "checks" | "review">;
     const prs: PullRequest[] = ok
-      ? [
-          {
-            number: 12,
-            branch: "feature/theme",
-            title: "Warmer theme glow",
-            draft: false,
-            author: "seoyeon",
-            checks: "success" as const,
-            review: "approved" as const,
-          },
-          {
-            number: 15,
-            branch: "hotfix/crash",
-            title: "Fix crash on empty repo",
-            draft: true,
-            author: "hyunwoo",
-            checks: "failure" as const,
-            review: null,
-          },
-        ]
+      ? (
+          [
+            {
+              number: 12,
+              branch: "feature/theme",
+              title: "Warmer theme glow",
+              draft: false,
+              author: "seoyeon",
+              checks: "success" as const,
+              review: "approved" as const,
+            },
+            {
+              number: 15,
+              branch: "hotfix/crash",
+              title: "Fix crash on empty repo",
+              draft: true,
+              author: "hyunwoo",
+              checks: "failure" as const,
+              review: null,
+            },
+          ] as Open[]
+        )
+          .concat(demoNewPrs.map((p) => ({ ...p, author: "stella", checks: "pending" as const, review: null })))
           .filter((p) => repo.branches.has(p.branch))
           .map((p): PullRequest => ({
             ...p,
@@ -1608,6 +1622,35 @@ const mockTable: Table = {
       ],
       prs,
     });
+  },
+  pr_target({ remote }) {
+    const token = demoControls.forgeToken;
+    const connected = token === "cli" || token === "keychain";
+    return delay({
+      remote,
+      kind: "github" as const,
+      host: "github.com",
+      slug: "ddugit/ddugit-demo",
+      token: token === "unauthorized" ? ("keychain" as const) : token,
+      public: true,
+      needsToken: !connected,
+      unauthorized: token === "unauthorized",
+      // The demo repository counts as private (see `pull_requests`).
+      locked: connected && !demoControls.pro.pro,
+      defaultBranch: connected ? "main" : null,
+    });
+  },
+  pr_create({ remote, req }) {
+    if (!demoControls.pro.pro) return Promise.reject(PRO_LOCKED);
+    if (demoControls.forgeToken === "none" || demoControls.forgeToken === "unauthorized")
+      return delay({ kind: "refused" as const, message: "Bad credentials" });
+    const open = demoOpenPr(req.head);
+    const url = (n: number) => `https://github.com/ddugit/ddugit-demo/pull/${n}`;
+    if (open) return delay({ kind: "exists" as const, number: open.number, url: url(open.number) });
+    if (!repo.remotes.has(`${remote}/${req.head}`)) return fail("head invalid");
+    const number = 16 + demoNewPrs.length;
+    demoNewPrs.push({ number, branch: req.head, title: req.title, draft: req.draft });
+    return delay({ kind: "created" as const, number, url: url(number) });
   },
   set_forge_token({ host, token }) {
     demoControls.forgeToken = token ? "keychain" : "none";
