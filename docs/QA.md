@@ -1,7 +1,7 @@
 # QA 계획 (v1.0)
 
 > v1.0.0 출시 전에 ddugit 앱(데스크톱·데모)과 ddugit.com 사이트의 모든 사용자 기능을 무엇으로 확인하는지 정리한 문서다.
-> 기준: 앱 `93d087d`(버전 0.8.0), 사이트 `ddugit-site` `37e0aa4`. 테스트 이름은 이 시점의 것이다.
+> 기준: 앱 `93d087d`(버전 0.8.0), 사이트 `ddugit-site` `37e0aa4`. 테스트 이름은 이 시점의 것이다. 2026-10-05에 5장의 앱 쪽 빈칸(e2e·vitest)을 채우고 판정을 고쳤다.
 > 테스트 파일은 나뉘거나 옮겨질 수 있으니 **테스트 이름**(e2e·vitest의 문자열, cargo의 함수 이름)으로 찾는다: `npx playwright test -g "<이름>"`, `npx vitest run -t "<이름>"`, `cargo test <함수>`.
 
 ## 1. 범위와 테스트 층
@@ -17,7 +17,7 @@
 
 | 층              | 명령                                                                                                                            | 무엇을 도는가                                                                                                                                                                   | CI                                                                            |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 웹 검사         | `npm run check`                                                                                                                 | `tsc`(앱 + `e2e/`), ESLint, Prettier `--check`, vitest(`src/**/*.test.ts` 41개 파일 + `scripts/downloads.test.mjs`)                                                             | `ci-web.yml` Web 잡(PR에서 `src/`·`e2e/`·설정이 바뀔 때) + `npm run build`    |
+| 웹 검사         | `npm run check`                                                                                                                 | `tsc`(앱 + `e2e/`), ESLint, Prettier `--check`, vitest(`src/**/*.test.ts` 42개 파일 + `scripts/downloads.test.mjs`)                                                             | `ci-web.yml` Web 잡(PR에서 `src/`·`e2e/`·설정이 바뀔 때) + `npm run build`    |
 | e2e             | `npm run e2e`                                                                                                                   | Playwright(Chromium)가 `npm run dev`(localhost:1420) 데모를 띄워 `e2e/*.e2e.ts`를 돈다. 페이지 오류·콘솔 오류가 하나라도 나면 실패(`fixtures.ts`)                               | `ci-web.yml` E2E 잡                                                           |
 | e2e(샌드박스)   | `PW_CHROMIUM=/opt/pw-browsers/chromium npm run e2e`                                                                             | 브라우저를 내려받을 수 없는 환경에서 미리 깔린 Chromium을 쓴다                                                                                                                  | —                                                                             |
 | Rust            | `cd src-tauri && mkdir -p ../dist && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`              | 모듈마다 `#[cfg(test)]`: 임시 저장소(`testutil`)에서 실제 git CLI·libgit2, 로컬 bare 원격, 가짜 HTTP 서버(forge, clone 인증 실패), 가짜 키체인(device)                          | `ci-rust.yml`(ubuntu, PR에서 `src-tauri/`가 바뀔 때). 릴리스 전 `all_os` 수동 |
@@ -29,7 +29,8 @@
 알아둘 것:
 
 - e2e는 `reuseExistingServer`라서 이미 떠 있는 vite를 쓴다. `src/mock/`을 고쳤으면 `pkill -f "[v]ite --port 1420"` 후 다시 돈다.
-- 로컬 e2e "adds a remote from the GitHub tab, named after the owner"는 부하가 크면 시간 초과가 난다(단독·CI는 통과, NEXT.md). 실패하면 단독으로 다시 돌려 본다.
+- e2e가 기다리는 것은 데모가 흉내 내는 작업 시간(진행 카드의 타이머)도 포함한다. 부하가 크면 이 시간이 늘어나니, 오래 걸리는 작업은 결과(상태)를 넉넉한 시간 제한으로 기다린 뒤 토스트를 본다("adds a remote from the GitHub tab, named after the owner"가 그렇게 고쳐졌다). 다른 테스트가 부하로 시간 초과가 나면 단독으로 다시 돌려 본다.
+- 데모 제어값(`window.__ddugitDemo`, `src/mock/controls.ts`)과 시작 전 플래그(`demoFlags`: `Pro`·`Update`·`GitMissing`·`License`·`Tabs`)로 실패·충돌 상황을 만든다: `failNextRemote`(fetch·pull·push·clone·서브모듈 업데이트·LFS 받기), `conflictNext`(병합·cherry-pick·revert·정리·stash pop)와 `binaryConflict`, `signFail`, `lfs`, `nextBundle`, `diffs`
 - 일부 cargo 테스트는 도구가 없으면 **조용히 건너뛴다**: `ssh-keygen`(`ssh.rs` `makes_a_key_and_lists_it_with_its_public_half`), `git-lfs`(`lfs.rs` `tracks_patterns_and_finds_files_left_as_pointers`). 새 기계에서는 `which ssh-keygen git-lfs`를 먼저 본다.
 - Linux에서 Rust를 빌드하려면 `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev`가 필요하다.
 
@@ -56,46 +57,46 @@
 
 ### 2.0 요약
 
-| 묶음                        | 항목    | 자동   | 부분   | 없음   | +실기  |
-| --------------------------- | ------- | ------ | ------ | ------ | ------ |
-| A. 그래프와 탐색            | 16      | 8      | 8      | 0      | 1      |
-| B. 커밋과 스테이징          | 7       | 3      | 3      | 1      | 0      |
-| C. diff                     | 4       | 2      | 2      | 0      | 0      |
-| D. 브랜치·태그·원격 관리    | 8       | 5      | 3      | 0      | 0      |
-| E. Fetch · Pull · Push      | 7       | 4      | 3      | 0      | 1      |
-| F. stash                    | 3       | 0      | 2      | 1      | 0      |
-| G. 병합과 충돌              | 7       | 5      | 1      | 1      | 0      |
-| H. cherry-pick · revert     | 5       | 2      | 2      | 1      | 0      |
-| I. interactive rebase       | 4       | 3      | 1      | 0      | 0      |
-| J. 지난 커밋 손보기         | 5       | 4      | 1      | 0      | 0      |
-| K. reset · reflog           | 4       | 4      | 0      | 0      | 0      |
-| L. bisect                   | 2       | 1      | 1      | 0      | 0      |
-| M. 파일 이력 · blame        | 2       | 2      | 0      | 0      | 0      |
-| N. 브랜치 정리              | 1       | 1      | 0      | 0      | 0      |
-| O. worktree                 | 3       | 2      | 1      | 0      | 0      |
-| P. 서브모듈                 | 2       | 1      | 1      | 0      | 0      |
-| Q. LFS                      | 3       | 2      | 1      | 0      | 0      |
-| R. 저장소 들어오기와 탭     | 7       | 3      | 4      | 0      | 4      |
-| S. 내 저장소(은하 대시보드) | 4       | 3      | 0      | 1      | 0      |
-| T. 백포트                   | 6       | 5      | 1      | 0      | 0      |
-| U. 폐쇄망 반출입(Pro)       | 3       | 2      | 1      | 0      | 0      |
-| V. 스택 브랜치(Pro)         | 3       | 3      | 0      | 0      | 0      |
-| W. 릴리스 노트(Pro)         | 2       | 2      | 0      | 0      | 0      |
-| X. GitHub · GitLab          | 6       | 5      | 1      | 0      | 4      |
-| Y. SSH                      | 2       | 1      | 0      | 1      | 1      |
-| Z. 커밋할 사람과 서명       | 4       | 2      | 2      | 0      | 3      |
-| AA. 설정 · 단축키 · 언어    | 4       | 4      | 0      | 0      | 1      |
-| AB. 앱 업데이트             | 1       | 0      | 1      | 0      | 1      |
-| AC. Free / Pro              | 3       | 3      | 0      | 0      | 0      |
-| AD. 라이선스                | 5       | 4      | 1      | 0      | 4      |
-| AE. 문제 신고               | 5       | 4      | 0      | 1      | 1      |
-| AF. 첫 실행과 Git 없음      | 2       | 2      | 0      | 0      | 1      |
-| AG. 오류 경계와 안전        | 3       | 2      | 1      | 0      | 1      |
-| AH. 키보드와 대화상자       | 4       | 3      | 0      | 1      | 0      |
-| AI. 창과 레이아웃           | 2       | 0      | 2      | 0      | 1      |
-| AJ. 큰 저장소 성능          | 1       | 0      | 1      | 0      | 1      |
-| AK. 설치와 배포             | 3       | 1      | 0      | 2      | 3      |
-| **합계**                    | **153** | **98** | **45** | **10** | **28** |
+| 묶음                        | 항목    | 자동    | 부분   | 없음  | +실기  |
+| --------------------------- | ------- | ------- | ------ | ----- | ------ |
+| A. 그래프와 탐색            | 16      | 13      | 3      | 0     | 1      |
+| B. 커밋과 스테이징          | 7       | 7       | 0      | 0     | 0      |
+| C. diff                     | 4       | 4       | 0      | 0     | 0      |
+| D. 브랜치·태그·원격 관리    | 8       | 8       | 0      | 0     | 0      |
+| E. Fetch · Pull · Push      | 7       | 7       | 0      | 0     | 1      |
+| F. stash                    | 3       | 3       | 0      | 0     | 0      |
+| G. 병합과 충돌              | 7       | 7       | 0      | 0     | 0      |
+| H. cherry-pick · revert     | 5       | 5       | 0      | 0     | 0      |
+| I. interactive rebase       | 4       | 4       | 0      | 0     | 0      |
+| J. 지난 커밋 손보기         | 5       | 5       | 0      | 0     | 0      |
+| K. reset · reflog           | 4       | 4       | 0      | 0     | 0      |
+| L. bisect                   | 2       | 2       | 0      | 0     | 0      |
+| M. 파일 이력 · blame        | 2       | 2       | 0      | 0     | 0      |
+| N. 브랜치 정리              | 1       | 1       | 0      | 0     | 0      |
+| O. worktree                 | 3       | 3       | 0      | 0     | 0      |
+| P. 서브모듈                 | 2       | 2       | 0      | 0     | 0      |
+| Q. LFS                      | 3       | 3       | 0      | 0     | 0      |
+| R. 저장소 들어오기와 탭     | 7       | 5       | 2      | 0     | 4      |
+| S. 내 저장소(은하 대시보드) | 4       | 4       | 0      | 0     | 0      |
+| T. 백포트                   | 6       | 6       | 0      | 0     | 0      |
+| U. 폐쇄망 반출입(Pro)       | 3       | 3       | 0      | 0     | 0      |
+| V. 스택 브랜치(Pro)         | 3       | 3       | 0      | 0     | 0      |
+| W. 릴리스 노트(Pro)         | 2       | 2       | 0      | 0     | 0      |
+| X. GitHub · GitLab          | 6       | 5       | 1      | 0     | 4      |
+| Y. SSH                      | 2       | 2       | 0      | 0     | 1      |
+| Z. 커밋할 사람과 서명       | 4       | 4       | 0      | 0     | 3      |
+| AA. 설정 · 단축키 · 언어    | 4       | 4       | 0      | 0     | 1      |
+| AB. 앱 업데이트             | 1       | 0       | 1      | 0     | 1      |
+| AC. Free / Pro              | 3       | 3       | 0      | 0     | 0      |
+| AD. 라이선스                | 5       | 4       | 1      | 0     | 4      |
+| AE. 문제 신고               | 5       | 5       | 0      | 0     | 1      |
+| AF. 첫 실행과 Git 없음      | 2       | 2       | 0      | 0     | 1      |
+| AG. 오류 경계와 안전        | 3       | 2       | 1      | 0     | 1      |
+| AH. 키보드와 대화상자       | 4       | 3       | 0      | 1     | 0      |
+| AI. 창과 레이아웃           | 2       | 1       | 1      | 0     | 1      |
+| AJ. 큰 저장소 성능          | 1       | 0       | 1      | 0     | 1      |
+| AK. 설치와 배포             | 3       | 1       | 0      | 2     | 3      |
+| **합계**                    | **153** | **139** | **11** | **3** | **28** |
 
 `+실기`는 다른 판정과 겹쳐 센다(자동 테스트가 있어도 실기 확인이 필요한 항목). 사이트는 3장에 따로 센다.
 
@@ -106,10 +107,10 @@
 - **A2 장면·그리기 범위** `부분` — 간선 경계 상자와 행 색인으로 화면에 걸친 것만 그린다. 반짝임 흐름.
   - vitest: `src/graph/scene.test.ts` › "bounds each edge by its rows and the lanes it runs through", "finds the edges crossing a span of rows, long ones included, in layout order", "reads the commit at a row and lane", "maps world x to a fraction of the edge", "keeps the evenly spaced sparkles that fall in the window"
   - 빈칸: `renderer.ts`(실제 그리기)는 자동 테스트 없음. 눈으로 확인
-- **A3 줌·팬·카메라** `부분` — 휠·⌘휠·Shift휠, `+`/`-`, `0` 맞추기, `H` HEAD로, 그래프가 화면 밖으로 사라지지 않음(KEEP px).
+- **A3 줌·팬·카메라** `자동` — 휠·⌘휠·Shift휠, `+`/`-`, `0` 맞추기, `H` HEAD로, 그래프가 화면 밖으로 사라지지 않음(KEEP px).
   - vitest: `src/graph/camera.test.ts` › "leaves a view showing the graph alone", "stops panning once only KEEP px of the graph would remain", "keeps less than KEEP on a small viewport"
   - e2e: `graph.e2e.ts` › "folds a straight run when zoomed out and unfolds it on click"(HUD 축소 버튼); `history.e2e.ts` › "hunts down the commit that broke something with bisect"(`h`)
-  - 빈칸: 휠 줌, `0` 키, `+`/`-` 키
+  - e2e: `graph.e2e.ts` › "zooms with the keys and Ctrl+wheel, pans with the wheel, and the minimap jumps there"(`+`/`-`/`0`, ⌘휠·휠·Shift휠)
 - **A4 직선 구간 접기** `자동` — 50% 미만에서 4개 이상 직선 구간이 개수 막대가 되고 누르면 펼쳐 확대한다.
   - e2e: `graph.e2e.ts` › "folds a straight run when zoomed out and unfolds it on click"
   - vitest: `src/graph/runs.test.ts` › "folds the inside of a linear history, not its tip or root", "splits at kept commits and drops runs shorter than min", "stops at merges and fork points", "returns the runs reaching into a span of rows"
@@ -124,67 +125,70 @@
 - **A8 키보드 탐색·스크린리더** `자동` — ←→ 부모/자식, ↑↓ 옆 레인, Enter 메뉴, aria-live로 읽기.
   - e2e: `graph.e2e.ts` › "moves through commits with the keyboard and announces them"
   - vitest: `src/graph/navigate.test.ts` › "walks first parents and children along the same line", "jumps to the nearest commit in the next lane"
-- **A9 커밋 검색** `부분` — ⌘/Ctrl+F, 메시지·본문·작성자·SHA(4자 이상)·브랜치 이름, 그래프 하이라이트, Enter/Shift+Enter로 결과 이동.
+- **A9 커밋 검색** `자동` — ⌘/Ctrl+F, 메시지·본문·작성자·SHA(4자 이상)·브랜치 이름, 그래프 하이라이트, Enter/Shift+Enter로 결과 이동.
   - vitest: `src/graph/search.test.ts` › "matches message text case-insensitively, including the body", "matches author and email", "matches SHA prefixes of 4+ hex chars only", "matches ref names and keeps newest-first order", "returns nothing for a blank query"
-  - 빈칸: 검색 막대 화면 흐름(e2e 없음)
-- **A10 미니맵** `부분` — 전체 개요, 클릭으로 이동, 그래프가 낮으면 숨김.
+  - e2e: `graph.e2e.ts` › "finds commits with Ctrl+F, walks the matches with Enter and Shift+Enter, and flies to each"(대소문자 무시, SHA 앞부분, 없음, 끝에서 돌아감, 카메라 이동, Esc 후 선택 유지)
+- **A10 미니맵** `자동` — 전체 개요, 클릭으로 이동, 그래프가 낮으면 숨김.
   - e2e: `history.e2e.ts` › "keeps the diff and the conflict sheet usable in a small window"(숨김만)
-  - 빈칸: 미니맵 클릭 이동
-- **A11 이전 이력 더 불러오기** `부분` — 왼쪽 끝 "⋯ 이전 이력 더 불러오기", 설정한 개수(1000/3000/10000)씩, 카메라 위치 유지.
+  - e2e: `graph.e2e.ts` › "zooms with the keys and Ctrl+wheel, pans with the wheel, and the minimap jumps there"(클릭 이동)
+- **A11 이전 이력 더 불러오기** `자동` — 왼쪽 끝 "⋯ 이전 이력 더 불러오기", 설정한 개수(1000/3000/10000)씩, 카메라 위치 유지.
   - cargo: `git/read.rs` › `history_limit_sets_truncated`, `children_first_moves_a_parent_after_its_skewed_child`
-  - 빈칸: 화면 흐름(e2e 없음, mock은 `truncated`를 지원)
+  - e2e: `graph.e2e.ts` › "loads older history from the end of the graph and keeps the camera where it was"(`?page=10`), `settings.e2e.ts` › "settings: a smaller history size reads the repository again with fewer commits"
 - **A12 자동 새로고침·⌘R** `부분` `+실기` — 파일이 바뀌면 300ms 뒤 다시 읽는다(무시 경로 제외), 보이는 탭만 감시, ⌘/Ctrl+R.
   - cargo: `git/watch.rs` › `relevance_rules`, `editing_a_file_triggers_the_callback`
   - e2e: `branches.e2e.ts` › "switches branch from the top bar and re-reads the repository with Cmd/Ctrl+R"
   - 실기: 외부 편집기·터미널에서 커밋하면 macOS(FSEvents)·Windows(ReadDirectoryChangesW)에서 그래프가 따라오는지
 - **A13 사이드바** `자동` — 섹션 접기(저장), 레일로 접기(⌘/Ctrl+B, 아이콘으로 그 섹션 열며 펼침), 브랜치 여러 개 고르기(클릭 토글, 선택 해제).
   - e2e: `branches.e2e.ts` › "folds sidebar sections and the whole sidebar, and keeps the layout"; `graph.e2e.ts` › "several branches can be picked in the sidebar, lighting their histories together"
-- **A14 커밋 인스펙터** `부분` — 본문 전체, 한 줄 메타, sha 복사, 부모로 이동, 포함한 브랜치·PR·CI, 폴더로 묶은 파일과 +/− 막대.
+- **A14 커밋 인스펙터** `자동` — 본문 전체, 한 줄 메타, sha 복사, 부모로 이동, 포함한 브랜치·PR·CI, 폴더로 묶은 파일과 +/− 막대.
   - e2e: `commit.e2e.ts` › "inspector: shows whether a commit is signed"(부모로 이동); `repos.e2e.ts` › "opens repositories in tabs and keeps each tab's state"(선택 유지)
   - vitest: `src/components/ChangedFiles.test.ts` › "groups files by folder, root files first, folders in path order"
-  - 빈칸: sha 복사, 포함한 브랜치 표시
+  - e2e: `commit.e2e.ts` › "inspector: copies the commit id, lists the branches holding it, and says when copying fails", "inspector: a changed file opens the commit's diff sheet, read-only"
 - **A15 우주 연출** `자동` — push 혜성, fetch 유성, 병합 섬광, cherry-pick 혜성, 충돌 성운, rebase 별자리. 반짝임을 끄면 아무것도 안 나옴. 하늘 회전.
   - e2e: `remote.e2e.ts` › "a push rides a comet into orbit and fetched commits arrive as meteors, unless sparkles are off"; `history.e2e.ts` › "merges by dragging a branch tip onto HEAD", "cherry-picks a commit from its menu and a comet carries the copy over", "resolves a conflict block by editing it by hand"(성운), "reorders and folds commits with the interactive rebase sheet"
   - vitest: `src/graph/space.test.ts` › "turns slowly while animating, holds still otherwise, and ignores long gaps"
 - **A16 진행 중 작업 표시** `부분` — 멈춘 병합·cherry-pick·revert의 들어오는 커밋 → ＋ 빨간 점선, 진행 중 띠.
   - cargo: `git/read.rs` › `stopped_merge_reports_incoming_commit`
   - e2e: `pro.e2e.ts` › "a backported commit that is already there stops as empty and is skipped, not sent to the conflict sheet"(띠)
-  - 빈칸: 점선 그리기
+  - e2e: `history.e2e.ts` › "a cherry-pick stopped on conflicts goes on from its banner"(띠, 스냅샷의 `incoming`)
+  - 빈칸: 점선 그리기(캔버스, 눈으로 확인)
 
 ### B. 커밋과 스테이징
 
 - **B1 커밋 작성** `자동` — 탑바 Commit·HEAD 다음 ＋, ⌘/Ctrl+Enter, 고른 파일만, 경로를 문자 그대로.
   - e2e: `commit.e2e.ts` › "adds a checkpoint from the + composer"
   - cargo: `git/write.rs` › `commit_only_selected_paths`, `commit_takes_paths_literally`
-- **B2 hunk 스테이지·내리기** `부분` — diff 시트 "변경 / 스테이지됨" 탭, hunk마다 스테이지·내리기, 보여 준 뒤 바뀐 hunk는 거부, 스테이지된 것만 커밋.
+- **B2 hunk 스테이지·내리기** `자동` — diff 시트 "변경 / 스테이지됨" 탭, hunk마다 스테이지·내리기, 보여 준 뒤 바뀐 hunk는 거부, 스테이지된 것만 커밋.
   - cargo: `git/stage.rs` › `stage_one_hunk_and_commit_only_that`, `unstage_a_hunk`, `select_hunks_keeps_header_and_chosen_blocks`, `a_hunk_that_changed_since_it_was_shown_is_refused`
-  - 빈칸: hunk 버튼·스테이지됨 탭 화면 흐름(e2e는 줄 단위만)
+  - e2e: `commit.e2e.ts` › "stages a whole hunk from the diff sheet and takes it back from the staged tab"; 줄 단위는 "stages single lines picked in the diff"
 - **B3 줄 단위 스테이지** `자동` — 줄 번호 클릭, Shift로 범위, 내리기도 같은 방식, 비 UTF-8 파일도 바이트 그대로.
   - e2e: `commit.e2e.ts` › "stages single lines picked in the diff"
   - cargo: `git/stage.rs` › `stage_and_unstage_single_lines`, `stage_lines_of_additions_deletions_and_new_files`, `line_selection_errors`, `select_lines_follows_no_newline_marker`, `stages_hunks_and_lines_of_non_utf8_files_byte_for_byte`
-- **B4 새 파일 스테이지** `부분` — untracked 파일 스테이지, 깨진 index 거부.
+- **B4 새 파일 스테이지** `자동` — untracked 파일 스테이지, 깨진 index 거부.
   - cargo: `git/stage.rs` › `stage_untracked_file_and_reject_bad_index`
+  - e2e: `commit.e2e.ts` › "stages a new, untracked file from the diff sheet as an added file"
 - **B5 amend(마지막 커밋 수정)** `자동` — 메시지만 또는 파일 추가.
   - e2e: `remote.e2e.ts` › "overwrites the upstream after rewriting a pushed commit"
   - cargo: `git/write.rs` › `amend_rewords_or_adds_files`
-- **B6 변경 버리기(discard)** `부분` — 수정·untracked·스테이지된 새 파일, 경로 문자 그대로, 첫 커밋 전에도.
+- **B6 변경 버리기(discard)** `자동` — 수정·untracked·스테이지된 새 파일, 경로 문자 그대로, 첫 커밋 전에도.
   - cargo: `git/stash.rs` › `discard_handles_modified_untracked_and_staged_new`, `discard_and_stash_take_paths_literally`, `discard_on_unborn_branch`
-  - 빈칸: 화면 흐름(확인 창)
-- **B7 커밋 창 단축키** `없음` — `[`/`]` 파일 이동, 줄 고르기 키(단축키 표의 "커밋" 묶음).
+  - e2e: `commit.e2e.ts` › "discarding picked files asks first, and only those files are restored"
+- **B7 커밋 창 단축키** `자동` — `[`/`]` 파일 이동, 줄 고르기 키(단축키 표의 "커밋" 묶음).
+  - e2e: `commit.e2e.ts` › "the diff sheet steps through files with [ and ], and draws only the rows near view in a long file"; ⌘/Ctrl+Enter는 "adds a checkpoint from the + composer", 줄 고르기는 "stages single lines picked in the diff"
 
 ### C. diff
 
-- **C1 커밋 diff** `부분` — 첫 부모 기준, 루트 커밋은 전체 추가.
+- **C1 커밋 diff** `자동` — 첫 부모 기준, 루트 커밋은 전체 추가.
   - cargo: `git/diff.rs` › `commit_diff_against_parent_and_root`
-  - 빈칸: 인스펙터에서 파일을 눌러 커밋 diff 시트 열기(e2e 없음)
+  - e2e: `commit.e2e.ts` › "inspector: a changed file opens the commit's diff sheet, read-only"
 - **C2 작업 트리 diff** `자동` — untracked 포함, 경로 필터, 첫 커밋 전, all/unstaged/staged.
   - cargo: `git/diff.rs` › `worktree_diff_includes_untracked_and_filters_by_path`, `worktree_diff_on_unborn_branch`
   - e2e: `commit.e2e.ts` › "stages single lines picked in the diff"
 - **C3 바이너리·큰 파일** `자동` — 바이너리는 hunk 없음, 파일당 50,000줄·전체 100,000줄에서 자름.
   - cargo: `git/diff.rs` › `binary_files_have_no_hunks`, `large_files_are_truncated`
-- **C4 가상 스크롤** `부분` — 400줄이 넘으면 화면 근처 줄만 그림(diff·시트·인스펙터 파일 목록).
+- **C4 가상 스크롤** `자동` — 400줄이 넘으면 화면 근처 줄만 그림(diff·시트·인스펙터 파일 목록).
   - vitest: `src/components/virtual.test.ts` › "adds up row tops", "draws every row of a short list", "draws the rows meeting the viewport and the overscan around it"
-  - 빈칸: 큰 파일을 연 화면(e2e 없음), 실제 속도는 PERF.md 수동 측정
+  - e2e: `commit.e2e.ts` › "the diff sheet steps through files with [ and ], and draws only the rows near view in a long file"(3,000줄, `diffs` 제어값). 실제 속도는 PERF.md 수동 측정(AJ1)
 
 ### D. 브랜치·태그·원격 관리
 
@@ -197,18 +201,18 @@
 - **D3 원격 브랜치 체크아웃** `자동` — 추적 브랜치를 만들고, 같은 이름 로컬이 다른 커밋이면 새 이름(`origin-main`)을 묻는다.
   - e2e: `branches.e2e.ts` › "makes local branches: from a remote-only branch, a new one at HEAD, and under another name"
   - cargo: `git/refs.rs` › `checkout_remote_creates_tracking_branch_then_reuses_it`; `git/write.rs` › `checkout_of_a_remote_only_branch_tracks_it`
-- **D4 브랜치 이름 변경·삭제** `부분` — 병합 안 된 브랜치는 한 번 더 확인.
+- **D4 브랜치 이름 변경·삭제** `자동` — 병합 안 된 브랜치는 한 번 더 확인.
   - cargo: `git/refs.rs` › `rename_and_delete_branch_with_unmerged_guard`, `ref_op_json_shape`
-  - 빈칸: 메뉴·확인 창 흐름(e2e 없음)
-- **D5 태그 만들기·삭제** `부분` — 가벼운 태그·주석 태그.
+  - e2e: `branches.e2e.ts` › "renames a branch, and deleting an unmerged one asks a second time"
+- **D5 태그 만들기·삭제** `자동` — 가벼운 태그·주석 태그.
   - cargo: `git/refs.rs` › `lightweight_and_annotated_tags`
-  - 빈칸: 화면 흐름(e2e 없음)
+  - e2e: `branches.e2e.ts` › "tags a commit and deletes the tag from the sidebar"(mock은 주석 태그 설명을 저장하지 않는다)
 - **D6 원격 추가** `자동` — 사이드바 ＋, 추가한 원격만 받아오기, 진행 카드, 받아온 브랜치 수 알림, origin이 아니면 가져오기 전용.
   - e2e: `pro.e2e.ts` › "adds the original project as a remote and lists its fixes to backport"; `remote.e2e.ts` › "the original project added as a remote is fetch-only: a push offers origin instead"
   - cargo: `git/refs.rs` › `add_fetch_and_remove_a_remote`; `git/remote.rs` › `fetches_one_remote_only`, `a_fetch_only_remote_is_never_pushed_to_and_push_to_moves_the_upstream`
-- **D7 원격 메뉴** `부분` — 원격별 접기, ⋯ 메뉴(이 원격만 받기, URL 복사, 보내기 허용/막기, 연결 끊기), 원격이 하나뿐이어도.
+- **D7 원격 메뉴** `자동` — 원격별 접기, ⋯ 메뉴(이 원격만 받기, URL 복사, 보내기 허용/막기, 연결 끊기), 원격이 하나뿐이어도.
   - e2e: `remote.e2e.ts` › "a remote can be disconnected from its menu, even the only one"
-  - 빈칸: 보내기 허용/막기(`SetPushable`), 이 원격만 받기, URL 복사
+  - e2e: `remote.e2e.ts` › "a remote's menu copies its URL, fetches it alone, and blocks or allows pushing to it"
 - **D8 git에 넘기는 이름 검사** `자동` — `-`로 시작하는 ref·리비전·이름 거부.
   - cargo: `git/mod.rs` › `operands_that_look_like_options_are_refused`
 
@@ -217,37 +221,39 @@
 - **E1 Fetch** `자동` — 기본으로 묻지 않음, 새 커밋 알림.
   - e2e: `remote.e2e.ts` › "asks before pull and push, lists what moves, and can stop asking"
   - cargo: `git/remote.rs` › `fetch_then_fast_forward_pull`
-- **E2 Pull** `부분` — 확인 창(들어올 커밋, 변경이 있으면 경고), ff-only, 갈라지면 병합/리베이스 선택, 리베이스 충돌, upstream 없음.
+- **E2 Pull** `자동` — 확인 창(들어올 커밋, 변경이 있으면 경고), ff-only, 갈라지면 병합/리베이스 선택, 리베이스 충돌, upstream 없음.
   - e2e: `remote.e2e.ts` › "asks before pull and push, lists what moves, and can stop asking"
   - cargo: `git/remote.rs` › `diverged_pull_and_rejected_push`, `rebase_pull_keeps_history_linear`, `conflicting_rebase_pull_reports_conflict`, `pull_without_upstream_is_an_error`
   - vitest: `src/sync.test.ts` › "lists what a push sends and a pull brings"
-  - 빈칸: 갈라짐 창(`SyncDialog`)에서 병합·리베이스 고르기(e2e 없음, mock은 `diverged`를 돌려준다)
+  - e2e: `remote.e2e.ts` › "a pull that can't fast-forward offers to merge", "a pull that can't fast-forward offers to rebase"
 - **E3 Push** `자동` — 확인 창(보낼 곳·커밋 목록, '다시 묻지 않기'), 첫 push는 `-u`, 원격에 없는 커밋 목록.
   - e2e: `remote.e2e.ts` › "asks before pull and push, lists what moves, and can stop asking"; `createPr.e2e.ts` › "creates a pull request from a branch menu, pushing the branch first"
   - cargo: `git/remote.rs` › `first_push_sets_upstream`
   - vitest: `src/sync.test.ts` › "before the first push, lists the commits no remote branch has"
-- **E4 Push 거부** `부분` — fetch 후 병합/리베이스하고 다시 push, 또는 덮어쓰기(`--force-with-lease`, 못 본 원격 작업은 지킴).
+- **E4 Push 거부** `자동` — fetch 후 병합/리베이스하고 다시 push, 또는 덮어쓰기(`--force-with-lease`, 못 본 원격 작업은 지킴).
   - e2e: `remote.e2e.ts` › "overwrites the upstream after rewriting a pushed commit"
   - cargo: `git/remote.rs` › `diverged_pull_and_rejected_push`, `force_push_replaces_rewritten_history_but_not_unseen_work`
-  - 빈칸: 거부 창의 '병합하고 push'·'리베이스하고 push'
+  - e2e: `remote.e2e.ts` › "a rejected push merges the upstream in, then pushes"('리베이스하고 push'는 같은 `resolveSync` 경로)
 - **E5 진행률** `자동` — `--progress` 파싱, 0.6초 뒤 진행 카드.
   - cargo: `git/remote.rs` › `parses_progress_lines`, `push_reports_progress_and_keeps_it_out_of_output`
   - e2e: `pro.e2e.ts` › "adds the original project as a remote and lists its fixes to backport"
-- **E6 인증 실패 안내** `부분` `+실기` — HTTPS(credential helper)·SSH(agent) 안내 창, 출력 보기, 다시 시도. 프롬프트로 멈추지 않음.
+- **E6 인증 실패 안내** `자동` `+실기` — HTTPS(credential helper)·SSH(agent) 안내 창, 출력 보기, 다시 시도. 프롬프트로 멈추지 않음.
   - cargo: `git/remote.rs` › `missing_credentials_are_classified_as_auth`; `git/mod.rs` › `remote_work_gets_no_hidden_prompts_unless_the_user_chose_ssh`, `a_fetch_over_ssh_that_would_prompt_fails_as_auth`
-  - 빈칸: `AuthDialog` 화면(e2e 없음, mock에 `failNextRemote = "https" | "ssh"`가 있다)
+  - e2e: `remote.e2e.ts` › "a fetch or push refused for credentials explains the HTTPS setup and tries again"; SSH는 Y2
   - 실기: macOS osxkeychain·Windows Git Credential Manager, 틀린 비밀번호, 잠긴 ssh-agent
 - **E7 동시 작업 거부** `자동` — 원격 작업 중 다른 git 작업은 거부, 진행 카드 유지.
   - e2e: `safety.e2e.ts` › "a second git operation is refused while one is still running"
 
 ### F. stash
 
-- **F1 저장·적용·꺼내기·삭제** `부분` — 일부 파일/전체(untracked 포함), id로 지정(다른 stash가 쌓인 뒤에도).
+- **F1 저장·적용·꺼내기·삭제** `자동` — 일부 파일/전체(untracked 포함), id로 지정(다른 stash가 쌓인 뒤에도).
   - cargo: `git/stash.rs` › `partial_stash_then_pop`, `stash_everything_including_untracked_then_apply_and_drop`, `acts_on_the_stash_by_id_after_another_was_pushed`
-  - 빈칸: 화면 흐름 전부(e2e 없음, mock은 `git_stash_push`·`git_stash` 지원)
-- **F2 충돌 나는 pop** `부분` — 충돌을 알리고 stash는 남긴다.
+  - e2e: `commit.e2e.ts` › "stashes picked files, finds the stash on the graph, and applies, pops and drops stashes"
+- **F2 충돌 나는 pop** `자동` — 충돌을 알리고 stash는 남긴다.
   - cargo: `git/stash.rs` › `conflicting_pop_reports_conflict_and_keeps_stash`
-- **F3 그래프 마름모·stash 패널** `없음` — 기준 커밋 옆 마름모, 패널의 시각·기준·꺼내기/적용/삭제.
+  - e2e: `commit.e2e.ts` › "a stash that conflicts when popped stops on the conflicts and is kept"(`conflictNext`)
+- **F3 그래프 마름모·stash 패널** `자동` — 기준 커밋 옆 마름모, 패널의 시각·기준·꺼내기/적용/삭제.
+  - e2e: `commit.e2e.ts` › "stashes picked files, finds the stash on the graph, and applies, pops and drops stashes"(마름모 위치는 개발용 `__ddugit.stashScreenOf`)
 
 ### G. 병합과 충돌
 
@@ -260,12 +266,13 @@
   - e2e: `history.e2e.ts` › "resolves a conflict block by editing it by hand"
   - vitest: `src/conflict.test.ts` › "splits text and conflict blocks with labels and diff3 base", "returns a single text segment when there are no markers", "leaves an unterminated block as plain text", "applies one pick per block and keeps surrounding text byte for byte", "keeps markers for blocks without a pick", "uses hand-edited text with the file's line ending and a trailing newline", "handles CRLF files"
   - cargo: `git/conflict.rs` › `reads_all_three_sides_and_markers`, `resolve_with_each_choice_clears_the_conflict`, `resolution_json_shape`
-- **G4 바이너리 충돌·리베이스 라벨 반전** `없음` — 바이너리는 파일 전체 선택만, 리베이스 중에는 현재/들어오는 쪽 라벨이 바뀐다.
+- **G4 바이너리 충돌·리베이스 라벨 반전** `자동` — 바이너리는 파일 전체 선택만, 리베이스 중에는 현재/들어오는 쪽 라벨이 바뀐다.
+  - e2e: `history.e2e.ts` › "a binary file in conflict is resolved by picking a whole side", "a tidy-up stopped on conflicts names the sides for a rebase, and goes on or is cancelled"(`binaryConflict`)
 - **G5 충돌 해결 안전** `자동` — 충돌 중인 파일만, 작업 트리 안만, 심볼릭 링크는 따라가지 않음.
   - cargo: `git/conflict.rs` › `writes_only_conflicted_files_inside_the_work_tree`, `never_follows_a_conflicted_symlink`
-- **G6 병합 취소·계속** `부분` — 진행 중 띠의 취소(abort)·계속(continue), 계속할 때 untracked 파일을 넣지 않음.
+- **G6 병합 취소·계속** `자동` — 진행 중 띠의 취소(abort)·계속(continue), 계속할 때 untracked 파일을 넣지 않음.
   - cargo: `git/write.rs` › `conflicting_merge_reports_conflict_and_can_abort`, `continue_leaves_untracked_files_out`
-  - 빈칸: 띠의 버튼(e2e 없음)
+  - e2e: `history.e2e.ts` › "a merge stopped on conflicts is cancelled from its banner, and a resolved one ends with a commit", "a cherry-pick stopped on conflicts goes on from its banner"(병합은 계속 대신 커밋으로 끝난다)
 - **G7 작은 창의 충돌 시트** `자동` — 블록이 접히지 않고, 토스트가 블록을 가리지 않음.
   - e2e: `history.e2e.ts` › "keeps the diff and the conflict sheet usable in a small window"
 
@@ -274,12 +281,14 @@
 - **H1 메뉴로 cherry-pick** `자동` — '…에 cherry-pick', `-x`로 원본 기록, 혜성.
   - e2e: `history.e2e.ts` › "cherry-picks a commit from its menu and a comet carries the copy over"
   - cargo: `git/pick.rs` › `cherry_pick_onto_another_branch_records_origin`
-- **H2 Alt+끌기 cherry-pick** `없음` — ⌥/Alt를 누른 채 커밋을 브랜치에 끌어 놓기.
-- **H3 revert** `부분` — 일반 커밋과 병합 커밋.
+- **H2 Alt+끌기 cherry-pick** `자동` — ⌥/Alt를 누른 채 커밋을 브랜치에 끌어 놓기.
+  - e2e: `history.e2e.ts` › "Alt-dragging a commit onto a branch tip cherry-picks it there"
+- **H3 revert** `자동` — 일반 커밋과 병합 커밋.
   - cargo: `git/pick.rs` › `revert_undoes_a_commit_and_a_merge`
-  - 빈칸: 커밋 메뉴의 되돌리기(e2e 없음)
-- **H4 충돌한 cherry-pick 계속·취소** `부분`
+  - e2e: `history.e2e.ts` › "reverts a commit from its menu"
+- **H4 충돌한 cherry-pick 계속·취소** `자동`
   - cargo: `git/pick.rs` › `conflicting_cherry_pick_can_continue_or_abort`
+  - e2e: `history.e2e.ts` › "a cherry-pick stopped on conflicts goes on from its banner"; 취소는 G6의 병합과 같은 띠 버튼
 - **H5 이미 들어 있는 변경(empty) 건너뛰기** `자동` — 충돌 창 대신 '이미 들어 있는 변경' 창, 띠의 건너뛰기.
   - e2e: `pro.e2e.ts` › "a backported commit that is already there stops as empty and is skipped, not sent to the conflict sheet"
   - cargo: `git/backport.rs` › `a_pick_that_is_already_there_stops_as_empty_and_can_be_skipped`
@@ -297,18 +306,18 @@
   - e2e: `history.e2e.ts` › "tidies a range with a merge in it: merges stay, commits move only within their line"
   - vitest: `src/rebasePlan.test.ts` › "groups picks into lines between merges, labels and resets", "reorders within a line, keeps the merges, and refuses a line that starts by melding"
   - cargo: `git/rebase.rs` › `reads_the_todo_git_writes_for_merges`, `plans_apply_within_runs_and_keep_the_merges`, `rewrites_a_range_with_a_merge`
-- **I4 정리 중 충돌** `부분` — 중간에 멈추고 충돌 시트 → 계속/취소.
+- **I4 정리 중 충돌** `자동` — 중간에 멈추고 충돌 시트 → 계속/취소.
   - cargo: `git/rebase.rs` › `reordering_into_a_conflict_stops_mid_rebase`
-  - 빈칸: 화면 흐름(e2e 없음)
+  - e2e: `history.e2e.ts` › "a tidy-up stopped on conflicts names the sides for a rebase, and goes on or is cancelled"
 
 ### J. 지난 커밋 손보기
 
 - **J1 메시지 고치기** `자동` — 이전 커밋·루트 커밋, 뒤 커밋과 로컬 변경 유지.
   - e2e: `commit.e2e.ts` › "rewords and splits a past commit, and restores a file as of a commit"
   - cargo: `git/edit.rs` › `rewords_an_older_commit_and_keeps_later_ones_and_local_changes`, `rewords_the_root_commit`, `reads_the_ui_shape`
-- **J2 작성자 바꾸기** `부분`
+- **J2 작성자 바꾸기** `자동`
   - cargo: `git/edit.rs` › `changes_the_author_of_one_commit`
-  - 빈칸: 화면 흐름(e2e 없음)
+  - e2e: `commit.e2e.ts` › "changes the author of a past commit and replays the commits after it"
 - **J3 커밋 둘로 나누기(파일별)** `자동` — 파일 이름의 줄바꿈으로 명령 주입 불가.
   - e2e: `commit.e2e.ts` › "rewords and splits a past commit, and restores a file as of a commit"
   - cargo: `git/edit.rs` › `splits_a_commit_by_files`, `a_file_name_with_a_newline_cannot_inject_a_command`
@@ -337,9 +346,9 @@
 - **L1 범위 고르기·좋음/나쁨·원인·끝내기** `자동` — 후보 밖은 흐리게, 조준선, 붉은 노바.
   - e2e: `history.e2e.ts` › "hunts down the commit that broke something with bisect"
   - cargo: `git/bisect.rs` › `finds_the_commit_that_broke_it`
-- **L2 건너뛰기** `부분`
+- **L2 건너뛰기** `자동`
   - cargo: `git/bisect.rs` › `skipping_leaves_the_commit_out_of_the_candidates`
-  - 빈칸: 배너의 건너뛰기(e2e 없음)
+  - e2e: `history.e2e.ts` › "skips a commit that can't be tested while bisecting"
 
 ### M. 파일 이력 · blame
 
@@ -363,9 +372,9 @@
 - **O1 목록·추가·탭으로 열기·제거** `자동` — 새 브랜치/기존 브랜치, 폴더 제안 `<원본 옆>/<저장소>-<브랜치>`, 지운 폴더는 prune.
   - e2e: `branches.e2e.ts` › "adds a worktree for a new branch, opens it in a tab, and removes it"
   - cargo: `git/worktree.rs` › `adds_lists_and_removes_worktrees`, `an_existing_branch_goes_out_and_a_deleted_folder_is_pruned`
-- **O2 변경이 남은 worktree 제거** `부분` — 거부(`unmerged`) → '변경째 지우기' 확인.
+- **O2 변경이 남은 worktree 제거** `자동` — 거부(`unmerged`) → '변경째 지우기' 확인.
   - cargo: `git/worktree.rs` › `adds_lists_and_removes_worktrees`
-  - 빈칸: 확인 창(e2e 없음)
+  - e2e: `branches.e2e.ts` › "removing a worktree with changes left in it asks again before deleting them"
 - **O3 다른 worktree에 꺼낸 브랜치** `자동` — 폴더 표시, 체크아웃하면 그 탭을 연다.
   - e2e: `branches.e2e.ts` › "adds a worktree for a new branch, opens it in a tab, and removes it"
 
@@ -374,18 +383,18 @@
 - **P1 상태·모두 업데이트·탭으로 열기** `자동` — 초기화 안 됨/최신/다른 커밋/변경 있음.
   - e2e: `branches.e2e.ts` › "lists submodules with their state, updates them, and opens one in a tab"
   - cargo: `git/submodule.rs` › `reads_and_updates_submodules`
-- **P2 하나만 업데이트·sync·URL 복사·인증 실패** `부분`
+- **P2 하나만 업데이트·sync·URL 복사·인증 실패** `자동`
   - cargo: `git/submodule.rs` › `reads_and_updates_submodules`(sync 포함)
-  - 빈칸: 메뉴 흐름, `auth` 결과 화면
+  - e2e: `branches.e2e.ts` › "a submodule's menu updates it (saying when it needs sign-in), copies its URL and syncs"
 
 ### Q. LFS
 
 - **Q1 상태·받기·추적** `자동` — 패턴, 받지 않은 파일 N개 받기, 형식 추가(`.gitattributes` 변경), 줄바꿈 든 패턴 거부.
   - e2e: `branches.e2e.ts` › "LFS: downloads files left as pointers and tracks a new file type"
   - cargo: `git/lfs.rs` › `reads_patterns_and_pointer_marks`, `tracks_patterns_and_finds_files_left_as_pointers`, `patterns_with_line_breaks_are_refused`
-- **Q2 git-lfs 없음 안내·LFS 켜기·추적 해제** `부분`
+- **Q2 git-lfs 없음 안내·LFS 켜기·추적 해제** `자동`
   - cargo: `git/lfs.rs` › `tracks_patterns_and_finds_files_left_as_pointers`(install·untrack)
-  - 빈칸: 설치 안내·켜기·해제 화면(e2e 없음)
+  - e2e: `branches.e2e.ts` › "LFS: turns LFS on for the repository, untracks a pattern, and says when git-lfs is missing"(`lfs` 제어값, 받기의 인증 실패 포함)
 - **Q3 포인터 diff** `자동` — 포인터 대신 이전·이후 객체 크기와 oid.
   - vitest: `src/lfs.test.ts` › "reads a pointer and nothing else", "turns a pointer diff into before / after objects", "formats sizes"
 
@@ -396,9 +405,9 @@
   - cargo: `git/setup.rs` › `clones_a_local_repository_into_a_new_folder`, `clone_fails_cleanly_into_a_non_empty_folder_or_missing_parent`
   - vitest: `src/recent.test.ts` › "parses stored lists and drops broken entries", "moves a reopened repo to the front, keeps stars first and trims old ones", "names repositories from paths and URLs"
   - 실기: 실제 HTTPS 원격(GitHub 비공개 저장소)
-- **R2 clone 인증 실패** `부분` `+실기` — 인증 실패를 따로 알려 기존 안내 창을 띄운다.
+- **R2 clone 인증 실패** `자동` `+실기` — 인증 실패를 따로 알려 기존 안내 창을 띄운다.
   - cargo: `git/setup.rs` › `clone_refused_by_the_server_is_classified_as_auth`(로컬 HTTP 서버: 401·403은 `Auth`, 404는 `Failed`, 폴더를 남기지 않음)
-  - 빈칸: 안내 창 화면(e2e 없음, 5장 1번)
+  - e2e: `repos.e2e.ts` › "a clone refused over SSH explains the setup in the app, and trying again reopens the clone"
 - **R3 새 저장소(init)** `자동` — `main`으로 시작.
   - e2e: `repos.e2e.ts` › "creates a new repository in a plain folder"
   - cargo: `git/setup.rs` › `init_makes_an_empty_repository_on_main`
@@ -406,10 +415,10 @@
   - cargo: `git/setup.rs` › `finds_the_repository_of_a_nested_path`
   - e2e: `repos.e2e.ts` › "opens repositories in tabs and keeps each tab's state"(폴더 열기)
   - 실기: Finder·탐색기에서 창에 끌어다 놓기
-- **R5 탭** `부분` — 탭마다 상태 유지, 닫으면 이웃으로, 다시 켜면 복원, ⌘/Ctrl+T·W·1…9, Ctrl+Tab, ⌘/Ctrl+0(내 저장소).
+- **R5 탭** `자동` — 탭마다 상태 유지, 닫으면 이웃으로, 다시 켜면 복원, ⌘/Ctrl+T·W·1…9, Ctrl+Tab, ⌘/Ctrl+0(내 저장소).
   - e2e: `repos.e2e.ts` › "opens repositories in tabs and keeps each tab's state"; `safety.e2e.ts` › "a tab that crashes while rendering shows a notice, and the other tabs keep working"(Ctrl+T)
   - vitest: `src/tabs.test.ts` › "opens a path in its existing tab, the welcome tab, or a new one", "closes to the neighbour and never leaves zero tabs", "cycles with wrap-around and ignores out-of-range picks", "round-trips through storage without welcome tabs"; `src/planet.test.ts` › "is the same planet for the same repository, and varies between them"
-  - 빈칸: W·1…9·Ctrl+Tab·0 키, 새로고침 후 탭 복원(e2e 없음)
+  - e2e: `repos.e2e.ts` › "tabs follow the keyboard: new, by number, cycle, home and close, and come back after a reload"(데모는 `Tabs` 플래그가 있을 때만 탭을 기억한다)
 - **R6 `ddugit <경로>` 실행 인자** `부분` `+실기`
   - cargo: `lib.rs` › `the_first_plain_argument_is_the_repository_to_open`(옵션은 건너뛰고 첫 인자를 절대 경로로)
   - 빈칸: 실제 앱이 그 저장소를 탭으로 여는지(Tauri 실행)
@@ -429,7 +438,8 @@
   - e2e: `repos.e2e.ts` › "the dashboard pulls picked repositories and puts them all on the same branch", "on Free, batch pull and branch switching offer Pro"
   - vitest: `src/galaxy.test.ts` › "pulls only branches with an upstream, and switches none stopped mid-operation"
   - cargo: `git/write.rs` › `switch_or_create_takes_local_then_remote_then_makes_one`
-- **S4 Free는 대시보드 3개** `없음` — 별표 먼저·최근 순 3개만 열리고 나머지는 잠김 + Pro 안내(`FREE_DASHBOARD`).
+- **S4 Free는 대시보드 3개** `자동` — 별표 먼저·최근 순 3개만 열리고 나머지는 잠김 + Pro 안내(`FREE_DASHBOARD`).
+  - e2e: `repos.e2e.ts` › "on Free, the dashboard reads three repositories, starred first, and offers Pro for the rest"
 
 ### T. 백포트
 
@@ -445,20 +455,19 @@
   - cargo: `git/backport.rs` › `ignores_are_per_target_and_summary_counts_each`, `ignore_then_apply_the_rest`
 - **T5 일괄 cherry-pick(Pro)** `자동`
   - e2e: `pro.e2e.ts` › "backports a missing commit and then counts it as applied", "on Free, private pull requests and backport actions offer Pro instead"
-- **T6 패치 내보내기(Pro)** `부분`
+- **T6 패치 내보내기(Pro)** `자동`
   - cargo: `git/backport.rs` › `exports_numbered_patches`
-  - 빈칸: 화면 흐름(e2e 없음, mock `backport_export` 있음)
+  - e2e: `pro.e2e.ts` › "exports picked backport commits as numbered patches into a chosen folder"
 
 ### U. 폐쇄망 반출입(Pro)
 
 - **U1 반출** `자동` — 받는 곳별 지난 반출 이후만, 새 것이 없으면 알림, `.sha256`, 반출 기록.
   - e2e: `pro.e2e.ts` › "air-gapped transfer writes only what a destination lacks, and imports a bundle as remote branches"
   - cargo: `git/transfer.rs` › `bundles_carry_only_what_the_destination_lacks_and_import_in_order`, `checksums_are_sha256sum_hex`; `digest.rs` › `matches_sha256sum`
-- **U2 반입** `부분` — 검사(체크섬, 빠진 선행 커밋) 후 `refs/remotes/<이름>/`로, 번들 이름에서 받는 곳 추정.
-  - e2e: 위와 같음(정상 번들만)
+- **U2 반입** `자동` — 검사(체크섬, 빠진 선행 커밋) 후 `refs/remotes/<이름>/`로, 번들 이름에서 받는 곳 추정.
+  - e2e: 위와 같음(정상 번들); `pro.e2e.ts` › "a bundle with a bad checksum or missing prerequisite commits is not imported"(`nextBundle`)
   - cargo: `git/transfer.rs` › `a_changed_bundle_is_refused`, `names_are_checked`
   - vitest: `src/transfer.test.ts` › "takes the destination out of a ddugit bundle name, even with dashes in the repository", "keeps any other name whole"
-  - 빈칸: 체크섬 불일치·빠진 선행 커밋의 화면(mock `transfer_check`가 늘 `match`)
 - **U3 Free 잠금** `자동`
   - e2e: `pro.e2e.ts` › "on Free, air-gapped transfer offers Pro"
 
@@ -516,7 +525,8 @@
   - cargo: `ssh.rs` › `finds_the_ssh_host_of_a_remote`, `reads_fingerprints_and_checks_the_published_ones`, `reads_who_the_server_greeted`, `makes_a_key_and_lists_it_with_its_public_half`, `fingerprints_a_scanned_key`
   - vitest: `src/sshUrl.test.ts` › "switches between the HTTPS and SSH forms of a forge address", "recognises SSH addresses and their host"; `src/shell.test.ts` › "picks PowerShell on Windows, a POSIX shell elsewhere", "quotes so nothing expands", "leaves plain words alone and quotes the rest", "takes host names only"
   - 실기: 실제 github.com·gitlab.com 연결, Windows OpenSSH(ssh-agent 서비스), 암호 걸린 기존 키
-- **Y2 인증 실패 창의 SSH 패널** `없음` — SSH 원격에서 인증 실패 시 같은 4단계 패널.
+- **Y2 인증 실패 창의 SSH 패널** `자동` — SSH 원격에서 인증 실패 시 같은 4단계 패널.
+  - e2e: `repos.e2e.ts` › "a clone refused over SSH explains the setup in the app, and trying again reopens the clone"
 
 ### Z. 커밋할 사람과 서명
 
@@ -524,16 +534,17 @@
   - e2e: `commit.e2e.ts` › "identity: a profile made in settings is applied to the repository from the composer"
   - vitest: `src/identity.test.ts` › "keeps well-formed profiles and drops broken entries", "is read as part of the settings", "names what is wrong", "shows name <email>, where it comes from and whether commits are signed", "flags a missing name or email", "matches by name and email, and by signing for the full match", "makes a profile from the current identity", "adds, replaces in place and folds duplicates"
   - cargo: `git/identity.rs` › `parses_config_with_scopes_last_one_winning`, `applies_and_clears_a_profile_in_the_repo`, `writes_global_style_config_to_the_given_file_and_refuses_bad_values`
-- **Z2 서명 키 제안** `부분` `+실기` — GPG 비밀 키·SSH 공개 키 목록.
+- **Z2 서명 키 제안** `자동` `+실기` — GPG 비밀 키·SSH 공개 키 목록.
   - cargo: `git/identity.rs` › `parses_gpg_secret_keys`
+  - e2e: `commit.e2e.ts` › "identity: the signing key field suggests the GPG and SSH keys found on this computer"
   - 실기: 실제 gpg 키링·`~/.ssh`
 - **Z3 서명 배지** `자동` `+실기` — 서명됨/서명됨(확인 안 됨)/없음, 서명자.
   - e2e: `commit.e2e.ts` › "inspector: shows whether a commit is signed"
   - cargo: `git/identity.rs` › `parses_signature_codes`, `reads_the_signature_of_unsigned_and_ssh_signed_commits`
   - 실기: GPG로 서명한 커밋(`%G?` = G), GitHub의 Verified와 같은지
-- **Z4 서명 실패 안내** `부분` `+실기` — gpg·ssh 서명 실패를 알아보고 안내.
+- **Z4 서명 실패 안내** `자동` `+실기` — gpg·ssh 서명 실패를 알아보고 안내.
   - vitest: `src/identity.test.ts` › "recognizes gpg and ssh signing failures"
-  - 빈칸: 커밋 실패 → 안내 화면(e2e 없음)
+  - e2e: `commit.e2e.ts` › "a commit refused while signing explains what signing needs"(`signFail`)
   - 실기: gpg-agent·pinentry가 뜨는 환경에서 앱이 멈추지 않는지
 
 ### AA. 설정 · 단축키 · 언어
@@ -542,7 +553,7 @@
   - e2e: `settings.e2e.ts` › "settings: shortcut table, sparkles and git path"
   - vitest: `src/settings.test.ts` › "falls back to defaults for missing or broken data", "keeps valid fields and drops invalid ones", "respects reduced motion by default"
   - cargo: `git/mod.rs` › `git_program_is_validated_before_use`, `git_programs_a_clone_could_plant_are_refused`; `proc.rs` › `reads_what_a_program_prints`
-  - 빈칸: '한 번에 불러올 커밋 수'를 바꿨을 때 다시 읽기
+  - e2e: `settings.e2e.ts` › "settings: a smaller history size reads the repository again with fewer commits"
 - **AA2 설정 창 구성** `자동` — 섹션 목록(클릭·화살표), `Segmented`(화살표, Tab 한 번).
   - e2e: `dialogs.e2e.ts` › "settings: the section list switches sections, by click and by arrow keys", "a segmented switch moves with the arrow keys, one Tab stop for the group"
 - **AA3 단축키 표** `자동` — `?`로 열기, 마우스 동작은 글자로, 입력 중에는 단축키 무시.
@@ -568,7 +579,7 @@
   - cargo: `pro.rs` › `without_a_license_it_is_free_from_the_first_day`, `an_active_license_opens_pro_and_a_lapsed_or_foreign_one_does_not`; `license.rs` › `a_device_bound_license_opens_pro_only_on_its_device`
 - **AC2 화면의 잠금과 Pro 안내** `자동` — PRO 표시, 안내 창(닫기·'이미 구매했어요' → 설정의 라이선스), 대화상자 위에서 Esc.
   - e2e: `pro.e2e.ts` › "on Free, private pull requests and backport actions offer Pro instead", "on Free, air-gapped transfer offers Pro", "on Free, stacking a branch offers Pro", "on Free, release notes offer Pro"; `repos.e2e.ts` › "on Free, batch pull and branch switching offer Pro"; `createPr.e2e.ts` › "creating a pull request asks for a token first, and offers Pro on Free"; `dialogs.e2e.ts` › "on Free, the Pro offer over a dialog closes with Esc, then the dialog"
-  - 빈칸: 대시보드 3개 제한(S4)
+  - e2e: `repos.e2e.ts` › "on Free, the dashboard reads three repositories, starred first, and offers Pro for the rest"(S4)
 - **AC3 백엔드 잠금(`pro::require`)** `자동` — 화면을 거치지 않아도 백포트 실행·반출입·스택·일괄 전환 명령이 Free에서 거부된다(`lib.rs`).
   - cargo: `lib.rs` › `pro_commands_are_refused_on_free_before_touching_anything`(Pro 명령 9가지: 거부 문구, 참조·HEAD·로컬 config·작업 트리·내보낼 폴더가 그대로), `pro_commands_work_with_a_license`(테스트 키로 서명한 사이트 라이선스), `taking_a_branch_out_of_its_stack_stays_free`. 명령 본문(`<명령>::run`)에 설정 폴더를 직접 넘긴다
 
@@ -605,7 +616,9 @@
 - **AE4 정보 화면과 링크** `자동` — 버전·OS·아키텍처, https 링크만 연다.
   - e2e: `report.e2e.ts` › "a report from settings → About is sent with redacted diagnostics"
   - cargo: `about.rs` › `app_info_names_this_build`, `only_web_links_open`
-- **AE5 복사·링크 열기 실패 알림** `없음` — 클립보드·브라우저 열기가 실패하면 토스트(`share.ts`).
+- **AE5 복사·링크 열기 실패 알림** `자동` — 클립보드·브라우저 열기가 실패하면 토스트(`share.ts`).
+  - vitest: `src/share.test.ts` › "copies and reports done, or shows a failure when the clipboard refuses or is missing", "opens links through the backend and shows why one could not be opened"
+  - e2e: `commit.e2e.ts` › "inspector: copies the commit id, lists the branches holding it, and says when copying fails"(거부된 클립보드 → 토스트)
 
 ### AF. 첫 실행과 Git 없음
 
@@ -639,9 +652,9 @@
 
 ### AI. 창과 레이아웃
 
-- **AI1 작은 창** `부분` — 최소 900×560(`tauri.conf.json`)에서 탑바·사이드바·시트·설정·대시보드가 넘치지 않음.
+- **AI1 작은 창** `자동` — 최소 900×560(`tauri.conf.json`)에서 탑바·사이드바·시트·설정·대시보드가 넘치지 않음.
   - e2e: `history.e2e.ts` › "keeps the diff and the conflict sheet usable in a small window"(1024×680)
-  - 빈칸: 900×560, 다른 화면들
+  - e2e: `safety.e2e.ts` › "the smallest window (900×560) keeps every screen inside it, controls unclipped and apart"(탑바·사이드바·그래프·커밋 창·rebase 시트·설정·대시보드)
 - **AI2 창 테두리** `부분` `+실기` — macOS 신호등이 탭 줄 위, Windows 창 버튼(최소화·최대화·닫기), 탭 줄 빈 곳 끌기·더블클릭 최대화, 가장자리 크기 조절. Linux·데모는 시스템 제목 표시줄.
   - vitest: `src/chrome.test.ts` › "draws its own frame only in the desktop app on macOS and Windows"
 
@@ -819,24 +832,10 @@
 
 ## 5. 자동화할 빈칸
 
-지금 데모 e2e·vitest·cargo 임시 저장소로 만들 수 있는 것만, 효과가 큰 순서로.
+앱 쪽(데모 e2e·vitest)으로 만들 수 있던 빈칸은 2026-10-05에 채웠다(위 각 항목의 e2e·vitest). 남은 것:
 
-1. **e2e 인증 실패 창** — `failNextRemote = "https"`로 Fetch·Push, `"ssh"`로 clone → `AuthDialog` 안내·SSH 패널·'다시 시도' 확인(E6, R2, Y2)
-2. **e2e Pull 갈라짐** — `commitOn`으로 upstream과 로컬을 갈라 놓고 Pull → `SyncDialog`에서 병합/리베이스 각각, Push 거부 창의 '병합하고 push'(E2, E4)
-3. **e2e stash** — 커밋 창에서 일부 파일 stash → 그래프 마름모 → stash 패널 적용·꺼내기·삭제(F1, F3)
-4. **e2e Free 대시보드 3개** — 최근 저장소 5개 + `__ddugitDemoPro = free` → 카드 3개만 열리고 나머지 잠김·Pro 안내(S4)
-5. **e2e 충돌 띠의 취소·계속** — `conflictNext`로 병합 충돌 → 띠 '취소' → `state`가 `clean`, 다시 충돌 → 해결 → '계속'(G6)
-6. **e2e revert와 Alt+끌기 cherry-pick** — 커밋 메뉴 되돌리기 → 새 커밋, Alt를 누른 채 끌어 놓기 → cherry-pick 확인 창(H2, H3)
-7. **e2e 태그·브랜치 관리** — 커밋 메뉴로 태그 만들기·지우기, 브랜치 이름 바꾸기, 병합 안 된 브랜치 삭제의 두 번째 확인(D4, D5)
-8. **e2e 커밋 검색** — ⌘/Ctrl+F → 입력 → 결과 수, Enter/Shift+Enter로 선택 이동, Esc로 닫기(A9)
-9. **e2e hunk 스테이지와 discard** — diff 시트에서 hunk 스테이지 → '스테이지됨' 탭에서 내리기, 커밋 창에서 변경 버리기 확인 창(B2, B6)
-10. **e2e 최소 창 900×560** — 지금 작은 창 테스트를 넓혀 탑바·사이드바·설정·대시보드·rebase 시트에 가로 스크롤·잘림이 없는지(AI1)
-11. **e2e 탭 단축키와 복원** — Ctrl+T·W·1…9·Ctrl+Tab·Ctrl+0, 새로고침 후 열린 탭 복원(R5)
-12. **e2e 이전 이력 더 불러오기** — 설정 historyPage 1000 + `grow`로 넘기기 → 버튼으로 더 불러오고 카메라가 제자리인지(A11, AA1)
-13. **e2e 반입 검사 실패** — mock `transfer_check`에 `checksum: "mismatch"`·`missing` 제어값을 더해 거부 화면 확인(U2)
-14. **e2e 정리 중 충돌** — rebase 계획이 충돌하게 만들어 충돌 시트 → 계속/취소(I4)
-15. **e2e bisect 건너뛰기, 작성자 바꾸기, 패치 내보내기** — 이미 있는 흐름 테스트에 한 단계씩 덧붙인다(L2, J2, T6)
-16. **e2e worktree 강제 제거·서브모듈 sync·LFS 켜기** — mock 제어값으로 변경 남은 worktree, 초기화 안 된 LFS(O2, P2, Q2)
-17. **vitest `share.ts`** — `navigator.clipboard.writeText`가 거부되거나 없을 때 실패 콜백이 불리는지(AE5)
-18. **사이트 node:test 보안 헤더·다운로드** — `next.config.ts`의 `headers()` 결과가 모든 경로와 `/activate`에 기대한 값인지, `downloads.ts` 파싱(W-11, W-12)
-19. **사이트 RLS 시험** — `supabase db test`(pgTAP)로 authenticated·anon 역할의 `licenses`·`devices`·`reports` 권한과 `devices_within_limit` 트리거(W-5, W-13)
+1. **사이트 node:test 보안 헤더·다운로드** — `next.config.ts`의 `headers()` 결과가 모든 경로와 `/activate`에 기대한 값인지, `downloads.ts` 파싱(W-11, W-12)
+2. **사이트 RLS 시험** — `supabase db test`(pgTAP)로 authenticated·anon 역할의 `licenses`·`devices`·`reports` 권한과 `devices_within_limit` 트리거(W-5, W-13)
+3. **캔버스 그리기 검사(선택)** — 지금은 눈으로 본다(A2, A16의 점선). 화면 픽셀을 읽는 e2e는 테마·반짝임·글꼴에 흔들리기 쉬워 효과에 비해 비싸다
+
+데모로는 만들 수 없어 실기에 남긴 것: 실제 창에 끌어다 놓기(R4, Tauri의 파일 끌기 이벤트)와 실행 인자(R6), 키체인(X2, AD5), 업데이터(AB1), 실제 앱의 CSP(AG3), 창 테두리(AI2), 큰 저장소의 속도(AJ1), 설치 파일(AK1, AK2). 팝업 퇴장 애니메이션(AH4)은 자동화 브라우저에서 일부러 꺼져 있어 눈으로 본다.
