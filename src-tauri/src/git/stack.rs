@@ -170,7 +170,7 @@ pub fn apply(path: &str, op: &StackOp) -> Result<OpResult> {
             if local(&dir, name).is_some() {
                 return Err(format!("Branch '{name}' already exists"));
             }
-            let o = git(&dir, &["checkout", "-b", name, parent])?;
+            let o = git(&dir, &["checkout", "-b", name, parent, "--"])?;
             if !o.ok {
                 return Ok(o.into());
             }

@@ -138,8 +138,7 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
             }
             let remote = default_remote(&repo).ok_or("No remote configured")?;
             super::operand(&remote)?;
-            super::operand(&branch)?;
-            args.extend(["-u".into(), remote, branch]);
+            args.extend(["-u".into(), remote, heads_refspec(&branch)]);
         }
     }
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -170,6 +169,12 @@ pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -
         _ => OpStatus::Failed,
     };
     Ok(OpResult::with(status, o))
+}
+
+/// `refs/heads/b:refs/heads/b`: a branch name as a refspec is read by git, and
+/// a branch named `+main` (a legal name) would mean "force-push main".
+fn heads_refspec(branch: &str) -> String {
+    format!("refs/heads/{branch}:refs/heads/{branch}")
 }
 
 /// The remote of an upstream like `upstream/main` (remote names may hold slashes).
@@ -204,7 +209,8 @@ pub fn push_to(
     if !pushable(&repo, super::operand(remote)?) {
         return Err(format!("{remote} is fetch-only"));
     }
-    let args = ["push", "--progress", "-u", remote, super::operand(&branch)?];
+    let spec = heads_refspec(super::operand(&branch)?);
+    let args = ["push", "--progress", "-u", remote, &spec];
     let o = git_streaming(&dir, &args, |line| match parse_progress(line) {
         Some(p) => {
             on_progress(p);
@@ -527,6 +533,17 @@ mod tests {
         );
         assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
         assert!(push_to(pb, "origin", Some("--all"), |_| {}).is_err());
+
+        // A branch named `+main` is pushed as itself, never as a forced push of main.
+        let main_before = git_ok(origin.path(), &["rev-parse", "main"]).unwrap();
+        git_ok(b.path(), &["branch", "-q", "+main", "HEAD~1"]).unwrap();
+        let r = push_to(pb, "origin", Some("+main"), |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(
+            git_ok(origin.path(), &["rev-parse", "main"]).unwrap(),
+            main_before
+        );
+        assert!(git_ok(origin.path(), &["rev-parse", "--verify", "refs/heads/+main"]).is_ok());
 
         // Pushing can be allowed again.
         let allow = RefOp::SetPushable {

@@ -66,7 +66,7 @@ pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {
     }
     if let Some(t) = target {
         if read_head(&repo).branch.as_deref() != Some(t) {
-            git_ok(&dir, &["checkout", t])?;
+            git_ok(&dir, &["checkout", t, "--"])?;
         }
     }
     Ok(dir)
@@ -113,7 +113,9 @@ pub fn abort(path: &str) -> Result<OpResult> {
 }
 
 /// Continue a rebase / cherry-pick / revert after conflicts were resolved
-/// (stages everything first). A merge is concluded by committing instead.
+/// (stages the tracked files first: conflicted paths are always tracked, and an
+/// unrelated untracked file such as `.env` must not slip into the rewritten
+/// commit). A merge is concluded by committing instead.
 pub fn continue_op(path: &str) -> Result<OpResult> {
     let repo = open(path)?;
     let state = state_name(repo.state());
@@ -121,7 +123,7 @@ pub fn continue_op(path: &str) -> Result<OpResult> {
         return Err(format!("Nothing to continue ({state})"));
     }
     let dir = workdir(&repo)?;
-    git_ok(&dir, &["add", "-A"])?;
+    git_ok(&dir, &["add", "-u"])?;
     let o = git(&dir, &[state, "--continue"])?;
     Ok(conflict_aware(path, o))
 }
@@ -137,10 +139,14 @@ pub fn skip(path: &str) -> Result<OpResult> {
     Ok(conflict_aware(path, o))
 }
 
+/// Check out branch or commit `target`. The `--` makes it a revision only: a
+/// name that isn't one (a branch deleted from a terminal) fails instead of
+/// checking out a file of that name over its local edits. A remote branch's
+/// name still makes a local branch that follows it.
 pub fn checkout(path: &str, target: &str) -> Result<OpResult> {
     operand(target)?;
     let dir = repo_dir(path)?;
-    Ok(git(&dir, &["checkout", target])?.into())
+    Ok(git(&dir, &["checkout", target, "--"])?.into())
 }
 
 pub fn create_branch(path: &str, name: &str, at: Option<&str>, switch: bool) -> Result<OpResult> {
@@ -168,6 +174,9 @@ pub fn create_branch(path: &str, name: &str, at: Option<&str>, switch: bool) -> 
             })
             .ok_or_else(|| format!("Unknown commit '{at}'"))?;
         args.push(at);
+    }
+    if switch {
+        args.push("--");
     }
     Ok(git(&dir, &args)?.into())
 }
@@ -222,7 +231,7 @@ pub fn switch_or_create(path: &str, name: &str) -> Result<SwitchResult> {
             };
             return Ok(done(o, Switched::Already));
         }
-        return Ok(done(git(&dir, &["checkout", name])?, Switched::Local));
+        return Ok(done(git(&dir, &["checkout", name, "--"])?, Switched::Local));
     }
     let mut remotes: Vec<String> = repo
         .remotes()
@@ -238,10 +247,10 @@ pub fn switch_or_create(path: &str, name: &str) -> Result<SwitchResult> {
         .find(|r| repo.find_branch(r, BranchType::Remote).is_ok());
     Ok(match tracked {
         Some(r) => done(
-            git(&dir, &["checkout", "-b", name, "--track", &r])?,
+            git(&dir, &["checkout", "-b", name, "--track", &r, "--"])?,
             Switched::Tracked,
         ),
-        None => done(git(&dir, &["checkout", "-b", name])?, Switched::Created),
+        None => done(git(&dir, &["checkout", "-b", name, "--"])?, Switched::Created),
     })
 }
 
@@ -283,6 +292,57 @@ mod tests {
         assert_eq!(r.result.status, OpStatus::Failed);
         assert_eq!(r.how, None);
         assert!(switch_or_create(p, "--orphan").is_err());
+    }
+
+    /// A name that is no branch any more but is a file: the file's edits stay.
+    #[test]
+    fn checkout_of_a_name_that_is_only_a_file_keeps_its_edits() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "gone", "committed", "base");
+        fs::write(d.path().join("gone"), "my edit").unwrap();
+        assert_eq!(checkout(p, "gone").unwrap().status, OpStatus::Failed);
+        assert!(switch_or_create(p, "gone").is_ok());
+        git_ok(d.path(), &["checkout", "-q", "main"]).unwrap();
+        assert_eq!(fs::read_to_string(d.path().join("gone")).unwrap(), "my edit");
+    }
+
+    /// `checkout <name> --` still makes a local branch following `origin/<name>`.
+    #[test]
+    fn checkout_of_a_remote_only_branch_tracks_it() {
+        let origin = repo();
+        commit_file(origin.path(), "a.txt", "a", "base");
+        git_ok(origin.path(), &["branch", "feat"]).unwrap();
+        let d = tempfile::tempdir().unwrap();
+        git_ok(d.path(), &["clone", "-q", s(origin.path()), "."]).unwrap();
+        let r = checkout(s(d.path()), "feat").unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(s(d.path()), 5).unwrap();
+        assert_eq!(snap.head.branch.as_deref(), Some("feat"));
+        assert_eq!(snap.head.upstream.as_deref(), Some("origin/feat"));
+    }
+
+    /// Continue stages the resolved files but not an unrelated untracked one.
+    #[test]
+    fn continue_leaves_untracked_files_out() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "base", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "a.txt", "feature", "feature edit");
+        checkout(p, "main").unwrap();
+        commit_file(d.path(), "a.txt", "main", "main edit");
+        let feat = git_ok(d.path(), &["rev-parse", "feature"]).unwrap();
+        let r =
+            super::super::pick::pick(p, super::super::pick::PickOp::CherryPick, feat.trim(), None).unwrap();
+        assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
+        fs::write(d.path().join("a.txt"), "resolved").unwrap();
+        fs::write(d.path().join(".env"), "SECRET=1").unwrap();
+        let r = continue_op(p).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let files = git_ok(d.path(), &["show", "--name-only", "--format=", "HEAD"]).unwrap();
+        assert_eq!(files.trim(), "a.txt");
+        assert!(d.path().join(".env").exists());
     }
 
     #[test]
