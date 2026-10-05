@@ -197,7 +197,6 @@ export const ko = {
   "license.newer": "이 버전은 라이선스의 업데이트 기간({date}) 이후에 나왔어요.",
   "license.until": "{date}까지 · {email}",
   "license.lapsed": "라이선스 기간({date})이 지났어요. Pro 기능은 잠겨요.",
-  "license.lapsedToast": "ddugit 라이선스 기간({date})이 지났어요. 설정 → 라이선스에서 확인하세요.",
   "license.devices": "기기 3대까지 · ddugit.com/account에서 기기 관리",
   "license.account": "ddugit.com/account 열기",
   "license.deactivate": "이 기기에서 해제",

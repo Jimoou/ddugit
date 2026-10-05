@@ -200,7 +200,6 @@ export const en: Record<Key, string> = {
   "license.newer": "This version was released after your license's update period ended ({date}).",
   "license.until": "Until {date} · {email}",
   "license.lapsed": "Your license period ended on {date}. Pro features are locked.",
-  "license.lapsedToast": "Your ddugit license period ended on {date}. See Settings → License.",
   "license.devices": "Up to 3 devices · manage them at ddugit.com/account",
   "license.account": "Open ddugit.com/account",
   "license.deactivate": "Deactivate this device",

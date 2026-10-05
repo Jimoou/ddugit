@@ -9,11 +9,9 @@
 //
 //   node scripts/license.mjs sign --key private.pem --name "Acme Corp" --email it@acme.example \
 //       [--kind commercial|site] [--seats 1] [--until 2027-10-02] [--id lic_123]
-//       [--plan monthly|yearly --expires 2026-11-11]
-//       Prints a license text (DDUGIT1.<payload>.<signature>) to send to the buyer.
-//       A subscription (--plan) expires on --expires (paid through + 7 days); the
-//       license-refresh function in ddugit-site renews it while it is paid. Without
-//       --plan it is a site license with no expiry (air-gapped sites).
+//       Prints a license text (DDUGIT1.<payload>.<signature>) to send to the buyer:
+//       a site license with no expiry, for air-gapped sites. Bought (lifetime,
+//       device-bound) licenses are signed by ddugit.com on activation.
 //
 //   node scripts/license.mjs verify --pub <base64url> <license text>
 //       Checks a license the way the app does.
@@ -66,10 +64,9 @@ if (cmd === "keygen") {
   if (!name || !email) throw new Error("--name and --email are required");
   const kind = opt("kind", "commercial");
   if (!["commercial", "site"].includes(kind)) throw new Error("--kind is commercial or site");
-  const plan = opt("plan");
-  const expires = opt("expires");
-  if (plan && !["monthly", "yearly"].includes(plan)) throw new Error("--plan is monthly or yearly");
-  if (Boolean(plan) !== Boolean(expires)) throw new Error("--plan and --expires go together");
+  if (args.includes("--plan") || args.includes("--expires")) {
+    throw new Error("subscriptions are no longer issued (--plan / --expires)");
+  }
   console.log(
     licenseText(key, {
       id: opt("id", `lic_${b64(randomBytes(9))}`),
@@ -78,8 +75,7 @@ if (cmd === "keygen") {
       kind,
       seats: Number(opt("seats", "1")),
       issued: today(),
-      updatesUntil: expires ?? opt("until", yearLater()),
-      ...(plan ? { expires, plan } : {}),
+      updatesUntil: opt("until", yearLater()),
     }),
   );
 } else if (cmd === "verify") {
