@@ -115,10 +115,13 @@ export default function App() {
   const remindLicense = useCallback((text: string) => toast("ok", text), [toast]);
   useLicenseCheck(remindLicense);
 
+  // Patches merge into the latest settings: two in a row, or one from an async callback, keep each other's fields.
   const updateSettings = (patch: Partial<Settings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    store(SETTINGS, JSON.stringify(next));
+    setSettings((s) => {
+      const next = { ...s, ...patch };
+      store(SETTINGS, JSON.stringify(next)); // the same write if React calls this twice
+      return next;
+    });
     // Every component reads the locale while rendering, so this re-render switches them all.
     if (patch.language) setLocale(resolveLocale(patch.language));
   };
