@@ -5,6 +5,7 @@ import { useState } from "react";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { useDialog } from "./useDialog";
+import { safeHost, shellCommand, shellOf } from "../shell";
 
 interface Props {
   /** Remote URL the operation talked to. */
@@ -12,8 +13,8 @@ interface Props {
   /** git's output, used to tell "unknown host key" from "no key". */
   output: string;
   repoPath: string;
-  /** Command that signs in once from a terminal; defaults to fetching `repoPath`. */
-  fetchCmd?: string;
+  /** The command (as words) that signs in once from a terminal; defaults to fetching `repoPath`. */
+  signIn?: string[];
   busy: boolean;
   onRetry(): void;
   onClose(): void;
@@ -23,6 +24,7 @@ type Os = "mac" | "windows" | "linux";
 type Step = { text: Key; cmd?: string };
 
 const os: Os = /Mac/i.test(navigator.userAgent) ? "mac" : /Win/i.test(navigator.userAgent) ? "windows" : "linux";
+const shell = shellOf(navigator.userAgent);
 
 const isSsh = (url: string | null, output: string) =>
   /^(ssh:\/\/|[\w.-]+@[\w.-]+:)/.test(url ?? "") || /publickey|Host key/i.test(output);
@@ -93,35 +95,44 @@ const GUIDES: Record<string, Step[]> = {
   ],
 };
 
-export function AuthDialog({ url, output, repoPath, fetchCmd, busy, onRetry, onClose }: Props) {
+export function AuthDialog({ url, output, repoPath, signIn, busy, onRetry, onClose }: Props) {
   const [copied, setCopied] = useState<number | null>(null);
   const ssh = isSsh(url, output);
   const host = hostOf(url);
   const key = ssh ? (/Host key/i.test(output) ? "ssh-host" : `ssh:${os}`) : `https:${os}`;
-  const signIn = fetchCmd ?? `git -C "${repoPath}" fetch`;
-  const fill = (s: string) => s.replaceAll("{host}", host).replaceAll("{fetch}", signIn);
+  // Paths and URLs are quoted for the terminal; a host that isn't a plain name leaves its commands out.
+  const signInCmd = shellCommand(signIn ?? ["git", "-C", repoPath, "fetch"], shell);
+  const cmdHost = safeHost(host);
+  const fill = (s: string) => s.replaceAll("{host}", host);
+  const command = (cmd: string | undefined) =>
+    cmd && (cmdHost || !cmd.includes("{host}"))
+      ? cmd.replaceAll("{host}", cmdHost ?? "").replaceAll("{fetch}", signInCmd)
+      : null;
   const steps = (
     <ol className="steps">
-      {GUIDES[key].map((s, i) => (
-        <li key={i}>
-          <span>{fill(t(s.text))}</span>
-          {s.cmd && (
-            <div className="cmd">
-              <code>{fill(s.cmd)}</code>
-              <button
-                className="icon"
-                title={t("auth.copy")}
-                onClick={() => {
-                  void navigator.clipboard?.writeText(fill(s.cmd!));
-                  setCopied(i);
-                }}
-              >
-                <Icon name={copied === i ? "check" : "copy"} />
-              </button>
-            </div>
-          )}
-        </li>
-      ))}
+      {GUIDES[key].map((s, i) => {
+        const cmd = command(s.cmd);
+        return (
+          <li key={i}>
+            <span>{fill(t(s.text))}</span>
+            {cmd && (
+              <div className="cmd">
+                <code>{cmd}</code>
+                <button
+                  className="icon"
+                  title={t("auth.copy")}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(cmd);
+                    setCopied(i);
+                  }}
+                >
+                  <Icon name={copied === i ? "check" : "copy"} />
+                </button>
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 

@@ -391,7 +391,7 @@ export default function App() {
           url={cloneAuth.req.url}
           output={cloneAuth.output}
           repoPath={cloneAuth.req.parent}
-          fetchCmd={`git clone ${cloneAuth.req.url}`}
+          signIn={["git", "clone", "--", cloneAuth.req.url]}
           busy={false}
           onClose={() => setCloneAuth(null)}
           onRetry={() => {
