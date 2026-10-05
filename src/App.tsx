@@ -19,6 +19,7 @@ import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import { repoName } from "./recent";
+import { isTypingTarget } from "./keys";
 import { RepoView, type ToastAction } from "./RepoView";
 import { defaults, parseSettings, type Settings } from "./settings";
 import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
@@ -170,8 +171,6 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      const tag = (e.target as HTMLElement)?.tagName;
-      const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
       if (mod && e.key === "0") {
         e.preventDefault();
         setHome(true);
@@ -188,7 +187,7 @@ export default function App() {
       } else if (mod && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         setTabs((tb) => selectAt(tb, Number(e.key) - 1));
-      } else if (e.key === "?" && !typing) setSettingsAt("shortcuts");
+      } else if (e.key === "?" && !isTypingTarget(e.target)) setSettingsAt("shortcuts");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

@@ -87,3 +87,21 @@ test("a selection dragged out of a dialog onto the scrim keeps the dialog open",
   await page.mouse.click(5, 5);
   await expect(page.locator(".dialog")).toHaveCount(0);
 });
+
+test("Esc that closes a menu keeps the selected commit", async ({ demo }) => {
+  const { page } = demo;
+  const at = (await demo.screenOf((await demo.snapshot()).head.target!))!;
+  await page.mouse.click(at.x, at.y);
+  const inspector = page.locator(".app:not([hidden]) .inspector");
+  await expect(inspector).toBeVisible();
+
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await expect(page.locator(".context-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".context-menu")).toHaveCount(0);
+  await expect(inspector).toBeVisible();
+
+  // With nothing open, Esc clears the selection as before.
+  await page.keyboard.press("Escape");
+  await expect(inspector).toHaveCount(0);
+});

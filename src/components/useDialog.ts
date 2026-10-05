@@ -1,4 +1,5 @@
 import { type MouseEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import { isTypingTarget } from "../keys";
 
 /**
  * Keyboard behaviour shared by every dialog, sheet and popup menu:
@@ -81,8 +82,8 @@ function top(): Layer | undefined {
   for (let i = layers.length - 1; i >= 0; i--) if (layers[i].el?.getClientRects().length) return layers[i];
 }
 
-const typing = (t: EventTarget | null) =>
-  t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+/** A dialog, sheet or menu is on screen: Esc is its, not the graph's. */
+export const hasOpenLayer = () => !!top();
 
 /** What Tab visits: shown controls out of the tab order's -1, and of a radio group only its checked one (when one is). */
 function tabStops(el: HTMLElement) {
@@ -100,7 +101,7 @@ function onKey(e: KeyboardEvent) {
   const l = top();
   if (!l?.el || e.defaultPrevented || e.isComposing) return;
   if (e.key === "Escape") {
-    if (!l.modal && typing(e.target) && !l.el.contains(e.target as Node)) return;
+    if (!l.modal && isTypingTarget(e.target) && !l.el.contains(e.target as Node)) return;
     e.preventDefault();
     l.close();
   } else if (e.key === "Tab" && l.modal) {
