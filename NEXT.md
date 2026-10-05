@@ -20,7 +20,7 @@ _마지막 갱신: 2026-10-05_
 
 ## 다음 단계
 
-- 릴리스 v0.8.0(평생 라이선스가 들어간 첫 버전, 사용자 확인 후)
+- v0.8.0 릴리스 진행 중(버전 올림 PR → merge → main에서 Release 수동 실행)
 - 사용자: Supabase 배포 workflow 성공 확인(마이그레이션 `20261005100000_lifetime_devices.sql`, `license-deactivate`), `licenses`에 시험 행(`kind='personal'`, `plan='lifetime'`, `status='active'`, `text=''`)으로 활성화 → 해제 → 재활성화 실제 확인
 - 사용자: Lemon Squeezy 상품을 Single payment $29로. 승인 나면 M15 웹훅(주문 → `licenses` 행 `store_order_id`, 환불 → `status='refunded'`), 사이트 구매 버튼(체크아웃 URL)
 - 실제 GitHub·GitLab API로 저장소 목록·PR·MR 만들기 확인(가짜 서버로만 시험함)
