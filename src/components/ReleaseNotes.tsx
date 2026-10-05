@@ -4,9 +4,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
+import { copyText } from "../share";
 import { forgeWeb, noteItems, releaseMarkdown } from "../notes";
 import type { NoteRange } from "../types";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 /** Section headings in the app's language. */
 const LABELS = () => ({
@@ -31,8 +32,10 @@ export function ReleaseNotesDialog(p: {
 }) {
   // undefined: the latest tag before `to`, picked by the backend; "": from the first commit.
   const [from, setFrom] = useState<string | undefined>(undefined);
-  const [range, setRange] = useState<NoteRange | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // What the backend answered, and for which start: while another start loads, the old notes don't show or copy.
+  const [loaded, setLoaded] = useState<{ from: string | undefined; range: NoteRange | null; error: string | null }>();
+  /** The tags to start from, kept from the last answer so the picker doesn't empty while loading. */
+  const [knownTags, setKnownTags] = useState<string[]>([]);
   const [title, setTitle] = useState(`${p.to} (${new Date().toISOString().slice(0, 10)})`);
   const [includeOther, setIncludeOther] = useState(true);
   const [edited, setEdited] = useState<string | null>(null);
@@ -42,16 +45,19 @@ export function ReleaseNotesDialog(p: {
     api.releaseRange(p.path, from ?? null, p.to).then(
       (r) => {
         if (!live) return;
-        setRange(r);
-        setError(null);
+        setLoaded({ from, range: r, error: null });
+        setKnownTags(r.tags);
       },
-      (e) => live && setError(String(e)),
+      (e) => live && setLoaded({ from, range: null, error: String(e) }),
     );
     return () => {
       live = false;
     };
   }, [p.path, p.to, from]);
 
+  const current = loaded && loaded.from === from ? loaded : null;
+  const range = current?.range ?? null;
+  const error = current?.error ?? null;
   const items = useMemo(() => noteItems(range?.commits ?? []), [range]);
   const markdown = useMemo(
     () =>
@@ -74,11 +80,11 @@ export function ReleaseNotesDialog(p: {
     };
 
   const start = from === undefined ? (range?.from ?? "") : from;
-  const tags = (range?.tags ?? []).filter((tag) => tag !== p.to);
+  const tags = knownTags.filter((tag) => tag !== p.to);
 
   const dialog = useDialog(p.onClose);
   return (
-    <div className="scrim" onClick={p.onClose}>
+    <div className="scrim" {...closeOnScrim(p.onClose)}>
       <div className="dialog notes" aria-label={t("notes.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("notes.title")}</h2>
         <p className="muted small">{t("notes.hint")}</p>
@@ -121,11 +127,7 @@ export function ReleaseNotesDialog(p: {
         </p>
         <div className="dialog-actions">
           <button onClick={p.onClose}>{t("common.close")}</button>
-          <button
-            className="primary"
-            disabled={!range}
-            onClick={() => void navigator.clipboard?.writeText(text).then(p.onCopied, (e) => setError(String(e)))}
-          >
+          <button className="primary" disabled={!range} onClick={() => copyText(text, p.onCopied)}>
             {t("notes.copy")}
           </button>
         </div>

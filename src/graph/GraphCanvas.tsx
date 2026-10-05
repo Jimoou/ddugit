@@ -31,6 +31,8 @@ import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap } from "./Minimap";
 import { t } from "../i18n";
+import { isTypingTarget } from "../keys";
+import { hasOpenLayer } from "../components/useDialog";
 
 export interface GraphHandle {
   centerOn(id: string, zoom?: number): void;
@@ -602,8 +604,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   // Keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (isTypingTarget(e.target) || e.defaultPrevented) return;
       // Keys pressed in a modal dialog belong to it.
       if ((e.target as Element).closest?.("[aria-modal]")) return;
       // Every tab keeps its graph mounted; only the one on screen takes keys.
@@ -614,6 +615,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       else if (e.key === "h" || e.key === "H") api.centerOnHead();
       else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) propsRef.current.onRotate?.();
       else if (e.key === "Escape") {
+        // Esc that closes a menu, sheet or dialog leaves the selection alone.
+        if (hasOpenLayer()) return;
         st.current.drag = null;
         propsRef.current.onSelect(null);
       } else if (ARROWS[e.key] || e.key === "Enter" || e.key === "ContextMenu") {

@@ -600,6 +600,10 @@ export const demoControls = {
   gitMissing: !!(
     typeof window !== "undefined" && (window as unknown as Record<string, unknown>).__ddugitDemoGitMissing
   ),
+  /** The demo tab throws while rendering (the tab's error boundary, e2e) until this is cleared. */
+  crashTab: false,
+  /** Extra milliseconds every demo remote operation takes (e2e: something still running). */
+  slow: 0,
   /** Make the next checkout fail with this text, like an unexpected backend error (the toast's Report button). */
   failNext: null as string | null,
   /** How the next problem reports fail: the site's rate limit, or no network. */
@@ -856,6 +860,7 @@ const mockTable: Table = {
   // Any folder "is" the demo repository, except ones named like a plain folder.
   repo_root: ({ dir }) => delay(/not-a-repo/.test(dir) ? null : dir, 0),
   async git_clone({ url, onProgress }) {
+    if (demoControls.slow) await delay(null, demoControls.slow);
     const fake = demoControls.failNextRemote;
     if (fake) {
       demoControls.failNextRemote = null;
@@ -1105,6 +1110,7 @@ const mockTable: Table = {
       demoWorlds.set(path, { ...demoWorlds.get(path), behind: 0 });
       return delay(res("ok", g.behind ? "Fast-forward" : "Already up to date."));
     }
+    if (demoControls.slow) await delay(null, demoControls.slow);
     const fake = demoControls.failNextRemote;
     if (fake) {
       demoControls.failNextRemote = null;

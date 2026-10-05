@@ -10,7 +10,7 @@ import type { WorktreeInfo, WorktreeOp } from "../types";
 import { Icon } from "./Icon";
 import { SideSection } from "./Sidebar";
 import { Segmented } from "./Segmented";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 export function WorktreeSection(p: {
   worktrees: WorktreeInfo[];
@@ -83,7 +83,7 @@ export function WorktreeDialog(p: {
   const ok = !!chosen && !!dir.trim() && !p.busy;
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <form
         className="dialog worktree-dialog"
         aria-label={t("wt.add")}

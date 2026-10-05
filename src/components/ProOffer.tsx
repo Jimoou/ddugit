@@ -1,8 +1,8 @@
-import { api } from "../api";
 import { t } from "../i18n";
+import { openLink } from "../share";
 import { closeProOffer, FREE_DASHBOARD, type ProFeature, useProOffer } from "../pro";
 import { BUY_URL } from "./License";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 /** "This is a Pro feature": what it unlocks, the price, and where to get it. */
 export function ProOffer({ onLicense }: { onLicense(): void }) {
@@ -13,7 +13,7 @@ export function ProOffer({ onLicense }: { onLicense(): void }) {
 function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void }) {
   const dialog = useDialog(closeProOffer);
   return (
-    <div className="scrim" onClick={closeProOffer}>
+    <div className="scrim" {...closeOnScrim(closeProOffer)}>
       <div className="dialog pro-offer" aria-label={t("pro.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("pro.title")}</h2>
         <p>
@@ -39,7 +39,7 @@ function Offer({ feature, onLicense }: { feature: ProFeature; onLicense(): void 
           >
             {t("pro.haveLicense")}
           </button>
-          <button className="primary" onClick={() => void api.openUrl("", BUY_URL)}>
+          <button className="primary" onClick={() => openLink(BUY_URL)}>
             {t("pro.buy")}
           </button>
         </div>

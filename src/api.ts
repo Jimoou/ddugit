@@ -1,6 +1,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { demoControls, mock } from "./mock";
 import { logError } from "./report";
+import { Lru } from "./lru";
 import type {
   AppInfo,
   NewReport,
@@ -186,8 +187,8 @@ function progressSink(onProgress: (p: Progress) => void, path?: string): Sink<Pr
   return ch;
 }
 
-// Commits are immutable, so their diffs can be cached for the session.
-const diffCache = new Map<string, Promise<FileDiff[]>>();
+// Commits are immutable, so their diffs can be cached; the last few dozen viewed are enough for going back and forth.
+const diffCache = new Lru<string, Promise<FileDiff[]>>(50);
 
 export const api = {
   initialRepo: () => (isTauri ? call("initial_repo", {}) : Promise.resolve(null)),
@@ -320,13 +321,12 @@ export const api = {
     call("worktree_diff", { path, file, scope }),
   commitDiff(path: string, id: string): Promise<FileDiff[]> {
     const key = `${path}\n${id}`;
-    let hit = diffCache.get(key);
-    if (!hit) {
-      hit = call("commit_diff", { path, id });
-      hit.catch(() => diffCache.delete(key));
-      diffCache.set(key, hit);
-    }
-    return hit;
+    const hit = diffCache.get(key);
+    if (hit) return hit;
+    const load = call("commit_diff", { path, id });
+    load.catch(() => diffCache.delete(key, load));
+    diffCache.set(key, load);
+    return load;
   },
   /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),

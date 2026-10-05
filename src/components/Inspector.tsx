@@ -6,6 +6,7 @@ import type { CommitInfo, FileDiff, RefInfo, Signature } from "../types";
 import { ChangedFiles } from "./ChangedFiles";
 import type { MenuItem } from "./ContextMenu";
 import { t } from "../i18n";
+import { copyText } from "../share";
 
 interface Props {
   path: string;
@@ -77,9 +78,10 @@ export function Inspector(props: Props) {
   const body = commit.message.split("\n").slice(1).join("\n").trim();
   const tools = props.actions.filter((a): a is Exclude<MenuItem, "separator"> => a !== "separator" && !!a.icon);
   const copy = () => {
-    void navigator.clipboard?.writeText(commit.id);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
+    copyText(commit.id, () => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
   };
 
   return (

@@ -10,6 +10,7 @@ import { ForgeRepoPicker, type Picked, ProtoSwitch, SourceTabs } from "./ForgeRe
 import { SOURCES, type Source } from "../forgeRepos";
 import { api } from "../api";
 import { t } from "../i18n";
+import { openLink } from "../share";
 import {
   forgetRecent,
   joinPath,
@@ -32,7 +33,7 @@ import {
   type RepoGroup,
   updateGroup,
 } from "../groups";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 const RECENT = "ddugit.recent";
 const GROUPS = "ddugit.groups";
@@ -293,7 +294,7 @@ export function CloneDialog(p: {
 
   const dialog = useDialog(() => !running && p.onCancel());
   return (
-    <div className="scrim" onClick={() => !running && p.onCancel()}>
+    <div className="scrim" {...closeOnScrim(() => !running && p.onCancel())}>
       <form
         className="dialog clone"
         onClick={(e) => e.stopPropagation()}
@@ -345,7 +346,7 @@ export function CloneDialog(p: {
             {ssh && url.includes(":") && (
               <details className="ssh-ready" open={sshOpen} onToggle={(e) => setSshOpen(e.currentTarget.open)}>
                 <summary>{t("ssh.title")}</summary>
-                <SshSetup url={url} onOpenUrl={(u) => void api.openUrl("", u)} />
+                <SshSetup url={url} onOpenUrl={openLink} />
               </details>
             )}
             <div className="field col">

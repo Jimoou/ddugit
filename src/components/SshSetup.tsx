@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
+import { copyText } from "../share";
 import { Rich } from "../i18n/Rich";
 import { sshHostOf, sshKeysPage } from "../sshUrl";
 import type { HostKey, SshStatus, SshTest } from "../types";
@@ -81,9 +82,10 @@ export function SshSetup({ url, onOpenUrl }: { url: string; onOpenUrl(url: strin
             <span className="row">
               <button
                 onClick={() => {
-                  void navigator.clipboard?.writeText(key.public);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
+                  copyText(key.public, () => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  });
                 }}
               >
                 <Icon name={copied ? "check" : "copy"} size={12} /> {copied ? t("ssh.copied") : t("ssh.copy")}

@@ -6,7 +6,7 @@ import { Rich } from "../i18n/Rich";
 import { offerPro } from "../pro";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../types";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
 /** What the forge calls a pull request. */
@@ -181,7 +181,7 @@ export function TokenDialog(p: {
   const page = tokenPage(p.forge);
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <div
         className="dialog token-dialog"
         aria-label={t("pr.token.title", { forge: name })}

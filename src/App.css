@@ -1849,12 +1849,6 @@ button.link {
   flex-direction: column;
   gap: 6px;
 }
-.actions.inline {
-  flex-direction: row;
-}
-.actions.inline button {
-  white-space: nowrap;
-}
 .tip {
   margin: 0;
   color: var(--muted);

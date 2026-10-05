@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { Segmented } from "./Segmented";
 import { useDialog } from "./useDialog";
 import { Rich } from "../i18n/Rich";
+import { isTypingTarget } from "../keys";
 
 interface Props {
   title: string;
@@ -74,8 +75,8 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // Hidden tabs keep their sheets mounted; only the one on screen takes keys.
+      if (isTypingTarget(e.target) || !body.current?.getClientRects().length) return;
       if ((e.key === "]" || e.key === "[") && files?.length && current) {
         const i = files.indexOf(current) + (e.key === "]" ? 1 : -1);
         setPath(files[(i + files.length) % files.length].path);

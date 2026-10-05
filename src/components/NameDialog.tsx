@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { t } from "../i18n";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 export interface NameRequest {
   title: string;
@@ -27,7 +27,7 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
   const ok = name.trim() !== "" && name.trim() !== initial && !busy;
   const dialog = useDialog(onCancel);
   return (
-    <div className="scrim" onClick={onCancel}>
+    <div className="scrim" {...closeOnScrim(onCancel)}>
       <form
         className="dialog"
         {...dialog}

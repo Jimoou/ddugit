@@ -16,6 +16,17 @@ export interface RepoGroup {
 /** Colours handed out in turn (and cycled through by "change colour"). */
 export const GROUP_HUES = [190, 300, 95, 35, 260, 0, 160, 220];
 
+/** A stored (or dragged) JSON list of strings; anything else, malformed or not, is an empty list. */
+export function parseStringList(raw: string | null): string[] {
+  let v: unknown;
+  try {
+    v = raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
 export function parseGroups(raw: string | null): RepoGroup[] {
   let v: unknown;
   try {

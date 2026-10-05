@@ -5,17 +5,16 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { getLocale, t } from "../i18n";
+import { openLink } from "../share";
 import { usePro } from "../pro";
 import { diagnostics, recentLog, reportText } from "../report";
 import type { AppInfo, ReportKind } from "../types";
 import { Segmented } from "./Segmented";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 const SITE_URL = "https://ddugit.com";
 const PRIVACY_URL = "https://ddugit.com/privacy";
 const GIT_DOWNLOAD_URL = "https://git-scm.com/download";
-
-const open = (url: string) => void api.openUrl("", url);
 
 /** Settings → About: version, plan, and where to go next. */
 export function AboutSection({ onReport }: { onReport(): void }) {
@@ -44,8 +43,8 @@ export function AboutSection({ onReport }: { onReport(): void }) {
         <button className="primary" onClick={onReport}>
           {t("about.report")}
         </button>
-        <button onClick={() => open(SITE_URL)}>ddugit.com</button>
-        <button onClick={() => open(PRIVACY_URL)}>{t("about.privacy")}</button>
+        <button onClick={() => openLink(SITE_URL)}>ddugit.com</button>
+        <button onClick={() => openLink(PRIVACY_URL)}>{t("about.privacy")}</button>
       </div>
       <p className="muted small">{t("about.reportHint")}</p>
     </section>
@@ -129,7 +128,7 @@ export function ReportDialog({ lastError, onSent, onClose }: ReportProps) {
   const ready = !!what.trim() && !(withDiag && diag === null) && !sending;
 
   return (
-    <div className="scrim" onClick={onClose}>
+    <div className="scrim" {...closeOnScrim(onClose)}>
       <div className="dialog report" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t(kind === "bug" ? "report.title" : "report.askTitle")}</h2>
         <Segmented
@@ -215,7 +214,7 @@ interface GitMissingProps {
 export function GitMissing({ error, onRecheck, onSetPath, onClose }: GitMissingProps) {
   const dialog = useDialog(onClose);
   return (
-    <div className="scrim" onClick={onClose}>
+    <div className="scrim" {...closeOnScrim(onClose)}>
       <div className="dialog git-missing" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("gitMissing.title")}</h2>
         <p>{t("gitMissing.body")}</p>
@@ -226,7 +225,7 @@ export function GitMissing({ error, onRecheck, onSetPath, onClose }: GitMissingP
           <button onClick={onClose}>{t("common.close")}</button>
           <button onClick={onRecheck}>{t("gitMissing.recheck")}</button>
           <button onClick={onSetPath}>{t("gitMissing.setPath")}</button>
-          <button className="primary" autoFocus onClick={() => open(GIT_DOWNLOAD_URL)}>
+          <button className="primary" autoFocus onClick={() => openLink(GIT_DOWNLOAD_URL)}>
             {t("gitMissing.download")}
           </button>
         </div>

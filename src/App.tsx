@@ -4,6 +4,7 @@ import { api, DEMO_PATH, isTauri } from "./api";
 import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
+import { Boundary, TabCrash } from "./components/Crash";
 import { Galaxy } from "./components/Galaxy";
 import { SettingsDialog, type SettingsSection } from "./components/SettingsDialog";
 import { SpaceBackdrop } from "./components/Planet";
@@ -12,12 +13,14 @@ import { UpdateNotice } from "./components/Update";
 import { ProOffer } from "./components/ProOffer";
 import { GitMissing, ReportDialog } from "./components/Report";
 import { isUnexpected } from "./report";
+import { onShareFailure } from "./share";
 import { refreshPro } from "./pro";
 import { useLicenseCheck } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
 import { resolveLocale, setLocale, t } from "./i18n";
 import { Rich } from "./i18n/Rich";
 import { repoName } from "./recent";
+import { isTypingTarget } from "./keys";
 import { RepoView, type ToastAction } from "./RepoView";
 import { defaults, parseSettings, type Settings } from "./settings";
 import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
@@ -109,14 +112,20 @@ export default function App() {
     setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" || action ? 7000 : 3200);
   }, []);
 
+  useEffect(() => {
+    onShareFailure((text) => toast("err", text));
+  }, [toast]);
   useEffect(refreshPro, []);
   const remindLicense = useCallback((text: string) => toast("ok", text), [toast]);
   useLicenseCheck(remindLicense);
 
+  // Patches merge into the latest settings: two in a row, or one from an async callback, keep each other's fields.
   const updateSettings = (patch: Partial<Settings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    store(SETTINGS, JSON.stringify(next));
+    setSettings((s) => {
+      const next = { ...s, ...patch };
+      store(SETTINGS, JSON.stringify(next)); // the same write if React calls this twice
+      return next;
+    });
     // Every component reads the locale while rendering, so this re-render switches them all.
     if (patch.language) setLocale(resolveLocale(patch.language));
   };
@@ -169,8 +178,6 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      const tag = (e.target as HTMLElement)?.tagName;
-      const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
       if (mod && e.key === "0") {
         e.preventDefault();
         setHome(true);
@@ -187,7 +194,7 @@ export default function App() {
       } else if (mod && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         setTabs((tb) => selectAt(tb, Number(e.key) - 1));
-      } else if (e.key === "?" && !typing) setSettingsAt("shortcuts");
+      } else if (e.key === "?" && !isTypingTarget(e.target)) setSettingsAt("shortcuts");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -307,18 +314,30 @@ export default function App() {
       <UpdateNotice onError={(text) => toast("err", text)} />
       {tabs.list.map((tab) =>
         tab.path ? (
-          <RepoView
+          // One tab's crash leaves the others (and the window) working.
+          <Boundary
             key={tab.id}
-            path={tab.path}
-            active={!home && tab.id === tabs.active}
-            settings={settings}
-            page={page}
-            toast={toast}
-            onLoaded={onLoaded}
-            onChangeSettings={updateSettings}
-            onOpenPath={openPath}
-            onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
-          />
+            fallback={(error, reload) => (
+              <TabCrash
+                error={error}
+                active={!home && tab.id === tabs.active}
+                onReload={reload}
+                onReport={(text) => setReport({ error: text })}
+              />
+            )}
+          >
+            <RepoView
+              path={tab.path}
+              active={!home && tab.id === tabs.active}
+              settings={settings}
+              page={page}
+              toast={toast}
+              onLoaded={onLoaded}
+              onChangeSettings={updateSettings}
+              onOpenPath={openPath}
+              onRepoMenu={() => setRepoMenu(document.querySelector(".tab.on")?.getBoundingClientRect().left ?? 60)}
+            />
+          </Boundary>
         ) : null,
       )}
       {welcome && (
@@ -378,7 +397,7 @@ export default function App() {
           url={cloneAuth.req.url}
           output={cloneAuth.output}
           repoPath={cloneAuth.req.parent}
-          fetchCmd={`git clone ${cloneAuth.req.url}`}
+          signIn={["git", "clone", "--", cloneAuth.req.url]}
           busy={false}
           onClose={() => setCloneAuth(null)}
           onRetry={() => {

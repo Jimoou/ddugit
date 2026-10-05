@@ -1,6 +1,6 @@
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 interface Props {
   source: string;
@@ -17,7 +17,7 @@ interface Props {
 export function MergeDialog(p: Props) {
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <div className="dialog" onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("merge.title")}</h2>
         <div className="merge-flow">

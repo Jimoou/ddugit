@@ -7,6 +7,7 @@ import { api } from "../api";
 import { fmtAgo } from "../format";
 import { FORGE_SOURCES, type Proto, type Source, filterRepos, repoUrl } from "../forgeRepos";
 import { t } from "../i18n";
+import { openLink } from "../share";
 import type { ForgeKind, ForgeRepo, ForgeRepos } from "../types";
 import { Icon } from "./Icon";
 import { FORGE_NAME, TokenDialog } from "./Pulls";
@@ -249,7 +250,7 @@ export function ForgeRepoPicker(p: Props) {
               forge={result}
               busy={saving}
               onSave={saveToken}
-              onOpenPage={(url) => void api.openUrl(p.path, url)}
+              onOpenPage={(url) => openLink(url, p.path)}
               onCancel={() => setConnecting(false)}
             />
           </div>,

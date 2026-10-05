@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { type Key, t } from "../i18n";
+import { openLink } from "../share";
 import { refreshPro, usePro } from "../pro";
 import type { LicenseStatus } from "../types";
 
@@ -174,7 +175,7 @@ export function LicenseSection() {
                 <button className="danger" disabled={busy} onClick={() => setAsking(true)}>
                   {t("license.deactivate")}
                 </button>
-                <button onClick={() => void api.openUrl("", ACCOUNT_URL)}>{t("license.account")}</button>
+                <button onClick={() => openLink(ACCOUNT_URL)}>{t("license.account")}</button>
               </>
             )}
           </div>
@@ -197,7 +198,7 @@ export function LicenseSection() {
                     <button className="primary" disabled={busy} onClick={() => void signIn()}>
                       {t("license.activate")}
                     </button>
-                    {BUY_URL && <button onClick={() => void api.openUrl("", BUY_URL)}>{t("license.buy")}</button>}
+                    {BUY_URL && <button onClick={() => openLink(BUY_URL)}>{t("license.buy")}</button>}
                   </>
                 )}
               </div>

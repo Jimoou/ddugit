@@ -8,7 +8,7 @@ import { fmtTime } from "../format";
 import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { ReflogEntry, ResetMode } from "../types";
-import { useDialog } from "./useDialog";
+import { closeOnScrim, useDialog } from "./useDialog";
 
 const MODES: { mode: ResetMode; title: Key; hint: Key }[] = [
   { mode: "soft", title: "undo.soft", hint: "undo.soft.hint" },
@@ -34,7 +34,7 @@ export function ResetDialog(p: {
   const [mode, setMode] = useState<ResetMode>(p.initial ?? "mixed");
   const dialog = useDialog(p.onCancel);
   return (
-    <div className="scrim" onClick={p.onCancel}>
+    <div className="scrim" {...closeOnScrim(p.onCancel)}>
       <div className="dialog reset" aria-label={t("undo.title")} onClick={(e) => e.stopPropagation()} {...dialog}>
         <h2 className="dialog-title">{t("undo.title")}</h2>
         <p>
