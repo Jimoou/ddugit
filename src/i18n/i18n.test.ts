@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { en } from "./en";
 import { ko } from "./ko";
-import { fill, finalSound, josa, setLocale, t } from ".";
+import { fill, finalSound, josa, plural, setLocale, t } from ".";
 
 // Particles are Korean only: `{name:을}` counts as `{name}`, and a bare `{:을}` not at all.
 const placeholders = (s: string) =>
@@ -12,6 +12,12 @@ describe("dictionaries", () => {
     for (const [key, text] of Object.entries(ko)) {
       expect(en[key as keyof typeof ko], key).toBeTruthy();
       expect(placeholders(en[key as keyof typeof ko]), key).toEqual(placeholders(text));
+    }
+  });
+  it("write English plurals as two forms instead of (s)", () => {
+    for (const [key, text] of Object.entries(en)) {
+      expect(text, key).not.toMatch(/\(s\)/);
+      for (const m of text.matchAll(/\{\w*:([^}]*\|[^}]*)\}/g)) expect(m[1].split("|"), key).toHaveLength(2);
     }
   });
   it("use particle placeholders instead of 을(를)-style fallbacks", () => {
@@ -84,5 +90,25 @@ describe("fill", () => {
   });
   it("leaves unknown placeholders as they are", () => {
     expect(fill("{other:을} {n}", { n: 1 })).toBe("{other:을} 1");
+  });
+});
+
+describe("plural", () => {
+  it("picks the singular only for exactly one", () => {
+    expect(plural("1", "commit|commits")).toBe("commit");
+    expect(plural("0", "commit|commits")).toBe("commits");
+    expect(plural("12", "branch|branches")).toBe("branches");
+  });
+  it("fills a count with its noun, or only the noun after markup", () => {
+    expect(fill("{n:commit|commits} left", { n: 1 })).toBe("1 commit left");
+    expect(fill("{n:commit|commits} left", { n: 3 })).toBe("3 commits left");
+    expect(fill("<b>{n}</b> {:repository|repositories}", { n: 1 })).toBe("<b>1</b> repository");
+  });
+  it("reads singular and plural in English", () => {
+    setLocale("en");
+    expect(t("graph.run", { n: 1 })).toBe("1 commit · click to expand");
+    expect(t("discard.go", { n: 1 })).toBe("Discard 1 file");
+    expect(t("discard.go", { n: 2 })).toBe("Discard 2 files");
+    setLocale("ko");
   });
 });
