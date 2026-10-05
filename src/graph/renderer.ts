@@ -116,7 +116,7 @@ export interface DrawState {
   runHover: Run | null;
 }
 
-export interface Rect {
+interface Rect {
   x: number;
   y: number;
   w: number;
@@ -132,7 +132,7 @@ export interface LabelHit {
 }
 
 /** A stash drawn as a small diamond hanging off the commit it was taken on. */
-export interface StashMark {
+interface StashMark {
   index: number;
   message: string;
   base: Pt;

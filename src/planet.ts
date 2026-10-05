@@ -2,7 +2,7 @@
 // path, so the same repository is always the same planet: in the tabs, the
 // recent list and the galaxy dashboard.
 
-export interface PlanetLook {
+interface PlanetLook {
   /** Base hue, degrees. */
   hue: number;
   /** Has a ring, like a gas giant. */

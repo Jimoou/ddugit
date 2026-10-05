@@ -58,7 +58,7 @@ export function defaultBody(commits: CommitInfo[]): string {
     .join("\n");
 }
 
-export type PushNeed = { kind: "none" } | { kind: "missing" } | { kind: "ahead"; n: number };
+type PushNeed = { kind: "none" } | { kind: "missing" } | { kind: "ahead"; n: number };
 
 /** Whether `branch` must go up to `remote` first: not there yet, or with commits the copy there lacks. */
 export function pushNeed(commits: CommitInfo[], refs: RefInfo[], remote: string, branch: string): PushNeed {

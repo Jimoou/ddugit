@@ -11,7 +11,7 @@ import type { CommitInfo, HeadInfo, RefInfo } from "../types";
  * (or HEAD) — so the main line never wanders.
  */
 
-export interface LayoutNode {
+interface LayoutNode {
   id: string;
   row: number;
   lane: number;
@@ -43,7 +43,7 @@ export interface Layout {
   rowCount: number;
 }
 
-export const PALETTE_SIZE = 8;
+const PALETTE_SIZE = 8;
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -68,7 +68,7 @@ export function colorForBranch(name: string): number {
  * to the next free colour on collision, so live branches look distinct while
  * staying stable as long as the branch set doesn't change much.
  */
-export function branchColors(refs: RefInfo[]): Map<string, number> {
+function branchColors(refs: RefInfo[]): Map<string, number> {
   const bases = [...new Set(refs.filter((r) => r.kind !== "tag").map((r) => baseName(r.name)))].sort();
   const out = new Map<string, number>();
   const used = new Set<number>();
@@ -83,7 +83,7 @@ export function branchColors(refs: RefInfo[]): Map<string, number> {
   return out;
 }
 
-export function trunkName(refs: RefInfo[], head: Pick<HeadInfo, "branch" | "target">): string | null {
+function trunkName(refs: RefInfo[], head: Pick<HeadInfo, "branch" | "target">): string | null {
   const locals = new Set(refs.filter((r) => r.kind === "local").map((r) => r.name));
   for (const n of ["main", "master", "develop", "trunk"]) if (locals.has(n)) return n;
   return head.branch;

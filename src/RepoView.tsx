@@ -59,8 +59,6 @@ import { useRun } from "./repo/useRun";
 import { useSheet } from "./repo/useSheet";
 import { useSnapshot } from "./repo/useSnapshot";
 
-export type { ToastAction } from "./repo/state";
-
 /** How long the pointer rests on a star before its preview card shows. */
 const PEEK_DELAY_MS = 350;
 
@@ -70,7 +68,7 @@ const PR_REFRESH_MS = 5 * 60_000;
 /** Longest wait for the camera to settle before an effect plays anyway. */
 const SETTLE_MAX_MS = 1500;
 
-export interface RepoViewProps {
+interface RepoViewProps {
   path: string;
   /** The visible tab: only it listens to keys, watches files and draws. */
   active: boolean;

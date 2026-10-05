@@ -2,7 +2,7 @@
 // macOS keeps its traffic lights over our tab row, Windows gets our own buttons,
 // anything else (Linux, the browser demo) keeps the system title bar.
 
-export type Chrome = "mac" | "win" | "native";
+type Chrome = "mac" | "win" | "native";
 
 export function chromeOf(userAgent: string, tauri: boolean): Chrome {
   if (!tauri) return "native";

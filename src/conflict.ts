@@ -1,6 +1,6 @@
 // Conflict-marker parsing for the resolution view. Pure, so it is unit-tested.
 
-export type Segment =
+type Segment =
   | { kind: "text"; text: string }
   | { kind: "conflict"; ours: string; theirs: string; base: string | null; oursLabel: string; theirsLabel: string };
 

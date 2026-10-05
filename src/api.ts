@@ -68,7 +68,7 @@ export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in
 export const DEMO_PATH = "demo";
 
 /** Receives streamed updates; a Tauri `Channel` in the app, a plain object in demo mode. */
-export interface Sink<T> {
+interface Sink<T> {
   onmessage: (msg: T) => void;
 }
 

@@ -21,7 +21,7 @@ interface Props {
   onClose(): void;
 }
 
-export interface Staging {
+interface Staging {
   scope: "unstaged" | "staged";
   busy: boolean;
   onScope(scope: Staging["scope"]): void;

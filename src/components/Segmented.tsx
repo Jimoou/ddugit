@@ -1,6 +1,6 @@
 import type { KeyboardEvent, ReactNode } from "react";
 
-export interface Option<T extends string> {
+interface Option<T extends string> {
   value: T;
   label: ReactNode;
   disabled?: boolean;

@@ -17,7 +17,7 @@ export interface Box {
   h: number;
 }
 
-export interface CaptionItem {
+interface CaptionItem {
   id: string;
   /** Star centre, screen px. */
   x: number;
@@ -28,7 +28,7 @@ export interface CaptionItem {
   up: boolean;
 }
 
-export interface PlacedCaption extends Box {
+interface PlacedCaption extends Box {
   id: string;
   /** Steps away from the star (0 = right under or over it): > 0 gets a leader line. */
   level: number;

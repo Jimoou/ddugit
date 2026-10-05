@@ -24,7 +24,7 @@ export interface Pt {
 }
 
 /** An edge with its world bounding box; its drawn shape is made when first needed (`shapeOf`). */
-export interface EdgePath {
+interface EdgePath {
   edge: LayoutEdge;
   minX: number;
   maxX: number;

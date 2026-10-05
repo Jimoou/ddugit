@@ -89,7 +89,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
 }
 
 /** `keys` and `what` are dictionary keys, or literal text (key names like "Enter"). */
-export interface Shortcut {
+interface Shortcut {
   keys: Key | string;
   what: Key | string;
 }

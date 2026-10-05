@@ -4,7 +4,7 @@
 import type { ForgeKind, ForgeRepo } from "./types";
 
 /** A forge the user can list their repositories on; `host` is the public one, editable for self-hosted. */
-export interface ForgeSource {
+interface ForgeSource {
   id: ForgeKind;
   kind: ForgeKind;
   host: string;
