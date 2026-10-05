@@ -81,7 +81,7 @@ export interface Commands {
   repo_glance: [{ paths: string[] }, RepoGlance[]];
   git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
   git_stage_hunks: [
-    { path: string; file: string; hunks: number[]; lines: number[] | null; unstage: boolean },
+    { path: string; file: string; hunks: string[]; lines: number[] | null; unstage: boolean },
     OpResult,
   ];
   git_merge: [{ path: string; source: string; target: string | null }, OpResult];
@@ -204,7 +204,8 @@ export const api = {
   glance: (paths: string[]) => call("repo_glance", { paths }),
   commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
     call("git_commit", { path, message, paths, amend, stagedOnly }),
-  stageHunks: (path: string, file: string, hunks: number[], unstage: boolean, lines?: number[]) =>
+  /** `hunks` are `DiffHunk.key`s: a hunk that changed on disk since it was shown is refused. */
+  stageHunks: (path: string, file: string, hunks: string[], unstage: boolean, lines?: number[]) =>
     call("git_stage_hunks", { path, file, hunks, lines: lines ?? null, unstage }),
   merge: (path: string, source: string, target: string | null) => call("git_merge", { path, source, target }),
   abort: (path: string) => call("git_abort", { path }),

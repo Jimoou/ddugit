@@ -2207,7 +2207,7 @@ export function RepoView({
                             api.stageHunks(
                               path,
                               file,
-                              [hunk],
+                              [diff.files?.find((f) => f.path === file)?.hunks[hunk]?.key ?? ""],
                               diff.source.kind === "worktree" && diff.source.scope === "staged",
                               lines,
                             ),

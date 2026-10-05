@@ -3,23 +3,25 @@
 
 use git2::Patch;
 
-use super::diff::{local_diff, DiffScope};
+use super::diff::{hunk_key, local_diff, DiffScope};
 use super::{err, git_input, open, workdir, OpResult, Result};
 
-/// Stage (or with `unstage`, unstage) the hunks of `file` at `hunks` — indices into
-/// the hunk list `worktree_diff` shows for the unstaged (or staged) scope. With
-/// `lines`, only those lines (indices into the one selected hunk's lines) move.
+/// Stage (or with `unstage`, unstage) the hunks of `file` whose `key`s are given —
+/// the keys `worktree_diff` showed for the unstaged (or staged) scope. A key that
+/// no longer matches (the file changed since) is refused rather than staging
+/// something else. With `lines`, only those lines (indices into the one
+/// selected hunk's lines) move.
 pub fn stage_hunks(
     path: &str,
     file: &str,
-    hunks: &[usize],
+    keys: &[String],
     lines: Option<&[usize]>,
     unstage: bool,
 ) -> Result<OpResult> {
-    if hunks.is_empty() {
+    if keys.is_empty() {
         return Err("No hunks selected".into());
     }
-    if lines.is_some() && hunks.len() != 1 {
+    if lines.is_some() && keys.len() != 1 {
         return Err("Lines can be picked from one hunk at a time".into());
     }
     let repo = open(path)?;
@@ -35,8 +37,17 @@ pub fn stage_hunks(
             if unstage { "unstage" } else { "stage" }
         )
     })?;
-    let text = String::from_utf8_lossy(&patch.to_buf().map_err(err)?).into_owned();
-    let mut partial = select_hunks(&text, hunks)?;
+    let now = (0..patch.num_hunks())
+        .map(|h| hunk_key(&patch, h))
+        .collect::<Result<Vec<_>>>()?;
+    let hunks = keys
+        .iter()
+        .map(|k| now.iter().position(|n| n == k))
+        .collect::<Option<Vec<usize>>>()
+        .ok_or_else(|| format!("'{file}' changed since its diff was shown; look at it again and retry"))?;
+    // Bytes throughout: a file in a legacy encoding (CP949, Latin-1) must reach the index unchanged.
+    let buf = patch.to_buf().map_err(err)?;
+    let mut partial = select_hunks(&buf, &hunks)?;
     if let Some(lines) = lines {
         partial = select_lines(&partial, lines, unstage)?;
     }
@@ -49,17 +60,22 @@ pub fn stage_hunks(
     Ok(git_input(&workdir(&repo)?, &args, &partial)?.into())
 }
 
+/// `patch` split after each `\n`, the last piece kept even without one.
+fn lines_of(patch: &[u8]) -> impl Iterator<Item = &[u8]> {
+    patch.split_inclusive(|&b| b == b'\n')
+}
+
 /// Keep the file header and only the chosen `@@` hunks of a single-file patch.
-fn select_hunks(patch: &str, keep: &[usize]) -> Result<String> {
-    let mut out = String::new();
+fn select_hunks(patch: &[u8], keep: &[usize]) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
     let mut hunk: Option<usize> = None;
-    for line in patch.split_inclusive('\n') {
-        if line.starts_with("@@") {
+    for line in lines_of(patch) {
+        if line.starts_with(b"@@") {
             hunk = Some(hunk.map_or(0, |h| h + 1));
         }
         // Header lines (before the first hunk) and "\ No newline" lines follow their block.
         if hunk.is_none_or(|h| keep.contains(&h)) {
-            out.push_str(line);
+            out.extend_from_slice(line);
         }
     }
     let total = hunk.map_or(0, |h| h + 1);
@@ -74,48 +90,48 @@ fn select_hunks(patch: &str, keep: &[usize]) -> Result<String> {
 /// index as it is: when staging, an unpicked `-` stays as context and an
 /// unpicked `+` is dropped; when unstaging (applied with `--reverse`) it is the
 /// other way round.
-fn select_lines(patch: &str, keep: &[usize], reverse: bool) -> Result<String> {
-    let mut head = String::new();
-    let mut body = String::new();
+fn select_lines(patch: &[u8], keep: &[usize], reverse: bool) -> Result<Vec<u8>> {
+    let mut head = Vec::new();
+    let mut body = Vec::new();
     let mut range: Option<HunkRange> = None;
     let (mut old_n, mut new_n, mut idx) = (0, 0, 0);
     let (mut picked, mut dropped_prev) = (false, false);
-    for line in patch.split_inclusive('\n') {
+    for line in lines_of(patch) {
         if range.is_none() {
-            if line.starts_with("@@") {
+            if line.starts_with(b"@@") {
                 range = Some(HunkRange::parse(line)?);
             } else {
-                head.push_str(line);
+                head.extend_from_slice(line);
             }
             continue;
         }
-        if line.starts_with('\\') {
+        if line.starts_with(b"\\") {
             // "\ No newline at end of file" belongs to the line before it.
             if !dropped_prev {
-                body.push_str(line);
+                body.extend_from_slice(line);
             }
             continue;
         }
-        let sign = line.chars().next().unwrap_or(' ');
+        let sign = line.first().copied().unwrap_or(b' ');
         let chosen = keep.contains(&idx);
         idx += 1;
         let kept = match sign {
-            '+' | '-' if chosen => {
+            b'+' | b'-' if chosen => {
                 picked = true;
                 Some(sign)
             }
-            '+' if reverse => Some(' '),
-            '-' if !reverse => Some(' '),
-            '+' | '-' => None,
-            _ => Some(' '),
+            b'+' if reverse => Some(b' '),
+            b'-' if !reverse => Some(b' '),
+            b'+' | b'-' => None,
+            _ => Some(b' '),
         };
         dropped_prev = kept.is_none();
         let Some(c) = kept else { continue };
         body.push(c);
-        body.push_str(&line[1..]);
+        body.extend_from_slice(line.get(1..).unwrap_or_default());
         match c {
-            '-' => old_n += 1,
-            '+' => new_n += 1,
+            b'-' => old_n += 1,
+            b'+' => new_n += 1,
             _ => {
                 old_n += 1;
                 new_n += 1;
@@ -129,26 +145,44 @@ fn select_lines(patch: &str, keep: &[usize], reverse: bool) -> Result<String> {
     if !picked {
         return Err("No changed lines selected".into());
     }
-    Ok(format!(
-        "{head}@@ -{} +{} @@{}\n{body}",
-        HunkRange::side(r.old, old_n),
-        HunkRange::side(r.new, new_n),
-        r.section
-    ))
+    let mut out = head;
+    out.extend_from_slice(
+        format!(
+            "@@ -{} +{} @@",
+            HunkRange::side(r.old, old_n),
+            HunkRange::side(r.new, new_n)
+        )
+        .as_bytes(),
+    );
+    out.extend_from_slice(&r.section);
+    out.push(b'\n');
+    out.extend_from_slice(&body);
+    Ok(out)
 }
 
-/// The `@@ -a,b +c,d @@ section` line of a hunk.
+/// The `@@ -a,b +c,d @@ section` line of a hunk. The ranges are ASCII; the
+/// section is a line of the file and kept as bytes.
 struct HunkRange {
     old: (u32, u32),
     new: (u32, u32),
-    section: String,
+    section: Vec<u8>,
 }
 
 impl HunkRange {
-    fn parse(line: &str) -> Result<Self> {
-        let bad = || format!("Unexpected hunk header: {}", line.trim_end());
-        let rest = line.strip_prefix("@@ -").ok_or_else(bad)?;
-        let (ranges, section) = rest.split_once(" @@").ok_or_else(bad)?;
+    fn parse(line: &[u8]) -> Result<Self> {
+        let bad = || {
+            format!(
+                "Unexpected hunk header: {}",
+                String::from_utf8_lossy(line).trim_end()
+            )
+        };
+        let rest = line.strip_prefix(b"@@ -").ok_or_else(bad)?;
+        let end = rest.windows(3).position(|w| w == b" @@").ok_or_else(bad)?;
+        let ranges = std::str::from_utf8(&rest[..end]).map_err(|_| bad())?;
+        let mut section = &rest[end + 3..];
+        while let [head @ .., b'\n' | b'\r'] = section {
+            section = head;
+        }
         let (old, new) = ranges.split_once(" +").ok_or_else(bad)?;
         let side = |s: &str| -> Option<(u32, u32)> {
             match s.split_once(',') {
@@ -159,7 +193,7 @@ impl HunkRange {
         Ok(Self {
             old: side(old).ok_or_else(bad)?,
             new: side(new).ok_or_else(bad)?,
-            section: section.trim_end_matches(['\n', '\r']).to_string(),
+            section: section.to_vec(),
         })
     }
 
@@ -195,6 +229,92 @@ mod tests {
         d
     }
 
+    /// `stage_hunks` with the keys the UI got for hunks `at` (a missing index gets a key that matches nothing).
+    fn stage(p: &str, file: &str, at: &[usize], lines: Option<&[usize]>, unstage: bool) -> Result<OpResult> {
+        let scope = if unstage {
+            DiffScope::Staged
+        } else {
+            DiffScope::Unstaged
+        };
+        let diff = worktree_diff(p, Some(file), scope).unwrap();
+        let keys: Vec<String> = at
+            .iter()
+            .map(|&i| {
+                diff.first()
+                    .and_then(|f| f.hunks.get(i))
+                    .map_or("none".into(), |h| h.key.clone())
+            })
+            .collect();
+        stage_hunks(p, file, &keys, lines, unstage)
+    }
+
+    #[test]
+    fn a_hunk_that_changed_since_it_was_shown_is_refused() {
+        let d = two_hunk_repo();
+        let p = s(d.path());
+        let shown = worktree_diff(p, Some("f.txt"), DiffScope::Unstaged).unwrap();
+        let bottom = shown[0].hunks[1].key.clone();
+        // An editor saves again: a new hunk above, and the shown one edited.
+        let now = fs::read_to_string(d.path().join("f.txt")).unwrap();
+        fs::write(d.path().join("f.txt"), now.replace("line 15\n", "MIDDLE\n")).unwrap();
+        // The bottom hunk is unchanged, only its index moved: it is still found.
+        let r = stage_hunks(p, "f.txt", &[bottom], None, false).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let staged = super::super::git_ok(d.path(), &["show", ":f.txt"]).unwrap();
+        assert!(staged.contains("BOTTOM") && !staged.contains("MIDDLE") && !staged.contains("TOP"));
+        // The top hunk as shown no longer exists.
+        let now = fs::read_to_string(d.path().join("f.txt")).unwrap();
+        fs::write(d.path().join("f.txt"), now.replace("TOP\n", "TOP!\n")).unwrap();
+        let top = shown[0].hunks[0].key.clone();
+        assert!(stage_hunks(p, "f.txt", std::slice::from_ref(&top), None, false)
+            .unwrap_err()
+            .contains("changed since"));
+        assert!(stage_hunks(p, "f.txt", &[top], Some(&[1]), false).is_err());
+        let staged = super::super::git_ok(d.path(), &["show", ":f.txt"]).unwrap();
+        assert!(!staged.contains("TOP") && !staged.contains("MIDDLE"));
+    }
+
+    /// A legacy-encoded (CP949) file: its bytes reach the index unchanged.
+    #[test]
+    fn stages_hunks_and_lines_of_non_utf8_files_byte_for_byte() {
+        let d = repo();
+        let p = s(d.path());
+        let han = b"\xc7\xd1\xb1\xdb"; // "한글" in CP949
+        let mut base = b"a\n".to_vec();
+        base.extend_from_slice(han);
+        base.extend_from_slice(b" old\nz\n");
+        fs::write(d.path().join("k.txt"), &base).unwrap();
+        super::super::git_ok(d.path(), &["add", "k.txt"]).unwrap();
+        super::super::git_ok(d.path(), &["commit", "-qm", "base"]).unwrap();
+        let mut edited = b"a\n".to_vec();
+        edited.extend_from_slice(han);
+        edited.extend_from_slice(b" new\n");
+        edited.extend_from_slice(han);
+        edited.extend_from_slice(b" more\nz\n");
+        fs::write(d.path().join("k.txt"), &edited).unwrap();
+        let index = || {
+            let out = std::process::Command::new("git")
+                .args(["show", ":k.txt"])
+                .current_dir(d.path())
+                .output()
+                .unwrap();
+            out.stdout
+        };
+        // Lines: 0 " a", 1 -han old, 2 +han new, 3 +han more, 4 " z". Stage only "+han more".
+        let r = stage(p, "k.txt", &[0], Some(&[3]), false).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let mut expect = b"a\n".to_vec();
+        expect.extend_from_slice(han);
+        expect.extend_from_slice(b" old\n");
+        expect.extend_from_slice(han);
+        expect.extend_from_slice(b" more\nz\n");
+        assert_eq!(index(), expect);
+        // The rest as a whole hunk: the index now equals the work tree.
+        let r = stage(p, "k.txt", &[0], None, false).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(index(), edited);
+    }
+
     fn hunks(p: &str, scope: DiffScope) -> usize {
         worktree_diff(p, Some("f.txt"), scope)
             .unwrap()
@@ -208,7 +328,7 @@ mod tests {
         let p = s(d.path());
         assert_eq!(hunks(p, DiffScope::Unstaged), 2);
 
-        let r = stage_hunks(p, "f.txt", &[1], None, false).unwrap();
+        let r = stage(p, "f.txt", &[1], None, false).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(hunks(p, DiffScope::Staged), 1);
         assert_eq!(hunks(p, DiffScope::Unstaged), 1);
@@ -227,9 +347,9 @@ mod tests {
     fn unstage_a_hunk() {
         let d = two_hunk_repo();
         let p = s(d.path());
-        stage_hunks(p, "f.txt", &[0, 1], None, false).unwrap();
+        stage(p, "f.txt", &[0, 1], None, false).unwrap();
         assert_eq!(hunks(p, DiffScope::Unstaged), 0);
-        let r = stage_hunks(p, "f.txt", &[0], None, true).unwrap();
+        let r = stage(p, "f.txt", &[0], None, true).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(hunks(p, DiffScope::Staged), 1);
         assert_eq!(hunks(p, DiffScope::Unstaged), 1);
@@ -241,7 +361,7 @@ mod tests {
         let p = s(d.path());
         commit_file(d.path(), "a.txt", "a", "base");
         fs::write(d.path().join("new.txt"), "hello\n").unwrap();
-        let r = stage_hunks(p, "new.txt", &[0], None, false).unwrap();
+        let r = stage(p, "new.txt", &[0], None, false).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(
             worktree_diff(p, Some("new.txt"), DiffScope::Staged)
@@ -249,20 +369,20 @@ mod tests {
                 .len(),
             1
         );
-        assert!(stage_hunks(p, "new.txt", &[3], None, true).is_err());
+        assert!(stage(p, "new.txt", &[3], None, true).is_err());
     }
 
     #[test]
     fn select_hunks_keeps_header_and_chosen_blocks() {
         let patch = "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1 +1 @@\n-a\n+b\n@@ -9 +9 @@\n-y\n+z\n\\ No newline at end of file\n";
-        let out = select_hunks(patch, &[1]).unwrap();
+        let out = String::from_utf8(select_hunks(patch.as_bytes(), &[1]).unwrap()).unwrap();
         assert!(out.starts_with("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -9 +9 @@"));
         assert!(!out.contains("+b") && out.ends_with("No newline at end of file\n"));
     }
 
     /// Stage `pick` lines of `file`'s only hunk (or unstage), returning the index copy (trimmed).
     fn lines(d: &tempfile::TempDir, file: &str, pick: &[usize], unstage: bool) -> String {
-        let r = stage_hunks(s(d.path()), file, &[0], Some(pick), unstage).unwrap();
+        let r = stage(s(d.path()), file, &[0], Some(pick), unstage).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         super::super::git_ok(d.path(), &["show", &format!(":{file}")]).unwrap()
     }
@@ -302,21 +422,24 @@ mod tests {
         fs::write(d.path().join("f.txt"), "a\nB\n").unwrap();
         let p = s(d.path());
         // Only context picked, an index past the hunk, two hunks at once.
-        assert!(stage_hunks(p, "f.txt", &[0], Some(&[0]), false).is_err());
-        assert!(stage_hunks(p, "f.txt", &[0], Some(&[9]), false).is_err());
-        assert!(stage_hunks(p, "f.txt", &[0, 1], Some(&[1]), false).is_err());
+        assert!(stage(p, "f.txt", &[0], Some(&[0]), false).is_err());
+        assert!(stage(p, "f.txt", &[0], Some(&[9]), false).is_err());
+        assert!(stage(p, "f.txt", &[0, 1], Some(&[1]), false).is_err());
     }
 
     #[test]
     fn select_lines_follows_no_newline_marker() {
         let patch = "--- a/f\n+++ b/f\n@@ -1 +1 @@ fn x\n-old\n\\ No newline at end of file\n+new\n\\ No newline at end of file\n";
         // Staging only the addition: "-old" stays as context with its marker.
+        let sel = |keep: &[usize], rev| {
+            String::from_utf8(select_lines(patch.as_bytes(), keep, rev).unwrap()).unwrap()
+        };
         assert_eq!(
-            select_lines(patch, &[1], false).unwrap(),
+            sel(&[1], false),
             "--- a/f\n+++ b/f\n@@ -1,1 +1,2 @@ fn x\n old\n\\ No newline at end of file\n+new\n\\ No newline at end of file\n"
         );
         // Unstaging only the removal (applied in reverse): the unpicked "+new" stays as context.
-        let rev = select_lines(patch, &[0], true).unwrap();
+        let rev = sel(&[0], true);
         assert!(rev.contains("@@ -1,2 +1,1 @@") && rev.contains("-old\n") && rev.contains(" new\n"));
     }
 }

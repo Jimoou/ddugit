@@ -52,7 +52,7 @@ command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bo
 } else {
     git::write::commit(&path, &message, &paths, amend)
 });
-command!(git_stage_hunks(path: String, file: String, hunks: Vec<usize>, lines: Option<Vec<usize>>, unstage: bool) -> OpResult
+command!(git_stage_hunks(path: String, file: String, hunks: Vec<String>, lines: Option<Vec<usize>>, unstage: bool) -> OpResult
     => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
 command!(backport_compare(path: String, source: String, target: String) -> Vec<BackportItem>
     => git::backport::compare(&path, &source, &target));

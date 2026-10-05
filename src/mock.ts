@@ -399,7 +399,7 @@ function fakeFile(path: string, seed: number, summary: string, status = "modifie
     deletions,
     binary: false,
     truncated: false,
-    hunks: [{ header, lines }],
+    hunks: [{ header, key: `${path}:${seed}`, lines }],
   };
 }
 

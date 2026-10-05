@@ -26,6 +26,9 @@ pub struct DiffLine {
 #[serde(rename_all = "camelCase")]
 pub struct DiffHunk {
     pub header: String,
+    /// Fingerprint of the hunk's header and every line (see `hunk_key`): staging
+    /// names hunks by it, so a file that changed since is refused, not mis-staged.
+    pub key: String,
     pub lines: Vec<DiffLine>,
 }
 
@@ -181,6 +184,7 @@ fn collect(diff: &mut Diff) -> Result<Vec<FileDiff>> {
                     if !lines.is_empty() {
                         file.hunks.push(DiffHunk {
                             header: header(&hunk),
+                            key: hunk_key(&patch, h)?,
                             lines,
                         });
                     }
@@ -203,6 +207,7 @@ fn collect(diff: &mut Diff) -> Result<Vec<FileDiff>> {
             }
             file.hunks.push(DiffHunk {
                 header: header(&hunk),
+                key: hunk_key(&patch, h)?,
                 lines,
             });
         }
@@ -210,6 +215,21 @@ fn collect(diff: &mut Diff) -> Result<Vec<FileDiff>> {
         out.push(file);
     }
     Ok(out)
+}
+
+/// SHA-256 (hex, shortened) over hunk `h`'s raw header and lines, origins
+/// included: the same hunk always gets the same key, any edit to it a new one.
+pub(super) fn hunk_key(patch: &Patch, h: usize) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    let (hunk, n) = patch.hunk(h).map_err(err)?;
+    let mut sha = Sha256::new();
+    sha.update(hunk.header());
+    for l in 0..n {
+        let line = patch.line_in_hunk(h, l).map_err(err)?;
+        sha.update([line.origin() as u8]);
+        sha.update(line.content());
+    }
+    Ok(super::hex(&sha.finalize()[..12]))
 }
 
 fn header(h: &git2::DiffHunk) -> String {

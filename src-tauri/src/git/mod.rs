@@ -309,7 +309,7 @@ fn git_streaming(dir: &Path, args: &[&str], mut on_segment: impl FnMut(&str) -> 
 }
 
 /// Like `git`, but feeds `input` on stdin (e.g. a patch for `git apply`).
-fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
+fn git_input(dir: &Path, args: &[&str], input: &[u8]) -> Result<Output> {
     use std::io::Write;
     let mut child = command(dir, args)
         .stdin(Stdio::piped())
@@ -321,7 +321,7 @@ fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
         .stdin
         .take()
         .expect("piped stdin")
-        .write_all(input.as_bytes())
+        .write_all(input)
         .map_err(err)?; // stdin drops here, closing the pipe
     let out = child.wait_with_output().map_err(err)?;
     Ok(join_output(
@@ -329,6 +329,11 @@ fn git_input(dir: &Path, args: &[&str], input: &str) -> Result<Output> {
         &String::from_utf8_lossy(&out.stdout),
         &String::from_utf8_lossy(&out.stderr),
     ))
+}
+
+/// Lowercase hex of `bytes` (digests).
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn git_ok(dir: &Path, args: &[&str]) -> Result<String> {

@@ -362,6 +362,8 @@ export interface DiffLine {
 
 export interface DiffHunk {
   header: string;
+  /** Fingerprint of the hunk's content; staging names hunks by it. */
+  key: string;
   lines: DiffLine[];
 }
 
