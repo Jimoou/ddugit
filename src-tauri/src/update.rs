@@ -19,11 +19,18 @@ pub struct UpdateInfo {
     pub notes: Option<String>,
 }
 
+/// The manifest address a build was given: none (or empty) means never update.
+fn endpoint(raw: Option<&str>) -> Result<Option<tauri::Url>, String> {
+    match raw.filter(|u| !u.is_empty()) {
+        None => Ok(None),
+        Some(url) => url.parse().map(Some).map_err(|e| format!("{e}")),
+    }
+}
+
 async fn find(app: &tauri::AppHandle) -> Result<Option<tauri_plugin_updater::Update>, String> {
-    let Some(url) = ENDPOINT.filter(|u| !u.is_empty()) else {
+    let Some(url) = endpoint(ENDPOINT)? else {
         return Ok(None);
     };
-    let url = url.parse().map_err(|e| format!("{e}"))?;
     let updater = app
         .updater_builder()
         .endpoints(vec![url])
@@ -48,4 +55,40 @@ pub async fn install(app: &tauri::AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
     app.restart()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+
+    #[test]
+    fn a_build_without_an_address_never_updates() {
+        assert_eq!(endpoint(None), Ok(None));
+        assert_eq!(endpoint(Some("")), Ok(None));
+        let url = endpoint(Some("https://example.com/releases/latest.json")).unwrap();
+        assert_eq!(url.unwrap().path(), "/releases/latest.json");
+        assert!(endpoint(Some("not a url")).is_err());
+    }
+
+    /// Installers are only trusted when signed by the release key, for the version
+    /// they claim; the platform files must not drop that.
+    #[test]
+    fn updates_must_be_signed_by_the_release_key() {
+        let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let updater = &conf["plugins"]["updater"];
+        assert_eq!(updater["requireSignedVersion"], true);
+        let key = base64::engine::general_purpose::STANDARD
+            .decode(updater["pubkey"].as_str().unwrap())
+            .unwrap();
+        let key = String::from_utf8(key).unwrap();
+        assert!(key.starts_with("untrusted comment: minisign public key"), "{key}");
+        for platform in [
+            include_str!("../tauri.macos.conf.json"),
+            include_str!("../tauri.windows.conf.json"),
+        ] {
+            let conf: serde_json::Value = serde_json::from_str(platform).unwrap();
+            assert!(conf["plugins"]["updater"].is_null(), "{platform}");
+        }
+    }
 }

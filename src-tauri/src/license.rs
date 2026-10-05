@@ -114,7 +114,17 @@ pub fn verify_with(text: &str, key: &VerifyingKey) -> Result<LicenseInfo> {
     serde_json::from_slice(&payload).map_err(|_| "The license is damaged".into())
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The issuer key tests trust on their own thread, in place of the build's.
+    static TEST_KEY: std::cell::Cell<Option<[u8; 32]>> = const { std::cell::Cell::new(None) };
+}
+
 fn key() -> Result<VerifyingKey> {
+    #[cfg(test)]
+    if let Some(k) = TEST_KEY.with(|k| k.get()) {
+        return VerifyingKey::from_bytes(&k).map_err(|e| e.to_string());
+    }
     parse_key(PUBLIC_KEY.ok_or("This build can't check licenses")?)
 }
 
@@ -269,9 +279,17 @@ pub fn remove_in(dir: &Path) -> Result<LicenseStatus> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
+
+    /// Trust the test issuer on this thread and keep a site license signed by it
+    /// in `dir`: Pro opens there, as with a real license on a release build.
+    pub(crate) fn install_test_license(dir: &Path) {
+        TEST_KEY.with(|k| k.set(Some(issuer().verifying_key().to_bytes())));
+        let status = install_in(dir, &sign(&issuer(), &info())).unwrap();
+        assert!(active(&status).is_some(), "{status:?}");
+    }
 
     fn issuer() -> SigningKey {
         SigningKey::from_bytes(&[7u8; 32])

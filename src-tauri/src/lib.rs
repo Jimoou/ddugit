@@ -52,7 +52,14 @@ macro_rules! command {
         #[tauri::command]
         async fn $name(app: tauri::AppHandle, $($arg: $ty),*) -> Result<$ret, String> {
             let $dir = license_dir(&app)?;
-            blocking(move || $body).await
+            blocking(move || $name::run($dir, $($arg),*)).await
+        }
+        /// The command's body with the config folder passed in (tests give their own).
+        mod $name {
+            use super::*;
+            pub(super) fn run($dir: std::path::PathBuf, $($arg: $ty),*) -> Result<$ret, String> {
+                $body
+            }
         }
     };
     ($name:ident($($arg:ident: $ty:ty),*) -> $ret:ty => $body:expr) => {
@@ -255,7 +262,12 @@ fn repo_root(dir: String) -> Option<String> {
 /// Repository passed on the command line (`ddugit path/to/repo`), if any.
 #[tauri::command]
 fn initial_repo() -> Option<String> {
-    let arg = std::env::args().skip(1).find(|a| !a.starts_with('-'))?;
+    repo_arg(std::env::args().skip(1))
+}
+
+/// The first argument that isn't an option, as an absolute path.
+fn repo_arg(mut args: impl Iterator<Item = String>) -> Option<String> {
+    let arg = args.find(|a| !a.starts_with('-'))?;
     // `absolute` rather than `canonicalize`: no `\\?\` verbatim prefix on Windows.
     std::path::absolute(arg)
         .ok()
@@ -357,4 +369,182 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git::stack::StackOp;
+    use git::testutil::{commit_file, repo, run, s};
+    use git::OpStatus;
+    use std::path::{Path, PathBuf};
+
+    /// A repository on `main` with a `topic` branch one fix ahead, stacked on main and
+    /// bundled in `.git/topic.bundle`, and the fix's id.
+    fn fixture() -> (tempfile::TempDir, String) {
+        let d = repo();
+        commit_file(d.path(), "a.txt", "a", "base");
+        run(d.path(), &["branch", "topic"]);
+        run(d.path(), &["checkout", "-q", "topic"]);
+        commit_file(d.path(), "b.txt", "b", "fix");
+        let fix = run(d.path(), &["rev-parse", "HEAD"]).trim().to_string();
+        run(d.path(), &["checkout", "-q", "main"]);
+        run(d.path(), &["config", "branch.topic.ddugit-parent", "main"]);
+        run(
+            d.path(),
+            &["bundle", "create", "-q", ".git/topic.bundle", "topic"],
+        );
+        (d, fix)
+    }
+
+    /// Everything a refused command must leave alone: refs, HEAD, local config, files.
+    fn state(repo: &Path, out: &Path) -> String {
+        let files: Vec<_> = std::fs::read_dir(out)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
+        [
+            run(repo, &["for-each-ref"]),
+            run(repo, &["symbolic-ref", "HEAD"]),
+            run(repo, &["config", "--local", "--list"]),
+            run(repo, &["status", "--porcelain"]),
+            format!("{files:?}"),
+        ]
+        .join("\n")
+    }
+
+    /// Every Pro-only command, as one call on `repo` with `cfg` as the config folder.
+    type Call = fn(PathBuf, String, &str, &Path) -> Result<OpStatus, String>;
+
+    fn pro_calls() -> Vec<(&'static str, Call)> {
+        vec![
+            ("backport_ignore", |cfg, p, fix, _| {
+                backport_ignore::run(cfg, p, "main".into(), fix.into(), true).map(|()| OpStatus::Ok)
+            }),
+            ("backport_apply", |cfg, p, fix, _| {
+                backport_apply::run(cfg, p, vec![fix.into()], "main".into()).map(|r| r.status)
+            }),
+            ("backport_export", |cfg, p, fix, out| {
+                backport_export::run(cfg, p, vec![fix.into()], s(out).into()).map(|r| r.status)
+            }),
+            ("transfer_export", |cfg, p, _, out| {
+                let req = git::transfer::ExportRequest {
+                    dest: "Acme".into(),
+                    branches: vec!["main".into()],
+                    full: true,
+                    out_dir: s(out).into(),
+                };
+                transfer_export::run(cfg, p, req).map(|r| r.status)
+            }),
+            ("transfer_import", |cfg, p, _, _| {
+                let file = Path::new(&p).join(".git/topic.bundle");
+                transfer_import::run(cfg, p, s(&file).into(), "acme".into()).map(|r| r.status)
+            }),
+            ("batch_switch", |cfg, p, _, _| {
+                batch_switch::run(cfg, p, "topic".into()).map(|r| r.result.status)
+            }),
+            ("stack_op create", |cfg, p, _, _| {
+                let op = StackOp::Create {
+                    name: "next".into(),
+                    parent: "main".into(),
+                };
+                stack_op::run(cfg, p, op).map(|r| r.status)
+            }),
+            ("stack_op set parent", |cfg, p, _, _| {
+                let op = StackOp::SetParent {
+                    branch: "topic".into(),
+                    parent: "main".into(),
+                };
+                stack_op::run(cfg, p, op).map(|r| r.status)
+            }),
+            ("stack_op restack", |cfg, p, _, _| {
+                let op = StackOp::Restack {
+                    branch: "topic".into(),
+                };
+                stack_op::run(cfg, p, op).map(|r| r.status)
+            }),
+        ]
+    }
+
+    #[test]
+    fn pro_commands_are_refused_on_free_before_touching_anything() {
+        let free = tempfile::tempdir().unwrap();
+        for (name, call) in pro_calls() {
+            let (d, fix) = fixture();
+            let out = tempfile::tempdir().unwrap();
+            let before = state(d.path(), out.path());
+            let r = call(free.path().into(), s(d.path()).into(), &fix, out.path());
+            assert_eq!(r, Err(pro::LOCKED.to_string()), "{name}");
+            assert_eq!(
+                state(d.path(), out.path()),
+                before,
+                "{name} changed something on Free"
+            );
+        }
+    }
+
+    #[test]
+    fn pro_commands_work_with_a_license() {
+        let pro_dir = tempfile::tempdir().unwrap();
+        license::tests::install_test_license(pro_dir.path());
+        for (name, call) in pro_calls() {
+            let (d, fix) = fixture();
+            let out = tempfile::tempdir().unwrap();
+            let r = call(pro_dir.path().into(), s(d.path()).into(), &fix, out.path());
+            assert_eq!(r, Ok(OpStatus::Ok), "{name}");
+        }
+    }
+
+    /// The release webview runs only the app's own scripts and talks only to the
+    /// backend; the platform files must not loosen that.
+    #[test]
+    fn the_release_window_runs_only_its_own_scripts() {
+        let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let security = &conf["app"]["security"];
+        assert_eq!(security["freezePrototype"], true);
+        let csp = security["csp"].as_str().unwrap();
+        let directive = |name: &str| {
+            csp.split(';')
+                .map(str::trim)
+                .find_map(|d| d.strip_prefix(name)?.strip_prefix(' '))
+                .unwrap_or_else(|| panic!("no {name} in {csp}"))
+                .to_string()
+        };
+        assert_eq!(directive("default-src"), "'self'");
+        assert_eq!(directive("script-src"), "'self'");
+        assert_eq!(directive("connect-src"), "ipc: http://ipc.localhost");
+        assert_eq!(directive("object-src"), "'none'");
+        assert_eq!(directive("frame-ancestors"), "'none'");
+        for platform in [
+            include_str!("../tauri.macos.conf.json"),
+            include_str!("../tauri.windows.conf.json"),
+        ] {
+            let conf: serde_json::Value = serde_json::from_str(platform).unwrap();
+            assert!(conf["app"]["security"].is_null(), "{platform}");
+        }
+    }
+
+    #[test]
+    fn the_first_plain_argument_is_the_repository_to_open() {
+        let args = |a: &[&str]| repo_arg(a.iter().map(|s| s.to_string()));
+        assert_eq!(args(&[]), None);
+        assert_eq!(args(&["--verbose", "-x"]), None);
+        let abs = std::path::absolute("work/app").unwrap();
+        let want = Some(abs.to_string_lossy().into_owned());
+        assert_eq!(args(&["--flag", "work/app", "other"]), want);
+        assert_eq!(args(&[&want.clone().unwrap()]), want);
+    }
+
+    #[test]
+    fn taking_a_branch_out_of_its_stack_stays_free() {
+        let free = tempfile::tempdir().unwrap();
+        let (d, _) = fixture();
+        let op = StackOp::Remove {
+            branch: "topic".into(),
+        };
+        let r = stack_op::run(free.path().into(), s(d.path()).into(), op).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert!(git::stack::list(s(d.path())).unwrap().is_empty());
+    }
 }

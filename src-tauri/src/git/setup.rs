@@ -75,6 +75,48 @@ mod tests {
         assert!(clone(" ", s(&parent.path().join("y")), |_| {}).is_err());
     }
 
+    /// An HTTP server on 127.0.0.1 that answers every request with `status` and
+    /// no body, and the URL of a repository on it.
+    fn http_answering(status: &'static str) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/team/app.git", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for mut sock in listener.incoming().flatten() {
+                let mut got = Vec::new();
+                let mut buf = [0u8; 1024];
+                while !got.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match sock.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => got.extend_from_slice(&buf[..n]),
+                    }
+                }
+                let reply = format!(
+                    "HTTP/1.1 {status}\r\nWWW-Authenticate: Basic realm=\"git\"\r\n\
+                     Content-Length: 0\r\nConnection: close\r\n\r\n"
+                );
+                let _ = sock.write_all(reply.as_bytes());
+            }
+        });
+        url
+    }
+
+    #[test]
+    fn clone_refused_by_the_server_is_classified_as_auth() {
+        for (status, want) in [
+            ("401 Unauthorized", OpStatus::Auth),
+            ("403 Forbidden", OpStatus::Auth),
+            ("404 Not Found", OpStatus::Failed),
+        ] {
+            let url = http_answering(status);
+            let parent = tempfile::tempdir().unwrap();
+            let dest = parent.path().join("app");
+            let r = clone(&url, s(&dest), |_| {}).unwrap();
+            assert_eq!(r.status, want, "{status}: {}", r.output);
+            assert!(!dest.join(".git").exists(), "{status} left a repository behind");
+        }
+    }
+
     #[test]
     fn init_makes_an_empty_repository_on_main() {
         let d = tempfile::tempdir().unwrap();
