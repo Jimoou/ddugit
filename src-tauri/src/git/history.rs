@@ -38,7 +38,8 @@ pub struct Blame {
 }
 
 const MAX_TOUCHES: &str = "--max-count=2000";
-/// Each record starts with this byte, then the id; the path follows on its own line.
+/// Each record starts with this byte, then the id; with `-z` the id ends in a
+/// NUL and the path follows (after a line break) up to the next NUL.
 const MARK: char = '\u{1}';
 
 /// Commits reachable from `rev` that changed `file`, newest first. Uses the
@@ -50,7 +51,10 @@ pub fn file_log(path: &str, rev: &str, file: &str) -> Result<Vec<FileTouch>> {
         &dir,
         &[
             LITERAL,
+            "-c",
+            "core.quotePath=false",
             "log",
+            "-z",
             "--follow",
             MAX_TOUCHES,
             "--format=%x01%H",
@@ -61,14 +65,19 @@ pub fn file_log(path: &str, rev: &str, file: &str) -> Result<Vec<FileTouch>> {
         ],
     )?;
     let mut touches: Vec<FileTouch> = Vec::new();
-    for line in out.lines().filter(|l| !l.is_empty()) {
-        if let Some(id) = line.strip_prefix(MARK) {
+    // Paths are kept byte for byte (no C quoting, no splitting on line breaks).
+    for field in out.split('\0') {
+        let field = field.strip_prefix('\n').unwrap_or(field);
+        if field.is_empty() {
+            continue;
+        }
+        if let Some(id) = field.strip_prefix(MARK) {
             touches.push(FileTouch {
                 id: id.to_string(),
                 path: file.to_string(),
             });
         } else if let Some(last) = touches.last_mut() {
-            last.path = line.to_string();
+            last.path = field.to_string();
         }
     }
     Ok(touches)
@@ -149,6 +158,19 @@ mod tests {
         assert_eq!(ids, [grown.as_str(), renamed.as_str(), first.as_str()]);
         assert_eq!(log[2].path, "a.txt");
         assert_eq!(log[0].path, "b.txt");
+    }
+
+    #[test]
+    fn korean_file_names_come_back_as_they_are() {
+        let d = repo();
+        commit_file(d.path(), "한글.txt", "one\n", "add");
+        let first = head(d.path());
+        git_ok(d.path(), &["mv", "한글.txt", "새 파일.txt"]).unwrap();
+        git_ok(d.path(), &["commit", "-qm", "rename"]).unwrap();
+        let log = file_log(s(d.path()), "HEAD", "새 파일.txt").unwrap();
+        let paths: Vec<&str> = log.iter().map(|t| t.path.as_str()).collect();
+        assert_eq!(paths, ["새 파일.txt", "한글.txt"]);
+        assert_eq!(log[1].id, first);
     }
 
     #[test]

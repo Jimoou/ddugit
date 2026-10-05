@@ -163,12 +163,12 @@ fn is_ancestor(dir: &Path, a: &str, b: &str) -> bool {
     git(dir, &["merge-base", "--is-ancestor", a, b]).is_ok_and(|o| o.ok)
 }
 
+/// Streamed through the hasher: a bundle may be several gigabytes.
 fn sha256_hex(file: &Path) -> Result<String> {
-    let bytes = std::fs::read(file).map_err(|e| format!("Can't read {}: {e}", file.display()))?;
-    Ok(Sha256::digest(&bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect())
+    let cant = |e: std::io::Error| format!("Can't read {}: {e}", file.display());
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut std::fs::File::open(file).map_err(cant)?, &mut hasher).map_err(cant)?;
+    Ok(hasher.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
 fn checksum_file(bundle: &Path) -> PathBuf {
@@ -353,6 +353,18 @@ mod tests {
 
     fn tip(p: &Path, r: &str) -> String {
         git_ok(p, &["rev-parse", r]).unwrap().trim().to_string()
+    }
+
+    #[test]
+    fn checksums_are_sha256sum_hex() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("x.bundle");
+        std::fs::write(&f, "abc").unwrap();
+        assert_eq!(
+            sha256_hex(&f).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert!(sha256_hex(&d.path().join("missing")).is_err());
     }
 
     #[test]
