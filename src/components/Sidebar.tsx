@@ -210,14 +210,6 @@ export function Sidebar(props: Props) {
         className={`sidebar ${slide ? "slide" : ""}`}
         onAnimationEnd={(e) => e.target === e.currentTarget && setSlide(false)}
       >
-        {focused.length > 1 && (
-          <div className="side-picked" role="status">
-            <span>{t("side.picked", { n: focused.length })}</span>
-            <button className="ghost" onClick={props.onClearFocus}>
-              {t("side.unpick")}
-            </button>
-          </div>
-        )}
         <div className="side-top">
           <input
             className="text search"
@@ -229,6 +221,14 @@ export function Sidebar(props: Props) {
             <Icon name="sidebar" />
           </button>
         </div>
+        {focused.length > 1 && (
+          <div className="side-picked" role="status">
+            <span>{t("side.picked", { n: focused.length })}</span>
+            <button className="ghost" onClick={props.onClearFocus}>
+              {t("side.unpick")}
+            </button>
+          </div>
+        )}
         {GROUPS.map((g) => {
           const items = filtered.filter((r) => r.kind === g.kind);
           // Branches and remotes stay (with their add buttons) even when empty.

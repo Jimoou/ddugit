@@ -29,7 +29,9 @@ export function StackSection(p: {
           <div key={lowest} className="stack-group">
             <div className="stack-base">
               <Icon name="stack" size={11} />
-              <span className="mono">{g.base}</span>
+              <span className="mono" title={g.base}>
+                {g.base}
+              </span>
               <button
                 className={`stack-restack ${g.behind ? "lit" : ""}`}
                 title={t("stack.restack.hint")}
@@ -44,7 +46,7 @@ export function StackSection(p: {
                 <li
                   key={b.name}
                   className={b.name === p.head ? "head" : ""}
-                  style={{ paddingLeft: 22 + depth * 12 }}
+                  style={{ paddingLeft: 14 + depth * 12 }}
                   onClick={() => p.onShow(b.name)}
                   onContextMenu={(e) => {
                     e.preventDefault();
@@ -60,7 +62,9 @@ export function StackSection(p: {
                       {t("stack.parentMissing")}
                     </span>
                   ) : b.behind ? (
-                    <span className="stack-flag">{t("stack.behind")}</span>
+                    <span className="stack-flag" title={t("stack.behind")}>
+                      {t("stack.behind")}
+                    </span>
                   ) : (
                     <span className="muted small">{t("stack.own", { n: b.own })}</span>
                   )}

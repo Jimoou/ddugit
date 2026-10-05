@@ -58,6 +58,34 @@ test("resolves a conflict block by editing it by hand", async ({ demo }) => {
   await expect(nebula).not.toHaveClass(/\bon\b/);
 });
 
+test("keeps the diff and the conflict sheet usable in a small window", async ({ demo }) => {
+  const { page } = demo;
+  await page.setViewportSize({ width: 1024, height: 680 });
+  // Beside the composer the diff takes the stage's whole width, the file list above it.
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  await page.locator(".composer .path").first().click();
+  const stage = (await page.locator(".stage").boundingBox())!;
+  const body = (await page.locator(".diff-sheet .diff-body").boundingBox())!;
+  expect(body.width).toBeGreaterThan(stage.width - 2);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".diff-sheet")).toHaveCount(0);
+
+  await demo.mutate((d) => (d.conflictNext = true));
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  await page.click(".dialog button.primary");
+  await expect(page.locator(".conflict-sheet")).toBeVisible();
+  // The banner says it; no toast over the blocks.
+  await expect(page.locator(".toast")).toHaveCount(0);
+  // Blocks keep their code instead of collapsing to their header row.
+  const block = page.locator(".block").first();
+  const head = (await block.locator(".block-head").boundingBox())!;
+  expect((await block.boundingBox())!.height).toBeGreaterThan(head.height + 30);
+  // The graph above is short: the overview strip and the help line step aside.
+  await expect(page.locator(".stage-graph .minimap")).toBeHidden();
+  await expect(page.locator(".stage-graph .hint")).toBeHidden();
+});
+
 test("stages single lines picked in the diff", async ({ demo }) => {
   const { page } = demo;
   await page.locator(".topbar button", { hasText: "커밋" }).click();
@@ -1380,6 +1408,10 @@ test("a newer version shows an update notice that installs or waits", async ({ d
   await page.reload();
   const notice = page.locator(".update-notice");
   await expect(notice).toContainText("9.9.9");
+  // It sits above the topbar instead of over its actions.
+  const box = (await notice.boundingBox())!;
+  const push = (await page.locator(".topbar button", { hasText: "Push" }).boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(push.y);
   await notice.locator("button.ghost").click();
   await expect(notice).toHaveCount(0);
   await page.reload();

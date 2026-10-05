@@ -82,12 +82,16 @@ export function TopBar(p: Props) {
               onClick={() => p.onRemote(op)}
             >
               <Icon name={icon} className="ico" />
-              {running && p.progress ? `${phase(p.progress.phase)} ${p.progress.percent}%` : label}
+              {label}
               {n > 0 && !running && <span className={`count ${op}`}>{n}</span>}
+              {/* The verb stays put; the percentage rides in a fixed-width badge (the phase is in the job card). */}
               {running && p.progress && (
-                <span className="progress" title={p.progress.phase}>
-                  <i style={{ width: `${p.progress.percent}%` }} />
-                </span>
+                <>
+                  <span className="count pct">{p.progress.percent}%</span>
+                  <span className="progress" title={phase(p.progress.phase)}>
+                    <i style={{ width: `${p.progress.percent}%` }} />
+                  </span>
+                </>
               )}
             </button>
           );

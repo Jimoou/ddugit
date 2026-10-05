@@ -293,7 +293,6 @@ export const ko = {
   "update.later": "나중에",
   "update.failed": "업데이트하지 못했어요: {error}",
   "app.gitPathError": "설정한 git을 쓸 수 없어요: {error}",
-  "app.conflict": "충돌이 났어요. 아래 충돌 해결 화면에서 고르거나 취소하세요.",
   "app.failed": "{label} 실패",
   "app.tagline": "그래프로 보고, 그래프로 다루는 Git.",
   "app.open": "저장소 열기",

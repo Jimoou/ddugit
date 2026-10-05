@@ -299,7 +299,6 @@ export const en: Record<Key, string> = {
   "update.later": "Later",
   "update.failed": "Update failed: {error}",
   "app.gitPathError": "Can't use the configured git executable: {error}",
-  "app.conflict": "There are conflicts. Choose a side in the conflict sheet below, or cancel.",
   "app.failed": "Failed: {label}",
   "app.tagline": "Git you can see and steer as a graph.",
   "app.open": "Open repository",
