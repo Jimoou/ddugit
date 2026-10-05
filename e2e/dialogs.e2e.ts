@@ -22,7 +22,7 @@ test("Esc closes the repository menu and the dialogs opened from the sidebar", a
     .click();
   await escCloses(page, page.locator(".dialog.clone"));
 
-  await sidebar.locator(".worktrees").getByRole("button", { name: "worktree 추가" }).click();
+  await sidebar.locator(".worktrees").getByRole("button", { name: "워크트리 추가" }).click();
   await escCloses(page, page.locator(".worktree-dialog"));
 
   await sidebar.locator("button[title='폐쇄망 반출입']").click();
@@ -46,7 +46,7 @@ test("Esc closes sheets, and a menu over a sheet closes alone", async ({ demo })
   await sidebar.getByLabel(/백포트: 다른 브랜치에만 있는 커밋/).click();
   await escCloses(page, page.locator(".backport-sheet"));
 
-  await page.getByRole("button", { name: "되돌리기 기록 (reflog)" }).click();
+  await page.getByRole("button", { name: "작업 기록 (reflog)" }).click();
   await escCloses(page, page.locator(".reflog-sheet"));
 });
 
@@ -64,8 +64,8 @@ test("Esc closes only the topmost of two dialogs", async ({ demo }) => {
   // Going back to a commit asks first; that dialog is labelled by its title.
   const snap = await demo.snapshot();
   const parent = snap.commits.find((c) => c.id === snap.head.target)!.parents[0];
-  await (await demo.commitMenu(parent)).getByText("이 커밋으로 되돌리기").click();
-  await escCloses(page, page.getByRole("dialog", { name: "되돌리기" }));
+  await (await demo.commitMenu(parent)).getByText("여기로 리셋").click();
+  await escCloses(page, page.getByRole("dialog", { name: "리셋" }));
 });
 
 test("? opens settings at the shortcut table; Esc closes it", async ({ demo }) => {
@@ -80,10 +80,10 @@ test("? opens settings at the shortcut table; Esc closes it", async ({ demo }) =
 
 test("Tab stays inside a modal dialog, and focus goes back to the opener", async ({ demo }) => {
   const { page } = demo;
-  const opener = page.locator(".app:not([hidden]) .sidebar .worktrees").getByRole("button", { name: "worktree 추가" });
+  const opener = page.locator(".app:not([hidden]) .sidebar .worktrees").getByRole("button", { name: "워크트리 추가" });
   await opener.focus();
   await page.keyboard.press("Enter");
-  const dialog = page.getByRole("dialog", { name: "worktree 추가" });
+  const dialog = page.getByRole("dialog", { name: "워크트리 추가" });
   await expect(dialog).toHaveAttribute("aria-modal", "true");
   const inside = () => dialog.evaluate((el) => el.contains(document.activeElement));
   await expect.poll(inside).toBe(true);

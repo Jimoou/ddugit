@@ -9,6 +9,13 @@ import type { ForgeKind, ForgeStatus, PrReport, PullRequest, RefInfo } from "../
 import { useDialog } from "./useDialog";
 
 export const FORGE_NAME: Record<ForgeKind, string> = { github: "GitHub", gitlab: "GitLab" };
+/** What the forge calls a pull request. */
+export const prNoun = (kind: ForgeKind) => (kind === "gitlab" ? "MR" : "PR");
+/** The noun for a repository's forges together: "MR" only when they are all GitLab. */
+export const nounOf = (forges: Pick<ForgeStatus, "kind">[]) =>
+  prNoun(forges.length > 0 && forges.every((f) => f.kind === "gitlab") ? "gitlab" : "github");
+/** The CLI whose login a forge can borrow. */
+const CLI: Record<ForgeKind, string> = { github: "gh", gitlab: "glab" };
 
 /** `#12` on GitHub, `!12` on GitLab; prefixed with the remote when several forges are in play. */
 export function prLabel(pr: PullRequest, report: PrReport): string {
@@ -67,6 +74,7 @@ export function PullSection(p: {
   const saved = report.forges.find((f) => f.token === "keychain");
   const open = report.prs.filter((pr) => pr.state === "open");
   const done = report.prs.filter((pr) => pr.state !== "open");
+  const noun = nounOf(report.forges);
   const row = (pr: PullRequest) => (
     <li
       key={`${pr.remote}:${pr.number}`}
@@ -97,7 +105,7 @@ export function PullSection(p: {
     <SideSection
       id="pulls"
       className="pulls"
-      title={t("pr.section")}
+      title={t("pr.section", { noun })}
       count={open.length}
       actions={
         <>
@@ -114,7 +122,12 @@ export function PullSection(p: {
               </button>
             )
           }
-          <button className="h3-add" title={t("pr.new.button")} aria-label={t("pr.new.button")} onClick={p.onCreate}>
+          <button
+            className="h3-add"
+            title={t("pr.new.button", { noun })}
+            aria-label={t("pr.new.button", { noun })}
+            onClick={p.onCreate}
+          >
             <Icon name="plus" size={12} />
           </button>
         </>
@@ -125,7 +138,7 @@ export function PullSection(p: {
           <p className="muted">
             {blocked.unauthorized
               ? t("pr.refused", { forge: FORGE_NAME[blocked.kind] })
-              : t("pr.hint", { forge: FORGE_NAME[blocked.kind] })}
+              : t("pr.hint", { forge: FORGE_NAME[blocked.kind], noun: prNoun(blocked.kind) })}
           </p>
           <button onClick={() => p.onConnect(blocked)}>{t("pr.connect", { forge: FORGE_NAME[blocked.kind] })}</button>
         </div>
@@ -138,8 +151,10 @@ export function PullSection(p: {
           </button>
         </div>
       )}
-      {failed && <p className="muted pr-error">{t("pr.failed", { error: failed.error ?? "" })}</p>}
-      {!blocked && !failed && !locked && open.length === 0 && <p className="muted pr-empty">{t("pr.none")}</p>}
+      {failed && <p className="muted pr-error">{t("pr.failed", { noun, error: failed.error ?? "" })}</p>}
+      {!blocked && !failed && !locked && open.length === 0 && (
+        <p className="muted pr-empty">{t("pr.none", { noun })}</p>
+      )}
       <ul>{open.map(row)}</ul>
       {done.length > 0 && (
         <SideSection id="pulls-done" className="sub" title={t("pr.done")} count={done.length}>
@@ -187,9 +202,11 @@ export function TokenDialog(p: {
           <Rich k={p.forge.kind === "github" ? "pr.token.cli.gh" : "pr.token.cli.glab"} vars={{ host: p.forge.host }} />
         </p>
         {!p.forge.public && p.forge.token !== "cli" && (
-          <button onClick={p.onTrustCli}>{t("pr.token.trustCli", { host: p.forge.host })}</button>
+          <button onClick={p.onTrustCli}>
+            {t("pr.token.trustCli", { host: p.forge.host, cli: CLI[p.forge.kind] })}
+          </button>
         )}
-        <p className="muted">{t("pr.token.paste", { host: p.forge.host })}</p>
+        <p className="muted">{t("pr.token.paste", { noun: prNoun(p.forge.kind) })}</p>
         <button className="token-page" onClick={() => p.onOpenPage(page)}>
           {t("pr.token.make")} <Icon name="external" size={12} />
         </button>

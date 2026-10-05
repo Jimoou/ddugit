@@ -62,7 +62,7 @@ export function TopBar(p: Props) {
       )}
       {onVoyage ? (
         <button className="demo-pill" onClick={onVoyage} title={t("voyage.reopen")}>
-          {t("top.demo")} <Icon name="sparkle" size={11} />
+          {t("top.demo.tour")}
         </button>
       ) : (
         !isTauri && <span className="demo-pill">{t("top.demo")}</span>

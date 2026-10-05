@@ -53,22 +53,21 @@ export function IdentityLine({ path, profiles, onProfiles, onChange }: LineProps
   const change = (label: string, op: IdentityOp) => void onChange(label, op).then(reload);
   const current = profileFrom(identity);
 
+  // The choices first, the current one checked (not greyed out); creating a profile comes last.
   const items: MenuItem[] = profiles.map((p) => ({
     label: `${p.name} <${p.email}>`,
-    icon: matchesProfile(identity, p) ? ("check" as const) : undefined,
+    icon: v.local && matchesProfile(identity, p) ? ("check" as const) : undefined,
     hint: p.signing ? `${t("identity.signs")} · ${p.signing.format === "ssh" ? "SSH" : "GPG"}` : undefined,
     onSelect: () => change(t("identity.applied", { name: p.name }), { kind: "apply", scope: "local", profile: p }),
   }));
-  if (current && !profiles.some((p) => sameIdentity(identity, p)))
-    items.push({ label: t("identity.saveCurrent"), icon: "plus", onSelect: () => onProfiles([...profiles, current]) });
-  else if (!profiles.length) items.push({ label: t("identity.noProfiles"), disabled: true, onSelect: () => {} });
-  items.push("separator", {
+  items.push({
     label: t("identity.useGlobal"),
-    disabled: !v.local,
-    onSelect: () => change(t("identity.cleared"), { kind: "clear", scope: "local" }),
+    icon: v.local ? undefined : "check",
+    onSelect: () => v.local && change(t("identity.cleared"), { kind: "clear", scope: "local" }),
   });
   if (identity.key?.value)
     items.push(
+      "separator",
       v.signs
         ? {
             label: t("identity.signOff"),
@@ -79,6 +78,14 @@ export function IdentityLine({ path, profiles, onProfiles, onChange }: LineProps
             onSelect: () => change(t("identity.signedOn"), { kind: "sign", scope: "local", on: true }),
           },
     );
+  if (current && !profiles.some((p) => sameIdentity(identity, p)))
+    items.push("separator", {
+      label: t("identity.saveCurrent"),
+      icon: "plus",
+      onSelect: () => onProfiles([...profiles, current]),
+    });
+  else if (!profiles.length)
+    items.push("separator", { label: t("identity.noProfiles"), disabled: true, onSelect: () => {} });
 
   return (
     <>

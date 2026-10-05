@@ -6,8 +6,17 @@ import { Composer } from "./components/Composer";
 import { ReflogSheet, ResetDialog } from "./components/Undo";
 import { BlameSheet } from "./components/History";
 import { type Effect, FxLayer, Nebula, useFx } from "./components/Fx";
-import { FORGE_NAME, PullSection, TokenDialog, prOf, prRefs, type TokenForge } from "./components/Pulls";
-import { CreatePr, prNoun, prTag } from "./components/CreatePr";
+import {
+  FORGE_NAME,
+  PullSection,
+  TokenDialog,
+  nounOf,
+  prNoun,
+  prOf,
+  prRefs,
+  type TokenForge,
+} from "./components/Pulls";
+import { CreatePr, prTag } from "./components/CreatePr";
 import { MissionPanel, useVoyage } from "./components/Missions";
 import { PeekCard } from "./components/Peek";
 import { CleanupSheet } from "./components/Cleanup";
@@ -1412,7 +1421,7 @@ export function RepoView({
       merge,
       compare,
       {
-        label: t("pr.new"),
+        label: t("pr.new", { noun: nounOf(pulls?.forges ?? []) }),
         icon: "pull",
         disabled: !pulls?.forges.length,
         onSelect: () => setPrFrom(r.name),
