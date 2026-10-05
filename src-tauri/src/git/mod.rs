@@ -124,6 +124,18 @@ fn state_name(s: RepositoryState) -> &'static str {
     }
 }
 
+/// Goes before a subcommand that takes file paths from the UI: they name files,
+/// so `[`, `*`, `?` and `:(magic)` must not match other files (`git clean -- 'a?'`
+/// would also delete `ab`). Not set globally: `lfs track` patterns are globs.
+/// Only for commands that run no hooks: git exports it to them as
+/// `GIT_LITERAL_PATHSPECS`, which would break a hook's own globs; those use [`literal`].
+pub(crate) const LITERAL: &str = "--literal-pathspecs";
+
+/// One UI file path as a pathspec that matches only that path (see [`LITERAL`]).
+pub(crate) fn literal(path: &str) -> String {
+    format!(":(literal){path}")
+}
+
 /// A remote's push URL meaning "never push here" (`git remote set-url --push`).
 pub(crate) const NO_PUSH: &str = "DISABLED";
 

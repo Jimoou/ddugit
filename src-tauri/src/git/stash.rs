@@ -4,7 +4,7 @@ use git2::Repository;
 use serde::{Deserialize, Serialize};
 
 use super::read::read_changes;
-use super::{err, git, git_ok, open, workdir, OpResult, OpStatus, Result};
+use super::{err, git, git_ok, literal, open, workdir, OpResult, OpStatus, Result, LITERAL};
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -78,16 +78,23 @@ pub fn discard(path: &str, paths: &[String]) -> Result<OpResult> {
     if !tracked.is_empty() {
         let mut args = if repo.head().is_ok() {
             // Paths missing from HEAD (newly added) are removed, matching the source.
-            vec!["restore", "--source=HEAD", "--staged", "--worktree", "--"]
+            vec![
+                LITERAL,
+                "restore",
+                "--source=HEAD",
+                "--staged",
+                "--worktree",
+                "--",
+            ]
         } else {
             // Unborn branch: nothing to restore from; just unstage, then delete below.
-            vec!["rm", "-r", "-q", "-f", "--"]
+            vec![LITERAL, "rm", "-r", "-q", "-f", "--"]
         };
         args.extend(&tracked);
         out.push(git_ok(&dir, &args)?);
     }
     if !untracked.is_empty() {
-        let mut args = vec!["clean", "-f", "-q", "--"];
+        let mut args = vec![LITERAL, "clean", "-f", "-q", "--"];
         args.extend(&untracked);
         out.push(git_ok(&dir, &args)?);
     }
@@ -100,13 +107,15 @@ pub fn discard(path: &str, paths: &[String]) -> Result<OpResult> {
 /// Stash `paths` (all changes when empty), including untracked files.
 pub fn stash_push(path: &str, message: &str, paths: &[String]) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
+    // Not `LITERAL`: stash's own internal pathspecs need magic, so each path is spelled literal.
+    let specs: Vec<String> = paths.iter().map(|p| literal(p)).collect();
     let mut args = vec!["stash", "push", "--include-untracked"];
     if !message.trim().is_empty() {
         args.extend(["-m", message.trim()]);
     }
     if !paths.is_empty() {
         args.push("--");
-        args.extend(paths.iter().map(String::as_str));
+        args.extend(specs.iter().map(String::as_str));
     }
     Ok(git(&dir, &args)?.into())
 }
@@ -154,6 +163,36 @@ mod tests {
         assert!(!d.path().join("u.txt").exists());
         assert!(!d.path().join("n.txt").exists());
         assert_eq!(changed(&d), vec!["keep.txt"]);
+    }
+
+    /// File names are not globs: discarding `u?` must not delete `ux`, and a
+    /// file named `*` or `:(top)x` is just that file.
+    #[test]
+    fn discard_and_stash_take_paths_literally() {
+        let d = repo();
+        commit_file(d.path(), "t?.txt", "t", "base");
+        commit_file(d.path(), "tx.txt", "t", "base2");
+        let names = ["u?", "ux", "*", ":(top)x"];
+        for n in names
+            .iter()
+            .filter(|n| cfg!(unix) || !n.contains(['?', '*', ':']))
+        {
+            fs::write(d.path().join(n), "u").unwrap();
+        }
+        fs::write(d.path().join("t?.txt"), "edit").unwrap();
+        fs::write(d.path().join("tx.txt"), "edit").unwrap();
+        if cfg!(unix) {
+            discard(s(d.path()), &["u?".into(), "*".into()]).unwrap();
+            assert!(!d.path().join("u?").exists() && !d.path().join("*").exists());
+            assert!(d.path().join("ux").exists() && d.path().join(":(top)x").exists());
+            discard(s(d.path()), &["t?.txt".into()]).unwrap();
+            assert_eq!(fs::read_to_string(d.path().join("t?.txt")).unwrap(), "t");
+            assert_eq!(fs::read_to_string(d.path().join("tx.txt")).unwrap(), "edit");
+            let r = stash_push(s(d.path()), "", &[":(top)x".into()]).unwrap();
+            assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+            assert!(!d.path().join(":(top)x").exists());
+            assert!(d.path().join("ux").exists());
+        }
     }
 
     #[test]

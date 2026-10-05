@@ -97,13 +97,23 @@ pub fn status(path: &str) -> Result<LfsStatus> {
     })
 }
 
+/// A track pattern becomes one `.gitattributes` line: a line break or other
+/// control character would add lines of its own.
+fn lfs_pattern(pattern: &str) -> Result<&str> {
+    let p = operand(pattern.trim())?;
+    if p.is_empty() || p.chars().any(char::is_control) {
+        return Err("The pattern can't be empty or hold line breaks".into());
+    }
+    Ok(p)
+}
+
 pub fn apply(path: &str, op: &LfsOp) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
     let args: Vec<&str> = match op {
         LfsOp::Install => vec!["lfs", "install", "--local"],
         LfsOp::Pull => vec!["lfs", "pull"],
-        LfsOp::Track { pattern } => vec!["lfs", "track", "--", operand(pattern.trim())?],
-        LfsOp::Untrack { pattern } => vec!["lfs", "untrack", "--", operand(pattern.trim())?],
+        LfsOp::Track { pattern } => vec!["lfs", "track", "--", lfs_pattern(pattern)?],
+        LfsOp::Untrack { pattern } => vec!["lfs", "untrack", "--", lfs_pattern(pattern)?],
     };
     let o = git(&dir, &args)?;
     if !o.ok && is_auth_failure(&o.text) {
@@ -124,6 +134,16 @@ mod tests {
         assert_eq!(lfs_patterns(attrs), ["*.psd", "assets/**"]);
         let ls = "4d7a2146b8 * big.psd\n9f86d08188 - art/huge file.psd\n";
         assert_eq!(pointers(ls), ["art/huge file.psd"]);
+    }
+
+    #[test]
+    fn patterns_with_line_breaks_are_refused() {
+        let d = repo();
+        for bad in ["*.bin\n* filter=evil", "a\rb", "-x", "  "] {
+            let op = LfsOp::Track { pattern: bad.into() };
+            assert!(apply(s(d.path()), &op).is_err(), "{bad:?}");
+        }
+        assert!(!d.path().join(".gitattributes").exists());
     }
 
     #[test]

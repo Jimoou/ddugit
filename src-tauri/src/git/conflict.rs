@@ -6,7 +6,7 @@ use std::path::{Component, Path, PathBuf};
 use git2::Repository;
 use serde::{Deserialize, Serialize};
 
-use super::{err, git_ok, open, workdir, OpResult, OpStatus, Result};
+use super::{err, git_ok, literal, open, workdir, OpResult, OpStatus, Result, LITERAL};
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -102,16 +102,16 @@ pub fn resolve(path: &str, file: &str, how: &Resolution) -> Result<OpResult> {
         Resolution::Content { .. } => None,
     };
     let out = match (how, side) {
-        (_, Some((_, false))) => git_ok(&dir, &["rm", "-q", "--", file])?,
+        (_, Some((_, false))) => git_ok(&dir, &[LITERAL, "rm", "-q", "--", file])?,
         (_, Some((flag, true))) => {
-            git_ok(&dir, &["checkout", flag, "--", file])?;
-            git_ok(&dir, &["add", "--", file])?
+            git_ok(&dir, &["checkout", flag, "--", &literal(file)])?;
+            git_ok(&dir, &[LITERAL, "add", "--", file])?
         }
         (Resolution::Content { text }, None) => {
             // Only a file that is in conflict, and only inside the work tree.
             conflict_file(path, file)?;
             fs::write(inside(&dir, file)?, text).map_err(err)?;
-            git_ok(&dir, &["add", "--", file])?
+            git_ok(&dir, &[LITERAL, "add", "--", file])?
         }
         _ => unreachable!("sides only come from Ours / Theirs"),
     };

@@ -83,12 +83,17 @@ pub(super) fn list(repo: &Repository) -> Vec<SubmoduleInfo> {
 
 pub fn apply(path: &str, op: &SubmoduleOp) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
+    // Checkouts in submodules run their hooks, so the path is spelled literal (see `LITERAL`).
+    let spec = match op {
+        SubmoduleOp::Update { path: Some(p) } => Some(super::literal(operand(p)?)),
+        _ => None,
+    };
     let mut args = vec!["submodule"];
     match op {
-        SubmoduleOp::Update { path: one } => {
+        SubmoduleOp::Update { .. } => {
             args.extend(["update", "--init", "--recursive"]);
-            if let Some(p) = one {
-                args.extend(["--", operand(p)?]);
+            if let Some(p) = &spec {
+                args.extend(["--", p.as_str()]);
             }
         }
         SubmoduleOp::Sync => args.extend(["sync", "--recursive"]),

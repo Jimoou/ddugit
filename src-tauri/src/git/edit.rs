@@ -8,7 +8,7 @@
 use serde::Deserialize;
 
 use super::write::{conflict_aware, prepare_on};
-use super::{err, git, git_ok, open, OpResult, Result};
+use super::{err, git, git_ok, literal, open, operand, OpResult, Result, LITERAL};
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "kind")]
@@ -140,14 +140,27 @@ pub fn edit_commit(path: &str, id: &str, edit: &CommitEdit) -> Result<OpResult> 
 }
 
 /// Put `file` back the way commit `source` had it (deleting it if it didn't
-/// exist there). The result is an uncommitted, staged change.
+/// exist there). The result is an uncommitted, staged change. A `source` that
+/// doesn't name a commit is refused: it never turns into a deletion.
 pub fn restore_file(path: &str, source: &str, file: &str) -> Result<OpResult> {
+    operand(source)?;
     let dir = prepare_on(path, None)?;
-    let exists = git(&dir, &["cat-file", "-e", &format!("{source}:{file}")])?.ok;
-    Ok(if exists {
-        git(&dir, &["checkout", source, "--", file])?
+    let repo = open(path)?;
+    let commit = repo
+        .revparse_single(source)
+        .and_then(|o| o.peel_to_commit())
+        .map_err(|_| format!("Unknown commit '{source}'"))?;
+    let id = commit.id().to_string();
+    let found = match commit.tree().and_then(|t| t.get_path(std::path::Path::new(file))) {
+        Ok(_) => true,
+        Err(e) if e.code() == git2::ErrorCode::NotFound => false,
+        Err(e) => return Err(e.message().to_string()),
+    };
+    // `checkout` runs the post-checkout hook, so the path is spelled literal (see `LITERAL`).
+    Ok(if found {
+        git(&dir, &["checkout", &id, "--", &literal(file)])?
     } else {
-        git(&dir, &["rm", "-q", "-f", "--ignore-unmatch", "--", file])?
+        git(&dir, &[LITERAL, "rm", "-q", "-f", "--ignore-unmatch", "--", file])?
     }
     .into())
 }
@@ -316,5 +329,15 @@ mod tests {
         assert!(!d.path().join("c.txt").exists());
         let snap = snapshot(s(d.path()), 10).unwrap();
         assert!(snap.changes.iter().all(|c| c.staged.is_some()));
+    }
+
+    #[test]
+    fn restoring_from_an_unknown_source_deletes_nothing() {
+        let d = three();
+        for bad in ["nope", "--output=x", "HEAD~9"] {
+            assert!(restore_file(s(d.path()), bad, "a.txt").is_err(), "{bad}");
+        }
+        assert!(d.path().join("a.txt").exists());
+        assert!(snapshot(s(d.path()), 10).unwrap().changes.is_empty());
     }
 }

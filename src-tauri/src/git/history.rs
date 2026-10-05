@@ -6,7 +6,7 @@ use std::path::Path;
 use git2::BlameOptions;
 use serde::Serialize;
 
-use super::{err, git_ok, open, workdir, Result};
+use super::{err, git_ok, open, workdir, Result, LITERAL};
 
 /// A commit that changed the file, and the file's path in that commit.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -49,6 +49,7 @@ pub fn file_log(path: &str, rev: &str, file: &str) -> Result<Vec<FileTouch>> {
     let out = git_ok(
         &dir,
         &[
+            LITERAL,
             "log",
             "--follow",
             MAX_TOUCHES,

@@ -4,10 +4,11 @@ use std::path::PathBuf;
 
 use git2::{BranchType, Oid, RepositoryState};
 
+use super::literal;
 use super::read::read_head;
 use super::{
     git, git_ok, in_progress, open, operand, repo_dir, state_name, workdir, OpResult, OpStatus, Output,
-    Result,
+    Result, LITERAL,
 };
 
 /// Commit the given paths (exactly those, regardless of what else is staged).
@@ -19,6 +20,8 @@ pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Resul
     }
     let dir = repo_dir(path)?;
     let ps: Vec<&str> = paths.iter().map(String::as_str).collect();
+    // `commit` runs hooks, so its paths are spelled literal one by one (see `LITERAL`).
+    let specs: Vec<String> = ps.iter().map(|p| literal(p)).collect();
     let mut commit: Vec<&str> = vec!["commit", "-m", message];
     if amend {
         commit.push("--amend");
@@ -26,12 +29,12 @@ pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Resul
     if amend && ps.is_empty() {
         commit.push("--only"); // reword: ignore whatever is staged
     } else {
-        let mut add = vec!["add", "-A", "--"];
+        let mut add = vec![LITERAL, "add", "-A", "--"];
         add.extend(&ps);
         git_ok(&dir, &add)?;
         if !ps.is_empty() {
             commit.push("--");
-            commit.extend(&ps);
+            commit.extend(specs.iter().map(String::as_str));
         }
     }
     Ok(git(&dir, &commit)?.into())
@@ -296,6 +299,19 @@ mod tests {
         assert_eq!(snap.changes.len(), 1);
         assert_eq!(snap.changes[0].path, "b.txt");
         assert_eq!(snap.changes[0].unstaged.as_deref(), Some("untracked"));
+    }
+
+    #[cfg(unix)] // `?` can't be in a Windows file name
+    #[test]
+    fn commit_takes_paths_literally() {
+        let d = repo();
+        fs::write(d.path().join("a?.txt"), "a").unwrap();
+        fs::write(d.path().join("ab.txt"), "b").unwrap();
+        let r = commit(s(d.path()), "only a?", &["a?.txt".into()], false).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(s(d.path()), 100).unwrap();
+        assert_eq!(snap.changes.len(), 1);
+        assert_eq!(snap.changes[0].path, "ab.txt");
     }
 
     #[test]
