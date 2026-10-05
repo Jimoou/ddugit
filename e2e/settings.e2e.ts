@@ -183,3 +183,23 @@ test("a newer version shows an update notice that installs or waits", async ({ d
   await page.locator(".update-notice button.primary").click();
   await expect(page.locator(".update-notice")).toHaveCount(0);
 });
+
+test("settings: a smaller history size reads the repository again with fewer commits", async ({ demo }) => {
+  const { page } = demo;
+  // A history longer than the smallest size.
+  await demo.mutate((d) => d.grow(1000));
+  const all = (await demo.snapshot()).commits;
+  const drawn = (id: string) => page.evaluate((id) => window.__ddugit.screenOf(id), id);
+  const hint = page.locator(".app:not([hidden]) .stage-graph .hint");
+  await expect.poll(() => drawn(all[all.length - 1].id)).not.toBeNull();
+  await expect(hint).not.toContainText("표시 중");
+
+  await page.locator(".tabrow-settings").click();
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  await dialog.getByLabel("한 번에 불러올 커밋").selectOption("1000");
+  await page.keyboard.press("Escape");
+  await expect(hint).toContainText("최근 1000개 표시 중");
+  await expect.poll(() => drawn(all[all.length - 1].id)).toBeNull();
+  expect(await drawn(all[999].id)).not.toBeNull();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).historyPage)).toBe(1000);
+});

@@ -105,3 +105,112 @@ test("Esc that closes a menu keeps the selected commit", async ({ demo }) => {
   await page.keyboard.press("Escape");
   await expect(inspector).toHaveCount(0);
 });
+
+test("the smallest window (900×560) keeps every screen inside it, controls unclipped and apart", async ({ demo }) => {
+  const { page } = demo;
+  await page.setViewportSize({ width: 900, height: 560 });
+  const view = { width: 900, height: 560 };
+  /** Fully inside the window, and not cut off by its own box (no hidden overflow). */
+  const inside = async (what: string, locator: ReturnType<typeof page.locator>) => {
+    // Panels slide in: measure where they come to rest.
+    await locator.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+    const box = (await locator.boundingBox())!;
+    expect(box, what).not.toBeNull();
+    expect(box.x, `${what} left`).toBeGreaterThanOrEqual(-0.5);
+    expect(box.y, `${what} top`).toBeGreaterThanOrEqual(-0.5);
+    expect(box.x + box.width, `${what} right`).toBeLessThanOrEqual(view.width + 0.5);
+    expect(box.y + box.height, `${what} bottom`).toBeLessThanOrEqual(view.height + 0.5);
+    return box;
+  };
+  const noPageScroll = async (what: string) =>
+    expect(
+      await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]),
+      what,
+    ).toEqual([view.width, view.height]);
+  /** Every visible control in `scope` is whole (its text not clipped) and none overlaps the next. */
+  const controlsApart = async (what: string, scope: ReturnType<typeof page.locator>) => {
+    const boxes = await scope.evaluate((root) =>
+      [...root.querySelectorAll<HTMLElement>("button, select, input:not([type=checkbox]):not([type=radio])")]
+        .filter((el) => el.offsetParent !== null && el.getClientRects().length > 0)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            name: el.getAttribute("aria-label") ?? el.title ?? el.textContent?.trim() ?? el.tagName,
+            x: r.x,
+            y: r.y,
+            w: r.width,
+            h: r.height,
+            clipped: el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflow !== "visible",
+          };
+        }),
+    );
+    for (const b of boxes) {
+      expect(b.clipped, `${what}: "${b.name}" is clipped`).toBe(false);
+      expect(b.x + b.w, `${what}: "${b.name}" runs off the window`).toBeLessThanOrEqual(view.width + 0.5);
+    }
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const [a, b] = [boxes[i], boxes[j]];
+        const overlap =
+          Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1 &&
+          Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1;
+        expect(overlap, `${what}: "${a.name}" overlaps "${b.name}"`).toBe(false);
+      }
+  };
+
+  // The repository screen: top bar, sidebar and graph.
+  await noPageScroll("repository");
+  await inside("top bar", page.locator(".app:not([hidden]) .topbar"));
+  await controlsApart("top bar", page.locator(".app:not([hidden]) .topbar"));
+  for (const name of [/Fetch/, /Pull/, /Push/, /커밋/])
+    await inside(`top bar ${name}`, page.locator(".topbar").getByRole("button", { name }).first());
+  await inside("sidebar", page.locator(".app:not([hidden]) .sidebar"));
+  await inside("graph", page.locator(".app:not([hidden]) .graph-area canvas"));
+
+  // The composer beside the graph.
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  const composer = page.locator(".composer");
+  await inside("composer", composer);
+  await inside("commit button", composer.locator("button.primary"));
+  await controlsApart("composer", composer);
+  await page.keyboard.press("Escape");
+
+  // The interactive rebase sheet.
+  await demo.mutate((d) => d.grow(3));
+  const snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  let base = snap.head.target!;
+  for (let i = 0; i < 3; i++) base = byId.get(base)!.parents[0];
+  await (await demo.commitMenu(base)).getByText("이후 커밋 정리").click();
+  const sheet = page.locator(".rebase-sheet");
+  await inside("rebase sheet", sheet);
+  await inside("rebase go", sheet.locator("button.primary"));
+  await controlsApart("rebase sheet", sheet);
+  await noPageScroll("rebase sheet");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+
+  // Settings.
+  await page.locator(".tabrow-settings").click();
+  const settings = page.getByRole("dialog", { name: "설정" });
+  await inside("settings", settings);
+  await controlsApart("settings", settings);
+  await page.keyboard.press("Escape");
+
+  // My repositories (the dashboard) with a few cards.
+  await page.evaluate(() => {
+    const paths = ["/work/rocket", "/work/api-gateway", "/srv/payments-service-long-name"];
+    localStorage.setItem("ddugit.recent", JSON.stringify(paths.map((path, i) => ({ path, starred: false, at: i }))));
+  });
+  await page.reload();
+  await page.locator(".tab-home").click();
+  const galaxy = page.locator(".welcome .galaxy");
+  await expect(galaxy.locator(".world")).toHaveCount(3);
+  await expect(galaxy.locator(".world-branch")).toHaveCount(3);
+  await noPageScroll("dashboard");
+  for (const card of await galaxy.locator(".world").all()) {
+    const box = (await card.boundingBox())!;
+    expect(box.x + box.width, "dashboard card").toBeLessThanOrEqual(view.width + 0.5);
+  }
+  await controlsApart("dashboard toolbar", galaxy.locator(".galaxy-head").first());
+});

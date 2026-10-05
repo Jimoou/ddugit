@@ -2,6 +2,7 @@
 
 import { demoControls } from "./controls";
 import { demoStacks } from "./pro";
+import { AUTH_OUTPUT } from "./remote";
 import { DEMO_ROOT, type Table, delay, fail, repo, res } from "./repo";
 
 /** The demo's LFS: two patterns, three files whose content isn't downloaded yet. */
@@ -10,6 +11,14 @@ const demoLfs = {
   filters: true,
   missing: ["art/cover.psd", "assets/hero.png", "assets/nebula.png"],
 };
+
+/** The next remote call refused for credentials (`failNextRemote`), as the submodule and LFS commands report it. */
+function authFailure() {
+  const fake = demoControls.failNextRemote;
+  if (!fake) return null;
+  demoControls.failNextRemote = null;
+  return delay(res("auth", AUTH_OUTPUT[fake]));
+}
 
 export const refsCommands = {
   git_ref({ op }) {
@@ -141,21 +150,31 @@ export const refsCommands = {
   },
 
   git_submodule({ op }) {
+    const refused = op.kind === "update" && authFailure();
+    if (refused) return refused;
     if (op.kind === "update")
       for (const m of repo.submodules)
         if (!op.path || m.path === op.path) Object.assign(m, { checkedOut: m.recorded, state: "clean" });
     return delay(res("ok", op.kind === "sync" ? "Synchronizing submodule url for 'vendor/stardust'" : ""));
   },
 
-  lfs_status: () =>
-    delay({
-      version: "git-lfs/3.4.1 (demo)",
+  lfs_status() {
+    if (demoControls.lfs === "off") {
+      demoLfs.filters = false;
+      demoControls.lfs = null;
+    }
+    return delay({
+      version: demoControls.lfs === "missing" ? null : "git-lfs/3.4.1 (demo)",
       patterns: [...demoLfs.patterns],
       filters: demoLfs.filters,
       missing: demoLfs.missing.length,
       missingFiles: [...demoLfs.missing],
-    }),
+    });
+  },
   git_lfs({ op }) {
+    if (demoControls.lfs === "missing") return fail("git: 'lfs' is not a git command. See 'git --help'.");
+    const refused = op.kind === "pull" && authFailure();
+    if (refused) return refused;
     if (op.kind === "install") demoLfs.filters = true;
     else if (op.kind === "pull") demoLfs.missing = [];
     else {

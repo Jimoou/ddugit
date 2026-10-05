@@ -56,6 +56,8 @@ export interface DemoFlags {
   GitMissing: boolean;
   /** A license on the demo computer from the start. */
   License: { kind: "lifetime" | "site"; deviceRemoved?: boolean };
+  /** Remember the open tabs across reloads, like the desktop app (the demo otherwise starts on its repository). */
+  Tabs: boolean;
 }
 
 const flag = <K extends keyof DemoFlags>(name: K): DemoFlags[K] | undefined =>
@@ -65,16 +67,24 @@ const flag = <K extends keyof DemoFlags>(name: K): DemoFlags[K] | undefined =>
 
 /** Dev/e2e hooks, exposed as `window.__ddugitDemo`. */
 export const demoControls = {
-  /** Make the next remote call fail authentication. */
+  /** Make the next call that reaches a remote (fetch, pull, push, clone, submodule update, LFS pull) fail authentication. */
   failNextRemote: null as null | "https" | "ssh",
   /** Local branches the demo reports as deleted on the remote. */
   goneBranches: [] as string[],
   /** Folder the next "choose folder" dialog returns (default: the demo repository). */
   nextFolder: null as string | null,
-  /** Make the next merge stop on a conflict in two files. */
+  /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */
   conflictNext: false,
+  /** The next conflict also stops on a binary file (`assets/logo.png`), resolved by picking a side. */
+  binaryConflict: false,
+  /** Make the next commit fail while signing, the way gpg or ssh-keygen report it. */
+  signFail: null as null | "gpg" | "ssh",
+  /** git-lfs isn't installed, or LFS is off in the demo repository (`git lfs install` turns it on). */
+  lfs: null as null | "missing" | "off",
   /** Make the next backport stop on a commit whose change is already there (nothing to commit). */
   emptyNext: false,
+  /** How the next checked bundle (transfer import) turns out: a bad checksum, prerequisites missing here, or no `.sha256`. */
+  nextBundle: null as null | "mismatch" | "missing" | "absent",
   /** How the demo's GitHub token is found: logged-in `gh`, a saved one, none, or refused. */
   forgeToken: "cli" as "cli" | "keychain" | "none" | "unauthorized",
   /** Free or Pro in the demo (Pro by default, so every feature shows); the `Pro` flag starts it otherwise. */
@@ -105,6 +115,8 @@ export const demoControls = {
   update: flag("Update") ?? (null as UpdateInfo | null),
   /** git can't be found (the first-run notice); the `GitMissing` flag starts that way. */
   gitMissing: !!flag("GitMissing"),
+  /** The open tabs are remembered across reloads (the `Tabs` flag). */
+  keepTabs: !!flag("Tabs"),
   /** The demo tab throws while rendering (the tab's error boundary, e2e) until this is cleared. */
   crashTab: false,
   /** Extra milliseconds every demo remote operation takes (e2e: something still running). */

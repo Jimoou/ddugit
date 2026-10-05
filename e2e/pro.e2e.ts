@@ -249,3 +249,50 @@ test("on Free, release notes offer Pro", async ({ demo }) => {
   await page.click(".context-menu >> text=여기까지 릴리스 노트 만들기");
   await expect(page.locator(".dialog.pro-offer")).toContainText("릴리스 노트");
 });
+
+test("a bundle with a bad checksum or missing prerequisite commits is not imported", async ({ demo }) => {
+  const { page } = demo;
+  await demo.branchTool("폐쇄망 반출입…");
+  const dialog = page.locator(".dialog.transfer");
+  await dialog.getByRole("tab", { name: "반입(안으로)" }).click();
+  const importButton = dialog.getByRole("button", { name: /^반입/ });
+  const check = dialog.locator(".tr-check");
+  const pick = async (how: "mismatch" | "missing" | "absent") => {
+    await page.evaluate((how) => (window.__ddugitDemo.nextBundle = how), how);
+    await dialog.getByRole("button", { name: "번들 파일 고르기…" }).click();
+  };
+
+  await pick("mismatch");
+  await expect(check.locator(".note.warn")).toHaveText("체크섬(.sha256)이 맞지 않아요. 파일이 손상됐거나 바뀌었어요.");
+  await expect(importButton).toBeDisabled();
+
+  await pick("missing");
+  await expect(check.locator(".note.warn")).toHaveText(
+    "이 번들이 기대는 커밋 2개가 이 저장소에 없어요. 앞선 번들을 먼저 반입해 주세요.",
+  );
+  await expect(importButton).toBeDisabled();
+
+  // Without a .sha256 the commits are still checked, and it can come in.
+  await pick("absent");
+  await expect(check).toContainText(".sha256 파일이 없어서 체크섬은 확인하지 못했어요");
+  await expect(check.locator(".note.warn")).toHaveCount(0);
+  await expect(importButton).toBeEnabled();
+  expect((await demo.snapshot()).refs.some((r) => r.name.startsWith("acme/"))).toBe(false);
+});
+
+test("exports picked backport commits as numbered patches into a chosen folder", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/work/patches"));
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 없는 커밋 보기");
+  const sheet = page.locator(".backport-sheet");
+  const rows = sheet.locator("tbody tr");
+  await expect(rows.first()).toBeVisible();
+  await rows.nth(0).locator("input[type=checkbox]").check();
+  await rows.nth(1).locator("input[type=checkbox]").check();
+  const before = await demo.snapshot();
+  await sheet.getByRole("button", { name: /패치로 내보내기/ }).click();
+  await demo.toast("패치 2개를 저장했어요");
+  // Exporting writes files only: no branch moves.
+  expect((await demo.snapshot()).refs).toEqual(before.refs);
+});

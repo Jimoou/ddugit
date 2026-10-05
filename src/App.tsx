@@ -1,6 +1,6 @@
 import { Icon } from "./components/Icon";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, DEMO_PATH, isTauri } from "./api";
+import { api, DEMO_PATH, isTauri, keepsTabs } from "./api";
 import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
 import { type Confirm, ConfirmDialog } from "./components/ConfirmDialog";
@@ -49,9 +49,9 @@ function loadSettings(): Settings {
   return settings;
 }
 
-/** Desktop: the tabs left open last time. Demo: the demo repository. */
+/** Desktop: the tabs left open last time. Demo: the demo repository (or its last tabs, when it keeps them). */
 const loadTabs = (): Tabs =>
-  isTauri ? parseTabs(readStored(TABS), readStored(LAST_REPO)) : parseTabs(null, DEMO_PATH);
+  keepsTabs ? parseTabs(readStored(TABS), isTauri ? readStored(LAST_REPO) : DEMO_PATH) : parseTabs(null, DEMO_PATH);
 
 /**
  * The window: a tab per open repository (each a `RepoView` that stays mounted
@@ -89,7 +89,7 @@ export default function App() {
     if (!stay) setHome(false);
     setTabsState((old) => {
       const next = f(old);
-      if (isTauri) writeStored(TABS, serializeTabs(next));
+      if (keepsTabs) writeStored(TABS, serializeTabs(next));
       return next;
     });
     setRepoMenu(null);

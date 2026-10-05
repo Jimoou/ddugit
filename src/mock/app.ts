@@ -166,6 +166,8 @@ export const appCommands = {
     return delay({ result: res("ok", `Switched to branch '${branch}'`), how } as const);
   },
   open_url({ url }) {
+    // Like `about::openable`: only https links leave the app.
+    if (!url.startsWith("https://")) return fail("Only https links can be opened");
     window.open(url, "_blank", "noopener");
     return delay(null);
   },
