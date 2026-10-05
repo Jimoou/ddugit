@@ -162,9 +162,7 @@ export function RebaseSheet({ branch, base, commits, todo, initial, unpushed, bu
           <span className="danger-text">{problem}</span>
         ) : rewritesPushed ? (
           <span className="warn-text">{t("rb.pushed")}</span>
-        ) : (
-          <span className="muted">{t("rb.safe")}</span>
-        )}
+        ) : null}
         <button className="primary" disabled={busy || !changed || problem !== null} onClick={() => onApply(steps)}>
           {t("rb.apply")}
         </button>

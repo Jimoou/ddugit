@@ -120,7 +120,6 @@ export function CleanupSheet(p: {
         })}
       </div>
       <footer className="conflict-foot">
-        <span className="muted">{t("clean.footer")}</span>
         <button
           className="primary danger"
           disabled={p.busy || chosen.length === 0}

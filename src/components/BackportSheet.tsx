@@ -57,7 +57,7 @@ function BackportGuide({ source, target }: { source: string; target: string }) {
       </button>
       {open && (
         <ol>
-          {(["bp.guide.1", "bp.guide.2", "bp.guide.3", "bp.guide.4"] as const).map((k) => (
+          {(["bp.guide.1", "bp.guide.2", "bp.guide.3"] as const).map((k) => (
             <li key={k}>
               <Rich k={k} vars={{ source, target }} />
             </li>
@@ -217,10 +217,7 @@ export function BackportSheet(p: Props) {
           <>
             {!items && !error && <p className="muted pad">{t("bp.comparing")}</p>}
             {items && !error && shown.length === 0 && (
-              <p className="muted pad">
-                {t("bp.upToDate", { target, source })}
-                {items.length > 0 && t("bp.upToDate.all")}
-              </p>
+              <p className="muted pad">{t("bp.upToDate", { target, source })}</p>
             )}
             {shown.length > 0 && (
               <table className="bp-list">
