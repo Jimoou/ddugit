@@ -440,6 +440,8 @@ export type LicenseRefresh = "renewed" | "current" | "lapsed" | "unknown" | "rem
 export interface Deactivation {
   status: LicenseStatus;
   confirmed: boolean;
+  /** What ddugit.com (or the connection) said when the place wasn't freed. */
+  error: string | null;
 }
 /** Mirrors `git/transfer.rs`. */
 export interface TransferExport {

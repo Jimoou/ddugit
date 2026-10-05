@@ -180,7 +180,10 @@ pub fn version(program: Option<&str>) -> Result<String> {
 }
 
 /// A git executable the user named: an absolute path to an existing file
-/// called `git` (`git.exe` on Windows). Checked before it is ever run.
+/// called `git` (`git.exe` on Windows). Checked before it is ever run. The
+/// file it resolves to must not be something a clone or a download could have
+/// put there: no file a repository tracks (or would add), nothing in a temp
+/// folder, and (Unix) nothing other users may rewrite.
 fn check_git_path(program: &str) -> Result<()> {
     let p = Path::new(program);
     let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -190,7 +193,62 @@ fn check_git_path(program: &str) -> Result<()> {
             "'{program}' is not a git executable (give the full path to git)"
         ));
     }
+    let real = p.canonicalize().map_err(err)?;
+    if in_temp(&real) {
+        return Err(format!("'{program}' is in a temporary folder"));
+    }
+    if in_repository(&real) {
+        return Err(format!("'{program}' is inside a git repository"));
+    }
+    if writable_by_others(&real) {
+        return Err(format!("'{program}' can be changed by other users"));
+    }
     Ok(())
+}
+
+/// Under the system temp folder (or `/tmp`, `/var/tmp`).
+fn in_temp(real: &Path) -> bool {
+    let mut temps = vec![std::env::temp_dir()];
+    if cfg!(unix) {
+        temps.extend(["/tmp", "/var/tmp"].map(std::path::PathBuf::from));
+    }
+    temps
+        .iter()
+        .filter_map(|t| t.canonicalize().ok())
+        .any(|t| real.starts_with(t))
+}
+
+/// In a repository's work tree and tracked there, or not ignored by it (a
+/// clone's files are tracked). Ignored files are fine: Homebrew's prefix is a
+/// repository that ignores its `bin/` and `Cellar/`.
+fn in_repository(real: &Path) -> bool {
+    let Some(parent) = real.parent() else {
+        return false;
+    };
+    let Ok(repo) = Repository::discover(parent) else {
+        return false;
+    };
+    let Some(rel) = repo
+        .workdir()
+        .and_then(|w| w.canonicalize().ok())
+        .and_then(|w| real.strip_prefix(w).ok().map(Path::to_path_buf))
+    else {
+        // Inside `.git` or a bare repository: hooks and such, never git itself.
+        return true;
+    };
+    let tracked = repo.index().is_ok_and(|i| i.get_path(&rel, 0).is_some());
+    tracked || !repo.is_path_ignored(&rel).unwrap_or(false)
+}
+
+#[cfg(unix)]
+fn writable_by_others(real: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::metadata(real).map_or(true, |m| m.permissions().mode() & 0o022 != 0)
+}
+
+#[cfg(not(unix))]
+fn writable_by_others(_: &Path) -> bool {
+    false
 }
 
 /// Use `program` for git (blank or `None`: back to PATH). Refused, keeping
@@ -369,6 +427,35 @@ mod tests {
             "/bin/sh"
         })
         .is_err());
+    }
+
+    #[test]
+    fn git_programs_a_clone_could_plant_are_refused() {
+        // A tracked file named `git` in a work tree (here also in a temp folder).
+        let d = testutil::repo();
+        let fake = d.path().join("git");
+        std::fs::write(&fake, "#!/bin/sh\necho git version 9\n").unwrap();
+        git_ok(d.path(), &["add", "git"]).unwrap();
+        let real = fake.canonicalize().unwrap();
+        assert!(in_repository(&real));
+        assert!(in_temp(&real));
+        assert!(check_git_path(real.to_str().unwrap()).is_err());
+        // Ignored and untracked: allowed as far as the repository goes.
+        let ignored = d.path().join("bin");
+        std::fs::create_dir(&ignored).unwrap();
+        std::fs::write(d.path().join(".gitignore"), "/bin/\n").unwrap();
+        std::fs::write(ignored.join("git"), "").unwrap();
+        assert!(!in_repository(&ignored.join("git").canonicalize().unwrap()));
+        assert!(!in_temp(Path::new("/usr/bin/git")));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let f = ignored.join("git");
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o757)).unwrap();
+            assert!(writable_by_others(&f));
+            std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o755)).unwrap();
+            assert!(!writable_by_others(&f));
+        }
     }
 
     #[test]

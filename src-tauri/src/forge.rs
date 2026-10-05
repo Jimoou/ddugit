@@ -132,7 +132,10 @@ pub fn parse_remote(url: &str) -> Option<Forge> {
         let (left, path) = url.split_once(':')?;
         (left.rsplit('@').next()?, path)
     };
-    let host = host.to_ascii_lowercase();
+    // Only a plain host name: `evil.com#github` would send the request (and a token) to evil.com.
+    let host = repos::normalize_host(host)
+        .ok()
+        .filter(|h| h == &host.to_ascii_lowercase())?;
     let path = path.trim_matches('/');
     let path = path.strip_suffix(".git").unwrap_or(path);
     let kind = if host.contains("github") {
@@ -144,11 +147,21 @@ pub fn parse_remote(url: &str) -> Option<Forge> {
     };
     let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
     let slug = match kind {
-        ForgeKind::Github if parts.len() >= 2 => format!("{}/{}", parts[0], parts[1]),
+        ForgeKind::Github if parts.len() >= 2 && parts[..2].iter().all(|p| github_segment(p)) => {
+            format!("{}/{}", parts[0], parts[1])
+        }
         ForgeKind::Gitlab if parts.len() >= 2 => parts.join("/"),
         _ => return None,
     };
     Some(Forge { kind, host, slug })
+}
+
+/// A GitHub owner or repository name as it may appear in a REST path
+/// (`/repos/{owner}/{repo}`): nothing that would make it another path.
+fn github_segment(s: &str) -> bool {
+    !matches!(s, "." | "..")
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
 }
 
 /// GraphQL endpoint for a forge host (GitHub Enterprise and self-hosted GitLab included).
@@ -160,15 +173,14 @@ pub fn graphql_url(kind: ForgeKind, host: &str) -> String {
     }
 }
 
-const KEYCHAIN_SERVICE: &str = "ddugit";
-
 fn keychain(host: &str) -> Option<keyring::Entry> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, host).ok()
+    crate::keychain::entry(crate::keychain::FORGE, host)
 }
 
 /// Remember (or with `None`, forget) the token for a forge host.
 pub fn set_token(host: &str, token: Option<&str>) -> Result<()> {
-    let entry = keychain(host).ok_or("The keychain is not available")?;
+    let host = repos::normalize_host(host)?;
+    let entry = keychain(&host).ok_or("The keychain is not available")?;
     match token.map(str::trim).filter(|t| !t.is_empty()) {
         Some(t) => entry.set_password(t).map_err(|e| e.to_string()),
         None => match entry.delete_credential() {
@@ -220,13 +232,77 @@ pub fn is_public_forge(host: &str) -> bool {
     host == "github.com" || host == "gitlab.com"
 }
 
+/// Where `gh` / `glab` keep the hosts one signed in to: `$GH_CONFIG_DIR`,
+/// `$XDG_CONFIG_HOME/gh`, `%AppData%/GitHub CLI`, `~/.config/gh` (and glab's
+/// `glab-cli` folder in the same spots, plus macOS's Application Support).
+fn cli_config_files(kind: ForgeKind) -> Vec<std::path::PathBuf> {
+    use std::path::PathBuf;
+    let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
+    let (own, folder, app_data, file) = match kind {
+        ForgeKind::Github => ("GH_CONFIG_DIR", "gh", "GitHub CLI", "hosts.yml"),
+        ForgeKind::Gitlab => ("GLAB_CONFIG_DIR", "glab-cli", "glab-cli", "config.yml"),
+    };
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    dirs.extend(env(own));
+    dirs.extend(env("XDG_CONFIG_HOME").map(|d| d.join(folder)));
+    dirs.extend(env("APPDATA").map(|d| d.join(app_data)));
+    if let Some(home) = env("HOME").or_else(|| env("USERPROFILE")) {
+        dirs.push(home.join(".config").join(folder));
+        if cfg!(target_os = "macos") {
+            dirs.push(home.join("Library/Application Support").join(folder));
+        }
+    }
+    dirs.into_iter().map(|d| d.join(file)).collect()
+}
+
+/// Hosts a `gh` `hosts.yml` (top-level keys) or a `glab` `config.yml` (keys
+/// directly under `hosts:`) lists. A tiny reader for just that shape: no YAML crate.
+fn config_hosts(kind: ForgeKind, yaml: &str) -> Vec<String> {
+    let key = |l: &str| {
+        let k = l.trim().strip_suffix(':')?.trim_matches(['"', '\'']);
+        (!k.is_empty() && !k.starts_with('#')).then(|| k.to_ascii_lowercase())
+    };
+    let indent = |l: &str| l.len() - l.trim_start().len();
+    let lines = yaml
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'));
+    match kind {
+        ForgeKind::Github => lines.filter(|l| indent(l) == 0).filter_map(key).collect(),
+        ForgeKind::Gitlab => {
+            let mut lines = lines.skip_while(|l| l.trim_end() != "hosts:").skip(1);
+            let mut out = Vec::new();
+            let mut level = None;
+            for l in lines.by_ref() {
+                let n = indent(l);
+                if n == 0 {
+                    break;
+                }
+                if *level.get_or_insert(n) == n {
+                    out.extend(key(l));
+                }
+            }
+            out
+        }
+    }
+}
+
+/// Whether the user signed in to `host` with the forge's CLI (`gh auth login
+/// --hostname`, `glab auth login --hostname`). Decided here from the CLI's own
+/// config, never by the webview.
+fn cli_signed_in(kind: ForgeKind, host: &str) -> bool {
+    cli_config_files(kind)
+        .iter()
+        .any(|f| std::fs::read_to_string(f).is_ok_and(|y| config_hosts(kind, &y).iter().any(|h| h == host)))
+}
+
 /// The forge CLI's token first, then the keychain. A CLI login is used for a
-/// host other than github.com / gitlab.com only once the user trusted that host:
-/// `gh` hands out its enterprise token for any host, so a repository whose
-/// remote names `github.attacker.example` would otherwise receive it. A token
-/// in the keychain was saved by the user for exactly that host.
-fn token_for(kind: ForgeKind, host: &str, trusted: &[String]) -> (Option<String>, TokenSource) {
-    let cli_ok = is_public_forge(host) || trusted.iter().any(|t| t == host);
+/// host other than github.com / gitlab.com only when the CLI's config lists that
+/// host: `gh` hands out its enterprise token (`GH_ENTERPRISE_TOKEN`) for any host
+/// asked, so a repository whose remote names `github.attacker.example` would
+/// otherwise receive it. A token in the keychain was saved by the user for
+/// exactly that host.
+fn token_for(kind: ForgeKind, host: &str) -> (Option<String>, TokenSource) {
+    let cli_ok = is_public_forge(host) || cli_signed_in(kind, host);
     if let Some(t) = cli_ok.then(|| cli_token(kind, host)).flatten() {
         return (Some(t), TokenSource::Cli);
     }
@@ -476,10 +552,9 @@ fn pulls(
 
 /// Ask each forge remote (origin first, each project once) for its open pull requests
 /// and the recently merged or closed ones.
-/// `trusted` are hosts (besides github.com / gitlab.com) whose `gh` / `glab`
-/// login the user agreed to use. Without `pro`, only public repositories on
+/// Without `pro`, only public repositories on
 /// github.com / gitlab.com are read (Free); a private or self-hosted one is `locked`.
-pub fn report(path: &str, trusted: &[String], pro: bool) -> Result<PrReport> {
+pub fn report(path: &str, pro: bool) -> Result<PrReport> {
     let repo = git2::Repository::discover(Path::new(path)).map_err(|e| e.message().to_string())?;
     let mut names: Vec<String> = repo
         .remotes()
@@ -503,7 +578,7 @@ pub fn report(path: &str, trusted: &[String], pro: bool) -> Result<PrReport> {
             continue;
         }
         seen.push(forge.clone());
-        let (token, source) = token_for(forge.kind, &forge.host, trusted);
+        let (token, source) = token_for(forge.kind, &forge.host);
         let mut status = ForgeStatus {
             remote: name.clone(),
             kind: forge.kind,
@@ -573,9 +648,38 @@ mod tests {
         assert!(is_public_forge("github.com") && is_public_forge("gitlab.com"));
         assert!(!is_public_forge("github.attacker.example"));
         assert!(!is_public_forge("gitlab.example.com"));
-        // An untrusted host never reaches `gh` / `glab`, and has no keychain entry here.
-        let (token, source) = token_for(ForgeKind::Github, "github.attacker.example", &[]);
+        // A host the CLI isn't signed in to never reaches `gh` / `glab`, and has no keychain entry here.
+        let (token, source) = token_for(ForgeKind::Github, "github.attacker.example");
         assert!(token.is_none() && source != TokenSource::Cli);
+    }
+
+    #[test]
+    fn reads_the_hosts_gh_and_glab_are_signed_in_to() {
+        let gh = "github.com:\n    user: kim\n    git_protocol: https\n\"GHE.corp.io\":\n    users:\n        kim:\n";
+        assert_eq!(config_hosts(ForgeKind::Github, gh), ["github.com", "ghe.corp.io"]);
+        let glab = "# glab\ngit_protocol: ssh\nhosts:\n    gitlab.com:\n        token: x\n        api_host: gitlab.com\n    gitlab.corp.io:\n        token:\naliases:\n    co: mr checkout\n";
+        assert_eq!(
+            config_hosts(ForgeKind::Gitlab, glab),
+            ["gitlab.com", "gitlab.corp.io"]
+        );
+        assert!(config_hosts(ForgeKind::Gitlab, "git_protocol: ssh\n").is_empty());
+    }
+
+    #[test]
+    fn remote_hosts_must_be_plain_host_names() {
+        assert_eq!(parse_remote("https://evil.com#github/o/r.git"), None);
+        assert_eq!(parse_remote("git@evil.com#github:o/r.git"), None);
+        assert_eq!(parse_remote("https://github.com%2f@evil/o/r"), None);
+        assert!(set_token("not a host", Some("t")).is_err());
+        // GitHub REST paths are built from owner/repo: `..`, `?` or `#` would reach another API path.
+        for url in [
+            "https://github.com/../x",
+            "https://github.com/o/..",
+            "https://github.com/o/r?x=1",
+            "git@github.com:o%2F/r",
+        ] {
+            assert_eq!(parse_remote(url), None, "{url}");
+        }
     }
 
     #[test]

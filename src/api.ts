@@ -107,9 +107,9 @@ export interface Commands {
   git_restore_file: [{ path: string; source: string; file: string }, OpResult];
   git_bisect: [{ path: string; op: BisectOp }, OpResult];
   bisect_state: [{ path: string }, BisectState | null];
-  pull_requests: [{ path: string; trusted: string[] }, PrReport];
-  pr_target: [{ path: string; remote: string; trusted: string[] }, PrTarget];
-  pr_create: [{ path: string; remote: string; trusted: string[]; req: NewPr }, PrOutcome];
+  pull_requests: [{ path: string }, PrReport];
+  pr_target: [{ path: string; remote: string }, PrTarget];
+  pr_create: [{ path: string; remote: string; req: NewPr }, PrOutcome];
   ssh_status: [Record<string, never>, SshStatus];
   /** `path: null`: the global identity alone. */
   identity_read: [{ path: string | null }, Identity];
@@ -140,7 +140,7 @@ export interface Commands {
   ssh_test: [{ url: string }, SshTest];
   // `path` only routes the demo; the backend keys tokens by host.
   set_forge_token: [{ path: string; host: string; token: string | null }, null];
-  forge_repos: [{ path: string; kind: ForgeKind; host: string; trusted: string[] }, ForgeRepos];
+  forge_repos: [{ path: string; kind: ForgeKind; host: string }, ForgeRepos];
   open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
@@ -252,13 +252,12 @@ export const api = {
   bisect: (path: string, op: BisectOp) => call("git_bisect", { path, op }),
   bisectState: (path: string) => call("bisect_state", { path }),
   /** Open pull / merge requests on the repository's forge remotes (GitHub, GitLab). */
-  /** `trusted`: hosts besides github.com / gitlab.com whose CLI login may be used. */
-  pullRequests: (path: string, trusted: string[]) => call("pull_requests", { path, trusted }),
+  /** Another host's `gh` / `glab` login is used only when that CLI is signed in there (decided in Rust). */
+  pullRequests: (path: string) => call("pull_requests", { path }),
   /** Where a pull request from `remote` would go: token state, Pro line, default branch. */
-  prTarget: (path: string, remote: string, trusted: string[]) => call("pr_target", { path, remote, trusted }),
+  prTarget: (path: string, remote: string) => call("pr_target", { path, remote }),
   /** Open a pull / merge request on `remote`'s project (the head branch is already pushed there). */
-  createPr: (path: string, remote: string, trusted: string[], req: NewPr) =>
-    call("pr_create", { path, remote, trusted, req }),
+  createPr: (path: string, remote: string, req: NewPr) => call("pr_create", { path, remote, req }),
   sshStatus: () => call("ssh_status", {}),
   /** Who commits in `path` are made as (and how they are signed), with where each value comes from; `null`: global. */
   identity: (path: string | null) => call("identity_read", { path }),
@@ -305,8 +304,7 @@ export const api = {
   /** Keep a forge token in the keychain (`null` forgets it). */
   setForgeToken: (path: string, host: string, token: string | null) => call("set_forge_token", { path, host, token }),
   /** The signed-in user's repositories on a forge host (`path` only routes the demo). */
-  forgeRepos: (path: string, kind: ForgeKind, host: string, trusted: string[]) =>
-    call("forge_repos", { path, kind, host, trusted }),
+  forgeRepos: (path: string, kind: ForgeKind, host: string) => call("forge_repos", { path, kind, host }),
   openUrl: (path: string, url: string) => call("open_url", { path, url }),
   /** Commits reachable from `rev` that changed `file` (following renames), newest first. */
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),

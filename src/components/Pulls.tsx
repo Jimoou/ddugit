@@ -14,8 +14,6 @@ export const prNoun = (kind: ForgeKind) => (kind === "gitlab" ? "MR" : "PR");
 /** The noun for a repository's forges together: "MR" only when they are all GitLab. */
 export const nounOf = (forges: Pick<ForgeStatus, "kind">[]) =>
   prNoun(forges.length > 0 && forges.every((f) => f.kind === "gitlab") ? "gitlab" : "github");
-/** The CLI whose login a forge can borrow. */
-const CLI: Record<ForgeKind, string> = { github: "gh", gitlab: "glab" };
 
 /** `#12` on GitHub, `!12` on GitLab; prefixed with the remote when several forges are in play. */
 export function prLabel(pr: PullRequest, report: PrReport): string {
@@ -176,8 +174,6 @@ export function TokenDialog(p: {
   busy: boolean;
   onSave(token: string | null): void;
   onOpenPage(url: string): void;
-  /** Use the `gh` / `glab` login for this (not github.com / gitlab.com) host. */
-  onTrustCli(): void;
   onCancel(): void;
 }) {
   const [token, setToken] = useState("");
@@ -202,11 +198,6 @@ export function TokenDialog(p: {
         <p>
           <Rich k={p.forge.kind === "github" ? "pr.token.cli.gh" : "pr.token.cli.glab"} vars={{ host: p.forge.host }} />
         </p>
-        {!p.forge.public && p.forge.token !== "cli" && (
-          <button onClick={p.onTrustCli}>
-            {t("pr.token.trustCli", { host: p.forge.host, cli: CLI[p.forge.kind] })}
-          </button>
-        )}
         <p className="muted">{t("pr.token.paste", { noun: prNoun(p.forge.kind) })}</p>
         <button className="token-page" onClick={() => p.onOpenPage(page)}>
           {t("pr.token.make")} <Icon name="external" size={12} />

@@ -25,7 +25,6 @@ interface Props {
   forges: ForgeStatus[];
   /** The branch the request starts from. */
   branch: string;
-  trusted: string[];
   /** Changes after a token is saved: ask the forge again. */
   retry: number;
   /** Push `branch` to `remote` (tracking it there); false when it didn't go up. */
@@ -54,14 +53,14 @@ export function CreatePr(p: Props) {
   const [loaded, setLoaded] = useState<{ remote: string; target: PrTarget | null; error: string | null } | null>(null);
   useEffect(() => {
     let live = true;
-    api.prTarget(p.path, remote, p.trusted).then(
+    api.prTarget(p.path, remote).then(
       (target) => live && setLoaded({ remote, target, error: null }),
       (e) => live && setLoaded({ remote, target: null, error: String(e) }),
     );
     return () => {
       live = false;
     };
-  }, [p.path, remote, p.trusted, p.retry]);
+  }, [p.path, remote, p.retry]);
   const current = loaded && loaded.remote === remote ? loaded : null;
   const target = current?.target ?? null;
   const ready = !!target && !target.needsToken && !target.locked;
@@ -98,7 +97,7 @@ export function CreatePr(p: Props) {
     try {
       if (need.kind !== "none" && !(await p.onPush(remote, head))) return;
       const req = { base: chosenBase, head, title: finalTitle.trim(), body: finalBody, draft };
-      const out = await api.createPr(p.path, remote, p.trusted, req);
+      const out = await api.createPr(p.path, remote, req);
       if (out.kind === "created") p.onCreated(kind, out.number, out.url);
       else setProblem(out);
     } catch (e) {

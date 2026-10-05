@@ -148,6 +148,10 @@ fn ignored(dir: &Path, target: &str) -> Result<HashSet<String>> {
 
 /// Mark (or unmark) `id` as not needed in `target`.
 pub fn set_ignored(path: &str, target: &str, id: &str, ignore: bool) -> Result<()> {
+    // A full commit id (SHA-1 or SHA-256): it is also matched as a regex below.
+    if !matches!(id.len(), 40 | 64) || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(format!("'{id}' is not a commit id"));
+    }
     let dir = repo_dir(path)?;
     let key = ignore_key(target);
     if ignore && !ignored(&dir, target)?.contains(id) {
@@ -296,6 +300,9 @@ mod tests {
         let p = s(d.path());
         set_ignored(p, "fork", &fix3, true).unwrap();
         set_ignored(p, "fork", &fix3, true).unwrap(); // idempotent
+        assert_eq!(states(p)[0].1, BackportState::Ignored);
+        // Only a full commit id: `.*` would match (and unset) every ignore.
+        assert!(set_ignored(p, "fork", ".*", false).is_err());
         assert_eq!(states(p)[0].1, BackportState::Ignored);
         set_ignored(p, "fork", &fix3, false).unwrap();
         assert_eq!(states(p)[0].1, BackportState::Missing);

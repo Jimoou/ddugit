@@ -1458,7 +1458,11 @@ const mockTable: Table = {
     return delay(undefined, 0);
   },
   license_deactivate() {
-    return delay({ status: putDemoLicense(null), confirmed: !demoControls.offline });
+    return delay({
+      status: putDemoLicense(null),
+      confirmed: !demoControls.offline,
+      error: demoControls.offline ? "Couldn't reach ddugit.com" : null,
+    });
   },
   license_refresh() {
     const lic = demoLicense.current;
@@ -1718,15 +1722,15 @@ const mockTable: Table = {
     else demoForgeHosts.delete(host);
     return delay(null);
   },
-  forge_repos({ kind, host, trusted }) {
+  forge_repos({ kind, host }) {
     host = host
       .trim()
       .replace(/^[a-z]+:\/\//i, "")
       .replace(/\/.*$/, "")
       .toLowerCase();
     if (!host) return fail("Not a host name");
-    // github.com answers through the demo's `gh` login; any other host needs a token pasted (or trusted) first.
-    const signedIn = host === "github.com" || demoForgeHosts.has(host) || trusted.includes(host);
+    // github.com answers through the demo's `gh` login; any other host needs a token pasted first.
+    const signedIn = host === "github.com" || demoForgeHosts.has(host);
     const day = 86_400_000;
     const repos = signedIn
       ? DEMO_FORGE_REPOS.map(([fullName, description, isPrivate, days]) => ({

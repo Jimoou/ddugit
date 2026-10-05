@@ -32,7 +32,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 ## 구조
 
-- `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다)
+- `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다. 이름이 `git`인 절대 경로만 받고, 저장소가 추적하는(무시되지 않는) 파일·임시 폴더·다른 사용자가 쓸 수 있는 파일은 거부한다)
   - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태). 이력은 libgit2 정렬 revwalk(전체 이력을 먼저 읽는다) 대신 커밋 시각 순으로 직접 걷다가(`TimeWalk`) 페이지 크기에서 멈추고, `children_first`로 자식이 부모보다 앞에 오게 고친다
   - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃)
   - `pick.rs`: cherry-pick / revert
@@ -59,7 +59,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `transfer.rs`: 폐쇄망 반출입(Pro). 받는 곳별로 지난 반출 이후만 담은 `git bundle` + `.sha256`, 반출 기록은 로컬 config `ddugit-transfer.<받는 곳>.sent`. 반입은 검사(체크섬·빠진 선행 커밋) 후 `refs/remotes/<이름>/`으로 가져온다. 화면은 `components/Transfer.tsx`(사이드바 로컬 브랜치 머리의 버튼), 순수 로직 `transfer.ts`
   - `stack.rs`: 스택 브랜치(Pro). 부모와 base(마지막으로 쌓은 부모 끝)를 로컬 config `branch.<이름>.ddugit-parent`·`ddugit-base`에 두고, 다시 쌓기는 스택 맨 아래부터 `rebase --onto <부모> <base> <브랜치>`(amend·squash된 부모의 옛 커밋을 다시 얹지 않는다). 화면은 `components/Stacks.tsx`(사이드바 섹션)와 브랜치 메뉴(`RepoView`의 `stackItems`), 순수 로직 `stack.ts`
   - `changelog.rs`: 릴리스 노트(Pro, 화면에서 잠금). 두 리비전 사이 첫 번째 부모 줄의 커밋(PR당 하나)과, 병합마다 들여온 커밋(`inner`, PR 번호 없는 병합에 씀). 시작을 안 주면 직전 태그(`describe --tags <to>^`), 빈 문자열이면 첫 커밋부터. 묶기·Markdown은 순수 로직 `notes.ts`, 화면은 `components/ReleaseNotes.tsx`(태그·로컬 브랜치 메뉴)
-- `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). 토큰은 webview로 넘기지 않는다. `forge/repos.rs`: 로그인한 사용자의 저장소 목록(clone·원격 추가에서 고르기, `components/ForgeRepoPicker.tsx`, 순수 로직 `forgeRepos.ts`의 `FORGE_SOURCES`·검색). `forge/create.rs`: PR·MR 만들기(REST, 기본 브랜치·비공개 확인 후 POST, 이미 열림은 기존 링크). 화면은 `components/CreatePr.tsx`(브랜치 메뉴·PR 섹션 머리), 순수 로직 `prDraft.ts`
+- `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). github.com·gitlab.com 밖의 호스트는 그 CLI 설정(`hosts.yml`·`config.yml`)에 로그인된 호스트일 때만 CLI 토큰을 쓴다(webview가 정하지 않는다). 원격 URL의 호스트는 `normalize_host`로 검사한다. 키체인 서비스는 `keychain.rs`(forge 토큰 `ddugit-forge`, 기기 ID `ddugit-device`, 옛 `ddugit`에서 옮겨 온다). 토큰은 webview로 넘기지 않는다. `forge/repos.rs`: 로그인한 사용자의 저장소 목록(clone·원격 추가에서 고르기, `components/ForgeRepoPicker.tsx`, 순수 로직 `forgeRepos.ts`의 `FORGE_SOURCES`·검색). `forge/create.rs`: PR·MR 만들기(REST, 기본 브랜치·비공개 확인 후 POST, 이미 열림은 기존 링크). 화면은 `components/CreatePr.tsx`(브랜치 메뉴·PR 섹션 머리), 순수 로직 `prDraft.ts`
 - `src-tauri/src/ssh.rs`: SSH 준비(키 목록·생성, 호스트 키 지문을 GitHub·GitLab 공개 지문과 비교해 known_hosts에 추가, 연결 확인). 시스템 OpenSSH, 프롬프트 없음
 - `src-tauri/src/update.rs`: 앱 자동 업데이트(tauri-plugin-updater). 확인 주소는 빌드 때 `DDUGIT_UPDATE_URL`(Supabase의 `latest.json`, 없으면 업데이트 안 함), 서명 공개키는 `tauri.conf.json`. 화면은 `components/Update.tsx`(시작할 때와 6시간마다 확인)
 - `src-tauri/src/pro.rs`: Free / Pro 판정(이 기기의 유효한 라이선스 또는 사이트 라이선스, 체험 없음). Pro 경계: 비공개·회사 서버 저장소의 PR 연동(`forge::report`의 `locked`), 백포트 실행·폐쇄망 반출입·스택 쌓기·대시보드 일괄 브랜치 전환(`pro::require`), 대시보드 3개 초과·릴리스 노트·일괄 Pull(화면). 화면 쪽은 `src/pro.ts`(상태 공유, `offerPro`)와 `components/ProOffer.tsx`

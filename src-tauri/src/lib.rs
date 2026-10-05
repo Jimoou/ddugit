@@ -4,6 +4,7 @@ mod device;
 mod forge;
 mod git;
 mod http;
+mod keychain;
 mod license;
 mod pro;
 mod report;
@@ -287,13 +288,9 @@ command!(ssh_trust_host(url: String, fingerprints: Vec<String>) -> () => ssh::tr
 command!(ssh_test(url: String) -> ssh::SshTest => ssh::test(&url));
 /// Pull requests: Free for public repositories, Pro for private or self-hosted ones.
 #[tauri::command]
-async fn pull_requests(
-    app: tauri::AppHandle,
-    path: String,
-    trusted: Vec<String>,
-) -> Result<forge::PrReport, String> {
+async fn pull_requests(app: tauri::AppHandle, path: String) -> Result<forge::PrReport, String> {
     let dir = license_dir(&app)?;
-    blocking(move || forge::report(&path, &trusted, pro::status_in(&dir).pro)).await
+    blocking(move || forge::report(&path, pro::status_in(&dir).pro)).await
 }
 
 /// Opening a pull request follows the same Free / Pro line as reading them.
@@ -302,10 +299,9 @@ async fn pr_target(
     app: tauri::AppHandle,
     path: String,
     remote: String,
-    trusted: Vec<String>,
 ) -> Result<forge::create::PrTarget, String> {
     let dir = license_dir(&app)?;
-    blocking(move || forge::create::target(&path, &remote, &trusted, pro::status_in(&dir).pro)).await
+    blocking(move || forge::create::target(&path, &remote, pro::status_in(&dir).pro)).await
 }
 
 #[tauri::command]
@@ -313,11 +309,10 @@ async fn pr_create(
     app: tauri::AppHandle,
     path: String,
     remote: String,
-    trusted: Vec<String>,
     req: forge::create::NewPr,
 ) -> Result<forge::create::PrOutcome, String> {
     let dir = license_dir(&app)?;
-    blocking(move || forge::create::create(&path, &remote, &trusted, pro::status_in(&dir).pro, &req)).await
+    blocking(move || forge::create::create(&path, &remote, pro::status_in(&dir).pro, &req)).await
 }
 
 #[tauri::command]
@@ -326,8 +321,8 @@ async fn pro_status(app: tauri::AppHandle) -> Result<pro::ProStatus, String> {
     blocking(move || Ok(pro::status_in(&dir))).await
 }
 // Listing one's own repositories is Free whatever the host: it only saves copying a URL.
-command!(forge_repos(kind: forge::ForgeKind, host: String, trusted: Vec<String>) -> forge::repos::ForgeRepos
-    => forge::repos::list(kind, &host, &trusted));
+command!(forge_repos(kind: forge::ForgeKind, host: String) -> forge::repos::ForgeRepos
+    => forge::repos::list(kind, &host));
 command!(set_forge_token(host: String, token: Option<String>) -> () => forge::set_token(&host, token.as_deref()));
 // Open a web page in the browser (https only).
 command!(open_url(url: String) -> () => {

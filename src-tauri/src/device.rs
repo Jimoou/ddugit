@@ -15,8 +15,7 @@ use sha2::{Digest, Sha256};
 
 type Result<T> = std::result::Result<T, String>;
 
-const FILE: &str = "device-id";
-const KEYCHAIN_SERVICE: &str = "ddugit";
+const FILE: &str = crate::keychain::DEVICE_ACCOUNT;
 
 /// Read once per run: the keychain is asked at most once.
 static ID: OnceLock<String> = OnceLock::new();
@@ -26,7 +25,7 @@ pub fn id_in(dir: &Path) -> Result<String> {
     if let Some(id) = ID.get() {
         return Ok(id.clone());
     }
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, FILE).ok();
+    let entry = crate::keychain::entry(crate::keychain::DEVICE, FILE);
     let held = entry.as_ref().and_then(|e| e.get_password().ok());
     let id = settle(dir, held, |id| {
         if let Some(e) = &entry {

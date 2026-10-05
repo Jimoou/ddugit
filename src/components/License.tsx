@@ -124,7 +124,13 @@ export function LicenseSection() {
     act(async () => {
       const d = await api.licenseDeactivate();
       setAsking(false);
-      setNotice(t(d.confirmed ? "license.deactivated" : "license.deactivatedOffline"));
+      setNotice(
+        d.confirmed
+          ? t("license.deactivated")
+          : d.error
+            ? t("license.deactivatedError", { error: d.error })
+            : t("license.deactivatedOffline"),
+      );
       return d.status;
     });
   const lic = status?.license;

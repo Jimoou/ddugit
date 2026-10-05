@@ -204,6 +204,8 @@ export const ko = {
   "license.deactivateAsk": "이 기기에서 라이선스를 해제할까요? 자리가 하나 비어 다른 기기에서 활성화할 수 있어요.",
   "license.deactivateYes": "해제",
   "license.deactivated": "이 기기에서 해제했어요.",
+  "license.deactivatedError":
+    "이 기기에서는 지웠지만 ddugit.com에서 지우지 못했어요({error}). ddugit.com/account에서도 이 기기를 지워 주세요.",
   "license.deactivatedOffline":
     "이 기기에서는 지웠지만 ddugit.com에 알리지 못했어요. ddugit.com/account에서도 이 기기를 지워 주세요.",
   "license.otherDevice": "이 라이선스는 다른 컴퓨터용이에요. 이 컴퓨터에서 ddugit.com 계정으로 다시 활성화하세요.",
@@ -977,7 +979,6 @@ export const ko = {
   "pr.token.forgotten": "저장된 토큰을 지웠어요",
   "pr.token.foreign":
     "<b>{host}</b>{:은} github.com·gitlab.com이 아니에요. 믿을 수 있는 서버일 때만 그 서버의 토큰을 쓰세요.",
-  "pr.token.trustCli": "{host}에 {cli} 로그인 사용",
   "remote.add.urlLabel": "URL",
   "forge.sources": "가져올 곳",
   "forge.source.url": "URL",

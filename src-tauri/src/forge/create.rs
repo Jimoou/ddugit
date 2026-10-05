@@ -271,9 +271,9 @@ fn locked(pro: bool, forge: &Forge, private: bool) -> bool {
 const LOCKED: &str = "Pull requests on private or company-server repositories need ddugit Pro";
 
 /// Where a pull request from `remote` would go: its project, token state, and default branch.
-pub fn target(path: &str, remote: &str, trusted: &[String], pro: bool) -> Result<PrTarget> {
+pub fn target(path: &str, remote: &str, pro: bool) -> Result<PrTarget> {
     let forge = forge_of(path, remote)?;
-    let (token, source) = token_for(forge.kind, &forge.host, trusted);
+    let (token, source) = token_for(forge.kind, &forge.host);
     let mut out = PrTarget {
         remote: remote.to_string(),
         kind: forge.kind,
@@ -301,12 +301,12 @@ pub fn target(path: &str, remote: &str, trusted: &[String], pro: bool) -> Result
 
 /// Open a pull / merge request on `remote`'s project. The Pro line is checked
 /// here too (the project is read first), not only in the UI.
-pub fn create(path: &str, remote: &str, trusted: &[String], pro: bool, req: &NewPr) -> Result<PrOutcome> {
+pub fn create(path: &str, remote: &str, pro: bool, req: &NewPr) -> Result<PrOutcome> {
     if req.title.trim().is_empty() {
         return Err("A title is required".into());
     }
     let forge = forge_of(path, remote)?;
-    let Some(token) = token_for(forge.kind, &forge.host, trusted).0 else {
+    let Some(token) = token_for(forge.kind, &forge.host).0 else {
         return Ok(PrOutcome::Refused {
             message: format!("No token for {}", forge.host),
         });
@@ -518,12 +518,11 @@ mod tests {
         let repo = git2::Repository::init(d.path()).unwrap();
         repo.remote("origin", "https://example.com/a/b.git").unwrap();
         let p = d.path().to_str().unwrap();
-        assert!(target(p, "origin", &[], true).is_err());
-        assert!(target(p, "nope", &[], true).is_err());
+        assert!(target(p, "origin", true).is_err());
+        assert!(target(p, "nope", true).is_err());
         assert!(create(
             p,
             "origin",
-            &[],
             true,
             &NewPr {
                 title: " ".into(),

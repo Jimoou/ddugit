@@ -10,8 +10,6 @@ interface Props {
   path: string;
   /** Names already taken (the placeholder suggests `upstream` until it is). */
   remotes: string[];
-  trusted: string[];
-  onTrust(host: string): void;
   busy: boolean;
   onSubmit(name: string, url: string): void;
   onCancel(): void;
@@ -63,8 +61,6 @@ export function AddRemoteDialog(p: Props) {
                 key={source}
                 kind={source}
                 path={p.path}
-                trusted={p.trusted}
-                onTrust={p.onTrust}
                 picked={picked}
                 onPick={(pk) => {
                   setPicked(pk);
