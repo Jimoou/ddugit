@@ -324,11 +324,41 @@ textarea:focus {
 }
 /* Groups and the cards scroll together under the header. */
 .galaxy-body {
-  max-height: 54vh;
+  min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+/* With repositories to show, the hero steps back: a smaller wordmark, no
+   tagline. The dashboard takes the height that is
+   left and the demo button stays in flow under it, never over a card. */
+.welcome:has(> .galaxy) {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 18px 0 14px;
+}
+/* Auto margins centre it while it fits and keep the top in view once it does not. */
+.welcome:has(> .galaxy) > .brand {
+  margin-top: auto;
+}
+.welcome:has(> .galaxy) > :last-child {
+  margin-bottom: auto;
+}
+.welcome:has(> .galaxy) .brand .wordmark {
+  height: 40px;
+}
+.welcome:has(> .galaxy) > p {
+  display: none;
+}
+.welcome:has(> .galaxy) .connect-actions {
+  margin-top: 0;
+}
+.welcome > .galaxy {
+  flex: 0 1 auto;
+}
+.welcome > :not(.galaxy, .space-backdrop) {
+  flex-shrink: 0;
 }
 .band {
   display: flex;
@@ -777,6 +807,11 @@ textarea:focus {
   background: var(--ui-soft);
   color: var(--ui-text);
 }
+.topbar .count.pct {
+  min-width: calc(4ch + 10px); /* "100%" plus padding: the badge never changes width */
+  background: var(--ui-soft);
+  color: var(--ui-text);
+}
 .topbar .count.push {
   background: rgba(79, 209, 165, 0.2);
   color: #b8f2dd;
@@ -875,16 +910,21 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 8px 6px;
-  padding: 4px 8px;
+  margin: 0 0 8px;
+  padding: 4px 6px 4px 8px;
   font-size: 11.5px;
   color: var(--text-2);
   border: 1px solid rgba(var(--signal), 0.35);
 }
+.sidebar .side-picked > span {
+  flex: 1;
+  min-width: 0;
+}
 .sidebar .side-picked button {
-  margin-left: auto;
+  flex-shrink: 0;
   padding: 0 6px;
   font-size: 11px;
+  white-space: nowrap;
 }
 /* Fold per remote inside the remote section. */
 .sidebar .fetch-only {
@@ -1210,12 +1250,12 @@ button.link {
   color: #fff;
   text-shadow: 0 0 12px color-mix(in srgb, var(--c, var(--ui-text)) 70%, transparent);
 }
+/* The ring stays inside the row's padding (8px): 4px dot + 1.5px gap + 1.5px ring. */
 .sidebar li.focused .dot {
-  transform: scale(1.25);
   box-shadow:
-    0 0 0 2px #000,
-    0 0 0 3.5px var(--c, currentColor),
-    0 0 10px var(--c, currentColor);
+    0 0 0 1.5px #000,
+    0 0 0 3px var(--c, currentColor),
+    0 0 8px var(--c, currentColor);
 }
 /* Folding and unfolding slide the width; the content fades in after it (Sidebar `slide`). */
 .sidebar.slide {
@@ -1309,6 +1349,7 @@ button.link {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  container: stage / inline-size;
 }
 .stage-graph {
   flex: 1;
@@ -1316,7 +1357,8 @@ button.link {
   position: relative;
   display: flex;
   flex-direction: column;
-  container-type: inline-size;
+  /* Both axes: the help line and the overview give way on a short graph too (a sheet open, a small window). */
+  container-type: size;
 }
 .graph {
   position: relative;
@@ -1414,11 +1456,23 @@ button.link {
   pointer-events: none;
   padding: 2px 8px;
   background: rgba(5, 4, 14, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-/* A narrow graph (panel open, small window) keeps the room for commits, not the help line. */
-@container (max-width: 640px) {
+/* A narrow or short graph (panel or sheet open, small window) keeps the room for commits, not the help line. */
+@container (max-width: 640px) or (max-height: 420px) {
   .hint {
     display: none;
+  }
+}
+/* Too short for the overview strip as well: the zoom controls drop into its place. */
+@container (max-height: 260px) {
+  .minimap:not(.tall) {
+    display: none;
+  }
+  .graph:not(.upright) ~ .hud {
+    bottom: 14px;
   }
 }
 .drag-hint {
@@ -2000,6 +2054,8 @@ button.link {
 .diff-sheet {
   position: relative;
   flex-shrink: 0;
+  /* However tall it is asked to be, the graph above keeps some sky. */
+  max-height: max(180px, calc(100% - 200px));
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--line-strong);
@@ -2085,6 +2141,27 @@ button.link {
   min-width: 0;
   overflow: auto;
   user-select: text;
+}
+/* A narrow stage (small window with the composer or inspector beside it): the
+   file list goes on top so the diff, the conflict blocks and blame get the full
+   width. The panel stays usable, so staging lines and committing need no switching. */
+@container stage (max-width: 600px) {
+  .diff-sheet .split {
+    flex-direction: column;
+  }
+  .diff-sheet .file-list {
+    width: auto;
+    max-height: 30%;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .diff-sheet .split > .diff-body {
+    min-height: 0;
+  }
+  /* The key hint is the first thing to go: a word cut to a letter reads as noise. */
+  .diff-sheet .keys {
+    display: none;
+  }
 }
 table.diff {
   width: 100%;
@@ -2391,7 +2468,9 @@ table.diff tr.picked .no {
   color: var(--muted);
   opacity: 0.7;
 }
+/* The body scrolls; a block keeps its height instead of being squeezed to its header. */
 .block {
+  flex-shrink: 0;
   border: 1px solid rgba(255, 77, 109, 0.45);
   overflow: hidden;
 }
@@ -2637,6 +2716,17 @@ b.bp-missing {
 }
 .rb-list li code {
   color: var(--muted);
+}
+/* Author and date give way before the summary does. */
+.rb-list li > .muted {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container stage (max-width: 600px) {
+  .rb-list li > .muted {
+    display: none;
+  }
 }
 .rb-list li select {
   font-size: 11px;
@@ -3105,22 +3195,24 @@ kbd {
 .toasts.floating.welcome-toasts {
   bottom: 24px;
 }
-/* A newer version: under the tab row, out of the graph's way. */
+/* A newer version: a slim bar in flow under the tab row. It pushes the
+   window down instead of floating over the topbar's actions. */
 .update-notice {
-  position: fixed;
-  top: 52px;
-  right: 14px;
-  z-index: 30;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px 8px 14px;
+  padding: 4px 14px;
   background: var(--brackets), var(--scanlines), var(--surface);
-  border: 1px solid rgba(var(--signal), 0.3);
-  box-shadow:
-    inset 3px 0 0 var(--cyan),
-    0 10px 30px rgba(0, 0, 0, 0.45);
-  animation: slide-in 0.18s ease-out;
+  border-bottom: 1px solid rgba(var(--signal), 0.3);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+.update-notice > span {
+  flex: 1;
+  min-width: 0;
+}
+.update-notice button {
+  padding: 3px 12px;
 }
 .drop-zone {
   position: fixed;
@@ -3435,6 +3527,12 @@ kbd {
   grid-template-columns: 270px 1fr;
   border-left: 2px solid var(--star);
   border-bottom: 1px solid var(--line);
+}
+/* Narrow stage (see the diff sheet): each hunk's commit line goes above its lines. */
+@container stage (max-width: 600px) {
+  .blame-hunk {
+    grid-template-columns: 1fr;
+  }
 }
 .blame-hunk.on {
   background: rgba(255, 212, 121, 0.08);
@@ -4415,14 +4513,22 @@ button.demo-pill {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px 3px 24px;
+  padding: 3px 10px 3px 14px;
   font-size: 11.5px;
   color: var(--muted);
 }
+.sidebar .stacks .stack-base .mono {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sidebar .stacks .stack-restack {
   margin-left: auto;
+  flex-shrink: 0;
   padding: 1px 8px;
   font-size: 11px;
+  white-space: nowrap;
 }
 .sidebar .stacks .stack-restack.lit {
   border-color: rgba(var(--signal), 0.6);
@@ -4450,6 +4556,15 @@ button.demo-pill {
   margin-left: auto;
   flex-shrink: 0;
   font-size: 10.5px;
+}
+/* A flag takes only the room the branch name leaves (its full text is in the title). */
+.sidebar .stacks .stack-flag {
+  flex: 1 1 0;
+  min-width: 1.5em;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar .stacks .stack-flag {
   color: rgb(var(--signal));

@@ -281,6 +281,7 @@ export default function App() {
             : undefined
         }
       />
+      <UpdateNotice onError={(text) => toast("err", text)} />
       {tabs.list.map((tab) =>
         tab.path ? (
           <RepoView
@@ -365,7 +366,6 @@ export default function App() {
       {settingsOpen && (
         <SettingsDialog settings={settings} onChange={updateSettings} onClose={() => setSettingsOpen(false)} />
       )}
-      <UpdateNotice onError={(text) => toast("err", text)} />
       <ProOffer onLicense={() => setSettingsOpen(true)} />
       <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
         {toasts.map((item) => (

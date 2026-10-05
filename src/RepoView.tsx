@@ -633,7 +633,7 @@ export function RepoView({
         toast("ok", label);
         after?.();
       } else if (r.status === "conflict") {
-        toast("err", t("app.conflict"));
+        // No toast: the sheet opens and the banner over it already says what happened.
         setConflictSheet({});
       } else if (r.status === "empty") askSkip();
       else if (r.status === "failed") toast("err", r.output || t("app.failed", { label }));

@@ -816,14 +816,19 @@ function drawMapCaptions(
   const list = queue
     .filter((L) => s.summaries.get(L.id) && (all || inHand(L.id)))
     .sort((a, b) => rank(a.id) - rank(b.id) || (byId.get(a.id)?.row ?? 0) - (byId.get(b.id)?.row ?? 0));
-  ctx.font = `11.5px ${SANS}`;
-  const items = list.map((L) => ({
-    id: L.id,
-    x: L.x,
-    y: L.y,
-    w: Math.min(ctx.measureText(s.summaries.get(L.id)!).width + 2, inHand(L.id) ? CAPTION_FULL : CAPTION_MAX),
-    up: !badged.has(L.id),
-  }));
+  // Measure in the font each caption is drawn in: a bold caption measured
+  // regular gets cut short with room to spare.
+  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} 11.5px ${SANS}`;
+  const items = list.map((L) => {
+    ctx.font = fontOf(L.id);
+    return {
+      id: L.id,
+      x: L.x,
+      y: L.y,
+      w: Math.min(ctx.measureText(s.summaries.get(L.id)!).width + 2, inHand(L.id) ? CAPTION_FULL : CAPTION_MAX),
+      up: !badged.has(L.id),
+    };
+  });
   const stars = queue.map((L) => ({ x: L.x - r - 3, y: L.y - r - 3, w: 2 * r + 6, h: 2 * r + 6 }));
   const byQueue = new Map(list.map((L) => [L.id, L]));
   ctx.textAlign = "left";
@@ -840,7 +845,7 @@ function drawMapCaptions(
       ctx.lineTo(L.x, c.above ? c.y + CAPTION_H : c.y);
       ctx.stroke();
     }
-    ctx.font = `${on ? 600 : 400} 11.5px ${SANS}`;
+    ctx.font = fontOf(c.id);
     const line = truncate(ctx, s.summaries.get(c.id)!, c.w);
     const y = c.y + CAPTION_H / 2;
     ctx.lineWidth = 3.5;
