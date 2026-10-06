@@ -237,7 +237,7 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 ### M15 · 구독과 라이선스
 
 - [x] 라이선스 형식을 구독에 맞게(앱: `expires`·`plan`, 시작할 때·'갱신 확인'으로 갱신, 사이트: `licenses` 테이블·`license-refresh` 함수·`/api/license/refresh`): 만료일(결제 기간 끝 + 유예 7일). 앱은 로그인 없이 라이선스 키로 `ddugit.com`에서 갱신받는다(구독이 살아 있으면 새 만료일). 폐쇄망은 연 단위 사이트 라이선스를 수동 발급. 구독이 끝나면 기능은 막지 않고 갱신 안내만(신뢰 기반, 2026-10-04 사용자 확정)
-- [ ] Lemon Squeezy 상품(월·연 구독, 사이트 라이선스), 결제 웹훅 → Supabase Edge Function이 서명·저장·메일 발송
+- [ ] Lemon Squeezy 상품(월·연 구독, 사이트 라이선스), 결제 웹훅 → Supabase Edge Function이 서명·저장·메일 발송 — 2026-10-06: Lemon Squeezy 스토어 심사 거절 → 아래 Paddle 항목으로 대체
 - [ ] 앱 구매 버튼(`BUY_URL`)을 사이트 가격 페이지로, 결제부터 앱 활성화까지 끝까지 확인
 
 ### M15+ · Free / Pro (2026-10-04 사용자 결정)
@@ -248,7 +248,9 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 - [x] 처음 설치 후 14일 Pro 체험, 사이트 라이선스는 Pro 전체(기간 없음)
 - [x] 앱: `pro.rs`, 잠금 표시(PRO)와 Pro 안내 창, 설정에 요금제 표시
 - [x] 평생 라이선스(2026-10-05 사용자 결정): $29 한 번 결제, 업데이트 평생, 기기 3대까지. 앱은 기기 ID(`device.rs`, 설정 폴더 + 키체인)로 활성화하고 '이 기기에서 해제', 시작할 때·하루마다 확인해 사이트에서 지운 기기·환불된 라이선스는 내려놓는다. 14일 체험은 없앰
-- [ ] 사이트: 가격 페이지를 Free / Pro 비교로, 약관의 사용 범위 조항
+- [x] 사이트: 가격 페이지를 Free / Pro 비교로, 약관의 사용 범위 조항 (비교표 2026-10-05, 약관 2026-10-06 ddugit-site #26)
+- [x] 스토어를 Paddle Billing으로(2026-10-06, 개인 판매자 Kim Jiwoon): `paddle-webhook`(서명·거래 완료·환불/차지백·순서 바뀜), ddugit.com의 Paddle.js 오버레이 체크아웃, 약관(판매자·MoR·환불 14일)·개인정보, 연락처 kfromh0136@gmail.com (ddugit-site #26)
+- [ ] (사용자) Paddle 가입·웹사이트 심사 → sandbox로 구매·활성화·환불까지 → live 설정
 
 ### M17 · 새 Pro 기능 (2026-10-04 사용자 선택)
 
@@ -404,3 +406,4 @@ PR 연동(M4)보다 먼저 한다. 순서대로 진행한다.
 | 2026-10-05 | 웹 구조 정리(동작 그대로): 공용 `Modal`·`useLoaded`·`storage.ts`, `RepoView`를 `src/repo/`로 나눔(2566 → 840줄: 스냅숏·`run`·원격 흐름 훅, 메뉴·배너·시트·창, 열린 시트/창은 판별 유니온 하나씩), `App.css`를 `src/styles/` 10개로(번들 CSS 바이트 동일·스크린숏 동일), `mock.ts`를 `src/mock/` 영역별로(`DemoControls`·`DemoFlags`, e2e `demoFlags`), `app.e2e.ts`를 기능별 8개로, 그래프·미니맵은 바뀔 때만 그리기·라벨 폭 캐시(C8), 안 쓰는 export 35개 정리                                                                                                                                                                                                                                                                            |
 | 2026-10-05 | 앱 자동화 빈칸 채우기(`test/e2e-gaps`, QA.md 5장): 인증 실패 창(HTTPS·SSH clone), Pull 갈라짐·Push 거부의 병합/리베이스, stash 흐름과 그래프 마름모, Free 대시보드 3개, 충돌 띠 취소·계속(병합·cherry-pick·정리·stash pop·바이너리), revert·Alt+끌기, 태그·브랜치 이름·병합 안 된 삭제, 검색, hunk·새 파일 스테이지·discard, 900×560, 탭 단축키·복원, 이전 이력, 반입 검사 실패, 원격·서브모듈·LFS·worktree 메뉴, 서명 실패, `share.ts`. 데모 제어값 추가(`binaryConflict`·`signFail`·`lfs`·`nextBundle`·`Tabs` 플래그), mock을 Rust에 맞춤(continue·https만 열기), 고친 버그: 취소한 뒤 남는 충돌 시트. GitHub 탭 원격 추가 e2e의 시간 초과 원인(진행 카드 시간) 해결. QA.md 자동 98 → 139, 부분 45 → 11, 없음 10 → 3(e2e +38, vitest +2) |
 | 2026-10-05 | v1.0.0 버전 올림: 문제 신고·첫 실행(#119), 큰 저장소 성능(#120), 영문 문구(#121), 코드·보안·응집도 점검과 반영(#122 #123 #126, 사이트 #24), 전체 기능 QA(`docs/QA.md`, #124 #125 #127: 153항목 중 자동 139·부분 11·없음 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-10-06 | 스토어 전환: Lemon Squeezy 심사 거절 → Paddle Billing(ddugit-site #26: `paddle-webhook`·오버레이 체크아웃·약관/개인정보·연락처). 사이트 SEO(ddugit-site #25). 앱 문서(RELEASE·QA·NEXT) 갱신                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

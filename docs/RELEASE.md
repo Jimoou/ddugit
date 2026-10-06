@@ -40,7 +40,11 @@ node scripts/license.mjs verify --pub <공개키> "<라이선스 텍스트>"   #
 
 출력된 텍스트를 메일로 보내면 된다. 고객은 앱 **설정 → 라이선스**에 붙여 넣는다.
 
-### Lemon Squeezy 자동 발급 (주문이 늘면)
+### 자동 발급
+
+> 2026-10-06 변경: 스토어는 **Paddle Billing**(개인 판매자, merchant of record)이다. Lemon Squeezy는 스토어 심사에서 거절됐다. 지금 구조: ddugit.com `/checkout`의 Paddle.js 오버레이 → `paddle-webhook`(Supabase Edge Function)이 `licenses` 행을 만들고, 앱은 ddugit.com 로그인으로 기기마다 서명된 라이선스를 받는다. 설정 순서는 ddugit-site README의 "판매(Paddle Billing)". 아래는 지난 계획이다.
+
+#### (옛 계획) Lemon Squeezy 자동 발급
 
 > 2026-10-04 변경: 서명·저장은 Cloudflare Worker 대신 **Supabase Edge Function**(ddugit-site의 `supabase/functions`)이 맡는다. `licenses` 테이블에 구독 상태(`paid_through`)를 두고, 웹훅이 결제마다 갱신한다. 아래는 처음 계획이다.
 
