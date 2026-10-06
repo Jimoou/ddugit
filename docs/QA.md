@@ -42,7 +42,7 @@
 | e2e(데모)        | 화면 흐름 전체: 클릭·끌기·키보드·대화상자·토스트, `api.ts` `Commands` 계약을 따르는 **가짜 백엔드**(`src/mock/`) 위의 상태 변화, 한국어·영어 문구    | 실제 git 동작(mock은 git을 흉내만 낸다), Rust 명령과 mock의 불일치, OS 창·파일 대화상자·키체인·클립보드 권한, 네트워크, 업데이터, 실제 성능                                                                 |
 | cargo            | 실제 git CLI/libgit2로 임시 저장소에서의 쓰기·읽기, 로컬 bare 원격의 fetch/pull/push, 인증 실패 분류, 라이선스 서명 확인, forge 응답 파싱(가짜 서버) | Tauri 명령 등록(`lib.rs`, Pro 잠금은 명령 본문을 직접 부른다)과 화면 연결, 실제 GitHub/GitLab API, 실제 SSH 서버·에이전트, GPG 에이전트, OS 키체인, macOS·Windows 경로 차이(CI는 ubuntu만, `all_os`는 수동) |
 | 사이트 node:test | 라이선스 형식·사용 가능 규칙, 활성화 대상 고르기, 웹훅 서명·주문 해석, 신고 검사·속도 제한, 관리자 필터, 전달 비밀·IP 규칙                           | 실제 Supabase(RLS·트리거·마이그레이션), OAuth 로그인, Lemon Squeezy, Netlify 헤더, 페이지 렌더링                                                                                                            |
-| 실기(사람)       | 설치·서명·SmartScreen·자동 업데이트, 실제 계정(GitHub·GitLab·Supabase·Lemon Squeezy), SSH·GPG, 키체인, 창 테두리, 큰 실제 저장소                     | —                                                                                                                                                                                                           |
+| 실기(사람)       | 설치·서명·SmartScreen·자동 업데이트, 실제 계정(GitHub·GitLab·Supabase·Paddle), SSH·GPG, 키체인, 창 테두리, 큰 실제 저장소                            | —                                                                                                                                                                                                           |
 
 ## 2. 기능별 점검표
 
@@ -675,15 +675,15 @@
 
 ## 3. 사이트(ddugit.com) 점검표
 
-사이트 테스트는 `node --test`(파일 › "이름")다. 사이트 화면·Supabase·Lemon Squeezy는 자동 테스트가 없어서 수동 단계로 적는다.
+사이트 테스트는 `node --test`(파일 › "이름")다. 사이트 화면·Supabase·Paddle은 자동 테스트가 없어서 수동 단계로 적는다.
 
 14항목: `부분` 8(W-2·3·4·5·7·8·9·10), `없음` 6(W-1·6·11·12·13·14). 모든 항목에 수동 단계가 있다.
 
-- **W-1 가격 페이지** `없음` — Free / Pro 비교, $29(`PRO_PRICE`), 기기 3대, 사이트 라이선스 문의. `NEXT_PUBLIC_LS_CHECKOUT_URL`이 없으면 "Available soon".
+- **W-1 가격 페이지** `없음` — Free / Pro 비교, $29(`PRO_PRICE`), 기기 3대, 사이트 라이선스 문의, 환불 14일·Paddle 안내. Paddle 공개 설정 셋(`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`·`_PRICE_ID`·`_ENV`)이 맞지 않으면 "Available soon".
   - 수동: `/pricing`을 넓은 창·휴대폰 폭에서 열어 가격·버튼 확인
-- **W-2 결제(/checkout → Lemon Squeezy → /thanks)** `부분` — 로그인 안 했으면 로그인 후 돌아옴, 로그인 이메일이 `checkout[email]`·`checkout[custom][email]`로.
-  - node:test: `src/lib/checkout.test.ts` › "the signed-in email fills in the checkout and rides along as custom data", "the link's own parameters stay; no email, no change"
-  - 수동: 테스트 모드로 끝까지 사기(4.4 전 준비)
+- **W-2 결제(/checkout → Paddle 오버레이 → /thanks)** `부분` — 로그인 안 했으면 로그인 후 돌아옴(`?guest`는 로그인 없이), 로그인 이메일로 고정(`customer.email`, `allowLogout: false`)하고 `customData.email`로도, `?_ptxn=`(Paddle 결제 링크)는 그 거래를 연다, Paddle.js가 막히면 안내.
+  - node:test: `src/lib/checkout.test.ts` › "only an explicit sandbox setting is the sandbox", "the store opens only when the token fits the environment and the price is a price id", "a signed-in buyer's checkout is fixed to their login, which rides along as custom data"
+  - 수동: sandbox로 끝까지 사기(4.4 전 준비, ddugit-site README "판매(Paddle Billing)" 8)
 - **W-3 로그인(GitHub·Google)** `부분` — `/auth/callback`, 돌아갈 곳은 이 사이트 경로만, 이메일 가입·익명 로그인 꺼짐(README의 Auth 설정 체크박스).
   - node:test: `src/lib/activate.test.ts` › "after signing in, only paths on this site"
   - 수동: 두 공급자로 로그인·로그아웃, 로그인 뒤 원래 페이지(`/activate`·`/checkout`)로 돌아오는지
@@ -698,9 +698,9 @@
 - **W-7 라이선스 API(/api/license/activate·deactivate·refresh)** `부분` — Next가 Supabase 함수로 넘김(크기 제한 1KB·8KB). 해제는 자기 라이선스와 기기 id로만. refresh: 행이 없거나 기기가 지워지면 `removed`, 못 쓰면 `expired`, 기기에 안 묶인 것의 행이 없으면 `unknown`.
   - node:test: `supabase/functions/_shared/license.test.ts` › "a signed license reads back, wrapped or not", "a tampered, foreign or garbled license is refused", "keys in the formats scripts/license.mjs writes (PKCS#8 PEM, base64url public)", "a lifetime license is signed for one device, with every update and no expiry", "every kind of license needs to be active; test orders only where allowed", "refresh: a missing row removes a device-bound license; an unusable one expires", "device ids are hashed as SHA-256 hex of their text", "a device is released only with its own license and device id"
   - 수동: 4.5·4.7(앱으로), 함수 로그에 오류 없는지
-- **W-8 웹훅(ls-webhook)** `부분` — HMAC-SHA256 서명, `order_created` → 평생 라이선스(기기 3 × 수량, 로그인 이메일), `order_refunded` 전액 → `refunded`, 부분 환불·다른 상품·다른 이벤트 무시, 같은 주문은 한 행, 상품 id 없으면 500.
-  - node:test: `supabase/functions/_shared/store.test.ts` › "only the HMAC-SHA256 of the exact body under the secret passes", "license ids look like the ones scripts/license.mjs makes", "a paid order makes a lifetime license for three devices", "the license goes to the ddugit login passed at checkout, when it is an email", "more copies, more devices; test mode is marked", "a full refund takes the license back; a partial one doesn't", "other events, unpaid orders and other products change nothing", "without product ids nothing makes a license; the setting is a comma-separated list"
-  - 수동: Lemon Squeezy 테스트 모드 주문·환불, 웹훅 재전송(같은 행인지)
+- **W-8 웹훅(paddle-webhook)** `부분` — `Paddle-Signature`(`ts:본문` HMAC-SHA256, 5분 창, 키 교체 중 h1 둘), `transaction.completed` → 평생 라이선스(Pro 항목만, 기기 3 × 수량, 로그인 이메일, 없으면 Paddle API로 고객 이메일), 승인된 전액 환불·차지백 → `refunded`(거래보다 먼저 와도 `store_refunds`로), 부분·대기·거절 조정과 다른 상품·이벤트 무시, 같은 거래는 한 행, 상품 id 없으면 500.
+  - node:test: `supabase/functions/_shared/store.test.ts` › "only the HMAC-SHA256 of ts:body under the secret, signed recently, passes", "license ids look like the ones scripts/license.mjs makes", "a completed Pro transaction makes a lifetime license for three devices, for the login passed at checkout", "without a usable login email the function looks up the customer; with neither, nothing happens", "more copies, more devices; other products in the same transaction don't count", "an approved full refund or chargeback takes the license back; anything less doesn't", "other events and other products change nothing", "without product ids nothing makes a license; the setting is a comma-separated list", "sandbox notifications go back to the sandbox API"
+  - 수동: sandbox 주문·환불(Paddle에서 환불 승인 → 앱 Pro 꺼짐), 알림 재전송(Notifications → Replay, 같은 행인지)
 - **W-9 /contact와 /api/report** `부분` — 검사(종류·길이·이메일·허니팟), 전달 비밀이 맞을 때만, Netlify IP 헤더만 믿음, 보낸 사람당 시간당 5건·전체 200건, 413(64KB), 503(비밀 없음), 함수를 직접 부르면 403. IP·내용은 로그에 안 남김.
   - node:test: `src/lib/report.test.ts` › "the visitor's IP is Netlify's header only; headers a visitor can write are ignored", "the report function gets the forwarding secret, and the IP when known"; `supabase/functions/_shared/report.test.ts` › "a minimal report passes, with every optional field null", "a full report keeps its fields, trimmed, and ignores unknown ones", "blank optional fields count as absent", "kind, source and message are required and checked", "lengths are counted in characters, not UTF-16 units", "an email must look like one and fit in 254 characters", "the honeypot catches any non-empty website", "only the site's forwarded IP counts; proxy headers a caller can write don't", "a request counts as the site's only with the exact forwarding secret", "the sender hash is the salted SHA-256, never the IP", "five reports per sender per hour, with a cap for everyone"
   - 수동: 4.8, `curl -X POST https://<ref>.supabase.co/functions/v1/report` → 403

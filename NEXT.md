@@ -3,28 +3,30 @@
 > **갱신형 문서입니다.** 작업 단위가 끝날 때마다 **덮어씁니다.** 이력은 [ROADMAP.md](ROADMAP.md)의 작업 기록에 남깁니다.
 > 컨텍스트가 압축되거나 새 세션을 시작하면 **이 파일부터 읽습니다.**
 
-_마지막 갱신: 2026-10-05_
+_마지막 갱신: 2026-10-06_
 
 ## 방금 끝난 것
 
-- v1.0.0 버전 올림(이 PR) → merge 후 main에서 Release 수동 실행
-- v1 준비: 문제 신고·문의는 HTTPS(`ddugit.com/api/report`, 사이트 #23 관리자 대시보드 `/admin`), 첫 실행 안내(#119), 큰 저장소 성능(#120), 영문 문구(#121)
-- 점검: Rust(#122)·웹(#123)·사이트(ddugit-site #24) 보안·정확성, 구조 정리(#126)
-- 전체 기능 QA: `docs/QA.md`(#124) — 153항목 중 자동 139·부분 11·없음 3, 실기 28(4장 사용자 대본). Rust 빈칸(#125), e2e 빈칸(#127, 충돌 시트가 취소 뒤 남던 버그 고침)
+- v1.0.0 릴리스(#128, Release 성공: macOS 서명·공증 dmg, Windows exe, `latest.json` 갱신)
+- 사이트 SEO(ddugit-site #25): sitemap·robots·페이지별 제목/설명/canonical·OG 이미지·JSON-LD
+- Lemon Squeezy 스토어 심사 거절(사유 비공개) → **Paddle Billing으로 전환**(ddugit-site #26): `paddle-webhook`, Paddle.js 오버레이 체크아웃, 약관(판매자 Kim Jiwoon 개인·Paddle MoR 문구·환불 14일)·개인정보, 연락처 kfromh0136@gmail.com
 
-## 결정
+## 결정 (2026-10-06)
 
-- 수익 모델: $29 한 번 결제, 평생 사용 + 모든 업데이트, 라이선스당 기기 3대, 체험 없음(#116, 사이트 #21)
-- 사이트 라이선스(붙여 넣기)의 `updatesUntil`은 지금 강제하지 않음 — 제품 결정 남음
+- 판매자: 개인 **Kim Jiwoon**(Paddle 계정의 법적 이름과 같아야 함, 사이트 `SITE.seller`). 연락처: kfromh0136@gmail.com(사이트 `_shared/contact.ts`). 앱에는 이메일 없음(신고는 HTTPS)
+- 환불 14일(Paddle 요구). 사이트 라이선스의 업데이트 기한은 두지 않는다(이전 버전을 계속 쓰는 것도 막지 않음)
+- 앱 코드는 바뀌지 않는다: 구매 버튼은 `ddugit.com/pricing`, 라이선스는 사이트 계정 로그인으로 받는다
 
 ## 다음 단계 (사용자)
 
-- Supabase 시크릿: `LEMONSQUEEZY_PRODUCT_ID`, `REPORT_SALT`, `REPORT_FORWARD_SECRET`(Netlify에도), 필요하면 `ALLOW_TEST_LICENSES`
-- Supabase Auth: Email 제공자를 끄거나, 이메일 확인·안전한 이메일 변경을 켠다
-- Lemon Squeezy: Single payment $29 상품, 웹훅, `NEXT_PUBLIC_LS_CHECKOUT_URL`
-- GitGuardian 사건 37879601을 오탐으로 닫기
-- `docs/QA.md` 4장 실기 대본(0.8.0 → 1.0.0 자동 업데이트 포함), Windows 실기
-- (출시 뒤) Windows 서명
+1. Paddle 가입(개인, 이름 Kim Jiwoon) → Checkout → Website approval에 `ddugit.com`
+2. ddugit-site README "판매(Paddle Billing)" 순서: 상품·가격($29 one-time), 기본 결제 링크 `/checkout`, 토큰·API 키, Notifications(`paddle-webhook`)
+3. Supabase Secrets: `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRODUCT_ID`, `PADDLE_API_KEY`, `PADDLE_ENV`, `REPORT_SALT`, `REPORT_FORWARD_SECRET`(Netlify에도). 옛 `LEMONSQUEEZY_*`는 지우고, 배포된 `ls-webhook` 함수도 지운다(`supabase functions delete ls-webhook`)
+4. Netlify: `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`·`_PRICE_ID`·`_ENV`. 옛 `NEXT_PUBLIC_LS_CHECKOUT_URL` 삭제
+5. sandbox로 구매 → 앱 활성화 → 환불까지 → live로 같은 설정
+6. Supabase Auth: Email 제공자 끄기(또는 Confirm email 켜짐 확인). 라이선스·관리자 권한이 로그인 이메일 기준이라서
+7. Search Console: `sitemap.xml` 제출, 주요 페이지 색인 요청
+8. `docs/QA.md` 4장 실기 대본(0.8.0 → 1.0.0 자동 업데이트 포함), Windows 실기. (출시 뒤) Windows 서명
 
 ## 막힌 것 / 결정 필요
 
