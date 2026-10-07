@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use git2::{BranchType, Oid, RepositoryState};
+use git2::{BranchType, Oid};
 use serde::Deserialize;
 
 use super::literal;
@@ -88,7 +88,19 @@ pub fn commit_template(path: &str) -> Result<Option<String>> {
         return Ok(None);
     };
     // A relative path is relative to where git runs: the top of the working tree.
-    let Ok(text) = std::fs::read_to_string(workdir(&repo)?.join(file)) else {
+    let Some(top) = repo.workdir() else {
+        return Ok(None);
+    };
+    let file = top.join(file);
+    // A plain file of reasonable size only (not a pipe or a device that never ends).
+    const MAX: u64 = 64 * 1024;
+    if !std::fs::metadata(&file).is_ok_and(|m| m.is_file() && m.len() <= MAX) {
+        return Ok(None);
+    }
+    let mut bytes = Vec::new();
+    let read = std::fs::File::open(&file)
+        .and_then(|f| std::io::Read::read_to_end(&mut std::io::Read::take(f, MAX), &mut bytes));
+    let (Ok(_), Ok(text)) = (read, String::from_utf8(bytes)) else {
         return Ok(None);
     };
     let kept: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
@@ -98,11 +110,10 @@ pub fn commit_template(path: &str) -> Result<Option<String>> {
 
 /// Refuse to start while another operation is half-done.
 fn require_clean(repo: &git2::Repository) -> Result<()> {
-    match repo.state() {
-        RepositoryState::Clean => Ok(()),
+    match super::repo_state(repo) {
+        "clean" => Ok(()),
         state => Err(format!(
-            "Repository is in the middle of a {}; finish or abort it first",
-            state_name(state)
+            "Repository is in the middle of a {state}; finish or abort it first"
         )),
     }
 }
@@ -146,6 +157,11 @@ pub fn merge(
 ) -> Result<OpResult> {
     operand(source)?;
     let dir = prepare_on(path, target)?;
+    // A squash that stops on conflicts can only be undone by going back to HEAD: start
+    // it on a clean work tree, so that never takes the user's own edits with it.
+    if mode == MergeMode::Squash && has_changes(path)? {
+        return Err("Commit or stash your changes before a squash merge".into());
+    }
     let mut args = vec![
         "merge",
         match mode {
@@ -154,18 +170,32 @@ pub fn merge(
             MergeMode::Squash => "--squash",
         },
     ];
+    // `merge.ff=false` in the user's config would refuse `--squash`; the command line wins.
+    if mode == MergeMode::Squash {
+        args.push("--ff");
+    }
     match message.map(str::trim).filter(|m| !m.is_empty()) {
         _ if mode == MergeMode::Squash => {}
         Some(m) => args.extend(["-m", m]),
         None => args.push("--no-edit"),
     }
-    args.push(source);
+    let source = super::branch_first(&open(path)?, source);
+    args.push(&source);
     let o = git(&dir, &args)?;
     // A squash leaves no merge in progress, but its conflicts still need resolving.
     if mode == MergeMode::Squash && !o.ok && has_conflicts(path) {
         return Ok(OpResult::with(OpStatus::Conflict, o));
     }
     Ok(conflict_aware(path, o))
+}
+
+/// Tracked files changed in the work tree or the index (untracked ones don't count).
+fn has_changes(path: &str) -> Result<bool> {
+    let repo = open(path)?;
+    let mut opts = git2::StatusOptions::new();
+    opts.include_untracked(false).include_ignored(false);
+    let statuses = repo.statuses(Some(&mut opts)).map_err(super::err)?;
+    Ok(!statuses.is_empty())
 }
 
 pub(super) fn has_conflicts(path: &str) -> bool {
@@ -190,9 +220,17 @@ pub(super) fn conflict_aware(path: &str, o: Output) -> OpResult {
 /// Abort the merge / rebase / cherry-pick / revert / am in progress.
 pub fn abort(path: &str) -> Result<OpResult> {
     let repo = open(path)?;
-    let state = state_name(repo.state());
+    let state = super::repo_state(&repo);
     if state == "clean" {
         return Err("Nothing to abort".into());
+    }
+    if state == "squash" {
+        // It started on a clean work tree (`merge`), so going back to HEAD loses nothing else.
+        let o = git(&workdir(&repo)?, &["reset", "--merge"])?;
+        if o.ok {
+            let _ = std::fs::remove_file(repo.path().join("SQUASH_MSG"));
+        }
+        return Ok(o.into());
     }
     let args: &[&str] = if state == "bisect" {
         &["bisect", "reset"]
@@ -342,7 +380,7 @@ pub fn switch_or_create(path: &str, name: &str) -> Result<SwitchResult> {
 #[cfg(test)]
 mod tests {
     use super::super::read::{snapshot, RefKind};
-    use super::super::testutil::{commit_file, repo, s};
+    use super::super::testutil::{commit_file, repo, run, s};
     use super::*;
     use std::fs;
 
@@ -686,7 +724,35 @@ mod tests {
         commit_file(d.path(), "a.txt", "main", "main edit");
         let r = merge(p, "feature", None, MergeMode::Squash, None).unwrap();
         assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
-        assert!(snapshot(p, 10).unwrap().changes.iter().any(|c| c.conflicted));
+        let snap = snapshot(p, 10).unwrap();
+        assert!(snap.changes.iter().any(|c| c.conflicted));
+        // It shows as a squash in progress, and cancelling goes back to where it started.
+        assert_eq!(snap.state, "squash");
+        assert!(merge(p, "feature", None, MergeMode::Commit, None).is_err());
+        let r = abort(p).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(p, 10).unwrap();
+        assert_eq!(snap.state, "clean");
+        assert!(snap.changes.is_empty());
+        assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "main");
+    }
+
+    #[test]
+    fn squash_merge_needs_a_clean_tree_and_ignores_merge_ff_false() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "base", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "b.txt", "b", "feature");
+        checkout(p, "main").unwrap();
+        run(d.path(), &["config", "merge.ff", "false"]);
+        fs::write(d.path().join("a.txt"), "mine").unwrap();
+        assert!(merge(p, "feature", None, MergeMode::Squash, None).is_err());
+        assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "mine");
+        fs::write(d.path().join("a.txt"), "base").unwrap();
+        let r = merge(p, "feature", None, MergeMode::Squash, None).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert!(d.path().join("b.txt").exists());
     }
 
     #[cfg(unix)] // the hook is a shell script made executable

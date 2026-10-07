@@ -10,14 +10,20 @@ pub fn ignore(path: &str, patterns: &[String], untrack: &[String]) -> Result<OpR
     let mut out = Vec::new();
     if !patterns.is_empty() {
         let file = dir.join(".gitignore");
-        let now = match std::fs::read(&file) {
-            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        // A repository can check out `.gitignore` as a link to any file: never write through one.
+        if file.symlink_metadata().is_ok_and(|m| !m.file_type().is_file()) {
+            return Err(".gitignore is not a plain file (a link?): edit it by hand".into());
+        }
+        let mut now = match std::fs::read(&file) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
             Err(e) => return Err(format!("Can't read .gitignore: {e}")),
         };
-        match appended(&now, patterns)? {
-            Some(next) => {
-                std::fs::write(&file, next).map_err(|e| format!("Can't write .gitignore: {e}"))?;
+        // Only appended to: the file's own bytes (any encoding) stay as they are.
+        match appended(&String::from_utf8_lossy(&now), patterns)? {
+            Some(more) => {
+                now.extend_from_slice(more.as_bytes());
+                std::fs::write(&file, now).map_err(|e| format!("Can't write .gitignore: {e}"))?;
                 out.push(format!("Added to .gitignore: {}", patterns.join(", ")));
             }
             None => out.push("Already in .gitignore".to_string()),
@@ -34,8 +40,8 @@ pub fn ignore(path: &str, patterns: &[String], untrack: &[String]) -> Result<OpR
     })
 }
 
-/// `.gitignore` text `now` with the `patterns` it lacks added at the end, each on its
-/// own line (`None` when every one is already there). A pattern must be one line.
+/// What to add to the end of `.gitignore` text `now` for the `patterns` it lacks, each on
+/// its own line (`None` when every one is already there). A pattern must be one line.
 fn appended(now: &str, patterns: &[String]) -> Result<Option<String>> {
     // Unescaped trailing spaces mean nothing to git; an escaped one (`\ `) is part of the pattern.
     let there = |p: &str| now.lines().any(|l| l == p || l.trim_end() == p);
@@ -53,8 +59,8 @@ fn appended(now: &str, patterns: &[String]) -> Result<Option<String>> {
     }
     // Keep the file's line endings when it uses CRLF.
     let eol = if now.contains("\r\n") { "\r\n" } else { "\n" };
-    let mut next = now.to_string();
-    if !next.is_empty() && !next.ends_with('\n') {
+    let mut next = String::new();
+    if !now.is_empty() && !now.ends_with('\n') {
         next.push_str(eol);
     }
     for p in add {
@@ -82,11 +88,11 @@ mod tests {
             appended("/target\n*.log", &pats(&["*.log", "/dist/", "/dist/"]))
                 .unwrap()
                 .as_deref(),
-            Some("/target\n*.log\n/dist/\n")
+            Some("\n/dist/\n")
         );
         assert_eq!(
             appended("a\r\n", &pats(&["b"])).unwrap().as_deref(),
-            Some("a\r\nb\r\n")
+            Some("b\r\n")
         );
         // Trailing spaces in the file don't make a second copy.
         assert_eq!(appended("*.log  \n", &pats(&["*.log"])).unwrap(), None);
@@ -119,6 +125,30 @@ mod tests {
             fs::read_to_string(d.path().join(".gitignore")).unwrap(),
             "*.log\n/build/\n"
         );
+    }
+
+    #[test]
+    fn a_gitignore_that_is_a_link_or_not_utf8_is_never_rewritten() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        // Latin-1 comment: kept byte for byte.
+        fs::write(d.path().join(".gitignore"), b"# caf\xe9\n/x\n").unwrap();
+        ignore(p, &["*.log".into()], &[]).unwrap();
+        assert_eq!(
+            fs::read(d.path().join(".gitignore")).unwrap(),
+            b"# caf\xe9\n/x\n*.log\n"
+        );
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            let victim = outside.path().join("victim");
+            fs::write(&victim, "keep\n").unwrap();
+            fs::remove_file(d.path().join(".gitignore")).unwrap();
+            std::os::unix::fs::symlink(&victim, d.path().join(".gitignore")).unwrap();
+            assert!(ignore(p, &["/evil".into()], &[]).is_err());
+            assert_eq!(fs::read_to_string(&victim).unwrap(), "keep\n");
+        }
     }
 
     #[test]

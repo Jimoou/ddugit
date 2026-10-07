@@ -152,6 +152,7 @@ export function CompareBanner({ repo, base }: { repo: Repo; base: CompareSide })
 /** In-progress operations (`state.<name>` and `.hint` in the dictionary) and whether "continue" applies. */
 const IN_PROGRESS: Record<string, { canContinue: boolean }> = {
   merge: { canContinue: false },
+  squash: { canContinue: false },
   rebase: { canContinue: true },
   "cherry-pick": { canContinue: true },
   revert: { canContinue: true },

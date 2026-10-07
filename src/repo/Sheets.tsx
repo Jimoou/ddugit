@@ -199,6 +199,7 @@ export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) 
     case "diff": {
       const { source } = sheet;
       const staged = source.kind === "worktree" && source.scope === "staged";
+      const conflicted = new Set(snap.changes.filter((c) => c.conflicted).map((c) => c.path));
       const hunkKey = (file: string, hunk: number) => sheet.files?.find((f) => f.path === file)?.hunks[hunk]?.key ?? "";
       return (
         <DiffSheet
@@ -217,8 +218,17 @@ export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) 
                       api.stageHunks(path, file, [hunkKey(file, hunk)], staged, lines),
                     ),
                   onDiscard: (file, hunk, lines) => discardHunk(repo, file, hunkKey(file, hunk), lines),
-                  onFile: (file) => void stageFiles(repo, [file], staged),
-                  onAll: () => void stageFiles(repo, [], staged),
+                  // Staging a file still in conflict would mark it resolved, markers and all.
+                  onFile: (file) =>
+                    !staged && conflicted.has(file)
+                      ? repo.toast("err", t("stage.conflicted", { file }))
+                      : void stageFiles(repo, [file], staged),
+                  onAll: () => {
+                    // `[]` is every change: name the rest instead while some are in conflict.
+                    const rest = snap.changes.filter((c) => !c.conflicted).map((c) => c.path);
+                    if (staged || !conflicted.size) void stageFiles(repo, [], staged);
+                    else if (rest.length) void stageFiles(repo, rest, false);
+                  },
                 }
               : undefined
           }

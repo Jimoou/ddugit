@@ -136,7 +136,17 @@ command!(git_continue(path: String) -> OpResult => git::write::continue_op(&path
 command!(git_pick(path: String, op: PickOp, ids: Vec<String>, target: Option<String>, mainline: Option<usize>)
     -> OpResult => git::pick::pick(&path, op, &ids, target.as_deref(), mainline));
 command!(commit_patch(path: String, id: String) -> String => git::patch::commit_patch(&path, &id));
-command!(save_patch(path: String, id: String, dest: String) -> OpResult => git::patch::save_patch(&path, &id, &dest));
+/// Save a commit as a patch at `dest`, a path the user just chose in `pick_save_file`.
+#[tauri::command]
+async fn save_patch(
+    app: tauri::AppHandle,
+    path: String,
+    id: String,
+    dest: String,
+) -> Result<OpResult, String> {
+    chosen(&app, &dest)?;
+    blocking(move || git::patch::save_patch(&path, &id, &dest)).await
+}
 command!(apply_patch(path: String, file: String) -> OpResult => git::patch::apply_patch(&path, &file));
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
@@ -256,8 +266,64 @@ command!(git_resolve(path: String, file: String, how: Resolution) -> OpResult
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
 command!(range_diff(path: String, from: String, to: String, merge_base: bool) -> Vec<FileDiff>
     => git::diff::range_diff(&path, &from, &to, merge_base));
-command!(save_file(path: String, rev: String, file: String, dest: String) -> OpResult
-    => git::history::save_file(&path, &rev, &file, &dest));
+/// Save `file` as `rev` has it at `dest`, a path the user just chose in `pick_save_file`.
+#[tauri::command]
+async fn save_file(
+    app: tauri::AppHandle,
+    path: String,
+    rev: String,
+    file: String,
+    dest: String,
+) -> Result<OpResult, String> {
+    chosen(&app, &dest)?;
+    blocking(move || git::history::save_file(&path, &rev, &file, &dest)).await
+}
+
+/// Paths the user chose in the native save dialog, each good for one write: the webview
+/// can't write a file anywhere the user didn't pick.
+#[derive(Default)]
+struct Chosen(std::sync::Mutex<std::collections::HashSet<String>>);
+
+/// Ask where to save (`name` to start with); the answer may be written once.
+#[tauri::command]
+async fn pick_save_file(
+    app: tauri::AppHandle,
+    title: String,
+    name: String,
+) -> Result<Option<String>, String> {
+    use tauri::Manager;
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        let picked = app
+            .dialog()
+            .file()
+            .set_title(title)
+            .set_file_name(name)
+            .blocking_save_file()
+            .and_then(|p| p.as_path().map(|p| p.to_string_lossy().into_owned()));
+        if let Some(p) = &picked {
+            app.state::<Chosen>()
+                .0
+                .lock()
+                .map_err(|e| e.to_string())?
+                .insert(p.clone());
+        }
+        Ok(picked)
+    })
+    .await
+}
+
+/// Use up the user's choice of `dest`; refused when it isn't one.
+fn chosen(app: &tauri::AppHandle, dest: &str) -> Result<(), String> {
+    use tauri::Manager;
+    let state = app.state::<Chosen>();
+    let removed = state.0.lock().map_err(|e| e.to_string())?.remove(dest);
+    if removed {
+        Ok(())
+    } else {
+        Err("Choose where to save it first".into())
+    }
+}
 // Outside the app: a path inside the repository's work tree only (`open::inside`).
 command!(open_in(path: String, file: Option<String>, how: open::OpenHow) in dir -> ()
     => open::open(&dir, &path, file.as_deref(), &how));
@@ -354,6 +420,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Watching::default())
+        .manage(Chosen::default())
         .invoke_handler(tauri::generate_handler![
             initial_repo,
             repo_root,
@@ -452,6 +519,7 @@ pub fn run() {
             commit_diff,
             range_diff,
             save_file,
+            pick_save_file,
             worktree_diff,
             open_in,
             open_version,

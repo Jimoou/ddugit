@@ -140,6 +140,29 @@ fn state_name(s: RepositoryState) -> &'static str {
     }
 }
 
+/// `name` as the UI means it: a local branch, else a remote-tracking one, else as given.
+/// (git alone would take a tag of the same name first.)
+pub(crate) fn branch_first(repo: &Repository, name: &str) -> String {
+    [format!("refs/heads/{name}"), format!("refs/remotes/{name}")]
+        .into_iter()
+        .find(|full| repo.find_reference(full).is_ok())
+        .unwrap_or_else(|| name.to_string())
+}
+
+/// The repository's state name, plus "squash": a squash merge stopped on conflicts
+/// (git keeps no merge in progress for it, only `SQUASH_MSG` and a conflicted index).
+pub(crate) fn repo_state(repo: &Repository) -> &'static str {
+    let s = repo.state();
+    let squash = s == RepositoryState::Clean
+        && repo.path().join("SQUASH_MSG").is_file()
+        && repo.index().is_ok_and(|i| i.has_conflicts());
+    if squash {
+        "squash"
+    } else {
+        state_name(s)
+    }
+}
+
 /// Goes before a subcommand that takes file paths from the UI: they name files,
 /// so `[`, `*`, `?` and `:(magic)` must not match other files (`git clean -- 'a?'`
 /// would also delete `ab`). Not set globally: `lfs track` patterns are globs.

@@ -26,7 +26,8 @@ interface Props {
 /** Side names per operation. During a rebase git's "ours" is the branch being rebased onto. */
 const SIDES: Record<string, [ours: Key, theirs: Key]> = {
   merge: ["cf.side.current", "cf.side.incoming"],
-  // Nothing in progress: a squash merge or a stash pop stopped on conflicts.
+  squash: ["cf.side.current", "cf.side.incoming"],
+  // Nothing in progress: a stash pop stopped on conflicts.
   clean: ["cf.side.current", "cf.side.incoming"],
   rebase: ["cf.side.base", "cf.side.mine"],
   "cherry-pick": ["cf.side.current", "cf.side.picked"],

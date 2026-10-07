@@ -3,7 +3,7 @@
 use git2::{BranchType, Repository, Status, StatusOptions};
 use serde::Serialize;
 
-use super::{err, open, state_name, workdir, Result};
+use super::{err, open, workdir, Result};
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -131,7 +131,7 @@ pub fn snapshot(path: &str, limit: usize) -> Result<RepoSnapshot> {
         remotes: read_remotes(&repo),
         changes,
         stashes: super::stash::read_stashes(path)?,
-        state: state_name(repo.state()).to_string(),
+        state: super::repo_state(&repo).to_string(),
         incoming: incoming(&repo),
         truncated,
         worktrees: super::worktree::list(&repo),

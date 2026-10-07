@@ -34,7 +34,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 
 - `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다. 이름이 `git`인 절대 경로만 받고, 저장소가 추적하는(무시되지 않는) 파일·임시 폴더·다른 사용자가 쓸 수 있는 파일은 거부한다)
   - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태). 이력은 libgit2 정렬 revwalk(전체 이력을 먼저 읽는다) 대신 커밋 시각 순으로 직접 걷다가(`TimeWalk`) 페이지 크기에서 멈추고, `children_first`로 자식이 부모보다 앞에 오게 고친다
-  - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃). `merge`는 `MergeMode`(commit `--no-ff` / fastForward `--ff` / squash `--squash`, 스테이지만)와 메시지(`-m`)를 받는다. squash 충돌은 진행 상태가 없어 index로 `conflict`를 판단한다. 화면은 `MergeDialog.tsx`(`squashMessage`로 커밋 창 메시지를 채운다)
+  - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃). `merge`는 `MergeMode`(commit `--no-ff` / fastForward `--ff` / squash `--squash`, 스테이지만)와 메시지(`-m`)를 받는다. squash 충돌은 git에 진행 상태가 없어 `mod.rs`의 `repo_state`가 `SQUASH_MSG` + 충돌 index를 `squash` 상태로 보고(취소는 `reset --merge`), squash는 작업 트리가 깨끗할 때만 시작한다(`--ff`로 `merge.ff=false`를 이긴다). 병합·rebase 대상 이름은 `branch_first`로 같은 이름의 태그보다 브랜치를 먼저 고른다. 화면은 `MergeDialog.tsx`(`squashMessage`로 커밋 창 메시지를 채운다)
   - `pick.rs`: cherry-pick / revert (여러 id: cherry-pick은 오래된 것부터, revert는 최근 것부터, 병합 revert의 `mainline` 부모)
   - `patch.rs`: 커밋을 패치로(`format-patch -1 --stdout`, `history::save_target`로 저장하거나 복사), 패치 파일 적용(메일 형식 → `am --3way`, 멈춘 `am`은 cherry-pick처럼 계속·건너뛰기·취소 / 일반 diff → `apply --3way`). 화면은 `repo/patches.ts`(커밋 메뉴, 브랜치 목록의 '패치 적용…')
   - `search.rs`: 전체 이력 검색(`git log`, 브랜치·원격·태그): 메시지 `--grep`·작성자 `--author`(정규식이 아니면 고정 문자열), 경로(pathspec, 파일 하나면 `--follow`), 내용 `-S`/`-G`. 최근 것부터, 상한과 `more`, 20초에서 멈추고 찾은 만큼 돌려준다(`run_within`)
@@ -47,11 +47,11 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `diff.rs`: 커밋 diff, 두 리비전 비교(`range_diff`, `merge_base`면 갈라진 지점부터 `from...to`, 이름 바뀜 포함), 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
   - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
   - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`), 파일 단위(`stage_files`: `add -A` / `restore --staged`, 첫 커밋 전엔 `rm --cached`), hunk·줄 버리기(`discard_hunks`: 같은 패치를 작업 트리에 `apply --reverse`)
-  - `ignore.rs`: `.gitignore`(최상위, 중복 건너뜀, CRLF 유지)에 패턴 추가와 추적 중지(`rm --cached`)를 한 번에(`ignore`). 패턴은 `src/ignore.ts`(`ignoreChoices`: `/file`, `*.ext`, `/dir/`, 이스케이프)
+  - `ignore.rs`: `.gitignore`(최상위, 중복 건너뜀, CRLF 유지, 바이트 그대로 뒤에만 덧붙임, 심볼릭 링크면 거부)에 패턴 추가와 추적 중지(`rm --cached`)를 한 번에(`ignore`). 패턴은 `src/ignore.ts`(`ignoreChoices`: `/file`, `*.ext`, `/dir/`, 이스케이프)
   - `bisect.rs`: `git bisect` 시작·좋음·나쁨·건너뛰기와 상태 읽기(refs/bisect/*에서 후보·지금 확인할 커밋·범인). 끝내기는 `write::abort`(bisect reset)
   - `edit.rs`: 지난 커밋 손보기(메시지·작성자·파일별로 둘로 나누기). 부모부터 rebase -i --autostash로 다시 쌓고 대상 바로 뒤에 `exec`을 끼운다. 훅(pre-commit 등)이 거부하면 rebase를 취소해 원래대로 돌리고 훅 출력을 돌려준다. 파일 하나를 어떤 커밋 상태로 되돌리기(`restore_file`)
   - `identity.rs`: 커밋할 사람과 서명(`user.name`·`user.email`·`commit.gpgsign`·`gpg.format`·`user.signingkey`)을 값이 온 곳(`--show-scope`)과 함께 CLI로 읽고, 저장소(local)·전역에 프로필 적용·서명 켜고 끄기·지우기(`IdentityOp`). GPG 비밀 키(`--with-colons`)·SSH 공개 키(`ssh::keys_in`) 목록, 커밋 하나의 서명(`%G?`·`%GS`·`%GK`, 확인 못 한 SSH 서명은 libgit2로 서명 유무). 프로필은 설정(`settings.profiles`, 순수 로직 `identity.ts`), 화면은 `components/Identity.tsx`(커밋 창의 이름 줄·메뉴, 설정의 프로필), 서명 배지는 `Inspector`
-  - `history.rs`: 어떤 리비전의 파일을 저장(`save_file`, 저장 창 경로, `.git` 안·git 디렉터리에는 쓰지 않음, 심볼릭 링크도 따라가 검사). 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
+  - `history.rs`: 어떤 리비전의 파일을 저장(`save_file`, 저장 창 경로(창은 Rust가 띄우고 고른 경로만 한 번 쓸 수 있다: `lib.rs`의 `pick_save_file`·`Chosen`, 패치 저장도 같다), `.git` 안·git 디렉터리에는 쓰지 않음, 심볼릭 링크도 따라가 검사). 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
   - `cleanup.rs`: 브랜치 정리 보고(기준 브랜치에 병합됨 / 원격에서 사라짐(gone) / 마지막 커밋 시각)와 여러 브랜치 한 번에 삭제
   - `undo.rs`: reset(soft/mixed/hard, 진행 중이면 거부), reflog(HEAD가 지나온 자리 + 어느 참조에서도 닿지 않는 `lost` 표시)
   - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분, `CloneOptions`: 브랜치·depth·single-branch·서브모듈, 화면은 `components/CloneAdvanced.tsx`, 검사는 `cloneOptions.ts`), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)

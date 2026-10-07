@@ -312,6 +312,9 @@ export const en: Record<Key, string> = {
   "remote.done.forcePush": "Force-pushed; the remote now matches your history",
   "state.merge": "Merge",
   "state.merge.hint": "Resolve the conflicts, then commit with ＋ to finish the merge.",
+  "stage.conflicted": "{file} still has conflicts. Resolve them first.",
+  "state.squash": "Squash merge",
+  "state.squash.hint": "Resolve the conflicts, then commit in the composer. Cancel goes back to before the merge.",
   "state.rebase": "Rebase",
   "state.rebase.hint": "Fix the files, then click “Continue” to resume the rebase.",
   "state.cherry-pick": "Cherry-pick",
@@ -434,6 +437,8 @@ export const en: Record<Key, string> = {
   "rebaseOnto.title": "Rebase onto another branch",
   "rebaseOnto.body":
     "Replays the {n:commit|commits} only <b>{current}</b> has on top of <b>{onto}</b>. Their commit IDs change.",
+  "rebaseOnto.bodyMore":
+    "Replays {n} or more commits only <b>{current}</b> has (history not loaded yet may hold more) on top of <b>{onto}</b>. Their commit IDs change.",
   "rebaseOnto.merges":
     "There {n:is a merge commit|are merge commits} among them. A rebase leaves merge commits out and lines the commits up in a row.",
   "rebaseOnto.dirty": "Uncommitted changes are put aside and restored when it's done.",

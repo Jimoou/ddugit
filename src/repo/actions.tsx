@@ -322,8 +322,10 @@ export const askRebaseOnto = (repo: Repo, onto: string, ontoId: string) => {
   if (!current || !snap.head.target) return;
   const mine = [...ancestors(snap.commits, snap.head.target)].filter((c) => !repo.isAncestor(c, ontoId));
   const merges = mine.filter((c) => (commitById.get(c)?.parents.length ?? 0) > 1).length;
+  // The walk ran into history not loaded yet: there may be more than it counted.
+  const partial = mine.some((c) => commitById.get(c)?.parents.some((p) => !commitById.has(p)));
   // More commits are rewritten than are unpushed: some were pushed (as in the rebase sheet).
-  const pushed = !!snap.head.upstream && mine.length > snap.head.ahead;
+  const pushed = !!snap.head.upstream && (partial || mine.length > snap.head.ahead);
   confirmThen(
     repo,
     {
@@ -331,7 +333,7 @@ export const askRebaseOnto = (repo: Repo, onto: string, ontoId: string) => {
       confirmLabel: t("rebaseOnto.go"),
       body: (
         <>
-          {richBody("rebaseOnto.body", { current, onto, n: mine.length - merges })}
+          {richBody(partial ? "rebaseOnto.bodyMore" : "rebaseOnto.body", { current, onto, n: mine.length - merges })}
           {merges > 0 && <p className="note warn">{t("rebaseOnto.merges", { n: merges })}</p>}
           {pushed && <p className="note warn">{t("rb.pushed")}</p>}
           {snap.changes.length > 0 && <p className="note">{t("rebaseOnto.dirty")}</p>}

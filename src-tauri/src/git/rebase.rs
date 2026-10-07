@@ -261,7 +261,8 @@ pub fn rebase(path: &str, base: &str, steps: &[RebaseStep]) -> Result<OpResult> 
 pub fn onto(path: &str, upstream: &str) -> Result<OpResult> {
     super::operand(upstream)?;
     let dir = prepare_on(path, None)?;
-    let o = git(&dir, &["rebase", "--autostash", upstream])?;
+    let upstream = super::branch_first(&super::open(path)?, upstream);
+    let o = git(&dir, &["rebase", "--autostash", &upstream])?;
     Ok(conflict_aware(path, o))
 }
 
@@ -492,11 +493,16 @@ mod tests {
         let d = diverged("f1.txt");
         let p = s(d.path());
         std::fs::write(d.path().join("f2.txt"), "edited").unwrap();
+        // A tag of the same name on an older commit: the branch is still the one meant.
+        super::super::git_ok(d.path(), &["tag", "main", "main~1"]).unwrap();
         let r = onto(p, "main").unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         let git = |args: &[&str]| super::super::git_ok(d.path(), args).unwrap();
-        assert_eq!(git(&["log", "--format=%s", "main..HEAD"]), "f2\nf1");
-        assert_eq!(git(&["rev-parse", "HEAD~2"]), git(&["rev-parse", "main"]));
+        assert_eq!(git(&["log", "--format=%s", "refs/heads/main..HEAD"]), "f2\nf1");
+        assert_eq!(
+            git(&["rev-parse", "HEAD~2"]),
+            git(&["rev-parse", "refs/heads/main"])
+        );
         assert_eq!(
             std::fs::read_to_string(d.path().join("f2.txt")).unwrap(),
             "edited"

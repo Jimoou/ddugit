@@ -202,8 +202,21 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
             Err(done) => return Ok(done),
         },
     };
+    // A remote with a push URL of its own would go on pushing to the old place: move it too
+    // (a fetch-only remote's placeholder stays).
+    let own_push = match op {
+        RefOp::SetRemoteUrl { name, .. } => repo
+            .find_remote(name)
+            .ok()
+            .and_then(|r| r.pushurl().map(String::from))
+            .filter(|p| p != super::NO_PUSH),
+        _ => None,
+    };
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     let o = git(&dir, &argv)?;
+    if let (RefOp::SetRemoteUrl { name, url }, Some(_), true) = (op, &own_push, o.ok) {
+        return Ok(git(&dir, &["remote", "set-url", "--push", name, url.trim()])?.into());
+    }
     if let (RefOp::RenameBranch { from, to }, true) = (op, o.ok) {
         super::stack::renamed(&dir, from, to);
     }
@@ -600,5 +613,10 @@ mod tests {
         assert!(!remotes[0].push, "still fetch-only");
         assert!(set_url("  ").is_err());
         assert!(set_url("--upload-pack=x").is_err());
+        // A push URL of its own moves with it.
+        git_ok(d.path(), &["remote", "set-url", "--push", "theirs", "/old/push"]).unwrap();
+        set_url("/new/place").unwrap();
+        let push = git_ok(d.path(), &["remote", "get-url", "--push", "theirs"]).unwrap();
+        assert_eq!(push, "/new/place");
     }
 }

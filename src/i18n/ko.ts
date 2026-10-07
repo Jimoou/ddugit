@@ -308,6 +308,9 @@ export const ko = {
   "remote.done.forcePush": "원격을 내 이력으로 덮어썼어요",
   "state.merge": "병합",
   "state.merge.hint": "해결한 뒤 ＋로 커밋하면 병합이 끝나요.",
+  "stage.conflicted": "{file}에는 아직 충돌이 있어요. 충돌을 먼저 해결하세요.",
+  "state.squash": "squash 병합",
+  "state.squash.hint": "해결한 뒤 커밋 창에서 커밋하면 끝나요. 취소하면 병합 전으로 돌아가요.",
   "state.rebase": "리베이스",
   "state.rebase.hint": "파일을 고친 뒤 '계속'을 누르면 리베이스를 이어 가요.",
   "state.cherry-pick": "cherry-pick",
@@ -427,6 +430,8 @@ export const ko = {
   "rebaseOnto.title": "다른 브랜치 위로 rebase",
   "rebaseOnto.body":
     "<b>{current}</b>에만 있는 커밋 {n}개를 <b>{onto}</b>의 끝 위로 옮겨 다시 쌓아요. 커밋 ID가 새로 바뀌어요.",
+  "rebaseOnto.bodyMore":
+    "<b>{current}</b>에만 있는 커밋 {n}개 이상(읽지 않은 이력에 더 있을 수 있어요)을 <b>{onto}</b>의 끝 위로 옮겨 다시 쌓아요. 커밋 ID가 새로 바뀌어요.",
   "rebaseOnto.merges": "사이에 병합 커밋 {n}개가 있어요. rebase하면 병합 커밋은 빠지고 커밋이 일직선으로 놓여요.",
   "rebaseOnto.dirty": "커밋하지 않은 변경은 잠시 치워 뒀다가 끝나면 되돌려 놓아요.",
   "rebaseOnto.go": "rebase",

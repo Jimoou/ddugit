@@ -104,19 +104,22 @@ export function RepoDialogs({ repo, dialog, pulls }: Props) {
     case "merge": {
       const { source, target, sourceId, targetId } = dialog;
       const label = source.length === 40 ? source.slice(0, 7) : source;
-      const squash = () => {
+      const squash = async () => {
         // Its summary for the composer: what the source brings that the target lacks.
         const brought = snap.commits.filter((c) => repo.isAncestor(c.id, sourceId) && !repo.isAncestor(c.id, targetId));
         const message = squashMessage(label, brought);
-        return run(
-          t("merge.done.squash", { source: label }),
-          () => api.merge(path, source, target, "squash", null),
-          () => {
-            // Together, so the dialog hands focus back before the composer takes it.
-            close();
-            repo.show({ composer: true, message });
-          },
+        // Together, so the dialog hands focus back before the composer takes it. The composer
+        // commits the index: exactly what the squash staged, not other work in progress.
+        const compose = () => {
+          close();
+          repo.show({ composer: true, message, stagedOnly: true });
+        };
+        const r = await run(t("merge.done.squash", { source: label }), () =>
+          api.merge(path, source, target, "squash", null),
         );
+        // Stopped on conflicts: the message waits in the composer until they are resolved.
+        if (r.status === "ok" || r.status === "conflict") compose();
+        return r;
       };
       return (
         <MergeDialog
