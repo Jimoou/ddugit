@@ -40,7 +40,8 @@ test("stages a file from its menu, which switches the composer to the index, and
   const sheet = page.locator(".diff-sheet");
   await expect(sheet.locator(".file-bar .path")).toHaveText(RENDERER);
   await sheet.getByRole("button", { name: "파일 스테이지" }).click();
-  await demo.toast("스테이지했어요");
+  // An earlier "staged" toast may still be up, so wait on the repository instead of the toast.
+  await expect.poll(async () => (await change(RENDERER))?.staged).toBe("modified");
   expect(await change(RENDERER)).toMatchObject({ staged: "modified", unstaged: null });
   await sheet.getByRole("button", { name: "모두 스테이지" }).click();
   await expect.poll(async () => (await change(MINIMAP))?.staged).toBe("added");
