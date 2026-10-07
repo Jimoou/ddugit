@@ -116,8 +116,9 @@ export class Demo {
     return menu;
   }
 
+  /** A toast with `text` is up (the newest one, when an earlier step left a similar one showing). */
   toast(text: string | RegExp) {
-    return expect(this.page.locator(".toast").filter({ hasText: text })).toBeVisible();
+    return expect(this.page.locator(".toast").filter({ hasText: text }).last()).toBeVisible();
   }
 
   async zoom(): Promise<number> {
