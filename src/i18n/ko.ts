@@ -11,6 +11,7 @@ export const ko = {
 
   // top bar
   "top.emptyRepo": "빈 저장소",
+  "top.detached": "분리된 HEAD @ {sha}",
   "top.demo": "데모",
   "top.demo.tour": "데모 · 튜토리얼",
   "top.fetch.title": "원격의 새 커밋만 가져와요. 파일은 바뀌지 않아요",
@@ -364,6 +365,20 @@ export const ko = {
   "tag.new.go": "태그 만들기",
   "tag.new.message": "설명 (비워 두면 경량 태그, 쓰면 주석 태그)",
   "tag.new.done": "{name} 태그를 만들었어요",
+  "tag.new.push": "만든 뒤 {remote}에 바로 올리기 (Push)",
+  "tag.push.menu": "{remote}에 올리기 (Push)",
+  "tag.push.done": "{name} 태그를 {remote}에 올렸어요",
+  "tag.deleteRemote.title": "원격 태그 삭제",
+  "tag.deleteRemote.body":
+    "<b>{remote}</b>의 태그 <b>{name}</b>{:을} 지워요. 이 원격을 쓰는 모든 사람에게서 사라지고, 로컬 태그는 그대로예요. 이미 받아 간 저장소에는 남아 있어요.",
+  "tag.deleteRemote.done": "{remote}에서 {name} 태그를 지웠어요",
+  "remote.pushTags": "모든 태그 올리기 (Push)",
+  "remote.pushTags.done": "{name}에 모든 태그를 올렸어요",
+  "menu.checkoutDetached": "이 커밋 체크아웃 (분리된 HEAD)…",
+  "menu.detached.hint": "분리된 HEAD",
+  "detach.title": "브랜치 없이 체크아웃",
+  "detach.body":
+    "<b>{name}</b>{:을} 브랜치 없이 체크아웃해요(분리된 HEAD). 여기서 만든 커밋은 어느 브랜치에도 속하지 않아서, 다른 곳으로 옮기면 찾기 어려워요.",
   "job.fetch": "원격에서 가져오는 중",
   "job.pull": "받아서 합치는 중",
   "job.push": "원격에 올리는 중",

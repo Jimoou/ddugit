@@ -342,6 +342,13 @@ export interface OpResult {
 
 export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push" | "forcePush";
 
+/** A ref sent to, or deleted on, a named remote (`remote.rs`'s `RemoteRefOp`). */
+export type RemoteRefOp =
+  | { kind: "deleteBranch"; name: string }
+  | { kind: "pushTag"; name: string }
+  | { kind: "deleteTag"; name: string }
+  | { kind: "pushTags" };
+
 /** Parsed from git's `--progress` output. */
 export interface Progress {
   phase: string;

@@ -9,7 +9,7 @@ import { type Key, t } from "../i18n";
 import type { MissionId } from "../missions";
 import type { Settings } from "../settings";
 import { type SyncOp, syncPlan } from "../sync";
-import type { OpStatus, Progress, RemoteOp, RepoSnapshot } from "../types";
+import type { OpStatus, Progress, RemoteOp, RemoteRefOp, RepoSnapshot } from "../types";
 import type { Repo, Run, Toast } from "./state";
 
 const REMOTE_DONE: Record<RemoteOp, Key> = {
@@ -45,18 +45,20 @@ export function splitRemote(snap: RepoSnapshot | null, name: string) {
   return { remote, branch: name.slice(remote.length + 1) };
 }
 
+/** The remote a branch's first push (or a new tag) goes to: `origin`, else the first one that takes pushes. */
+export const defaultPushRemote = (snap: RepoSnapshot) =>
+  (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
+
 /**
  * Where a push goes: the upstream's remote (or the default one for a first push),
  * whether that remote is fetch-only, and the alternative to offer instead.
  */
 function pushTargetOf(snap: RepoSnapshot | null) {
   if (!snap) return null;
-  const name = snap.head.upstream
-    ? splitRemote(snap, snap.head.upstream).remote
-    : (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
+  const alt = defaultPushRemote(snap);
+  const name = snap.head.upstream ? splitRemote(snap, snap.head.upstream).remote : alt;
   const info = snap.remotes.find((r) => r.name === name);
   if (!info) return null;
-  const alt = (snap.remotes.find((r) => r.name === "origin" && r.push) ?? snap.remotes.find((r) => r.push))?.name;
   return { remote: info.name, url: info.url, fetchOnly: !info.push, alt: alt && alt !== info.name ? alt : null };
 }
 
@@ -169,16 +171,18 @@ export function useRemote(o: Options) {
         : void remote(op)
       : void remote(op);
 
-  /** Delete `branch` on remote `name`; missing credentials open the same help as a push. */
-  const deleteRemoteBranch = async (name: string, branch: string) => {
+  /**
+   * Push a tag to remote `name`, or delete a branch or tag there, saying `done` after. Missing credentials
+   * open the same help as a push; a refusal (the tag there points elsewhere) is git's own words.
+   */
+  const remoteRef = async (name: string, op: RemoteRefOp, done: string) => {
     if (refuseBusy()) return;
     setRemoteBusy("push");
     setProgress(null);
     try {
-      const r = await run(t("remoteBranch.delete.done", { name: `${name}/${branch}` }), () =>
-        api.deleteRemoteBranch(path, name, branch, setProgress),
-      );
+      const r = await run(done, () => api.remoteRef(path, name, op, setProgress));
       if (r.status === "auth") setOpen({ kind: "auth", op: "push", output: r.output });
+      if (r.status === "rejected") toast("err", r.output);
     } finally {
       setRemoteBusy(null);
       setProgress(null);
@@ -299,5 +303,5 @@ export function useRemote(o: Options) {
       </>
     );
 
-  return { remoteBusy, progress, onRemote, pushTo, fetchOne, deleteRemoteBranch, askRemote, jobCard, dialogs };
+  return { remoteBusy, progress, onRemote, pushTo, fetchOne, remoteRef, askRemote, jobCard, dialogs };
 }

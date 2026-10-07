@@ -10,7 +10,7 @@ import { type Key, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { CommitEdit, CommitInfo, FileDiff, RefInfo, RefOp, ResetMode, WorktreeInfo, WorktreeOp } from "../types";
 import { type BisectDraft, closeDialog, type Repo } from "./state";
-import { splitRemote } from "./useRemote";
+import { defaultPushRemote, splitRemote } from "./useRemote";
 
 /** A confirmation's body: one dictionary sentence with its <b>/<code> markup. */
 export const richBody = (k: Key, vars?: Record<string, string | number>) => (
@@ -30,14 +30,14 @@ export const confirmThen = (repo: Repo, c: Omit<Confirm, "onConfirm">, go: () =>
   });
 
 /** Ask for a name; the dialog closes before `then` runs. */
-export const askName = (repo: Repo, req: Omit<NameRequest, "onSubmit">, then: (name: string, extra: string) => void) =>
+export const askName = (repo: Repo, req: Omit<NameRequest, "onSubmit">, then: NameRequest["onSubmit"]) =>
   repo.setDialog({
     kind: "name",
     req: {
       ...req,
-      onSubmit: (name, extra) => {
+      onSubmit: (name, extra, checked) => {
         closeDialog(repo, "name");
-        then(name, extra);
+        then(name, extra, checked);
       },
     },
   });
@@ -89,7 +89,9 @@ export const askBranchAt = (repo: Repo, at: string) =>
     (name) => void repo.run(t("branch.new.done", { name }), () => api.createBranch(repo.path, name, at, true)),
   );
 
-export const askTagAt = (repo: Repo, at: string) =>
+/** A tag at `at`, pushed to the default remote right after when the user ticks that. */
+export const askTagAt = (repo: Repo, at: string) => {
+  const remote = defaultPushRemote(repo.snap);
   askName(
     repo,
     {
@@ -97,8 +99,30 @@ export const askTagAt = (repo: Repo, at: string) =>
       placeholder: "v1.0.0",
       confirmLabel: t("tag.new.go"),
       extra: { placeholder: t("tag.new.message") },
+      check: remote ? { label: t("tag.new.push", { remote }) } : undefined,
     },
-    (name, message) => void refRun(repo, t("tag.new.done", { name }), { kind: "createTag", name, at, message }),
+    async (name, message, push) => {
+      const r = await refRun(repo, t("tag.new.done", { name }), { kind: "createTag", name, at, message });
+      if (push && remote && r.status === "ok") pushTag(repo, remote, name);
+    },
+  );
+};
+
+/** Push tag `name` to `remote`; git refuses when the tag there points elsewhere (no force from here). */
+export const pushTag = (repo: Repo, remote: string, name: string) =>
+  void repo.remoteRef(remote, { kind: "pushTag", name }, t("tag.push.done", { name, remote }));
+
+/** Delete tag `name` on `remote`, after saying it goes for everyone there and the local tag stays. */
+export const deleteRemoteTag = (repo: Repo, remote: string, name: string) =>
+  confirmThen(
+    repo,
+    {
+      title: t("tag.deleteRemote.title"),
+      danger: true,
+      confirmLabel: t("common.delete"),
+      body: richBody("tag.deleteRemote.body", { remote, name }),
+    },
+    () => void repo.remoteRef(remote, { kind: "deleteTag", name }, t("tag.deleteRemote.done", { name, remote })),
   );
 
 /** A local branch following remote branch `r`, under a name the user picks (`suggest` prefilled). */
@@ -114,8 +138,17 @@ export const askLocalFor = (repo: Repo, r: RefInfo, why: string, suggest: string
       }),
   );
 
-export const checkout = (repo: Repo, name: string) =>
-  repo.run(t("checkout.done", { name }), () => api.checkout(repo.path, name));
+/** Check out `target` (a branch, or a rev to detach at), called `name` in the toast. */
+export const checkout = (repo: Repo, target: string, name = target) =>
+  repo.run(t("checkout.done", { name }), () => api.checkout(repo.path, target));
+
+/** Check out `rev` without a branch, after saying that commits made there belong to none. */
+export const checkoutDetached = (repo: Repo, rev: string, name: string) =>
+  confirmThen(
+    repo,
+    { title: t("detach.title"), confirmLabel: t("menu.checkout"), body: richBody("detach.body", { name }) },
+    () => void checkout(repo, rev, name),
+  );
 
 export const checkoutRef = (repo: Repo, r: RefInfo) => {
   // git can't check out a branch another worktree has; open that worktree instead.
@@ -242,7 +275,12 @@ export const deleteRemoteBranch = (repo: Repo, remote: string, branch: string) =
       confirmLabel: t("common.delete"),
       body: richBody("remoteBranch.delete.body", { remote, branch }),
     },
-    () => void repo.deleteRemoteBranch(remote, branch),
+    () =>
+      void repo.remoteRef(
+        remote,
+        { kind: "deleteBranch", name: branch },
+        t("remoteBranch.delete.done", { name: `${remote}/${branch}` }),
+      ),
   );
 
 export const removeRemote = (repo: Repo, name: string) =>

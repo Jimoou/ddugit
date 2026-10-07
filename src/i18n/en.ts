@@ -12,6 +12,7 @@ export const en: Record<Key, string> = {
 
   // top bar
   "top.emptyRepo": "Empty repository",
+  "top.detached": "Detached HEAD @ {sha}",
   "top.demo": "Demo",
   "top.demo.tour": "Demo · Tour",
   "top.fetch.title": "Download new commits from remotes without changing your files",
@@ -371,6 +372,20 @@ export const en: Record<Key, string> = {
   "tag.new.go": "Create tag",
   "tag.new.message": "Message (leave empty for a lightweight tag)",
   "tag.new.done": "Created tag {name}",
+  "tag.new.push": "Push it to {remote} right away",
+  "tag.push.menu": "Push to {remote}",
+  "tag.push.done": "Pushed tag {name} to {remote}",
+  "tag.deleteRemote.title": "Delete remote tag",
+  "tag.deleteRemote.body":
+    "Deletes the tag <b>{name}</b> on <b>{remote}</b>, for everyone who uses that remote. Your local tag stays. Clones that already fetched it keep their copy.",
+  "tag.deleteRemote.done": "Deleted tag {name} on {remote}",
+  "remote.pushTags": "Push all tags",
+  "remote.pushTags.done": "Pushed all tags to {name}",
+  "menu.checkoutDetached": "Check out this commit (detached)…",
+  "menu.detached.hint": "detached",
+  "detach.title": "Check out without a branch",
+  "detach.body":
+    "Checks out <b>{name}</b> without a branch (detached HEAD). Commits you make there belong to no branch and are hard to find once you check out something else.",
   "job.fetch": "Fetching",
   "job.pull": "Pulling",
   "job.push": "Pushing",

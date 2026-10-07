@@ -401,7 +401,7 @@ export function RepoView({
     onOpenPath,
     openUrl,
     fetchOne: remote.fetchOne,
-    deleteRemoteBranch: remote.deleteRemoteBranch,
+    remoteRef: remote.remoteRef,
     canDropOn,
     isAncestor,
   };

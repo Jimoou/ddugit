@@ -51,7 +51,7 @@ export function TopBar(p: Props) {
       >
         <Icon name="head" size={12} />
         <span className="branch-name">
-          {head.branch ?? (head.target ? `detached @ ${head.target.slice(0, 7)}` : t("top.emptyRepo"))}
+          {head.branch ?? (head.target ? t("top.detached", { sha: head.target.slice(0, 7) }) : t("top.emptyRepo"))}
         </span>
         <Icon name="chevronDown" size={12} className="muted" />
       </button>

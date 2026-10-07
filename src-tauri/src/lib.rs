@@ -20,7 +20,7 @@ use git::pick::PickOp;
 use git::read::RepoSnapshot;
 use git::rebase::{RebaseStep, TodoItem};
 use git::refs::RefOp;
-use git::remote::{Progress, RemoteOp};
+use git::remote::{Progress, RemoteOp, RemoteRefOp};
 use git::stash::StashOp;
 use git::write::MergeMode;
 use git::OpResult;
@@ -143,8 +143,8 @@ command!(git_fetch_remote(path: String, name: String, on_progress: Channel<Progr
     => git::remote::fetch_one(&path, &name, |p| { let _ = on_progress.send(p); }));
 command!(git_push_to(path: String, remote: String, branch: Option<String>, on_progress: Channel<Progress>) -> OpResult
     => git::remote::push_to(&path, &remote, branch.as_deref(), |p| { let _ = on_progress.send(p); }));
-command!(git_delete_remote_branch(path: String, remote: String, branch: String, on_progress: Channel<Progress>) -> OpResult
-    => git::remote::delete_remote_branch(&path, &remote, &branch, |p| { let _ = on_progress.send(p); }));
+command!(git_remote_ref(path: String, remote: String, op: RemoteRefOp, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::remote_ref(&path, &remote, &op, |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));
 command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
     => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
@@ -320,7 +320,7 @@ pub fn run() {
             git_remote,
             git_fetch_remote,
             git_push_to,
-            git_delete_remote_branch,
+            git_remote_ref,
             git_skip,
             git_reset,
             git_reflog,

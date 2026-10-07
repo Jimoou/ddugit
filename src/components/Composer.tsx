@@ -109,7 +109,7 @@ export function Composer(props: Props) {
           <h2>
             <Rich
               k={amend ? "composer.onAmend" : "composer.onCommit"}
-              vars={{ branch: !amend && useBranch && newBranch ? newBranch : (branch ?? "detached HEAD") }}
+              vars={{ branch: !amend && useBranch && newBranch ? newBranch : (branch ?? t("galaxy.detached")) }}
             />
           </h2>
         </div>

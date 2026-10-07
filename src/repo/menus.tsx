@@ -19,16 +19,19 @@ import {
   askReset,
   askTagAt,
   checkout,
+  checkoutDetached,
   checkoutRef,
   confirmPick,
   confirmRevert,
   confirmThen,
   deleteBranch,
   deleteRemoteBranch,
+  deleteRemoteTag,
   deleteTag,
   markBisect,
   openEdit,
   openTrail,
+  pushTag,
   refRun,
   removeRemote,
   removeWorktree,
@@ -158,13 +161,31 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
     disabled: !snap.head.branch || isHead,
     onSelect: () => repo.setSheet({ kind: "backport", source: r.name, target: snap.head.branch! }),
   };
-  if (r.kind === "tag")
+  if (r.kind === "tag") {
+    // Nothing is pushed to a fetch-only remote, deletions included.
+    const remotes = snap.remotes.filter((x) => x.push).map((x) => x.name);
     return [
       { label: t("menu.tag.goto"), onSelect: () => repo.graph()?.centerOn(r.target) },
+      {
+        label: t("menu.checkout"),
+        hint: t("menu.detached.hint"),
+        disabled: !snap.head.branch && snap.head.target === r.target,
+        onSelect: () => checkoutDetached(repo, `refs/tags/${r.name}`, r.name),
+      },
       notesItem(repo, r.name),
       "separator",
+      ...remotes.map((remote) => ({
+        label: t("tag.push.menu", { remote }),
+        onSelect: () => pushTag(repo, remote, r.name),
+      })),
       { label: t("tag.delete.title"), danger: true, onSelect: () => deleteTag(repo, r.name) },
+      ...remotes.map((remote) => ({
+        label: t("menu.deleteRemoteBranch", { remote }),
+        danger: true,
+        onSelect: () => deleteRemoteTag(repo, remote, r.name),
+      })),
     ];
+  }
   if (r.kind === "remote") {
     const { remote: name, branch } = splitRemote(snap, r.name);
     return [
@@ -244,6 +265,11 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
       icon: "head" as const,
       onSelect: () => void checkout(repo, r.name),
     })),
+    {
+      label: t("menu.checkoutDetached"),
+      disabled: isHead && !snap.head.branch,
+      onSelect: () => checkoutDetached(repo, id, id.slice(0, 7)),
+    },
     "separator" as const,
     {
       label: snap.head.branch ? t("menu.pickInto", { branch: snap.head.branch }) : t("menu.pickIntoHead"),
@@ -336,6 +362,11 @@ export function remoteMenu(repo: Repo, name: string): MenuItem[] {
   return [
     { label: t("remote.fetchOne", { name }), icon: "fetch", onSelect: () => void repo.fetchOne(name) },
     { label: t("remote.copyUrl"), onSelect: () => copyText(info?.url ?? "") },
+    {
+      label: t("remote.pushTags"),
+      disabled: info?.push === false || !repo.snap.refs.some((r) => r.kind === "tag"),
+      onSelect: () => void repo.remoteRef(name, { kind: "pushTags" }, t("remote.pushTags.done", { name })),
+    },
     {
       label: info?.push === false ? t("remote.allowPush", { name }) : t("remote.blockPush", { name }),
       onSelect: () => {

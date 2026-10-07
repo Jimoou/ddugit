@@ -363,6 +363,35 @@ mod tests {
         assert_eq!(snap.head.upstream.as_deref(), Some("origin/feat"));
     }
 
+    /// A tag's full ref name detaches HEAD at the tag, even when a branch has the same name;
+    /// edits that don't collide come along, ones that do keep HEAD where it was.
+    #[test]
+    fn checkout_of_a_tag_detaches_head() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "one", "first");
+        git_ok(d.path(), &["tag", "v1"]).unwrap();
+        let tagged = git_ok(d.path(), &["rev-parse", "HEAD"])
+            .unwrap()
+            .trim()
+            .to_string();
+        commit_file(d.path(), "a.txt", "two", "second");
+        git_ok(d.path(), &["branch", "v1"]).unwrap();
+
+        fs::write(d.path().join("a.txt"), "mine").unwrap();
+        assert_eq!(checkout(p, "refs/tags/v1").unwrap().status, OpStatus::Failed);
+        assert_eq!(snapshot(p, 5).unwrap().head.branch.as_deref(), Some("main"));
+
+        git_ok(d.path(), &["checkout", "--", "a.txt"]).unwrap();
+        fs::write(d.path().join("notes.txt"), "kept").unwrap();
+        let r = checkout(p, "refs/tags/v1").unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let head = snapshot(p, 5).unwrap().head;
+        assert_eq!(head.branch, None);
+        assert_eq!(head.target.as_deref(), Some(tagged.as_str()));
+        assert_eq!(fs::read_to_string(d.path().join("notes.txt")).unwrap(), "kept");
+    }
+
     /// Continue stages the resolved files but not an unrelated untracked one.
     #[test]
     fn continue_leaves_untracked_files_out() {

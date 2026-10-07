@@ -129,6 +129,8 @@ export const demoControls = {
   sent: [] as NewReport[],
   /** Current demo state, read synchronously (e2e assertions). */
   snapshot: () => repo.snapshot(),
+  /** Tags on the remotes as `<remote>/<tag>` (git has no local record of them, so the snapshot doesn't either). */
+  remoteTags: () => [...repo.remoteTags.keys()],
   /** Append `n` commits to the current branch (long straight runs for the graph). */
   grow(n: number) {
     for (let i = 0; i < n; i++) repo.add(repo.head, `Step ${i + 1} of ${n}`);
