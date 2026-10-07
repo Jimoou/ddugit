@@ -112,6 +112,22 @@ export const remoteCommands = {
     return res("ok", `branch '${b}' set up to track '${name}/${b}'.`);
   },
 
+  async git_delete_remote_branch({ remote: name, branch, onProgress }) {
+    if (repo.fetchOnly.has(name)) return fail(`${name} is fetch-only`);
+    const fake = demoControls.failNextRemote;
+    if (fake) {
+      demoControls.failNextRemote = null;
+      return delay(res("auth", AUTH_OUTPUT[fake]));
+    }
+    const ref = `${name}/${branch}`;
+    if (!repo.remotes.has(ref)) return res("failed", `error: unable to delete '${branch}': remote ref does not exist`);
+    onProgress.onmessage({ phase: "Writing objects", percent: 100 });
+    await delay(null, 40);
+    repo.remotes.delete(ref);
+    for (const [local, up] of repo.tracking) if (up === ref) repo.tracking.delete(local);
+    return res("ok", ` - [deleted]         ${branch}`);
+  },
+
   async git_remote({ path, op, onProgress }) {
     // A dashboard world (not the demo tab, api.ts's DEMO_PATH): pull fast-forwards, or reports it can't.
     if (path !== "demo" && op === "pull") {

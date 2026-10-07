@@ -141,6 +141,8 @@ command!(git_fetch_remote(path: String, name: String, on_progress: Channel<Progr
     => git::remote::fetch_one(&path, &name, |p| { let _ = on_progress.send(p); }));
 command!(git_push_to(path: String, remote: String, branch: Option<String>, on_progress: Channel<Progress>) -> OpResult
     => git::remote::push_to(&path, &remote, branch.as_deref(), |p| { let _ = on_progress.send(p); }));
+command!(git_delete_remote_branch(path: String, remote: String, branch: String, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::delete_remote_branch(&path, &remote, &branch, |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));
 command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
     => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
@@ -315,6 +317,7 @@ pub fn run() {
             git_remote,
             git_fetch_remote,
             git_push_to,
+            git_delete_remote_branch,
             git_skip,
             git_reset,
             git_reflog,

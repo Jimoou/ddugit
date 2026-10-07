@@ -101,6 +101,7 @@ export interface Commands {
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_fetch_remote: [{ path: string; name: string; onProgress: Sink<Progress> }, OpResult];
   git_push_to: [{ path: string; remote: string; branch: string | null; onProgress: Sink<Progress> }, OpResult];
+  git_delete_remote_branch: [{ path: string; remote: string; branch: string; onProgress: Sink<Progress> }, OpResult];
   git_skip: [{ path: string }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
@@ -235,6 +236,10 @@ export const api = {
   /** Push `branch` (default: the current one) to `remote` and track it there from now on. */
   pushTo(path: string, remote: string, onProgress: (p: Progress) => void = () => {}, branch: string | null = null) {
     return call("git_push_to", { path, remote, branch, onProgress: progressSink(onProgress, path) });
+  },
+  /** Delete `branch` on `remote` (`push --delete`); its remote-tracking branch goes too, local branches stay. */
+  deleteRemoteBranch(path: string, remote: string, branch: string, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_delete_remote_branch", { path, remote, branch, onProgress: progressSink(onProgress, path) });
   },
   /** Drop the cherry-pick / revert / rebase step that stopped, and go on. */
   skip: (path: string) => call("git_skip", { path }),

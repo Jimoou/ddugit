@@ -314,3 +314,22 @@ test("a remote's menu copies its URL, fetches it alone, and blocks or allows pus
   await expect(origin.locator(".fetch-only")).toHaveCount(0);
   expect((await demo.snapshot()).remotes[0].push).toBe(true);
 });
+
+test("deletes a branch on its remote from the remote branch's menu, keeping the local one", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const target = before.refs.find((r) => r.kind === "remote" && r.name === "origin/feature/theme")!;
+  expect(target).toBeTruthy();
+  await page.click(".sidebar li >> text=feature/theme >> nth=1", { button: "right" });
+  await page.getByRole("menuitem", { name: "origin에서 삭제…" }).click();
+  const dialog = page.getByRole("dialog", { name: "원격 브랜치 삭제" });
+  await expect(dialog).toContainText("feature/theme");
+  await dialog.getByRole("button", { name: "삭제" }).click();
+  await expect
+    .poll(async () => (await demo.snapshot()).refs.some((r) => r.name === "origin/feature/theme"))
+    .toBe(false);
+  await demo.toast(/원격에서 origin\/feature\/theme/);
+  const snap = await demo.snapshot();
+  expect(snap.refs.some((r) => r.kind === "remote" && r.name === "origin/feature/theme")).toBe(false);
+  expect(snap.refs.some((r) => r.kind === "local" && r.name === "feature/theme")).toBe(true);
+});

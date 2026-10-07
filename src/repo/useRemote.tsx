@@ -169,6 +169,22 @@ export function useRemote(o: Options) {
         : void remote(op)
       : void remote(op);
 
+  /** Delete `branch` on remote `name`; missing credentials open the same help as a push. */
+  const deleteRemoteBranch = async (name: string, branch: string) => {
+    if (refuseBusy()) return;
+    setRemoteBusy("push");
+    setProgress(null);
+    try {
+      const r = await run(t("remoteBranch.delete.done", { name: `${name}/${branch}` }), () =>
+        api.deleteRemoteBranch(path, name, branch, setProgress),
+      );
+      if (r.status === "auth") setOpen({ kind: "auth", op: "push", output: r.output });
+    } finally {
+      setRemoteBusy(null);
+      setProgress(null);
+    }
+  };
+
   /** Fetch one remote with the progress card up, then say what came: its branch count. */
   const fetchOne = async (name: string) => {
     if (refuseBusy()) return;
@@ -283,5 +299,5 @@ export function useRemote(o: Options) {
       </>
     );
 
-  return { remoteBusy, progress, onRemote, pushTo, fetchOne, askRemote, jobCard, dialogs };
+  return { remoteBusy, progress, onRemote, pushTo, fetchOne, deleteRemoteBranch, askRemote, jobCard, dialogs };
 }

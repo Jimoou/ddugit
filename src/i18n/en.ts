@@ -391,6 +391,11 @@ export const en: Record<Key, string> = {
   "menu.checkoutLocal.hint": "tracking",
   "menu.branchHere": "New branch here…",
   "menu.tagHere": "Tag here…",
+  "menu.deleteRemoteBranch": "Delete on {remote}…",
+  "remoteBranch.delete.title": "Delete remote branch",
+  "remoteBranch.delete.body":
+    "Deletes the branch <b>{branch}</b> on <b>{remote}</b>, for everyone who uses that remote. Your local branches are not affected. Pull requests from this branch can no longer be merged.",
+  "remoteBranch.delete.done": "Deleted {name} on the remote",
   "remote.delete.menu": "Remove remote {name}…",
   "remote.delete.title": "Remove remote",
   "remote.delete.body":

@@ -116,6 +116,8 @@ export interface Repo {
   onOpenPath(path: string): void;
   openUrl(url: string): void;
   fetchOne(name: string): Promise<void>;
+  /** Delete a branch on its remote (after the confirmation in `actions.tsx`). */
+  deleteRemoteBranch(remote: string, branch: string): Promise<void>;
   canDropOn(target: string, source: string, mode: Drag["mode"]): boolean;
   /** Is `anc` an ancestor of (or) `of`? */
   isAncestor(anc: string, of: string | null): boolean;

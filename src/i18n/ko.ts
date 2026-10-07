@@ -384,6 +384,11 @@ export const ko = {
   "menu.checkoutLocal.hint": "추적",
   "menu.branchHere": "여기서 새 브랜치…",
   "menu.tagHere": "여기에 태그…",
+  "menu.deleteRemoteBranch": "{remote}에서 삭제…",
+  "remoteBranch.delete.title": "원격 브랜치 삭제",
+  "remoteBranch.delete.body":
+    "<b>{remote}</b>의 브랜치 <b>{branch}</b>{:을} 지워요. 이 원격을 쓰는 모든 사람에게서 사라지고, 로컬 브랜치는 그대로예요. 이 브랜치로 열린 PR은 더 이상 병합할 수 없어요.",
+  "remoteBranch.delete.done": "원격에서 {name:을} 지웠어요",
   "remote.delete.menu": "원격 {name} 삭제…",
   "remote.delete.title": "원격 삭제",
   "remote.delete.body":
