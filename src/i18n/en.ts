@@ -61,6 +61,17 @@ export const en: Record<Key, string> = {
   "merge.dirty": "You have {n:uncommitted change|uncommitted changes}. Git may refuse to merge if they conflict.",
   "merge.go": "Merge",
   "merge.going": "Merging…",
+  "merge.mode": "How to merge",
+  "merge.mode.commit": "Merge commit",
+  "merge.mode.ff": "Fast-forward",
+  "merge.mode.squash": "Squash",
+  "merge.body.ff": "Moves <b>{target}</b> forward to <b>{source}</b>. No merge commit is made.",
+  "merge.ff.cannot": "The branches have diverged, so a fast-forward isn't possible. A merge commit will be made.",
+  "merge.body.squash":
+    "Combines the changes of <b>{source}</b> into one and stages them on <b>{target}</b>. You review the message and commit from the commit panel.",
+  "merge.message": "Merge commit message (leave empty for the default)",
+  "merge.go.squash": "Stage",
+  "merge.done.squash": "Staged the changes of {source}. Review the message and commit",
 
   // changed files list
   "files.changed": "Changed files",
@@ -76,7 +87,7 @@ export const en: Record<Key, string> = {
   "graph.hint":
     "Drag to pan · ⌘/Ctrl+wheel to zoom · ⌘/Ctrl+F to search · drag a commit onto a branch tip to merge · Shift+drag to reorder",
   "graph.hint.truncated": " · showing the latest {n}",
-  "drag.merge:idle": "Drop on a branch tip to merge into it · ⌥/Alt: cherry-pick · Shift: reorder",
+  "drag.merge:idle": "Drop on a branch tip to merge into it · ⌥/Alt: cherry-pick · Shift: reorder · ⌘/Ctrl: rebase",
   "drag.merge:ok": "Release to merge",
   "drag.merge:bad": "Drop it on a branch tip",
   "drag.pick:idle": "Drop on a branch tip to cherry-pick this commit onto it",
@@ -85,6 +96,9 @@ export const en: Record<Key, string> = {
   "drag.move:idle": "Drop on another commit in the current branch to place it right after that commit",
   "drag.move:ok": "Release to review the new order",
   "drag.move:bad": "You can only reorder within the current branch's linear history",
+  "drag.rebase:idle": "Drop on a branch tip to rebase the current branch onto it",
+  "drag.rebase:ok": "Release to rebase onto this branch",
+  "drag.rebase:bad": "Start from the current branch's tip and drop on another branch's tip",
 
   // settings
   "settings.title": "Settings",
@@ -253,6 +267,8 @@ export const en: Record<Key, string> = {
   "keys.altDrag.what": "Cherry-pick",
   "keys.shiftDrag": "Shift + drag",
   "keys.shiftDrag.what": "Reorder commits on the current branch (rebase)",
+  "keys.modDrag": "⌘/Ctrl + drag",
+  "keys.modDrag.what": "Rebase the current branch onto another branch",
   "keys.rightClick": "Right-click",
   "keys.rightClick.what": "Commit and branch menu",
   "keys.leftRight.what": "Previous (parent) / next (child) commit",
@@ -380,6 +396,15 @@ export const en: Record<Key, string> = {
     "<b>{name}</b> has commits that aren't merged into any other branch. Deleting it leaves them only in the undo history (reflog).",
   "menu.mergeInto": "Merge into {branch}…",
   "menu.mergeIntoHead": "Merge into HEAD…",
+  "menu.rebaseOnto": "Rebase {current} onto {branch}…",
+  "rebaseOnto.title": "Rebase onto another branch",
+  "rebaseOnto.body":
+    "Replays the {n:commit|commits} only <b>{current}</b> has on top of <b>{onto}</b>. Their commit IDs change.",
+  "rebaseOnto.merges":
+    "There {n:is a merge commit|are merge commits} among them. A rebase leaves merge commits out and lines the commits up in a row.",
+  "rebaseOnto.dirty": "Uncommitted changes are put aside and restored when it's done.",
+  "rebaseOnto.go": "Rebase",
+  "rebaseOnto.done": "Rebased {current} onto {onto}",
   "menu.compare": "Backport: commits missing from {branch}…",
   "menu.compareHead": "Backport: commits missing from the current branch…",
   "menu.compare.hint": "Backport",

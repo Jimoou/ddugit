@@ -22,6 +22,7 @@ use git::rebase::{RebaseStep, TodoItem};
 use git::refs::RefOp;
 use git::remote::{Progress, RemoteOp};
 use git::stash::StashOp;
+use git::write::MergeMode;
 use git::OpResult;
 use tauri::ipc::Channel;
 
@@ -119,8 +120,9 @@ command!(git_rebase(path: String, base: String, steps: Vec<RebaseStep>) -> OpRes
     => git::rebase::rebase(&path, &base, &steps));
 command!(git_rebase_todo(path: String, base: String) -> Vec<TodoItem> => git::rebase::todo(&path, &base));
 command!(set_git_path(git_path: Option<String>) -> String => git::set_program(git_path.as_deref()));
-command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
-    => git::write::merge(&path, &source, target.as_deref()));
+command!(git_rebase_onto(path: String, upstream: String) -> OpResult => git::rebase::onto(&path, &upstream));
+command!(git_merge(path: String, source: String, target: Option<String>, mode: MergeMode, message: Option<String>)
+    -> OpResult => git::write::merge(&path, &source, target.as_deref(), mode, message.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
 command!(git_continue(path: String) -> OpResult => git::write::continue_op(&path));
 command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) -> OpResult
@@ -298,6 +300,7 @@ pub fn run() {
             report_send,
             git_rebase,
             git_rebase_todo,
+            git_rebase_onto,
             backport_compare,
             backport_ignore,
             backport_summary,

@@ -130,14 +130,54 @@ export function stopOnConflict(
 }
 
 export const historyCommands = {
-  git_merge({ source, target }) {
+  git_merge({ source, target, mode, message }) {
     const t = target ?? repo.head;
     if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
-    if (demoControls.conflictNext) return stopOnConflict("merge", repo.branches.get(source) ?? source, source);
+    const src = repo.resolve(source);
+    if (!src) return fail(`merge: ${source} - not something we can merge`);
+    const tip = repo.branches.get(t)!;
+    if (repo.ancestors(tip).has(src)) return delay(res("ok", "Already up to date."));
+    if (mode === "squash") {
+      // Like `--squash`: the changes staged (or stopped on conflicts), no commit and no merge in progress.
+      if (demoControls.conflictNext) return stopOnConflict("clean", src, source);
+      const mine = repo.ancestors(tip);
+      const paths = new Set([...repo.ancestors(src)].filter((id) => !mine.has(id)).flatMap((id) => filesOf(id)));
+      for (const path of paths) {
+        repo.changes = repo.changes.filter((c) => c.path !== path);
+        repo.changes.push({ path, staged: "modified", unstaged: null, conflicted: false });
+      }
+      return delay(res("ok", "Squash commit -- not updating HEAD"));
+    }
+    if (mode === "fastForward" && repo.ancestors(src).has(tip)) {
+      repo.branches.set(t, src);
+      return delay(res("ok", "Fast-forward"));
+    }
+    if (demoControls.conflictNext) return stopOnConflict("merge", src, source);
     const named = repo.branches.has(source) || repo.remotes.has(source);
-    repo.merge(source, t, `Merge ${named ? `branch '${source}'` : `commit ${source.slice(0, 7)}`} into ${t}`);
+    repo.merge(
+      source,
+      t,
+      message ?? `Merge ${named ? `branch '${source}'` : `commit ${source.slice(0, 7)}`} into ${t}`,
+    );
     return delay(res("ok", "Merge made by the 'ort' strategy."));
+  },
+
+  git_rebase_onto({ upstream }) {
+    if (repo.state !== "clean") return fail("Repository is in the middle of an operation");
+    const onto = repo.resolve(upstream);
+    if (!onto) return fail(`invalid upstream '${upstream}'`);
+    const theirs = repo.ancestors(onto);
+    // The branch's own commits, oldest first; merges among them are flattened, as plain `git rebase` does.
+    const ours = repo.ancestors(repo.branches.get(repo.head)!);
+    const mine = repo.order.filter((id) => ours.has(id) && !theirs.has(id) && repo.commits.get(id)!.parents.length < 2);
+    let tip = onto;
+    for (const id of mine.reverse())
+      tip = repo.commit([tip], repo.commits.get(id)!.summary, repo.commits.get(id)!.author);
+    if (demoControls.conflictNext && mine.length)
+      return stopOnConflict("rebase", mine[0], mine[0].slice(0, 7), { tip });
+    repo.branches.set(repo.head, tip);
+    return delay(res("ok", `Successfully rebased and updated refs/heads/${repo.head}.`));
   },
 
   git_abort() {

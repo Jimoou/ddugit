@@ -429,6 +429,9 @@
   align-items: center;
   gap: 10px;
 }
+.merge-message {
+  resize: vertical;
+}
 .chip-lg {
   font: 700 13px var(--mono);
   padding: 6px 12px;

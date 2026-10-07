@@ -35,7 +35,15 @@ import type { Pt } from "./graph/scene";
 import { StackSection } from "./components/Stacks";
 import { proOpen, usePro } from "./pro";
 import type { FileDiff, FileTouch, LfsOp, RefInfo, StackBranch, StackOp } from "./types";
-import { askName, askNewBranch, checkoutRef, confirmPick, confirmThen, showCommit } from "./repo/actions";
+import {
+  askName,
+  askNewBranch,
+  askRebaseOnto,
+  checkoutRef,
+  confirmPick,
+  confirmThen,
+  showCommit,
+} from "./repo/actions";
 import { BisectBanner, StateBanner, TrailBanner } from "./repo/Banners";
 import { RepoDialogs } from "./repo/Dialogs";
 import {
@@ -107,7 +115,7 @@ export function RepoView({
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
-  const [composer, setComposer] = useState<false | { amend: boolean }>(false);
+  const [composer, setComposer] = useState<false | { amend: boolean; message?: string }>(false);
   const [menu, setMenu] = useState<Menu | null>(null);
   // Where the last menu opened, for a follow-up menu in the same spot (picking a stack parent).
   const menuAt = useRef({ x: 0, y: 0 });
@@ -199,7 +207,7 @@ export function RepoView({
     setSelected(what.commit ?? null);
     if (what.commit) mission("inspect");
     setSelectedStash(what.stash ?? null);
-    setComposer(what.composer ? { amend: what.amend ?? false } : false);
+    setComposer(what.composer ? { amend: what.amend ?? false, message: what.message } : false);
   };
 
   // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
@@ -283,6 +291,15 @@ export function RepoView({
     (target: string, source: string, mode: Drag["mode"]) => {
       if (!snap || snap.state !== "clean") return false;
       if (mode === "move") return !!snap.head.target && !!planMove(commitById, snap.head.target, source, target);
+      // The current branch onto another branch (or remote branch) that neither contains nor is behind it.
+      if (mode === "rebase")
+        return (
+          !!snap.head.branch &&
+          source === snap.head.target &&
+          snap.refs.some((r) => r.target === target && (r.kind === "local" || r.kind === "remote")) &&
+          !isAncestor(target, source) &&
+          !isAncestor(source, target)
+        );
       if (!branchAt(target)) return false;
       return !isAncestor(source, target); // already contained otherwise
     },
@@ -600,6 +617,7 @@ export function RepoView({
                   if (plan) setSheet({ kind: "rebase", from: plan.base, init: plan.steps });
                   return;
                 }
+                if (mode === "rebase") return askRebaseOnto(repo, sourceName(targetId, snap.head.branch!), targetId);
                 const target = branchAt(targetId)!;
                 if (mode === "merge")
                   return setDialog({ kind: "merge", sourceId, targetId, target, source: sourceName(sourceId, target) });
@@ -672,6 +690,9 @@ export function RepoView({
 
         {composer && (
           <Composer
+            // A prefilled message (after a squash merge) starts a fresh panel.
+            key={composer.message ?? ""}
+            initialMessage={composer.message}
             path={path}
             profiles={settings.profiles}
             onProfiles={(profiles) => onChangeSettings({ profiles })}

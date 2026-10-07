@@ -60,6 +60,17 @@ export const ko = {
   "merge.dirty": "커밋하지 않은 변경 {n}개가 있어요. 충돌하면 git이 병합을 거부할 수 있어요.",
   "merge.go": "병합",
   "merge.going": "병합 중…",
+  "merge.mode": "병합 방식",
+  "merge.mode.commit": "병합 커밋",
+  "merge.mode.ff": "fast-forward",
+  "merge.mode.squash": "squash",
+  "merge.body.ff": "<b>{target}</b> 브랜치를 <b>{source}</b>까지 앞으로 옮겨요. 병합 커밋은 만들지 않아요.",
+  "merge.ff.cannot": "두 브랜치가 갈라져 있어서 fast-forward할 수 없어요. 병합 커밋을 만들어요.",
+  "merge.body.squash":
+    "<b>{source}</b>의 변경을 하나로 모아 <b>{target}</b>에 스테이지해요. 커밋은 커밋 창에서 메시지를 확인하고 직접 해요.",
+  "merge.message": "병합 커밋 메시지 (비워 두면 기본 메시지)",
+  "merge.go.squash": "스테이지",
+  "merge.done.squash": "{source}의 변경을 스테이지했어요. 메시지를 확인하고 커밋하세요",
 
   // changed files list
   "files.changed": "변경 파일",
@@ -74,7 +85,7 @@ export const ko = {
   "graph.hint":
     "끌어서 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 다른 브랜치 끝에 놓으면 병합 · Shift+끌기로 순서 바꾸기",
   "graph.hint.truncated": " · 최근 {n}개 표시 중",
-  "drag.merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt: cherry-pick · Shift: 순서 바꾸기",
+  "drag.merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt: cherry-pick · Shift: 순서 바꾸기 · ⌘/Ctrl: rebase",
   "drag.merge:ok": "놓으면 병합해요",
   "drag.merge:bad": "브랜치 끝에만 놓을 수 있어요",
   "drag.pick:idle": "이 커밋을 복사할 브랜치 끝으로 끌어다 놓으세요",
@@ -83,6 +94,9 @@ export const ko = {
   "drag.move:idle": "현재 브랜치의 다른 커밋에 놓으면 그 바로 다음으로 옮겨요",
   "drag.move:ok": "놓으면 순서 정리 화면이 열려요",
   "drag.move:bad": "현재 브랜치의 일직선 구간 안에서만 옮길 수 있어요",
+  "drag.rebase:idle": "현재 브랜치를 다시 쌓을 브랜치 끝으로 끌어다 놓으세요",
+  "drag.rebase:ok": "놓으면 그 브랜치 위로 rebase해요",
+  "drag.rebase:bad": "현재 브랜치 끝에서 시작해 다른 브랜치 끝에 놓을 수 있어요",
 
   // settings
   "settings.title": "설정",
@@ -249,6 +263,8 @@ export const ko = {
   "keys.altDrag.what": "cherry-pick",
   "keys.shiftDrag": "Shift + 끌기",
   "keys.shiftDrag.what": "현재 브랜치의 커밋 순서 바꾸기 (rebase)",
+  "keys.modDrag": "⌘/Ctrl + 끌기",
+  "keys.modDrag.what": "현재 브랜치를 다른 브랜치 위로 다시 쌓기 (rebase)",
   "keys.rightClick": "우클릭",
   "keys.rightClick.what": "커밋·브랜치 메뉴",
   "keys.leftRight.what": "이전(부모) / 다음(자식) 커밋 선택",
@@ -373,6 +389,14 @@ export const ko = {
     "<b>{name}</b>에는 다른 브랜치에 병합되지 않은 커밋이 있어요. 지우면 그 커밋은 작업 기록(reflog)에만 남아요.",
   "menu.mergeInto": "{branch}에 병합",
   "menu.mergeIntoHead": "HEAD에 병합",
+  "menu.rebaseOnto": "{branch} 위로 {current} 다시 쌓기 (rebase)…",
+  "rebaseOnto.title": "다른 브랜치 위로 rebase",
+  "rebaseOnto.body":
+    "<b>{current}</b>에만 있는 커밋 {n}개를 <b>{onto}</b>의 끝 위로 옮겨 다시 쌓아요. 커밋 ID가 새로 바뀌어요.",
+  "rebaseOnto.merges": "사이에 병합 커밋 {n}개가 있어요. rebase하면 병합 커밋은 빠지고 커밋이 일직선으로 놓여요.",
+  "rebaseOnto.dirty": "커밋하지 않은 변경은 잠시 치워 뒀다가 끝나면 되돌려 놓아요.",
+  "rebaseOnto.go": "rebase",
+  "rebaseOnto.done": "{current:을} {onto} 위로 다시 쌓았어요",
   "menu.compare": "백포트: {branch}에 없는 커밋 보기",
   "menu.compareHead": "백포트: 현재 브랜치에 없는 커밋 보기",
   "menu.compare.hint": "백포트",

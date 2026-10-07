@@ -218,6 +218,8 @@ export interface BranchReport {
 
 /** What a reset does with the changes of the commits it moves past. */
 export type ResetMode = "soft" | "mixed" | "hard";
+/** How a merge brings the other branch in (mirrors `MergeMode` in git/write.rs). */
+export type MergeMode = "commit" | "fastForward" | "squash";
 
 /** One move of HEAD (newest first). `lost`: only the reflog still reaches it. */
 export interface ReflogEntry {

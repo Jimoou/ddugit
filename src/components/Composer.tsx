@@ -15,6 +15,8 @@ interface Props {
   onOpenFile(path: string): void;
   /** Full message of HEAD, prefilled when switching to amend; `null` without commits. */
   headMessage: string | null;
+  /** Message to start with (a squash merge's summary). */
+  initialMessage?: string;
   /** Open in amend mode (from the HEAD node's context menu). */
   startAmend?: boolean;
   /** HEAD is already on the upstream: amending rewrites shared history. */
@@ -47,11 +49,11 @@ function kind(c: FileChange): string {
 /** Panel opened from the [+] node after HEAD: pick files, write a message, commit. */
 export function Composer(props: Props) {
   const { changes, branch, merging, busy, onClose, onOpenFile, onCommit, onStash, onDiscard } = props;
-  const { headMessage, startAmend = false, headPushed } = props;
+  const { headMessage, startAmend = false, headPushed, initialMessage = "" } = props;
   const [amend, setAmend] = useState(startAmend && headMessage !== null);
   // Amend from the menu = reword: nothing picked until the user chooses files.
   const [picked, setPicked] = useState<Set<string>>(() => new Set(amend ? [] : changes.map((c) => c.path)));
-  const [message, setMessage] = useState(amend ? (headMessage ?? "").trim() : "");
+  const [message, setMessage] = useState(amend ? (headMessage ?? "").trim() : initialMessage);
   const [newBranch, setNewBranch] = useState("");
   const [useBranch, setUseBranch] = useState(false);
   const msgRef = useRef<HTMLTextAreaElement>(null);

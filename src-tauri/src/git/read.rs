@@ -452,7 +452,7 @@ mod tests {
 
     #[test]
     fn stopped_merge_reports_incoming_commit() {
-        use super::super::write::{checkout, create_branch, merge};
+        use super::super::write::{checkout, create_branch, merge, MergeMode};
         let d = repo();
         let p = s(d.path());
         commit_file(d.path(), "a.txt", "base", "base");
@@ -462,7 +462,7 @@ mod tests {
         checkout(p, "main").unwrap();
         assert!(snapshot(p, 5).unwrap().incoming.is_none());
         commit_file(d.path(), "a.txt", "main", "main");
-        merge(p, "feature", None).unwrap();
+        merge(p, "feature", None, MergeMode::Commit, None).unwrap();
         assert_eq!(
             snapshot(p, 5).unwrap().incoming.as_deref(),
             Some(feature.as_str())

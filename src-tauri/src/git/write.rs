@@ -78,13 +78,56 @@ pub(super) fn prepare_on(path: &str, target: Option<&str>) -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// How `merge` brings the other branch in.
+#[derive(Debug, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum MergeMode {
+    /// Always a merge commit (`--no-ff`).
+    Commit,
+    /// Just move the branch when it can, else a merge commit (`--ff`).
+    FastForward,
+    /// The combined change staged, nothing committed (`--squash`): the user commits it.
+    Squash,
+}
+
 /// Merge `source` (branch name or commit id) into `target` branch.
-/// When `target` isn't the current branch it is checked out first.
-pub fn merge(path: &str, source: &str, target: Option<&str>) -> Result<OpResult> {
+/// When `target` isn't the current branch it is checked out first. `message`
+/// (when not blank) replaces git's merge commit message; a squash has none.
+pub fn merge(
+    path: &str,
+    source: &str,
+    target: Option<&str>,
+    mode: MergeMode,
+    message: Option<&str>,
+) -> Result<OpResult> {
     operand(source)?;
     let dir = prepare_on(path, target)?;
-    let o = git(&dir, &["merge", "--no-ff", "--no-edit", source])?;
+    let mut args = vec![
+        "merge",
+        match mode {
+            MergeMode::Commit => "--no-ff",
+            MergeMode::FastForward => "--ff",
+            MergeMode::Squash => "--squash",
+        },
+    ];
+    match message.map(str::trim).filter(|m| !m.is_empty()) {
+        _ if mode == MergeMode::Squash => {}
+        Some(m) => args.extend(["-m", m]),
+        None => args.push("--no-edit"),
+    }
+    args.push(source);
+    let o = git(&dir, &args)?;
+    // A squash leaves no merge in progress, but its conflicts still need resolving.
+    if mode == MergeMode::Squash && !o.ok && has_conflicts(path) {
+        return Ok(OpResult::with(OpStatus::Conflict, o));
+    }
     Ok(conflict_aware(path, o))
+}
+
+fn has_conflicts(path: &str) -> bool {
+    open(path)
+        .and_then(|r| r.index().map_err(super::err))
+        .is_ok_and(|i| i.has_conflicts())
 }
 
 /// Failed and left mid-operation → `Conflict`, otherwise the plain result.
@@ -93,10 +136,7 @@ pub(super) fn conflict_aware(path: &str, o: Output) -> OpResult {
         return o.into();
     }
     // Stopped with nothing in conflict: the commit's change is already here.
-    let conflicted = open(path)
-        .and_then(|r| r.index().map_err(super::err))
-        .is_ok_and(|i| i.has_conflicts());
-    if !conflicted && o.text.contains("now empty") {
+    if !has_conflicts(path) && o.text.contains("now empty") {
         OpResult::with(OpStatus::Empty, o)
     } else {
         OpResult::with(OpStatus::Conflict, o)
@@ -385,7 +425,7 @@ mod tests {
         checkout(p, "main").unwrap();
         commit_file(d.path(), "m.txt", "m", "main work");
 
-        let r = merge(p, "feature", Some("main")).unwrap();
+        let r = merge(p, "feature", Some("main"), MergeMode::Commit, None).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         let snap = snapshot(p, 100).unwrap();
         assert_eq!(snap.commits[0].parents.len(), 2);
@@ -404,7 +444,7 @@ mod tests {
         create_branch(p, "feature", None, true).unwrap();
         commit_file(d.path(), "f.txt", "f", "feature work");
         // HEAD is on feature; merge feature into main.
-        let r = merge(p, "feature", Some("main")).unwrap();
+        let r = merge(p, "feature", Some("main"), MergeMode::Commit, None).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(snapshot(p, 100).unwrap().head.branch.as_deref(), Some("main"));
     }
@@ -419,7 +459,7 @@ mod tests {
         checkout(p, "main").unwrap();
         commit_file(d.path(), "a.txt", "main", "main edit");
 
-        let r = merge(p, "feature", None).unwrap();
+        let r = merge(p, "feature", None, MergeMode::Commit, None).unwrap();
         assert_eq!(r.status, OpStatus::Conflict);
         let snap = snapshot(p, 100).unwrap();
         assert_eq!(snap.state, "merge");
@@ -482,5 +522,77 @@ mod tests {
         assert_eq!(snap.head.upstream.as_deref(), Some("origin/main"));
         assert_eq!(snap.commits.len(), 1);
         assert!(d.path().join("a.txt").exists());
+    }
+
+    /// main, and feature one commit ahead of it (HEAD on main).
+    fn forked() -> tempfile::TempDir {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "f.txt", "f", "feature work");
+        checkout(p, "main").unwrap();
+        d
+    }
+
+    #[test]
+    fn merge_fast_forwards_when_asked_and_takes_a_message() {
+        let d = forked();
+        let p = s(d.path());
+        let r = merge(p, "feature", None, MergeMode::FastForward, Some("ignored")).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let ids = git_ok(d.path(), &["rev-parse", "HEAD", "feature"]).unwrap();
+        let ids: Vec<&str> = ids.lines().collect();
+        assert_eq!(ids[0], ids[1], "main moved to feature, no merge commit");
+
+        // Diverged: a merge commit with the given message, even in fast-forward mode.
+        commit_file(d.path(), "m.txt", "m", "main work");
+        git_ok(d.path(), &["checkout", "-q", "feature"]).unwrap();
+        commit_file(d.path(), "g.txt", "g", "more feature");
+        git_ok(d.path(), &["checkout", "-q", "main"]).unwrap();
+        let r = merge(
+            p,
+            "feature",
+            None,
+            MergeMode::FastForward,
+            Some("Bring in feature\n\nWhy."),
+        )
+        .unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let msg = git_ok(d.path(), &["log", "-1", "--format=%B"]).unwrap();
+        assert_eq!(msg.trim(), "Bring in feature\n\nWhy.");
+        assert_eq!(snapshot(p, 10).unwrap().commits[0].parents.len(), 2);
+    }
+
+    #[test]
+    fn squash_merge_stages_without_committing() {
+        let d = forked();
+        let p = s(d.path());
+        commit_file(d.path(), "m.txt", "m", "main work");
+        let before = git_ok(d.path(), &["rev-parse", "HEAD"]).unwrap();
+        let r = merge(p, "feature", None, MergeMode::Squash, Some("unused")).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(git_ok(d.path(), &["rev-parse", "HEAD"]).unwrap(), before);
+        let snap = snapshot(p, 10).unwrap();
+        assert_eq!(snap.state, "clean");
+        let f = snap.changes.iter().find(|c| c.path == "f.txt").unwrap();
+        assert_eq!(f.staged.as_deref(), Some("added"));
+        let r = commit(p, "feature, squashed", &[], false).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(snapshot(p, 10).unwrap().commits[0].parents.len(), 1);
+    }
+
+    #[test]
+    fn conflicting_squash_merge_reports_conflict() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "base", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "a.txt", "feature", "feature edit");
+        checkout(p, "main").unwrap();
+        commit_file(d.path(), "a.txt", "main", "main edit");
+        let r = merge(p, "feature", None, MergeMode::Squash, None).unwrap();
+        assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
+        assert!(snapshot(p, 10).unwrap().changes.iter().any(|c| c.conflicted));
     }
 }

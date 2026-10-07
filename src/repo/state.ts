@@ -98,7 +98,14 @@ export interface Repo {
   run: Run;
   stackRun(label: string, op: StackOp): Promise<void>;
   /** The right panel shows one thing: composer, a stash, or a commit. */
-  show(what: { commit?: string | null; stash?: number | null; composer?: boolean; amend?: boolean }): void;
+  show(what: {
+    commit?: string | null;
+    stash?: number | null;
+    composer?: boolean;
+    amend?: boolean;
+    /** The composer's message to start with. */
+    message?: string;
+  }): void;
   setMenu(menu: Menu | null): void;
   /** Where the last menu opened, for a follow-up menu in the same spot. */
   menuAt(): { x: number; y: number };

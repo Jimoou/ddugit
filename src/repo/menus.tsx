@@ -15,6 +15,7 @@ import {
   askLocalFor,
   askName,
   askNewBranch,
+  askRebaseOnto,
   askReset,
   askTagAt,
   checkout,
@@ -146,6 +147,11 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
         target: snap.head.branch!,
       }),
   };
+  const rebaseOnto: MenuItem = {
+    label: t("menu.rebaseOnto", { current: snap.head.branch ?? "HEAD", branch: r.name }),
+    disabled: isHead || r.kind === "tag" || !repo.canDropOn(r.target, snap.head.target ?? "", "rebase"),
+    onSelect: () => askRebaseOnto(repo, r.name, r.target),
+  };
   const compare: MenuItem = {
     label: snap.head.branch ? t("menu.compare", { branch: snap.head.branch }) : t("menu.compareHead"),
     hint: t("menu.compare.hint"),
@@ -172,6 +178,7 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
         onSelect: () => askLocalFor(repo, r, t("branch.fromRemote", { remote: r.name }), `${name}-${branch}`),
       },
       merge,
+      rebaseOnto,
       compare,
       "separator",
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(repo, r.target) },
@@ -194,6 +201,7 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       onSelect: () => repo.setDialog({ kind: "worktree", branch: r.name }),
     },
     merge,
+    rebaseOnto,
     compare,
     {
       label: t("pr.new", { noun: nounOf(repo.pulls?.forges ?? []) }),

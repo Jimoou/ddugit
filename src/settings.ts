@@ -111,6 +111,7 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
       { keys: "keys.dragMerge", what: "keys.dragMerge.what" },
       { keys: "keys.altDrag", what: "keys.altDrag.what" },
       { keys: "keys.shiftDrag", what: "keys.shiftDrag.what" },
+      { keys: "keys.modDrag", what: "keys.modDrag.what" },
       { keys: "keys.rightClick", what: "keys.rightClick.what" },
       { keys: "← / →", what: "keys.leftRight.what" },
       { keys: "↑ / ↓", what: "keys.upDown.what" },

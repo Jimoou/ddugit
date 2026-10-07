@@ -254,6 +254,17 @@ pub fn rebase(path: &str, base: &str, steps: &[RebaseStep]) -> Result<OpResult> 
     run_todo(&dir, path, base, &todo, false)
 }
 
+/// Replay the current branch's own commits on top of `upstream` (another branch
+/// or a commit): plain `git rebase`, so merges among them are flattened (the
+/// dialog says so). Local edits are stashed and put back (`--autostash`);
+/// conflicts stop it like any other rebase (continue / skip / abort).
+pub fn onto(path: &str, upstream: &str) -> Result<OpResult> {
+    super::operand(upstream)?;
+    let dir = prepare_on(path, None)?;
+    let o = git(&dir, &["rebase", "--autostash", upstream])?;
+    Ok(conflict_aware(path, o))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::read::snapshot;
@@ -459,5 +470,51 @@ mod tests {
         );
         assert_eq!(git(&["log", "-1", "--format=%s", "HEAD^1"]), "b");
         assert!(!d.path().join("d.txt").exists() && d.path().join("s1.txt").exists());
+    }
+
+    /// main: base → m; feature (checked out): base → f1 → f2, `f1` touching `f1_file`.
+    fn diverged(f1_file: &str) -> tempfile::TempDir {
+        let d = repo();
+        let p = d.path();
+        let git = |args: &[&str]| super::super::git_ok(p, args).unwrap();
+        commit_file(p, "x.txt", "base\n", "base");
+        git(&["checkout", "-q", "-b", "feature"]);
+        commit_file(p, f1_file, "feature\n", "f1");
+        commit_file(p, "f2.txt", "f2", "f2");
+        git(&["checkout", "-q", "main"]);
+        commit_file(p, "x.txt", "main\n", "m");
+        git(&["checkout", "-q", "feature"]);
+        d
+    }
+
+    #[test]
+    fn rebases_onto_another_branch_keeping_local_edits() {
+        let d = diverged("f1.txt");
+        let p = s(d.path());
+        std::fs::write(d.path().join("f2.txt"), "edited").unwrap();
+        let r = onto(p, "main").unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let git = |args: &[&str]| super::super::git_ok(d.path(), args).unwrap();
+        assert_eq!(git(&["log", "--format=%s", "main..HEAD"]), "f2\nf1");
+        assert_eq!(git(&["rev-parse", "HEAD~2"]), git(&["rev-parse", "main"]));
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("f2.txt")).unwrap(),
+            "edited"
+        );
+        assert!(onto(p, "--root").is_err());
+    }
+
+    #[test]
+    fn a_conflicting_rebase_onto_stops_and_aborts_cleanly() {
+        let d = diverged("x.txt");
+        let p = s(d.path());
+        let before = sha(d.path(), "HEAD");
+        let r = onto(p, "main").unwrap();
+        assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
+        assert_eq!(snapshot(p, 5).unwrap().state, "rebase");
+        assert!(onto(p, "main").is_err(), "refused while one is in progress");
+        assert_eq!(super::super::write::abort(p).unwrap().status, OpStatus::Ok);
+        assert_eq!(snapshot(p, 5).unwrap().state, "clean");
+        assert_eq!(sha(d.path(), "HEAD"), before);
     }
 }

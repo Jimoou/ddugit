@@ -4,7 +4,7 @@
 import { api } from "../api";
 import { CreatePr, prTag } from "../components/CreatePr";
 import { EditCommitDialog } from "../components/EditCommit";
-import { MergeDialog } from "../components/MergeDialog";
+import { MergeDialog, squashMessage } from "../components/MergeDialog";
 import { NameDialog } from "../components/NameDialog";
 import { prNoun, type TokenForge } from "../components/Pulls";
 import { ReleaseNotesDialog } from "../components/ReleaseNotes";
@@ -101,30 +101,51 @@ export function RepoDialogs({ repo, dialog, pulls }: Props) {
         />
       );
     case "merge": {
-      const { source, target } = dialog;
+      const { source, target, sourceId, targetId } = dialog;
+      const label = source.length === 40 ? source.slice(0, 7) : source;
+      const squash = () => {
+        // Its summary for the composer: what the source brings that the target lacks.
+        const brought = snap.commits.filter((c) => repo.isAncestor(c.id, sourceId) && !repo.isAncestor(c.id, targetId));
+        const message = squashMessage(label, brought);
+        return run(
+          t("merge.done.squash", { source: label }),
+          () => api.merge(path, source, target, "squash", null),
+          () => {
+            // Together, so the dialog hands focus back before the composer takes it.
+            close();
+            repo.show({ composer: true, message });
+          },
+        );
+      };
       return (
         <MergeDialog
-          source={source.length === 40 ? source.slice(0, 7) : source}
+          source={label}
           target={target}
-          sourceColor={repo.colorOf(dialog.sourceId)}
-          targetColor={repo.colorOf(dialog.targetId)}
+          sourceColor={repo.colorOf(sourceId)}
+          targetColor={repo.colorOf(targetId)}
           switchesBranch={snap.head.branch !== target}
+          canFastForward={repo.isAncestor(targetId, sourceId)}
           dirty={snap.changes.length}
           busy={busy}
           onCancel={close}
-          onConfirm={() =>
-            run(t("merge.done", { source, target }), () => api.merge(path, source, target)).then((r) => {
-              close();
-              setTimeout(() => repo.graph()?.centerOnHead(), 60);
-              if (r.status !== "ok") return;
-              repo.mission("merge");
-              const merged = repo.latest()?.head.target;
-              repo.playAfterDraw((at) => {
-                const p = at(merged);
-                return p && { kind: "fusion", at: p };
-              });
-            })
-          }
+          onConfirm={(mode, message) => {
+            if (mode === "squash") return void squash().then(close);
+            void run(t("merge.done", { source, target }), () => api.merge(path, source, target, mode, message)).then(
+              (r) => {
+                close();
+                setTimeout(() => repo.graph()?.centerOnHead(), 60);
+                if (r.status !== "ok") return;
+                repo.mission("merge");
+                const merged = repo.latest()?.head.target;
+                // A fast-forward makes no new commit: nothing to fuse.
+                if (merged === sourceId) return;
+                repo.playAfterDraw((at) => {
+                  const p = at(merged);
+                  return p && { kind: "fusion", at: p };
+                });
+              },
+            );
+          }}
         />
       );
     }

@@ -9,6 +9,7 @@ import type {
   BackportTally,
   BisectOp,
   BisectState,
+  MergeMode,
   Blame,
   BranchReport,
   CommitEdit,
@@ -87,7 +88,10 @@ export interface Commands {
     { path: string; file: string; hunks: string[]; lines: number[] | null; unstage: boolean },
     OpResult,
   ];
-  git_merge: [{ path: string; source: string; target: string | null }, OpResult];
+  git_merge: [
+    { path: string; source: string; target: string | null; mode: MergeMode; message: string | null },
+    OpResult,
+  ];
   git_abort: [{ path: string }, OpResult];
   git_continue: [{ path: string }, OpResult];
   git_pick: [{ path: string; op: PickOp; id: string; target: string | null }, OpResult];
@@ -162,6 +166,7 @@ export interface Commands {
   report_send: [{ report: NewReport }, string];
   git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
   git_rebase_todo: [{ path: string; base: string }, TodoItem[]];
+  git_rebase_onto: [{ path: string; upstream: string }, OpResult];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
   backport_ignore: [{ path: string; target: string; id: string; ignore: boolean }, null];
   backport_summary: [{ path: string; source: string; targets: string[] }, BackportTally[]];
@@ -211,7 +216,9 @@ export const api = {
   /** `hunks` are `DiffHunk.key`s: a hunk that changed on disk since it was shown is refused. */
   stageHunks: (path: string, file: string, hunks: string[], unstage: boolean, lines?: number[]) =>
     call("git_stage_hunks", { path, file, hunks, lines: lines ?? null, unstage }),
-  merge: (path: string, source: string, target: string | null) => call("git_merge", { path, source, target }),
+  /** `message` (blank: git's own) is for the merge commit; a squash only stages. */
+  merge: (path: string, source: string, target: string | null, mode: MergeMode, message: string | null) =>
+    call("git_merge", { path, source, target, mode, message }),
   abort: (path: string) => call("git_abort", { path }),
   continueOp: (path: string) => call("git_continue", { path }),
   pick: (path: string, op: PickOp, id: string, target: string | null) => call("git_pick", { path, op, id, target }),
@@ -346,6 +353,8 @@ export const api = {
   rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
   /** git's own plan for a range with merges (`--rebase-merges`), without starting it. */
   rebaseTodo: (path: string, base: string) => call("git_rebase_todo", { path, base }),
+  /** Replay the current branch's own commits on top of `upstream` (plain `git rebase`). */
+  rebaseOnto: (path: string, upstream: string) => call("git_rebase_onto", { path, upstream }),
   backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),
   backportIgnore: (path: string, target: string, id: string, ignore: boolean) =>
     call("backport_ignore", { path, target, id, ignore }),
