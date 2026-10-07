@@ -3,7 +3,7 @@
 import type { Blame, CommitInfo, TodoItem } from "../types";
 import { applyPlan } from "../rebasePlan";
 import { demoControls } from "./controls";
-import { type Table, delay, fail, filesOf, hash, repo, res } from "./repo";
+import { type Table, delay, fail, fakeFile, filesOf, hash, repo, res } from "./repo";
 
 // --- demo conflicts ------------------------------------------------------------
 
@@ -100,6 +100,45 @@ const fileLog: Table["file_log"] = ({ rev, file }) => {
   if (!repo.commits.has(tip)) return fail(`Unknown revision ${rev}`);
   const seen = repo.ancestors(tip);
   return delay(repo.order.filter((id) => seen.has(id) && filesOf(id).includes(file)).map((id) => ({ id, path: file })));
+};
+
+/** A git pathspec as the demo understands it: the file, a folder above it, or a glob. */
+function pathMatches(spec: string, file: string) {
+  const s = spec.replace(/\/+$/, "");
+  if (file === s || file.startsWith(`${s}/`)) return true;
+  const glob = s
+    .replace(/[.+^${}()|\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  return /[*?]/.test(s) && new RegExp(`^${glob}$`).test(file);
+}
+
+const searchCommits: Table["search_commits"] = ({ query, kind, regex, limit }) => {
+  const q = query.trim();
+  let test: (text: string) => boolean;
+  try {
+    const re = regex ? new RegExp(q, "i") : null;
+    test = (text) => (re ? re.test(text) : text.toLowerCase().includes(q.toLowerCase()));
+  } catch (e) {
+    return fail(`fatal: invalid regular expression: ${String(e)}`);
+  }
+  // The changed lines of the demo's made-up diff for a commit (what `-S` / `-G` look through).
+  const changed = (c: CommitInfo) =>
+    filesOf(c.id)
+      .flatMap((f) => fakeFile(f, hash(c.id), c.summary).hunks.flatMap((h) => h.lines))
+      .filter((l) => l.kind !== " ")
+      .map((l) => l.text);
+  const matches = (c: CommitInfo) =>
+    kind === "message"
+      ? test(c.message)
+      : kind === "author"
+        ? test(`${c.author} <${c.email}>`)
+        : kind === "path"
+          ? filesOf(c.id).some((f) => pathMatches(q, f))
+          : changed(c).some(test);
+  const found = q ? repo.snapshot().commits.filter(matches) : [];
+  const hits = found.slice(0, limit).map(({ id, summary, author, time }) => ({ id, summary, author, time }));
+  return delay({ hits, more: found.length > limit, timedOut: false });
 };
 
 /** Marks a binary file among the demo's conflicted files (`conflict_file` shows no text for it). */
@@ -327,6 +366,7 @@ export const historyCommands = {
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
   file_log: fileLog,
+  search_commits: searchCommits,
   async save_file({ path, rev, file, dest }) {
     if (!(await fileLog({ path, rev, file })).length) return fail(`'${file}' is not in ${rev.slice(0, 7)}`);
     if (dest.split(/[\\/]/).includes(".git")) return fail(`Can't save into a .git folder: ${dest}`);

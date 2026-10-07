@@ -18,6 +18,8 @@ import type {
   DiffScope,
   FileDiff,
   FileTouch,
+  SearchKind,
+  SearchResult,
   ForgeKind,
   ForgeRepos,
   HostKey,
@@ -161,6 +163,7 @@ export interface Commands {
   forge_repos: [{ path: string; kind: ForgeKind; host: string }, ForgeRepos];
   open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
+  search_commits: [{ path: string; query: string; kind: SearchKind; regex: boolean; limit: number }, SearchResult];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
   save_file: [{ path: string; rev: string; file: string; dest: string }, OpResult];
   git_discard: [{ path: string; paths: string[] }, OpResult];
@@ -351,6 +354,9 @@ export const api = {
   openUrl: (path: string, url: string) => call("open_url", { path, url }),
   /** Commits reachable from `rev` that changed `file` (following renames), newest first. */
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
+  /** Up to `limit` commits in the whole history matching `query`, newest first (plain text unless `regex`). */
+  searchCommits: (path: string, query: string, kind: SearchKind, regex: boolean, limit: number) =>
+    call("search_commits", { path, query, kind, regex, limit }),
   /** Who last changed each line of `file` as of `rev`. */
   blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
   /** Write `file` as `rev` has it to `dest` (from `pickSaveFile`). */

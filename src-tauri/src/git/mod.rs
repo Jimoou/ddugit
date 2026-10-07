@@ -21,6 +21,7 @@ pub mod read;
 pub mod rebase;
 pub mod refs;
 pub mod remote;
+pub mod search;
 pub mod setup;
 pub mod stack;
 pub mod stage;

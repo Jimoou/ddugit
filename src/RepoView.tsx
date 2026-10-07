@@ -20,7 +20,6 @@ import { StashPanel } from "./components/StashPanel";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, ancestorsOf, computeLayout, descendantsOf } from "./graph/layout";
-import { searchCommits } from "./graph/search";
 import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { planMove } from "./rebasePlan";
@@ -68,6 +67,7 @@ import { useBisect } from "./repo/useBisect";
 import { useRemote } from "./repo/useRemote";
 import { useRun } from "./repo/useRun";
 import { useSheet } from "./repo/useSheet";
+import { useSearch } from "./repo/useSearch";
 import { useSnapshot } from "./repo/useSnapshot";
 
 /** How long the pointer rests on a star before its preview card shows. */
@@ -112,7 +112,7 @@ export function RepoView({
   onOpenPath,
 }: RepoViewProps) {
   if (import.meta.env.DEV && path === DEMO_PATH && demoControls.crashTab) throw new Error("Demo tab crashed");
-  const { snap, loadError, latest, refresh, loadMore } = useSnapshot(path, page, active, onLoaded, toast);
+  const { snap, loadError, latest, refresh, loadMore, loadTo } = useSnapshot(path, page, active, onLoaded, toast);
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedStash, setSelectedStash] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -141,7 +141,6 @@ export function RepoView({
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
   const [compareBase, setCompareBase] = useState<CompareSide | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
   // First-run tutorial, played on the demo repository only.
@@ -233,39 +232,28 @@ export function RepoView({
     () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
     [snap, pulls, commitById],
   );
-  const searchQuery = search?.query;
-  const matches = useMemo(
-    () => (snap && searchQuery !== undefined ? searchCommits(snap.commits, snap.refs, searchQuery) : []),
-    [snap, searchQuery],
-  );
+  const search = useSearch({ path, snap, latest, loadTo, show, graph, toast });
+  const searchLit = search.highlight;
 
   const trailIds = useMemo(() => trail?.touches.map((x) => x.id), [trail]);
   const trailFocus = useMemo(() => (trailIds ? new Set(trailIds) : null), [trailIds]);
   // Search highlights its matches; otherwise a focused branch highlights its ancestry.
   const focus = useMemo(() => {
-    if (searchQuery?.trim()) return new Set(matches);
+    if (searchLit) return searchLit;
     if (!snap || !focusRefs.length) return null;
     const lit = new Set<string>();
     for (const r of focusRefs) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
     return lit;
-  }, [snap, focusRefs, searchQuery, matches]);
+  }, [snap, focusRefs, searchLit]);
 
-  /** Select match `i` (wrapping) and fly the camera to it. */
-  const goToMatch = (i: number, list = matches) => {
-    if (!list.length) return;
-    const index = (i + list.length) % list.length;
-    setSearch((s) => s && { ...s, index });
-    show({ commit: list[index] });
-    graph.current?.centerOn(list[index]);
-  };
-
+  const openSearch = search.open;
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        setSearch((s) => s ?? { query: "", index: 0 });
+        openSearch();
       } else if ((mod && e.key.toLowerCase() === "r") || e.key === "F5") {
         // Re-read the repository (the file watcher usually has already); never reload the window.
         e.preventDefault();
@@ -274,7 +262,7 @@ export function RepoView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, refresh]);
+  }, [active, refresh, openSearch]);
   const colorOf = useCallback((id: string) => NEON[layout?.byId.get(id)?.color ?? 0], [layout]);
 
   /** Local branch a merge can land on at commit `id`. */
@@ -565,19 +553,7 @@ export function RepoView({
 
         <section className="stage">
           <div className="stage-graph" ref={stageGraph}>
-            {search && (
-              <SearchBar
-                query={search.query}
-                count={matches.length}
-                index={search.index}
-                onQuery={(query) => {
-                  setSearch({ query, index: 0 });
-                  goToMatch(0, searchCommits(snap.commits, snap.refs, query));
-                }}
-                onStep={(d) => goToMatch(search.index + d)}
-                onClose={() => setSearch(null)}
-              />
-            )}
+            {search.view && <SearchBar search={search.view} />}
             <FxLayer playing={fx} />
             {peek && commitById.has(peek.id) && peek.id !== selected && !menu && (
               <PeekCard

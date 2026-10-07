@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CommitInfo, RefInfo } from "../types";
-import { searchCommits } from "./search";
+import { nextLimit, searchCommits, searchKey } from "./search";
 
 const c = (id: string, message: string, author = "Jimin", email = "jimin@ddugit.dev"): CommitInfo => ({
   id,
@@ -41,5 +41,22 @@ describe("searchCommits", () => {
 
   it("returns nothing for a blank query", () => {
     expect(searchCommits(commits, refs, "  ")).toEqual([]);
+  });
+});
+
+describe("nextLimit", () => {
+  it("doubles the history read, from at least a thousand, up to the cap", () => {
+    expect(nextLimit(3000)).toBe(6000);
+    expect(nextLimit(100)).toBe(1000);
+    expect(nextLimit(40_000, 50_000)).toBe(50_000);
+    expect(nextLimit(50_000, 50_000)).toBeNull();
+  });
+});
+
+describe("searchKey", () => {
+  it("tells searches apart by mode, regex and trimmed query", () => {
+    expect(searchKey("message", " fix ", false)).toBe(searchKey("message", "fix", false));
+    expect(searchKey("message", "fix", false)).not.toBe(searchKey("author", "fix", false));
+    expect(searchKey("message", "fix", false)).not.toBe(searchKey("message", "fix", true));
   });
 });

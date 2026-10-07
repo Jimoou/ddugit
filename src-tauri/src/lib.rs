@@ -236,6 +236,8 @@ command!(git_version() -> String => git::version(None));
 command!(report_send(report: report::NewReport) -> String => report::send(&report));
 command!(file_log(path: String, rev: String, file: String) -> Vec<git::history::FileTouch>
     => git::history::file_log(&path, &rev, &file));
+command!(search_commits(path: String, query: String, kind: git::search::SearchKind, regex: bool, limit: usize)
+    -> git::search::SearchResult => git::search::search(&path, &query, kind, regex, limit));
 command!(git_blame(path: String, rev: String, file: String) -> git::history::Blame
     => git::history::blame(&path, &rev, &file));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
@@ -348,6 +350,7 @@ pub fn run() {
             git_bisect,
             bisect_state,
             file_log,
+            search_commits,
             pull_requests,
             pr_target,
             pr_create,

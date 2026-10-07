@@ -188,6 +188,26 @@ export interface ForgeRepos {
   repos: ForgeRepo[];
 }
 
+/** What a search over the whole history looks at (`search.rs`). */
+export type SearchKind = "message" | "author" | "path" | "content";
+
+export interface SearchHit {
+  id: string;
+  summary: string;
+  author: string;
+  /** Commit time, seconds since the epoch. */
+  time: number;
+}
+
+export interface SearchResult {
+  /** Newest first. */
+  hits: SearchHit[];
+  /** More commits match than `hits` holds (the limit, or the time limit, cut the search). */
+  more: boolean;
+  /** The search ran out of time; `hits` is what it found until then. */
+  timedOut: boolean;
+}
+
 /** A commit that changed a file, and the file's path in it (renames are followed). */
 export interface FileTouch {
   id: string;
