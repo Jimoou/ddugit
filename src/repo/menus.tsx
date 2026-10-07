@@ -23,6 +23,7 @@ import {
   confirmRevert,
   confirmThen,
   deleteBranch,
+  deleteRemoteBranch,
   deleteTag,
   markBisect,
   openEdit,
@@ -175,6 +176,13 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       "separator",
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(repo, r.target) },
       "separator",
+      {
+        label: t("menu.deleteRemoteBranch", { remote: name }),
+        danger: true,
+        // Nothing is pushed to a fetch-only remote, deletions included; `origin/HEAD` only points at a branch.
+        disabled: snap.remotes.find((x) => x.name === name)?.push === false || branch === "HEAD",
+        onSelect: () => deleteRemoteBranch(repo, name, branch),
+      },
       removeRemoteItem(repo, name),
     ];
   }

@@ -384,6 +384,7 @@ export function RepoView({
     onOpenPath,
     openUrl,
     fetchOne: remote.fetchOne,
+    deleteRemoteBranch: remote.deleteRemoteBranch,
     canDropOn,
     isAncestor,
   };

@@ -232,6 +232,19 @@ export const deleteTag = (repo: Repo, name: string) =>
     () => void refRun(repo, t("tag.delete.done", { name }), { kind: "deleteTag", name }),
   );
 
+/** Delete `branch` on `remote`, after saying it goes for everyone who uses that remote. */
+export const deleteRemoteBranch = (repo: Repo, remote: string, branch: string) =>
+  confirmThen(
+    repo,
+    {
+      title: t("remoteBranch.delete.title"),
+      danger: true,
+      confirmLabel: t("common.delete"),
+      body: richBody("remoteBranch.delete.body", { remote, branch }),
+    },
+    () => void repo.deleteRemoteBranch(remote, branch),
+  );
+
 export const removeRemote = (repo: Repo, name: string) =>
   confirmThen(
     repo,

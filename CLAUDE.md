@@ -39,7 +39,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `rebase.rs`: interactive rebase (UI가 만든 todo를 `sequence.editor`로 넣는다. 편집기 없음). 병합이 섞이면 `--rebase-merges`: git의 todo를 먼저 받아(`todo`, 사본만 남기고 실패하는 편집기) 처리·갈래 안 순서만 바꿔(`apply_plan`) 넣는다. 화면의 같은 로직은 `rebasePlan.ts`의 `todoRuns`·`applyPlan`
   - `refs.rs`: 브랜치 이름 변경·삭제, 태그, 원격 브랜치 체크아웃, 원격 추가·삭제 (`RefOp` 태그 enum 하나)
   - `stash.rs`: discard, stash
-  - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블)
+  - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블), 다른 원격으로 push(`push_to`), 원격 브랜치 삭제(`delete_remote_branch`, `push --delete refs/heads/…`, 가져오기 전용 원격은 거부)
   - `watch.rs`: 파일 감시 (관련 경로만 걸러 `repo-changed` 이벤트, `lib.rs`의 `Watching` 상태가 하나만 유지)
   - `diff.rs`: 커밋 diff, 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
   - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)

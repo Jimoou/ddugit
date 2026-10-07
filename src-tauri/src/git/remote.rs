@@ -240,6 +240,26 @@ pub fn push_to(
     Ok(OpResult::with(remote_status(&o, true), o))
 }
 
+/// Delete `branch` on `remote` (`git push <remote> --delete refs/heads/<branch>`). Git drops the
+/// remote-tracking branch with it. Local branches are left alone, and a fetch-only remote refuses.
+pub fn delete_remote_branch(
+    path: &str,
+    remote: &str,
+    branch: &str,
+    on_progress: impl FnMut(Progress),
+) -> Result<OpResult> {
+    let repo = open(path)?;
+    let dir = workdir(&repo)?;
+    if !pushable(&repo, super::operand(remote)?) {
+        return Err(format!("{remote} is fetch-only"));
+    }
+    // The full ref name: `branch` can't be read as an option or a refspec.
+    let target = format!("refs/heads/{}", super::operand(branch)?);
+    let args = ["push", "--progress", remote, "--delete", &target];
+    let o = stream_remote(&dir, &args, on_progress)?;
+    Ok(OpResult::with(remote_status(&o, true), o))
+}
+
 /// Fetch one remote (e.g. one just added), not all of them.
 pub fn fetch_one(path: &str, name: &str, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
     let dir = workdir(&open(path)?)?;
@@ -388,6 +408,39 @@ mod tests {
             OpStatus::Ok
         );
         assert_eq!(snapshot(s(a.path()), 100).unwrap().state, "clean");
+    }
+
+    #[test]
+    fn deletes_a_branch_on_the_remote_and_its_tracking_ref() {
+        let (origin, a, b) = setup();
+        git_ok(b.path(), &["push", "-q", "origin", "HEAD:refs/heads/old-feature"]).unwrap();
+        remote(s(a.path()), RemoteOp::Fetch, |_| {}).unwrap();
+        git_ok(a.path(), &["branch", "-q", "old-feature", "origin/old-feature"]).unwrap();
+        let tracking = |p: &tempfile::TempDir| {
+            git_ok(p.path(), &["branch", "-r", "--list", "origin/old-feature"]).unwrap()
+        };
+        assert!(!tracking(&a).trim().is_empty());
+
+        let r = delete_remote_branch(s(a.path()), "origin", "old-feature", |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let left = git_ok(origin.path(), &["branch", "--list", "old-feature"]).unwrap();
+        assert!(left.trim().is_empty(), "still on the remote: {left}");
+        assert!(tracking(&a).trim().is_empty(), "tracking ref kept");
+        // The local branch of the same name stays.
+        let local = git_ok(a.path(), &["branch", "--list", "old-feature"]).unwrap();
+        assert!(!local.trim().is_empty());
+    }
+
+    #[test]
+    fn deleting_a_branch_refuses_odd_names_and_fetch_only_remotes() {
+        let (_o, a, _b) = setup();
+        assert!(delete_remote_branch(s(a.path()), "origin", "--all", |_| {}).is_err());
+        git_ok(
+            a.path(),
+            &["remote", "set-url", "--push", "origin", super::super::NO_PUSH],
+        )
+        .unwrap();
+        assert!(delete_remote_branch(s(a.path()), "origin", "main", |_| {}).is_err());
     }
 
     #[test]
