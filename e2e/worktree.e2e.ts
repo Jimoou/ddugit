@@ -46,6 +46,7 @@ test("stages a file from its menu, which switches the composer to the index, and
   await sheet.getByRole("button", { name: "모두 스테이지" }).click();
   await expect.poll(async () => (await change(MINIMAP))?.staged).toBe("added");
   await sheet.getByRole("tab", { name: "스테이지됨" }).click();
+  await expect(sheet.getByRole("button", { name: "모두 내리기" })).toBeEnabled();
   await sheet.getByRole("button", { name: "모두 내리기" }).click();
   await expect.poll(async () => (await demo.snapshot()).changes.every((c) => !c.staged)).toBe(true);
 });
