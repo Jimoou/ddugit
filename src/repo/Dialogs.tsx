@@ -92,6 +92,7 @@ export function RepoDialogs({ repo, dialog, pulls }: Props) {
           branch={snap.head.branch ?? "HEAD"}
           summary={dialog.summary}
           passed={dialog.passed}
+          incoming={dialog.incoming}
           pushed={dialog.pushed}
           dirty={snap.changes.length}
           initial={dialog.initial}

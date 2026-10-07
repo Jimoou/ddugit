@@ -79,8 +79,8 @@ class MockRepo {
   remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);
   /** Remotes nothing is pushed to (the original project of a fork). */
   fetchOnly = new Set<string>();
-  /** Branches following something other than `origin/<same name>`. */
-  tracking = new Map<string, string>();
+  /** Branches following something other than `origin/<same name>` (null: nothing). */
+  tracking = new Map<string, string | null>();
   /** Commits a stopped (empty) backport still has to apply after a skip. */
   skipRest: string[] = [];
   /** Demo bisect (HEAD isn't moved; the probe is reported in the state instead). */
@@ -181,14 +181,14 @@ class MockRepo {
     return out;
   }
 
-  upstream(): string | null {
-    const name = this.tracking.get(this.head) ?? `origin/${this.head}`;
-    return this.remotes.has(name) ? name : null;
+  upstream(branch = this.head): string | null {
+    const name = this.tracking.has(branch) ? this.tracking.get(branch) : `origin/${branch}`;
+    return name && this.remotes.has(name) ? name : null;
   }
 
-  aheadBehind(): [number, number] {
-    const up = this.upstream();
-    const local = this.branches.get(this.head);
+  aheadBehind(branch = this.head): [number, number] {
+    const up = this.upstream(branch);
+    const local = this.branches.get(branch);
     if (!up || !local) return [0, 0];
     const a = this.ancestors(local);
     const b = this.ancestors(this.remotes.get(up)!);
@@ -199,7 +199,13 @@ class MockRepo {
     const refs: RefInfo[] = [
       ...[...this.branches]
         .filter(([name]) => name !== DETACHED)
-        .map(([name, target]) => ({ name, kind: "local" as const, target })),
+        .map(([name, target]) => {
+          const up = this.upstream(name);
+          const ref: RefInfo = { name, kind: "local", target };
+          if (!up) return ref;
+          const [ahead, behind] = this.aheadBehind(name);
+          return { ...ref, upstream: { name: up, ahead, behind, gone: false } };
+        }),
       ...[...this.remotes].map(([name, target]) => ({ name, kind: "remote" as const, target })),
       ...[...this.tags].map(([name, target]) => ({ name, kind: "tag" as const, target })),
     ];

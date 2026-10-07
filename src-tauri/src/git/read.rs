@@ -33,6 +33,23 @@ pub struct RefInfo {
     pub name: String,
     pub kind: RefKind,
     pub target: String,
+    /// Local branches only: the branch it follows, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upstream: Option<Tracking>,
+}
+
+/// Where a local branch stands against its upstream.
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Tracking {
+    /// Short name, e.g. `origin/main`.
+    pub name: String,
+    /// Commits on the branch not on the upstream.
+    pub ahead: usize,
+    /// Commits on the upstream not on the branch.
+    pub behind: usize,
+    /// Configured, but the remote branch is gone (deleted there and pruned).
+    pub gone: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -194,13 +211,44 @@ fn read_refs(repo: &Repository) -> Result<Vec<RefInfo>> {
             continue;
         }
         let Ok(commit) = r.peel_to_commit() else { continue };
+        let upstream = match kind {
+            RefKind::Local => tracking(repo, full, commit.id()),
+            _ => None,
+        };
         out.push(RefInfo {
             name: r.shorthand().unwrap_or(full).to_string(),
             kind,
             target: commit.id().to_string(),
+            upstream,
         });
     }
     Ok(out)
+}
+
+/// The upstream of local branch `full` (`refs/heads/…`) at `tip`, from its config.
+fn tracking(repo: &Repository, full: &str, tip: git2::Oid) -> Option<Tracking> {
+    let up = repo.branch_upstream_name(full).ok()?;
+    let up = up.as_str()?;
+    let name = up
+        .strip_prefix("refs/remotes/")
+        .or_else(|| up.strip_prefix("refs/heads/"))
+        .unwrap_or(up)
+        .to_string();
+    let Ok(there) = repo.refname_to_id(up) else {
+        return Some(Tracking {
+            name,
+            ahead: 0,
+            behind: 0,
+            gone: true,
+        });
+    };
+    let (ahead, behind) = repo.graph_ahead_behind(tip, there).unwrap_or((0, 0));
+    Some(Tracking {
+        name,
+        ahead,
+        behind,
+        gone: false,
+    })
 }
 
 fn read_remotes(repo: &Repository) -> Vec<RemoteInfo> {

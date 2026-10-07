@@ -161,6 +161,30 @@ mod tests {
     }
 
     #[test]
+    fn resets_onto_another_line_keeping_the_difference_as_changes() {
+        let r = repo();
+        commit_file(r.path(), "a.txt", "a", "first");
+        git_ok(r.path(), &["branch", "other"]).unwrap();
+        commit_file(r.path(), "mine.txt", "mine", "only on main");
+        git_ok(r.path(), &["checkout", "-q", "other"]).unwrap();
+        commit_file(r.path(), "theirs.txt", "theirs", "only on other");
+        let other = head_id(r.path());
+        git_ok(r.path(), &["checkout", "-q", "main"]).unwrap();
+
+        // Not an ancestor of main: main jumps over, its own commit's file stays as a change.
+        let res = reset(s(r.path()), &other, ResetMode::Mixed).unwrap();
+        assert_eq!(res.status, OpStatus::Ok, "{}", res.output);
+        assert_eq!(head_id(r.path()), other);
+        let snap = snapshot(s(r.path()), 10).unwrap();
+        assert_eq!(snap.head.branch.as_deref(), Some("main"));
+        let mine = snap.changes.iter().find(|c| c.path == "mine.txt").unwrap();
+        assert_eq!(mine.unstaged.as_deref(), Some("untracked"));
+        // The files stay as they were: what `other` added reads as deleted until checked out.
+        let theirs = snap.changes.iter().find(|c| c.path == "theirs.txt").unwrap();
+        assert_eq!(theirs.unstaged.as_deref(), Some("deleted"));
+    }
+
+    #[test]
     fn refuses_to_reset_mid_operation() {
         let r = repo();
         commit_file(r.path(), "a.txt", "a", "first");

@@ -22,6 +22,18 @@ export interface RefInfo {
   checks?: Checks | null;
   /** `pr` refs only: drawn as a mark after the name (approved / changes requested). */
   review?: Review | null;
+  /** Local branches only: the branch it follows, if any. */
+  upstream?: Tracking;
+}
+
+/** Where a local branch stands against its upstream. */
+export interface Tracking {
+  /** e.g. `origin/main`. */
+  name: string;
+  ahead: number;
+  behind: number;
+  /** Configured, but the remote branch is gone (deleted there and pruned). */
+  gone: boolean;
 }
 
 export interface HeadInfo {
@@ -326,7 +338,14 @@ export type RefOp =
   | { kind: "checkoutRemote"; remoteRef: string; name?: string }
   | { kind: "addRemote"; name: string; url: string; fetchOnly?: boolean }
   | { kind: "setPushable"; name: string; pushable: boolean }
-  | { kind: "removeRemote"; name: string };
+  | { kind: "removeRemote"; name: string }
+  | { kind: "renameRemote"; from: string; to: string }
+  /** A fetch-only remote stays fetch-only. */
+  | { kind: "setRemoteUrl"; name: string; url: string }
+  /** `upstream`: a remote branch like `origin/main`; null stops tracking. */
+  | { kind: "setUpstream"; branch: string; upstream: string | null }
+  /** A branch that isn't checked out, up to its upstream; `diverged` when that isn't a fast-forward. */
+  | { kind: "fastForward"; branch: string };
 
 export interface RepoSnapshot {
   path: string;

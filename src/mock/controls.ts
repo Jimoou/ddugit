@@ -179,6 +179,10 @@ export const demoControls = {
   commitOn(branch: string, summary: string) {
     repo.add(branch, summary);
   },
+  /** A teammate's commit on remote branch `ref` (e.g. `origin/main`), as a fetch would bring it. */
+  commitOnRemote(ref: string, summary: string) {
+    repo.remotes.set(ref, repo.commit([repo.remotes.get(ref)!], summary, "Minji"));
+  },
 };
 export type DemoControls = typeof demoControls;
 

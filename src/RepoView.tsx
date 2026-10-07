@@ -405,6 +405,7 @@ export function RepoView({
     onOpenPath,
     openUrl,
     fetchOne: remote.fetchOne,
+    pushTo: remote.pushTo,
     remoteRef: remote.remoteRef,
     canDropOn,
     isAncestor,

@@ -52,6 +52,27 @@ pub enum RefOp {
     RemoveRemote {
         name: String,
     },
+    /// Rename a remote; git moves its remote-tracking branches and the branches following them.
+    RenameRemote {
+        from: String,
+        to: String,
+    },
+    /// Fetch from another URL. A fetch-only remote stays fetch-only (its push URL is separate).
+    SetRemoteUrl {
+        name: String,
+        url: String,
+    },
+    /// Make `branch` follow remote branch `upstream` (`origin/main`), or nothing (`None`).
+    SetUpstream {
+        branch: String,
+        #[serde(default)]
+        upstream: Option<String>,
+    },
+    /// Move a branch that isn't checked out up to its upstream, only as a fast-forward
+    /// (`Diverged` when both have their own commits).
+    FastForward {
+        branch: String,
+    },
 }
 
 pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
@@ -64,8 +85,12 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
         RefOp::CheckoutRemote { remote_ref, name } => {
             [Some(remote_ref), name.as_ref()].into_iter().flatten().collect()
         }
-        RefOp::AddRemote { name, url, .. } => vec![name, url],
-        RefOp::SetPushable { name, .. } => vec![name],
+        RefOp::AddRemote { name, url, .. } | RefOp::SetRemoteUrl { name, url } => vec![name, url],
+        RefOp::SetPushable { name, .. } | RefOp::FastForward { branch: name } => vec![name],
+        RefOp::RenameRemote { from, to } => vec![from, to],
+        RefOp::SetUpstream { branch, upstream } => {
+            [Some(branch), upstream.as_ref()].into_iter().flatten().collect()
+        }
     };
     for n in names {
         super::operand(n.trim())?;
@@ -148,6 +173,34 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
             ]
         }
         RefOp::RemoveRemote { name } => vec!["remote".into(), "remove".into(), name.clone()],
+        RefOp::RenameRemote { from, to } => {
+            vec!["remote".into(), "rename".into(), from.clone(), to.trim().into()]
+        }
+        RefOp::SetRemoteUrl { name, url } => {
+            if url.trim().is_empty() {
+                return Err("Enter the remote's URL".into());
+            }
+            vec!["remote".into(), "set-url".into(), name.clone(), url.trim().into()]
+        }
+        // A full ref name: `origin/x` could also be read as a local branch of that name.
+        RefOp::SetUpstream {
+            branch,
+            upstream: Some(up),
+        } => vec![
+            "branch".into(),
+            format!("--set-upstream-to=refs/remotes/{}", up.trim()),
+            branch.clone(),
+        ],
+        RefOp::SetUpstream {
+            branch,
+            upstream: None,
+        } => {
+            vec!["branch".into(), "--unset-upstream".into(), branch.clone()]
+        }
+        RefOp::FastForward { branch } => match fast_forward_args(&repo, branch)? {
+            Ok(args) => args,
+            Err(done) => return Ok(done),
+        },
     };
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     let o = git(&dir, &argv)?;
@@ -173,7 +226,57 @@ pub fn apply(path: &str, op: &RefOp) -> Result<OpResult> {
     if !o.ok && o.text.contains("not fully merged") {
         return Ok(OpResult::with(OpStatus::Unmerged, o));
     }
+    // Moved on the upstream between the check and the fetch: still not a fast-forward.
+    if !o.ok && matches!(op, RefOp::FastForward { .. }) && o.text.contains("[rejected]") {
+        return Ok(OpResult::with(OpStatus::Diverged, o));
+    }
     Ok(o.into())
+}
+
+/// `git fetch . <upstream>:refs/heads/<branch>`: a local fetch that refuses anything but a
+/// fast-forward, and refuses a branch checked out here or in another worktree. Answers
+/// right away (`Err`) when there's nothing to do or the two have gone apart.
+fn fast_forward_args(
+    repo: &git2::Repository,
+    branch: &str,
+) -> Result<std::result::Result<Vec<String>, OpResult>> {
+    let full = format!("refs/heads/{branch}");
+    let tip = repo
+        .refname_to_id(&full)
+        .map_err(|_| format!("Branch '{branch}' not found"))?;
+    if repo
+        .head()
+        .ok()
+        .and_then(|h| h.name().map(str::to_string))
+        .as_deref()
+        == Some(full.as_str())
+    {
+        return Err(format!("'{branch}' is checked out; pull it instead"));
+    }
+    let up = repo
+        .branch_upstream_name(&full)
+        .ok()
+        .and_then(|b| b.as_str().map(str::to_string))
+        .ok_or_else(|| format!("'{branch}' follows no upstream branch"))?;
+    let there = repo
+        .refname_to_id(&up)
+        .map_err(|_| format!("{up} is gone; fetch first"))?;
+    let say = |status, output: &str| {
+        Err(OpResult {
+            status,
+            output: output.into(),
+        })
+    };
+    if there == tip || repo.graph_descendant_of(tip, there).unwrap_or(false) {
+        return Ok(say(OpStatus::Ok, "Already up to date."));
+    }
+    if !repo.graph_descendant_of(there, tip).unwrap_or(false) {
+        return Ok(say(
+            OpStatus::Diverged,
+            &format!("'{branch}' and {up} each have their own commits: not a fast-forward"),
+        ));
+    }
+    Ok(Ok(vec!["fetch".into(), ".".into(), format!("{up}:{full}")]))
 }
 
 #[cfg(test)]
@@ -348,5 +451,154 @@ mod tests {
         };
         assert_eq!(apply(p, &rm).unwrap().status, OpStatus::Ok);
         assert!(!has(p, RefKind::Remote, "upstream/main"));
+    }
+
+    fn tracking_of(p: &str, branch: &str) -> Option<super::super::read::Tracking> {
+        let refs = snapshot(p, 10).unwrap().refs;
+        refs.into_iter()
+            .find(|r| r.kind == RefKind::Local && r.name == branch)
+            .unwrap()
+            .upstream
+    }
+
+    #[test]
+    fn tracks_untracks_and_fast_forwards_a_branch_not_checked_out() {
+        let origin = tempfile::tempdir().unwrap();
+        git_ok(origin.path(), &["init", "-q", "--bare", "-b", "main"]).unwrap();
+        let a = repo();
+        git_ok(a.path(), &["remote", "add", "origin", s(origin.path())]).unwrap();
+        commit_file(a.path(), "a.txt", "a", "base");
+        create_branch(s(a.path()), "topic", None, true).unwrap();
+        commit_file(a.path(), "t.txt", "t", "topic work");
+        git_ok(a.path(), &["push", "-q", "origin", "main", "topic"]).unwrap();
+
+        let b = tempfile::tempdir().unwrap();
+        git_ok(b.path(), &["clone", "-q", s(origin.path()), "."]).unwrap();
+        identity(b.path());
+        let pb = s(b.path());
+        git_ok(b.path(), &["branch", "-q", "--no-track", "topic", "origin/topic"]).unwrap();
+        assert_eq!(tracking_of(pb, "topic"), None);
+        let track = |branch: &str, up: Option<&str>| {
+            apply(
+                pb,
+                &RefOp::SetUpstream {
+                    branch: branch.into(),
+                    upstream: up.map(str::to_string),
+                },
+            )
+        };
+        let r = track("topic", Some("origin/topic")).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let t = tracking_of(pb, "topic").unwrap();
+        assert_eq!(
+            (t.name.as_str(), t.ahead, t.behind, t.gone),
+            ("origin/topic", 0, 0, false)
+        );
+
+        // A pushes more to topic; B, on main, brings its topic up without checking it out.
+        commit_file(a.path(), "t2.txt", "t2", "more topic work");
+        git_ok(a.path(), &["push", "-q", "origin", "topic"]).unwrap();
+        git_ok(b.path(), &["fetch", "-q"]).unwrap();
+        assert_eq!(tracking_of(pb, "topic").unwrap().behind, 1);
+        let ff = |branch: &str| {
+            apply(
+                pb,
+                &RefOp::FastForward {
+                    branch: branch.into(),
+                },
+            )
+        };
+        let r = ff("topic").unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let rev = |r: &str| git_ok(b.path(), &["rev-parse", r]).unwrap();
+        assert_eq!(rev("topic"), rev("origin/topic"));
+        assert_eq!(ff("topic").unwrap().status, OpStatus::Ok, "already there");
+        assert_eq!(snapshot(pb, 1).unwrap().head.branch.as_deref(), Some("main"));
+
+        // Both sides move on: no fast-forward, and topic stays where it was.
+        git_ok(b.path(), &["checkout", "-q", "topic"]).unwrap();
+        commit_file(b.path(), "b.txt", "b", "b's own");
+        checkout(pb, "main").unwrap();
+        commit_file(a.path(), "t3.txt", "t3", "a's own");
+        git_ok(a.path(), &["push", "-q", "origin", "topic"]).unwrap();
+        git_ok(b.path(), &["fetch", "-q"]).unwrap();
+        let before = rev("topic");
+        let t = tracking_of(pb, "topic").unwrap();
+        assert_eq!((t.ahead, t.behind), (1, 1));
+        assert_eq!(ff("topic").unwrap().status, OpStatus::Diverged);
+        assert_eq!(rev("topic"), before);
+        assert!(ff("main").is_err(), "the checked-out branch is pulled instead");
+        assert!(ff("nope").is_err());
+
+        // Stop tracking; then nothing to fast-forward to. Odd names are refused.
+        assert_eq!(track("topic", None).unwrap().status, OpStatus::Ok);
+        assert_eq!(tracking_of(pb, "topic"), None);
+        assert!(ff("topic").is_err());
+        assert!(track("-x", Some("origin/topic")).is_err());
+        assert!(track("topic", Some("--all")).is_err());
+        assert_eq!(
+            track("topic", Some("origin/nope")).unwrap().status,
+            OpStatus::Failed
+        );
+
+        // A followed branch deleted on the remote shows as gone.
+        track("topic", Some("origin/topic")).unwrap();
+        git_ok(b.path(), &["update-ref", "-d", "refs/remotes/origin/topic"]).unwrap();
+        assert!(tracking_of(pb, "topic").unwrap().gone);
+    }
+
+    #[test]
+    fn renames_a_remote_and_changes_its_url_keeping_it_fetch_only() {
+        let upstream = repo();
+        commit_file(upstream.path(), "a.txt", "a", "upstream work");
+        let moved = repo();
+        commit_file(moved.path(), "m.txt", "m", "moved work");
+        let d = repo();
+        commit_file(d.path(), "b.txt", "b", "fork work");
+        let p = s(d.path());
+        let add = RefOp::AddRemote {
+            name: "upstream".into(),
+            url: s(upstream.path()).into(),
+            fetch_only: true,
+        };
+        assert_eq!(apply(p, &add).unwrap().status, OpStatus::Ok);
+        git_ok(d.path(), &["fetch", "-q", "upstream"]).unwrap();
+        git_ok(d.path(), &["branch", "-q", "--track", "up-main", "upstream/main"]).unwrap();
+
+        let rename = RefOp::RenameRemote {
+            from: "upstream".into(),
+            to: "theirs".into(),
+        };
+        let r = apply(p, &rename).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(p, 10).unwrap();
+        assert_eq!(
+            snap.remotes.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            ["theirs"]
+        );
+        assert!(has(p, RefKind::Remote, "theirs/main") && !has(p, RefKind::Remote, "upstream/main"));
+        assert_eq!(tracking_of(p, "up-main").unwrap().name, "theirs/main");
+        assert_eq!(
+            apply(p, &rename).unwrap().status,
+            OpStatus::Failed,
+            "no upstream any more"
+        );
+
+        let set_url = |url: &str| {
+            apply(
+                p,
+                &RefOp::SetRemoteUrl {
+                    name: "theirs".into(),
+                    url: url.into(),
+                },
+            )
+        };
+        let r = set_url(&format!(" {} ", s(moved.path()))).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let remotes = snapshot(p, 1).unwrap().remotes;
+        assert_eq!(remotes[0].url, s(moved.path()));
+        assert!(!remotes[0].push, "still fetch-only");
+        assert!(set_url("  ").is_err());
+        assert!(set_url("--upload-pack=x").is_err());
     }
 }

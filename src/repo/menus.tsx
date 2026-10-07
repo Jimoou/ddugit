@@ -32,7 +32,6 @@ import {
   pushTag,
   refRun,
   removeRemote,
-  renameBranch,
   showCommit,
   undoLastCommit,
 } from "./actions";
@@ -41,6 +40,7 @@ import { difftoolItem, openItems, versionItem } from "./outside";
 import { applyPatchItem, patchItems } from "./patches";
 import { confirmRevertMerge, pickedItems } from "./picks";
 import type { Repo } from "./state";
+import { remoteEditItems, renameBranch, trackingItems } from "./tracking";
 import { splitRemote } from "./useRemote";
 import { shortcutLabel } from "../settings";
 
@@ -205,6 +205,13 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       backport,
       "separator",
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(repo, r.target) },
+      {
+        // E.g. back to origin/main after diverging from it.
+        label: t("menu.resetTo", { branch: snap.head.branch ?? "HEAD" }),
+        icon: "history",
+        disabled: snap.state !== "clean" || !snap.head.target || r.target === snap.head.target,
+        onSelect: () => askReset(repo, r.target, undefined, r.name),
+      },
       "separator",
       {
         label: t("menu.deleteRemoteBranch", { remote: name }),
@@ -233,6 +240,8 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       disabled: !repo.pulls?.forges.length,
       onSelect: () => repo.setDialog({ kind: "pr", from: r.name }),
     },
+    "separator",
+    ...trackingItems(repo, r),
     "separator",
     ...stackItems(repo, r.name),
     notesItem(repo, r.name),
@@ -303,7 +312,8 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
     {
       label: t("undo.toHere"),
       icon: "history",
-      disabled: !clean || !onHead || isHead,
+      // Off HEAD's line too: the dialog counts what leaves and what comes in.
+      disabled: !clean || isHead || !head,
       onSelect: () => askReset(repo, id),
     },
     "separator" as const,
@@ -393,6 +403,7 @@ export function remoteMenu(repo: Repo, name: string): MenuItem[] {
         });
       },
     },
+    ...remoteEditItems(repo, name),
     "separator",
     removeRemoteItem(repo, name),
   ];

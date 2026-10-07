@@ -100,13 +100,13 @@ export function useRemote(o: Options) {
    * Push to `name` (e.g. origin) instead of a fetch-only upstream, and follow it there from now on.
    * `branch` defaults to the current one (another goes up before a pull request is opened from it).
    */
-  const pushTo = async (name: string, branch: string | null = null) => {
+  const pushTo = async (name: string, branch: string | null = null, done = t("remote.pushedTo", { name })) => {
     // Before the progress card changes: it belongs to the operation still running.
     if (refuseBusy()) return false;
     setRemoteBusy("push");
     setProgress(null);
     try {
-      const r = await run(t("remote.pushedTo", { name }), () => api.pushTo(path, name, setProgress, branch));
+      const r = await run(done, () => api.pushTo(path, name, setProgress, branch));
       if (r.status === "auth") setOpen({ kind: "auth", op: "push", output: r.output });
       // Another branch than HEAD: the pull-then-push dialog doesn't apply, so just say why.
       if (r.status === "rejected") {
@@ -176,13 +176,14 @@ export function useRemote(o: Options) {
    * open the same help as a push; a refusal (the tag there points elsewhere) is git's own words.
    */
   const remoteRef = async (name: string, op: RemoteRefOp, done: string) => {
-    if (refuseBusy()) return;
+    if (refuseBusy()) return false;
     setRemoteBusy("push");
     setProgress(null);
     try {
       const r = await run(done, () => api.remoteRef(path, name, op, setProgress));
       if (r.status === "auth") setOpen({ kind: "auth", op: "push", output: r.output });
       if (r.status === "rejected") toast("err", r.output);
+      return r.status === "ok";
     } finally {
       setRemoteBusy(null);
       setProgress(null);

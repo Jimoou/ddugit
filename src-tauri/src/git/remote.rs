@@ -467,6 +467,38 @@ mod tests {
         assert!(!local.trim().is_empty());
     }
 
+    /// The rename dialog's "also on the remote": rename here, push the new name, delete the old one there.
+    #[test]
+    fn renames_a_branch_on_its_remote_too() {
+        use super::super::refs::{apply, RefOp};
+        let (origin, a, _b) = setup();
+        let pa = s(a.path());
+        git_ok(a.path(), &["checkout", "-q", "-b", "old-name"]).unwrap();
+        commit_file(a.path(), "w.txt", "w", "work");
+        push_to(pa, "origin", None, |_| {}).unwrap();
+        git_ok(a.path(), &["checkout", "-q", "main"]).unwrap();
+
+        let rename = RefOp::RenameBranch {
+            from: "old-name".into(),
+            to: "new-name".into(),
+        };
+        assert_eq!(apply(pa, &rename).unwrap().status, OpStatus::Ok);
+        // git keeps the old upstream after a local rename.
+        let upstream = || git_ok(a.path(), &["rev-parse", "--abbrev-ref", "new-name@{upstream}"]).unwrap();
+        assert_eq!(upstream().trim(), "origin/old-name");
+
+        let r = push_to(pa, "origin", Some("new-name"), |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(upstream().trim(), "origin/new-name");
+        let op = RemoteRefOp::DeleteBranch {
+            name: "old-name".into(),
+        };
+        let r = remote_ref(pa, "origin", &op, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let there = git_ok(origin.path(), &["branch", "--list", "--format=%(refname:short)"]).unwrap();
+        assert_eq!(there.split_whitespace().collect::<Vec<_>>(), ["main", "new-name"]);
+    }
+
     #[test]
     fn remote_refs_refuse_odd_names_and_fetch_only_remotes() {
         let (_o, a, _b) = setup();
