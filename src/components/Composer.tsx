@@ -20,6 +20,8 @@ interface Props {
   headMessage: string | null;
   /** Message to start with (a squash merge's summary). */
   initialMessage?: string;
+  /** Start on the index ("staged only"), as after a squash merge. */
+  startStagedOnly?: boolean;
   /** Open in amend mode (from the HEAD node's context menu). */
   startAmend?: boolean;
   /** HEAD is already on the upstream: amending rewrites shared history. */
@@ -95,7 +97,9 @@ export function Composer(props: Props) {
    * staged), or commit the index as it is ("staged only"). In the second, a file's checkbox
    * stages and unstages it. Hunk staging leaves a file both staged and unstaged, so start there then.
    */
-  const [stagedOnly, setStagedOnly] = useState(() => changes.some((c) => c.staged && c.unstaged));
+  const [stagedOnly, setStagedOnly] = useState(
+    () => !!props.startStagedOnly || changes.some((c) => c.staged && c.unstaged),
+  );
   // A file newly staged, whole or in part (a menu, the diff sheet, a terminal), switches to the index.
   const stagedKey = changes
     .filter((c) => c.staged)
@@ -110,6 +114,11 @@ export function Composer(props: Props) {
   const indexMode = stagedOnly && !merging;
   const useStaged = indexMode && anyStaged;
   const fullyStaged = (c: FileChange) => !!c.staged && !c.unstaged;
+  // Staging everything at once would mark a file still holding conflict markers as resolved.
+  const conflicted = changes.some((c) => c.conflicted);
+  // What Stash and Discard act on: the picked files, or in the index view the staged ones (what is ticked).
+  const chosen = indexMode ? changes.filter((c) => c.staged).map((c) => c.path) : [...picked];
+  const allChosen = chosen.length === changes.length && changes.length > 0;
   const allStaged = changes.length > 0 && changes.every(fullyStaged);
 
   const [noVerify, setNoVerify] = useState(false);
@@ -174,7 +183,7 @@ export function Composer(props: Props) {
               ref={(el) => {
                 if (el) el.indeterminate = anyStaged && !allStaged;
               }}
-              disabled={busy || changes.length === 0}
+              disabled={busy || changes.length === 0 || conflicted}
               aria-label={t(allStaged ? "composer.unstageAll" : "composer.stageAll")}
               title={t(allStaged ? "composer.unstageAll" : "composer.stageAll")}
               onChange={() => onStage([], allStaged)}
@@ -324,13 +333,13 @@ export function Composer(props: Props) {
 
       {stashing && (
         <StashSaveDialog
-          count={all ? null : picked.size}
+          count={allChosen ? null : chosen.length}
           message={untouched ? "" : message.trim()}
           busy={busy}
           onCancel={() => setStashing(false)}
           onSave={(msg, options) => {
             setStashing(false);
-            onStash(msg, all ? [] : [...picked], options);
+            onStash(msg, allChosen ? [] : chosen, options);
           }}
         />
       )}
@@ -338,7 +347,7 @@ export function Composer(props: Props) {
       {!merging && (
         <div className="row side-actions">
           <button
-            disabled={busy || picked.size === 0}
+            disabled={busy || chosen.length === 0}
             title={t("composer.stash.title")}
             onClick={() => setStashing(true)}
           >
@@ -346,9 +355,9 @@ export function Composer(props: Props) {
           </button>
           <button
             className="danger ghost"
-            disabled={busy || picked.size === 0}
+            disabled={busy || chosen.length === 0}
             title={t("composer.discard.title")}
-            onClick={() => onDiscard([...picked])}
+            onClick={() => onDiscard(chosen)}
           >
             {t("composer.discard")}
           </button>

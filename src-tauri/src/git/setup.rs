@@ -32,7 +32,8 @@ impl CloneOptions {
         }
         let depth = self.depth.filter(|&d| d > 0);
         if let Some(d) = depth {
-            args.push(format!("--depth={d}"));
+            // `--no-local`: a clone from a folder on this computer ignores `--depth` otherwise.
+            args.extend([format!("--depth={d}"), "--no-local".into()]);
         }
         if self.single_branch {
             args.push("--single-branch".into());
@@ -67,10 +68,31 @@ pub fn clone(
         )
     })?;
     let target = dest.to_string_lossy();
+    // Whatever a failed clone leaves (e.g. a submodule that couldn't be fetched) is its own
+    // only when the folder was missing or empty before: then it goes, so trying again works.
+    let fresh = match std::fs::read_dir(dest) {
+        Ok(mut entries) => entries.next().is_none(),
+        Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+    };
+    let existed = dest.exists();
     let mut args = vec!["clone", "--progress"];
     args.extend(extra.iter().map(String::as_str));
     args.extend(["--", url, &target]);
     let o = stream_remote(parent, &args, on_progress)?;
+    if !o.ok && fresh {
+        if existed {
+            for entry in std::fs::read_dir(dest).into_iter().flatten().flatten() {
+                let p = entry.path();
+                let _ = if p.is_dir() && !p.is_symlink() {
+                    std::fs::remove_dir_all(&p)
+                } else {
+                    std::fs::remove_file(&p)
+                };
+            }
+        } else {
+            let _ = std::fs::remove_dir_all(dest);
+        }
+    }
     Ok(OpResult::with(remote_status(&o, false), o))
 }
 
@@ -205,7 +227,12 @@ mod tests {
         };
         assert_eq!(
             args(o),
-            ["--depth=5", "--no-single-branch", "--recurse-submodules"]
+            [
+                "--depth=5",
+                "--no-local",
+                "--no-single-branch",
+                "--recurse-submodules"
+            ]
         );
     }
 
@@ -225,6 +252,31 @@ mod tests {
         )
         .is_err());
         assert!(clone(" ", s(&parent.path().join("y")), &CloneOptions::default(), |_| {}).is_err());
+        // The folder that was in the way is left as it was.
+        assert_eq!(std::fs::read_to_string(parent.path().join("x")).unwrap(), "taken");
+        // A clone that fails into a new folder takes the folder away again, so a retry works.
+        let missing = parent.path().join("nothing-here");
+        let fresh = parent.path().join("fresh");
+        let r = clone(s(&missing), s(&fresh), &CloneOptions::default(), |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Failed);
+        assert!(!fresh.exists());
+    }
+
+    #[test]
+    fn a_shallow_clone_of_a_folder_on_this_computer_is_shallow() {
+        let src = repo();
+        for n in ["1", "2", "3"] {
+            commit_file(src.path(), "a.txt", n, n);
+        }
+        let parent = tempfile::tempdir().unwrap();
+        let dest = parent.path().join("shallow");
+        let depth = CloneOptions {
+            depth: Some(1),
+            ..Default::default()
+        };
+        let r = clone(s(src.path()), s(&dest), &depth, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(git_ok(&dest, &["rev-list", "--count", "HEAD"]).unwrap(), "1");
     }
 
     /// An HTTP server on 127.0.0.1 that answers every request with `status` and

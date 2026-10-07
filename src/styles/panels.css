@@ -252,6 +252,16 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: none;
+  white-space: nowrap;
+}
+/* A long hint (a path, a remote branch) gives way to the label. */
+.context-menu button > kbd {
+  min-width: 0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* In a menu where some entries have icons, the others keep the same text column. */
 .context-menu:has(.menu-label svg) .menu-label:not(:has(svg))::before {

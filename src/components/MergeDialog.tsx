@@ -15,6 +15,8 @@ interface Props {
   /** `target` is behind `source`: a fast-forward just moves it. */
   canFastForward: boolean;
   dirty: number;
+  /** Of those, changes to tracked files: a squash waits until there are none. */
+  trackedDirty: number;
   busy: boolean;
   onCancel(): void;
   /** `message` is null for git's own (or for a squash, which commits nothing). */
@@ -51,7 +53,9 @@ export function MergeDialog(p: Props) {
   // A fast-forward makes no commit, and a squash leaves the commit to the composer.
   const makesCommit = mode === "commit" || (mode === "fastForward" && !p.canFastForward);
   const body = mode === "squash" ? "merge.body.squash" : makesCommit ? "merge.body" : "merge.body.ff";
+  const blocked = mode === "squash" && p.trackedDirty > 0;
   const confirm = () => {
+    if (blocked) return;
     writeStored(MODE_KEY, mode);
     p.onConfirm(mode, makesCommit && message.trim() ? message.trim() : null);
   };
@@ -62,7 +66,7 @@ export function MergeDialog(p: Props) {
       actions={
         <>
           <button onClick={p.onCancel}>{t("common.cancel")}</button>
-          <button className="primary" autoFocus disabled={p.busy} onClick={confirm}>
+          <button className="primary" autoFocus disabled={p.busy || blocked} onClick={confirm}>
             {p.busy ? t("merge.going") : t(mode === "squash" ? "merge.go.squash" : "merge.go")}
           </button>
         </>
@@ -100,7 +104,11 @@ export function MergeDialog(p: Props) {
         />
       )}
       {p.switchesBranch && <p className="note">{t("merge.switch", { target: p.target })}</p>}
-      {p.dirty > 0 && <p className="note warn">{t("merge.dirty", { n: p.dirty })}</p>}
+      {blocked ? (
+        <p className="note warn">{t("merge.dirty.squash", { n: p.trackedDirty })}</p>
+      ) : (
+        p.dirty > 0 && <p className="note warn">{t("merge.dirty", { n: p.dirty })}</p>
+      )}
     </Modal>
   );
 }

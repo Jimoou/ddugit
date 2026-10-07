@@ -135,6 +135,8 @@ export interface Repo {
     amend?: boolean;
     /** The composer's message to start with. */
     message?: string;
+    /** Start the composer on the index (after a squash merge: commit exactly what it staged). */
+    stagedOnly?: boolean;
   }): void;
   setMenu(menu: Menu | null): void;
   /** Where the last menu opened, for a follow-up menu in the same spot. */

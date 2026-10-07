@@ -78,6 +78,8 @@ export const en: Record<Key, string> = {
   "merge.title": "Merge",
   "merge.body": "Merges <b>{source}</b> into <b>{target}</b> with a new merge commit.",
   "merge.switch": "Checks out {target} first, then merges.",
+  "merge.dirty.squash":
+    "You have {n:uncommitted change|uncommitted changes}. Commit or stash first: cancelling a squash that stopped on conflicts puts the work tree back as it was before the merge.",
   "merge.dirty": "You have {n:uncommitted change|uncommitted changes}. Git may refuse to merge if they conflict.",
   "merge.go": "Merge",
   "merge.going": "Merging…",
@@ -312,6 +314,9 @@ export const en: Record<Key, string> = {
   "remote.done.forcePush": "Force-pushed; the remote now matches your history",
   "state.merge": "Merge",
   "state.merge.hint": "Resolve the conflicts, then commit with ＋ to finish the merge.",
+  "stage.conflicted": "{file} still has conflicts. Resolve them first.",
+  "state.squash": "Squash merge",
+  "state.squash.hint": "Resolve the conflicts, then commit in the composer. Cancel goes back to before the merge.",
   "state.rebase": "Rebase",
   "state.rebase.hint": "Fix the files, then click “Continue” to resume the rebase.",
   "state.cherry-pick": "Cherry-pick",
@@ -434,6 +439,8 @@ export const en: Record<Key, string> = {
   "rebaseOnto.title": "Rebase onto another branch",
   "rebaseOnto.body":
     "Replays the {n:commit|commits} only <b>{current}</b> has on top of <b>{onto}</b>. Their commit IDs change.",
+  "rebaseOnto.bodyMore":
+    "Replays {n} or more commits only <b>{current}</b> has (history not loaded yet may hold more) on top of <b>{onto}</b>. Their commit IDs change.",
   "rebaseOnto.merges":
     "There {n:is a merge commit|are merge commits} among them. A rebase leaves merge commits out and lines the commits up in a row.",
   "rebaseOnto.dirty": "Uncommitted changes are put aside and restored when it's done.",
@@ -1338,7 +1345,7 @@ export const en: Record<Key, string> = {
   "settings.editor.custom": "Other program…",
   "settings.editor.placeholder": "Full path to the editor",
   "settings.editor.hint":
-    "Editors picked by name are found on PATH. Shells, interpreters and programs inside a repository or temp folder can't be used.",
+    "Editors picked by name are found on PATH. A program you name yourself is confirmed once more in a dialog showing its path. Shells, interpreters and programs inside a repository or temp folder can't be used.",
   "settings.diffTool": "External diff tool",
   "settings.mergeTool": "External merge tool",
   "settings.tool.git": "As set in git ({tool})",

@@ -480,8 +480,8 @@ export const api = {
       demoControls.nextSave = undefined;
       return next === undefined ? `/work/${name}` : next;
     }
-    const { save } = await import("@tauri-apps/plugin-dialog");
-    return save({ title, defaultPath: name });
+    // The backend shows the dialog and remembers the answer: only it may be written to.
+    return invoke<string | null>("pick_save_file", { title, name });
   },
   async pickFolder(title = t("app.open")): Promise<string | null> {
     if (!isTauri) {

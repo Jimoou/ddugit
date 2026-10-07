@@ -178,8 +178,10 @@ export const historyCommands = {
     const tip = repo.branches.get(t)!;
     if (repo.ancestors(tip).has(src)) return delay(res("ok", "Already up to date."));
     if (mode === "squash") {
-      // Like `--squash`: the changes staged (or stopped on conflicts), no commit and no merge in progress.
-      if (demoControls.conflictNext) return stopOnConflict("clean", src, source);
+      // Like `--squash`: the changes staged (or stopped on conflicts, shown as a squash in progress).
+      if (repo.changes.some((c) => c.staged || (c.unstaged && c.unstaged !== "untracked")))
+        return fail("Commit or stash your changes before a squash merge");
+      if (demoControls.conflictNext) return stopOnConflict("squash", src, source);
       const mine = repo.ancestors(tip);
       const paths = new Set([...repo.ancestors(src)].filter((id) => !mine.has(id)).flatMap((id) => filesOf(id)));
       for (const path of paths) {

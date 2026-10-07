@@ -112,7 +112,7 @@ export function RepoView({
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
-  const [composer, setComposer] = useState<false | { amend: boolean; message?: string }>(false);
+  const [composer, setComposer] = useState<false | { amend: boolean; message?: string; stagedOnly?: boolean }>(false);
   const [menu, setMenu] = useState<Menu | null>(null);
   // Where the last menu opened, for a follow-up menu in the same spot (picking a stack parent).
   const menuAt = useRef({ x: 0, y: 0 });
@@ -214,7 +214,9 @@ export function RepoView({
     setSelected(what.commit ?? null);
     if (what.commit) mission("inspect");
     setSelectedStash(what.stash ?? null);
-    setComposer(what.composer ? { amend: what.amend ?? false, message: what.message } : false);
+    setComposer(
+      what.composer ? { amend: what.amend ?? false, message: what.message, stagedOnly: what.stagedOnly } : false,
+    );
   };
 
   // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
@@ -687,6 +689,7 @@ export function RepoView({
             // A prefilled message (after a squash merge) starts a fresh panel.
             key={composer.message ?? ""}
             initialMessage={composer.message}
+            startStagedOnly={composer.stagedOnly}
             path={path}
             profiles={settings.profiles}
             onProfiles={(profiles) => onChangeSettings({ profiles })}

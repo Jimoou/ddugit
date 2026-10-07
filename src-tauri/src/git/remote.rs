@@ -234,10 +234,21 @@ pub fn push_to(
     if !pushable(&repo, super::operand(remote)?) {
         return Err(format!("{remote} is fetch-only"));
     }
-    let spec = heads_refspec(super::operand(&branch)?);
+    let spec = heads_refspec(valid(&branch, "heads")?);
     let args = ["push", "--progress", "-u", remote, &spec];
     let o = stream_remote(&dir, &args, on_progress)?;
     Ok(OpResult::with(remote_status(&o, true), o))
+}
+
+/// `name` when `refs/<kind>/<name>` is a ref name git accepts: never an option, nor a
+/// pattern (`*` in a refspec would push every branch).
+fn valid<'a>(name: &'a str, kind: &str) -> Result<&'a str> {
+    let name = super::operand(name)?;
+    if git2::Reference::is_valid_name(&format!("refs/{kind}/{name}")) {
+        Ok(name)
+    } else {
+        Err(format!("'{name}' is not a valid name"))
+    }
 }
 
 /// A ref sent to, or deleted on, a remote named by the user (not HEAD's upstream).
@@ -274,13 +285,13 @@ pub fn remote_ref(
     // Full ref names: a name can't be read as an option, nor as a refspec (`+v1` would force it).
     let (flag, target) = match op {
         RemoteRefOp::DeleteBranch { name } => {
-            (Some("--delete"), format!("refs/heads/{}", super::operand(name)?))
+            (Some("--delete"), format!("refs/heads/{}", valid(name, "heads")?))
         }
         RemoteRefOp::PushTag { name } => {
-            let name = super::operand(name)?;
+            let name = valid(name, "tags")?;
             (None, format!("refs/tags/{name}:refs/tags/{name}"))
         }
-        RemoteRefOp::DeleteTag { name } => (Some("--delete"), format!("refs/tags/{}", super::operand(name)?)),
+        RemoteRefOp::DeleteTag { name } => (Some("--delete"), format!("refs/tags/{}", valid(name, "tags")?)),
         RemoteRefOp::PushTags => (Some("--tags"), String::new()),
     };
     let mut args = vec!["push", "--progress"];
@@ -507,6 +518,10 @@ mod tests {
         assert!(remote_ref(s(a.path()), "origin", &del("--all"), |_| {}).is_err());
         assert!(remote_ref(s(a.path()), "origin", &tag, |_| {}).is_err());
         assert!(remote_ref(s(a.path()), "--all", &RemoteRefOp::PushTags, |_| {}).is_err());
+        // Patterns would push or match many refs at once.
+        let glob = RemoteRefOp::PushTag { name: "*".into() };
+        assert!(remote_ref(s(a.path()), "origin", &glob, |_| {}).is_err());
+        assert!(push_to(s(a.path()), "origin", Some("*"), |_| {}).is_err());
         git_ok(
             a.path(),
             &["remote", "set-url", "--push", "origin", super::super::NO_PUSH],

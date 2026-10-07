@@ -663,6 +663,11 @@ test("merges with its own message, by fast-forward, or as a squash for the compo
   // The last choice is offered first.
   await expect(dialog.getByRole("radio", { name: "fast-forward" })).toHaveAttribute("aria-checked", "true");
   await dialog.getByRole("radio", { name: "squash" }).click();
+  // Not over uncommitted work: going back from a squash's conflicts would take it along.
+  await expect(dialog.getByRole("button", { name: "스테이지" })).toBeDisabled();
+  await expect(dialog).toContainText("커밋하거나 보관(stash)한 뒤에");
+  await demo.mutate((d) => d.clean());
+  await expect(dialog.getByRole("button", { name: "스테이지" })).toBeEnabled();
   await dialog.getByRole("button", { name: "스테이지" }).click();
   await demo.toast("feature/theme의 변경을 스테이지했어요. 메시지를 확인하고 커밋하세요");
   snap = await demo.snapshot();
@@ -678,4 +683,30 @@ test("merges with its own message, by fast-forward, or as a squash for the compo
   head = snap.commits.find((c) => c.id === snap.head.target)!;
   expect(head.parents).toEqual([orbit]);
   expect(head.summary).toBe("feature/theme");
+});
+
+test("a squash merge stopped on conflicts keeps its message, and cancelling goes back", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  await demo.mutate((d) => {
+    d.clean();
+    d.conflictNext = true;
+  });
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  const dialog = page.getByRole("dialog", { name: "병합" });
+  await dialog.getByRole("radio", { name: "squash" }).click();
+  await dialog.getByRole("button", { name: "스테이지" }).click();
+  await expect(page.locator(".conflict-sheet")).toBeVisible();
+  // The message waits in the composer, which commits the index (what the squash staged).
+  await expect(page.locator(".composer textarea.message")).toHaveValue(/^feature\/theme\n/);
+  const banner = page.locator(".banner", { hasText: "진행 중" });
+  await expect(banner).toContainText("squash 병합 진행 중");
+  await banner.getByRole("button", { name: "취소" }).click();
+  await demo.toast("취소했어요");
+  await expect(banner).toHaveCount(0);
+  const snap = await demo.snapshot();
+  expect(snap.state).toBe("clean");
+  expect(snap.head.target).toBe(before.head.target);
+  expect(snap.changes).toHaveLength(0);
 });
