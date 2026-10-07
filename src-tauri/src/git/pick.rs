@@ -42,7 +42,7 @@ pub fn pick(path: &str, op: PickOp, id: &str, target: Option<&str>) -> Result<Op
 mod tests {
     use super::super::read::snapshot;
     use super::super::testutil::{commit_file, repo, s};
-    use super::super::write::{abort, checkout, continue_op, create_branch, merge};
+    use super::super::write::{abort, checkout, continue_op, create_branch, merge, MergeMode};
     use super::super::OpStatus;
     use super::*;
     use std::fs;
@@ -87,7 +87,7 @@ mod tests {
         create_branch(p, "feature", None, true).unwrap();
         commit_file(d.path(), "f.txt", "f", "feature");
         checkout(p, "main").unwrap();
-        merge(p, "feature", None).unwrap();
+        merge(p, "feature", None, MergeMode::Commit, None).unwrap();
         assert!(d.path().join("f.txt").exists());
         let r = pick(p, PickOp::Revert, &head_id(p), None).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);

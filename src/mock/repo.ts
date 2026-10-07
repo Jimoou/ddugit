@@ -30,13 +30,37 @@ export const fakeId = () => {
 
 export const AUTHORS = ["Jimin", "Seoyeon", "Hyunwoo", "Minji"];
 
+/**
+ * `head` while HEAD is detached: commits made there advance this pseudo-branch, which the
+ * snapshot doesn't list (it only keeps its commits in the history, like git's HEAD).
+ */
+const DETACHED = "HEAD";
+
 class MockRepo {
   commits = new Map<string, CommitInfo>();
   order: string[] = []; // newest first
   branches = new Map<string, string>();
   remotes = new Map<string, string>();
   tags = new Map<string, string>();
-  head = "main";
+  /** Tags on the remotes, as `<remote>/<tag>` → commit (git keeps no local copy; the demo has to). */
+  remoteTags = new Map<string, string>();
+  #head = "main";
+  /** The checked-out branch, or `DETACHED`. Switching to a branch forgets the detached HEAD. */
+  get head() {
+    return this.#head;
+  }
+  set head(name: string) {
+    if (name !== DETACHED) this.branches.delete(DETACHED);
+    this.#head = name;
+  }
+  get detached() {
+    return this.#head === DETACHED;
+  }
+  /** Check out commit `id` without a branch. */
+  detach(id: string) {
+    this.branches.set(DETACHED, id);
+    this.#head = DETACHED;
+  }
   changes: FileChange[] = [];
   state = "clean";
   clock = Math.floor(Date.now() / 1000) - 86400 * 40;
@@ -48,6 +72,8 @@ class MockRepo {
    */
   pending: { source: string; label: string; files: Map<string, string>; summary?: string; tip?: string } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
+  /** Lines of the top-level `.gitignore` (none at first). */
+  gitignore: string[] = [];
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();
   remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);
@@ -171,14 +197,16 @@ class MockRepo {
 
   snapshot(limit = Infinity): RepoSnapshot {
     const refs: RefInfo[] = [
-      ...[...this.branches].map(([name, target]) => ({ name, kind: "local" as const, target })),
+      ...[...this.branches]
+        .filter(([name]) => name !== DETACHED)
+        .map(([name, target]) => ({ name, kind: "local" as const, target })),
       ...[...this.remotes].map(([name, target]) => ({ name, kind: "remote" as const, target })),
       ...[...this.tags].map(([name, target]) => ({ name, kind: "tag" as const, target })),
     ];
     const [ahead, behind] = this.aheadBehind();
     // Like git, only list commits reachable from a ref (rebased-away ones vanish).
     const reachable = new Set<string>();
-    const stack = refs.map((r) => r.target);
+    const stack = [...refs.map((r) => r.target), ...(this.detached ? [this.branches.get(DETACHED)!] : [])];
     while (stack.length) {
       const id = stack.pop()!;
       if (reachable.has(id) || !this.commits.has(id)) continue;
@@ -190,7 +218,7 @@ class MockRepo {
       path: DEMO_ROOT,
       name: "ddugit-demo",
       head: {
-        branch: this.head,
+        branch: this.detached ? null : this.head,
         target: this.branches.get(this.head) ?? null,
         upstream: this.upstream(),
         ahead,
@@ -207,7 +235,13 @@ class MockRepo {
       worktrees: [
         { path: DEMO_ROOT, branch: this.head, main: true, current: true },
         ...this.worktrees.map((w) => ({ ...w, main: false, current: false })),
-      ].map((w) => ({ ...w, head: this.branches.get(w.branch) ?? null, locked: false, missing: false })),
+      ].map((w) => ({
+        ...w,
+        branch: w.branch === DETACHED ? null : w.branch,
+        head: this.branches.get(w.branch) ?? null,
+        locked: false,
+        missing: false,
+      })),
       submodules: this.submodules.map((m) => ({ ...m })),
     };
   }
@@ -234,6 +268,7 @@ function seed(): MockRepo {
   r.add("hotfix/crash", "Fix crash on empty repo");
   r.merge("hotfix/crash", "main");
   r.tags.set("v0.2.0", r.branches.get("main")!);
+  for (const [tag, id] of r.tags) r.remoteTags.set(`origin/${tag}`, id);
   r.add("feature/theme", "Sparkle particles");
   r.merge("main", "feature/theme", "Merge main into feature/theme");
   r.add("feature/theme", "Tune particle speed");

@@ -20,8 +20,9 @@ use git::pick::PickOp;
 use git::read::RepoSnapshot;
 use git::rebase::{RebaseStep, TodoItem};
 use git::refs::RefOp;
-use git::remote::{Progress, RemoteOp};
-use git::stash::StashOp;
+use git::remote::{Progress, RemoteOp, RemoteRefOp};
+use git::stash::{StashOp, StashOptions};
+use git::write::{CommitOptions, MergeMode};
 use git::OpResult;
 use tauri::ipc::Channel;
 
@@ -73,14 +74,21 @@ macro_rules! command {
 command!(repo_snapshot(path: String, limit: Option<usize>) -> RepoSnapshot
     => git::read::snapshot(&path, limit.unwrap_or(3000)));
 command!(repo_glance(paths: Vec<String>) -> Vec<git::glance::RepoGlance> => Ok(git::glance::glance(&paths)));
-command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool, staged_only: bool) -> OpResult
+command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool, staged_only: bool, options: CommitOptions) -> OpResult
 => if staged_only {
-    git::write::commit_index(&path, &message, amend)
+    git::write::commit_index(&path, &message, amend, options)
 } else {
-    git::write::commit(&path, &message, &paths, amend)
+    git::write::commit(&path, &message, &paths, amend, options)
 });
+command!(commit_template(path: String) -> Option<String> => git::write::commit_template(&path));
 command!(git_stage_hunks(path: String, file: String, hunks: Vec<String>, lines: Option<Vec<usize>>, unstage: bool) -> OpResult
     => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
+command!(git_discard_hunks(path: String, file: String, hunks: Vec<String>, lines: Option<Vec<usize>>) -> OpResult
+    => git::stage::discard_hunks(&path, &file, &hunks, lines.as_deref()));
+command!(git_stage_files(path: String, paths: Vec<String>, unstage: bool) -> OpResult
+    => git::stage::stage_files(&path, &paths, unstage));
+command!(git_ignore(path: String, patterns: Vec<String>, untrack: Vec<String>) -> OpResult
+    => git::ignore::ignore(&path, &patterns, &untrack));
 command!(backport_compare(path: String, source: String, target: String) -> Vec<BackportItem>
     => git::backport::compare(&path, &source, &target));
 // Backport actions are Pro; comparing branches stays Free.
@@ -119,8 +127,9 @@ command!(git_rebase(path: String, base: String, steps: Vec<RebaseStep>) -> OpRes
     => git::rebase::rebase(&path, &base, &steps));
 command!(git_rebase_todo(path: String, base: String) -> Vec<TodoItem> => git::rebase::todo(&path, &base));
 command!(set_git_path(git_path: Option<String>) -> String => git::set_program(git_path.as_deref()));
-command!(git_merge(path: String, source: String, target: Option<String>) -> OpResult
-    => git::write::merge(&path, &source, target.as_deref()));
+command!(git_rebase_onto(path: String, upstream: String) -> OpResult => git::rebase::onto(&path, &upstream));
+command!(git_merge(path: String, source: String, target: Option<String>, mode: MergeMode, message: Option<String>)
+    -> OpResult => git::write::merge(&path, &source, target.as_deref(), mode, message.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
 command!(git_continue(path: String) -> OpResult => git::write::continue_op(&path));
 command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) -> OpResult
@@ -141,8 +150,8 @@ command!(git_fetch_remote(path: String, name: String, on_progress: Channel<Progr
     => git::remote::fetch_one(&path, &name, |p| { let _ = on_progress.send(p); }));
 command!(git_push_to(path: String, remote: String, branch: Option<String>, on_progress: Channel<Progress>) -> OpResult
     => git::remote::push_to(&path, &remote, branch.as_deref(), |p| { let _ = on_progress.send(p); }));
-command!(git_delete_remote_branch(path: String, remote: String, branch: String, on_progress: Channel<Progress>) -> OpResult
-    => git::remote::delete_remote_branch(&path, &remote, &branch, |p| { let _ = on_progress.send(p); }));
+command!(git_remote_ref(path: String, remote: String, op: RemoteRefOp, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::remote_ref(&path, &remote, &op, |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));
 command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
     => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
@@ -230,13 +239,19 @@ command!(file_log(path: String, rev: String, file: String) -> Vec<git::history::
 command!(git_blame(path: String, rev: String, file: String) -> git::history::Blame
     => git::history::blame(&path, &rev, &file));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
-command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
-    => git::stash::stash_push(&path, &message, &paths));
+command!(git_stash_push(path: String, message: String, paths: Vec<String>, options: StashOptions) -> OpResult
+    => git::stash::stash_push(&path, &message, &paths, options));
+command!(git_stash_branch(path: String, id: String, name: String) -> OpResult
+    => git::stash::stash_branch(&path, &id, &name));
 command!(git_stash(path: String, op: StashOp, id: String) -> OpResult => git::stash::stash(&path, op, &id));
 command!(conflict_file(path: String, file: String) -> ConflictFile => git::conflict::conflict_file(&path, &file));
 command!(git_resolve(path: String, file: String, how: Resolution) -> OpResult
     => git::conflict::resolve(&path, &file, &how));
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
+command!(range_diff(path: String, from: String, to: String, merge_base: bool) -> Vec<FileDiff>
+    => git::diff::range_diff(&path, &from, &to, merge_base));
+command!(save_file(path: String, rev: String, file: String, dest: String) -> OpResult
+    => git::history::save_file(&path, &rev, &file, &dest));
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref(), scope));
 
@@ -292,12 +307,17 @@ pub fn run() {
             repo_glance,
             git_commit,
             git_stage_hunks,
+            git_discard_hunks,
+            git_stage_files,
+            git_ignore,
+            commit_template,
             set_git_path,
             git_version,
             app_info,
             report_send,
             git_rebase,
             git_rebase_todo,
+            git_rebase_onto,
             backport_compare,
             backport_ignore,
             backport_summary,
@@ -317,7 +337,7 @@ pub fn run() {
             git_remote,
             git_fetch_remote,
             git_push_to,
-            git_delete_remote_branch,
+            git_remote_ref,
             git_skip,
             git_reset,
             git_reflog,
@@ -364,10 +384,13 @@ pub fn run() {
             git_blame,
             git_discard,
             git_stash_push,
+            git_stash_branch,
             git_stash,
             conflict_file,
             git_resolve,
             commit_diff,
+            range_diff,
+            save_file,
             worktree_diff,
         ])
         .run(tauri::generate_context!())

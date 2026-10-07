@@ -464,10 +464,31 @@ table.diff tr.rem .sign {
 table.diff tr.hunk td {
   position: relative;
 }
-.hunk-btn {
+.hunk-btns {
   position: sticky;
   float: right;
   right: 8px;
+  display: flex;
+  gap: 6px;
+}
+.diff-sheet .file-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 10px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.diff-sheet .file-bar button {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  font: 11px var(--sans);
+}
+.hunk-btn {
   padding: 1px 8px;
   font: 11px var(--sans);
   border-color: var(--line-strong);

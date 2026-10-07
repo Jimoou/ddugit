@@ -38,6 +38,7 @@ interface Props {
   stashes: StashInfo[];
   selectedStash: number | null;
   onStash(index: number): void;
+  onStashMenu(stash: StashInfo, x: number, y: number): void;
   onAddRemote(): void;
   /** Remotes, for a fold per remote when there are several. */
   remotes: RemoteInfo[];
@@ -373,6 +374,10 @@ export function Sidebar(props: Props) {
                   className={selectedStash === st.index ? "focused" : ""}
                   title={st.message}
                   onClick={() => onStash(st.index)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    props.onStashMenu(st, e.clientX, e.clientY);
+                  }}
                 >
                   <span className="diamond" />
                   <span className="name">{stashTitle(st.message)}</span>

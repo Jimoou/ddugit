@@ -26,7 +26,6 @@ import { stashTitle } from "./format";
 import { planMove } from "./rebasePlan";
 import { useLoaded } from "./components/useLoaded";
 import type { Settings } from "./settings";
-import { signingHint } from "./identity";
 import { t } from "./i18n";
 import { openLink } from "./share";
 import { Rich } from "./i18n/Rich";
@@ -35,8 +34,20 @@ import type { Pt } from "./graph/scene";
 import { StackSection } from "./components/Stacks";
 import { proOpen, usePro } from "./pro";
 import type { FileDiff, FileTouch, LfsOp, RefInfo, StackBranch, StackOp } from "./types";
-import { askName, askNewBranch, checkoutRef, confirmPick, confirmThen, showCommit } from "./repo/actions";
-import { BisectBanner, StateBanner, TrailBanner } from "./repo/Banners";
+import { askName, askNewBranch, askRebaseOnto, checkoutRef, confirmPick, showCommit } from "./repo/actions";
+import {
+  applyStash,
+  branchFromStash,
+  changeMenu,
+  commitChanges,
+  discardFiles,
+  dropStash,
+  popStash,
+  saveStash,
+  stageFiles,
+  stashMenu,
+} from "./repo/changes";
+import { BisectBanner, CompareBanner, StateBanner, TrailBanner } from "./repo/Banners";
 import { RepoDialogs } from "./repo/Dialogs";
 import {
   branchesMenu,
@@ -52,7 +63,7 @@ import {
   worktreeMenu,
 } from "./repo/menus";
 import { RepoSheets } from "./repo/Sheets";
-import type { Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
+import type { CompareSide, Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
 import { useBisect } from "./repo/useBisect";
 import { useRemote } from "./repo/useRemote";
 import { useRun } from "./repo/useRun";
@@ -107,7 +118,7 @@ export function RepoView({
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
-  const [composer, setComposer] = useState<false | { amend: boolean }>(false);
+  const [composer, setComposer] = useState<false | { amend: boolean; message?: string }>(false);
   const [menu, setMenu] = useState<Menu | null>(null);
   // Where the last menu opened, for a follow-up menu in the same spot (picking a stack parent).
   const menuAt = useRef({ x: 0, y: 0 });
@@ -128,6 +139,7 @@ export function RepoView({
   const [tokenFor, setTokenFor] = useState<TokenForge | null>(null);
   /** File history: the commits that touched one file, drawn as a constellation. */
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
+  const [compareBase, setCompareBase] = useState<CompareSide | null>(null);
   const [zoom, setZoom] = useState(1);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
@@ -199,7 +211,7 @@ export function RepoView({
     setSelected(what.commit ?? null);
     if (what.commit) mission("inspect");
     setSelectedStash(what.stash ?? null);
-    setComposer(what.composer ? { amend: what.amend ?? false } : false);
+    setComposer(what.composer ? { amend: what.amend ?? false, message: what.message } : false);
   };
 
   // Changed files of the selected commit or stash (a stash is a commit too), for the side panel.
@@ -283,6 +295,15 @@ export function RepoView({
     (target: string, source: string, mode: Drag["mode"]) => {
       if (!snap || snap.state !== "clean") return false;
       if (mode === "move") return !!snap.head.target && !!planMove(commitById, snap.head.target, source, target);
+      // The current branch onto another branch (or remote branch) that neither contains nor is behind it.
+      if (mode === "rebase")
+        return (
+          !!snap.head.branch &&
+          source === snap.head.target &&
+          snap.refs.some((r) => r.target === target && (r.kind === "local" || r.kind === "remote")) &&
+          !isAncestor(target, source) &&
+          !isAncestor(source, target)
+        );
       if (!branchAt(target)) return false;
       return !isAncestor(source, target); // already contained otherwise
     },
@@ -362,6 +383,7 @@ export function RepoView({
     stacks,
     bisect: bisect.bisect,
     bisectDraft: bisect.draft,
+    compareBase,
     elsewhere,
     selected,
     colorOf,
@@ -377,6 +399,8 @@ export function RepoView({
     setSheet,
     setConflict,
     setBisectDraft: bisect.setDraft,
+    setCompareBase,
+    loadDiff,
     setTrail,
     play,
     playAfterDraw,
@@ -384,7 +408,7 @@ export function RepoView({
     onOpenPath,
     openUrl,
     fetchOne: remote.fetchOne,
-    deleteRemoteBranch: remote.deleteRemoteBranch,
+    remoteRef: remote.remoteRef,
     canDropOn,
     isAncestor,
   };
@@ -414,7 +438,6 @@ export function RepoView({
   const selectedCommit = selected ? commitById.get(selected) : undefined;
   const conflicts = snap.changes.filter((c) => c.conflicted).length;
   const headColor = colorOf(snap.head.target ?? "");
-  const closeWorktreeDiff = () => setSheet((s) => (s?.kind === "diff" && s.source.kind === "worktree" ? null : s));
 
   return (
     <div className="app" hidden={!active}>
@@ -437,6 +460,7 @@ export function RepoView({
 
       <BisectBanner repo={repo} />
       {trail && <TrailBanner repo={repo} trail={trail} />}
+      {compareBase && <CompareBanner repo={repo} base={compareBase} />}
       <StateBanner repo={repo} />
 
       <div className="main">
@@ -474,6 +498,7 @@ export function RepoView({
             const base = snap.stashes[i]?.base;
             if (base) graph.current?.centerOn(base);
           }}
+          onStashMenu={(st, x, y) => openMenu(repo, x, y, stashTitle(st.message), stashMenu(repo, st))}
           elsewhere={elsewhere}
           extra={
             <>
@@ -600,6 +625,7 @@ export function RepoView({
                   if (plan) setSheet({ kind: "rebase", from: plan.base, init: plan.steps });
                   return;
                 }
+                if (mode === "rebase") return askRebaseOnto(repo, sourceName(targetId, snap.head.branch!), targetId);
                 const target = branchAt(targetId)!;
                 if (mode === "merge")
                   return setDialog({ kind: "merge", sourceId, targetId, target, source: sourceName(sourceId, target) });
@@ -660,18 +686,14 @@ export function RepoView({
             </div>
           </div>
 
-          <RepoSheets
-            repo={repo}
-            sheet={sheet}
-            conflict={conflict}
-            rebase={rebase}
-            loadDiff={loadDiff}
-            askRemote={remote.askRemote}
-          />
+          <RepoSheets repo={repo} sheet={sheet} conflict={conflict} rebase={rebase} askRemote={remote.askRemote} />
         </section>
 
         {composer && (
           <Composer
+            // A prefilled message (after a squash merge) starts a fresh panel.
+            key={composer.message ?? ""}
+            initialMessage={composer.message}
             path={path}
             profiles={settings.profiles}
             onProfiles={(profiles) => onChangeSettings({ profiles })}
@@ -690,59 +712,12 @@ export function RepoView({
               // Fully staged files have nothing in the "unstaged" view.
               loadDiff({ kind: "worktree", scope: c?.unstaged ? "unstaged" : "staged" }, t("diff.worktree"), file);
             }}
-            onStash={(message, paths) =>
-              run(
-                t("stash.saved"),
-                () => api.stashPush(path, message, paths),
-                () => {
-                  show({});
-                  closeWorktreeDiff();
-                },
-              )
-            }
-            onDiscard={(paths) =>
-              confirmThen(
-                repo,
-                {
-                  title: t("discard.title"),
-                  danger: true,
-                  confirmLabel: t("discard.go", { n: paths.length }),
-                  body: (
-                    <>
-                      <p>
-                        <Rich k="discard.body" /> <b>{t("discard.warn")}</b>
-                      </p>
-                      <ul>
-                        {paths.map((p) => (
-                          <li key={p}>{p}</li>
-                        ))}
-                      </ul>
-                    </>
-                  ),
-                },
-                () => void run(t("discard.done"), () => api.discard(path, paths)),
-              )
-            }
-            onCommit={(message, paths, newBranch, amend, stagedOnly) =>
-              run(
-                amend ? t("commit.amended") : t("commit.done"),
-                async () => {
-                  if (newBranch) {
-                    const r = await api.createBranch(path, newBranch, null, true);
-                    if (r.status !== "ok") return r;
-                  }
-                  const r = await api.commit(path, message, paths, amend, stagedOnly);
-                  // git ran without a terminal: say what signing needs instead of git's bare error.
-                  const hint = r.status === "failed" ? signingHint(r.output) : null;
-                  return hint ? { ...r, output: `${r.output}\n${t(hint)}` } : r;
-                },
-                () => {
-                  setComposer(false);
-                  if (!amend) mission("commit");
-                  closeWorktreeDiff();
-                  setTimeout(() => graph.current?.centerOnHead(), 60);
-                },
-              )
+            onFileMenu={(c, x, y) => openMenu(repo, x, y, c.path, changeMenu(repo, c))}
+            onStage={(paths, unstage) => void stageFiles(repo, paths, unstage)}
+            onStash={(message, paths, options) => void saveStash(repo, message, paths, options)}
+            onDiscard={(paths) => discardFiles(repo, paths)}
+            onCommit={(message, paths, newBranch, amend, stagedOnly, options) =>
+              commitChanges(repo, message, paths, newBranch, amend, stagedOnly, options)
             }
           />
         )}
@@ -783,31 +758,10 @@ export function RepoView({
             onClose={() => show({})}
             onSelectBase={() => showCommit(repo, stashSel.base)}
             onOpenFile={(file) => loadDiff({ kind: "commit", id: stashSel.id }, stashTitle(stashSel.message), file)}
-            onPop={() =>
-              run(
-                t("stash.popped"),
-                () => api.stash(path, "pop", stashSel.id),
-                () => show({}),
-              )
-            }
-            onApply={() => run(t("stash.applied"), () => api.stash(path, "apply", stashSel.id))}
-            onDrop={() =>
-              confirmThen(
-                repo,
-                {
-                  title: t("stash.delete.title"),
-                  danger: true,
-                  confirmLabel: t("common.delete"),
-                  body: <p>{t("stash.delete.body", { name: stashTitle(stashSel.message) })}</p>,
-                },
-                () =>
-                  void run(
-                    t("stash.deleted"),
-                    () => api.stash(path, "drop", stashSel.id),
-                    () => show({}),
-                  ),
-              )
-            }
+            onPop={() => void popStash(repo, stashSel)}
+            onApply={() => void applyStash(repo, stashSel)}
+            onBranch={() => branchFromStash(repo, stashSel)}
+            onDrop={() => dropStash(repo, stashSel)}
           />
         )}
       </div>

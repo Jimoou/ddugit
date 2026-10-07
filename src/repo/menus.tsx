@@ -15,19 +15,23 @@ import {
   askLocalFor,
   askName,
   askNewBranch,
+  askRebaseOnto,
   askReset,
   askTagAt,
   checkout,
+  checkoutDetached,
   checkoutRef,
   confirmPick,
   confirmRevert,
   confirmThen,
   deleteBranch,
   deleteRemoteBranch,
+  deleteRemoteTag,
   deleteTag,
   markBisect,
   openEdit,
   openTrail,
+  pushTag,
   refRun,
   removeRemote,
   removeWorktree,
@@ -36,6 +40,7 @@ import {
   showCommit,
   undoLastCommit,
 } from "./actions";
+import { compareNodeItems, compareRefItem, saveVersionItem } from "./compare";
 import type { Repo } from "./state";
 import { splitRemote } from "./useRemote";
 
@@ -146,19 +151,42 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
         target: snap.head.branch!,
       }),
   };
-  const compare: MenuItem = {
+  const rebaseOnto: MenuItem = {
+    label: t("menu.rebaseOnto", { current: snap.head.branch ?? "HEAD", branch: r.name }),
+    disabled: isHead || r.kind === "tag" || !repo.canDropOn(r.target, snap.head.target ?? "", "rebase"),
+    onSelect: () => askRebaseOnto(repo, r.name, r.target),
+  };
+  const backport: MenuItem = {
     label: snap.head.branch ? t("menu.compare", { branch: snap.head.branch }) : t("menu.compareHead"),
     hint: t("menu.compare.hint"),
     disabled: !snap.head.branch || isHead,
     onSelect: () => repo.setSheet({ kind: "backport", source: r.name, target: snap.head.branch! }),
   };
-  if (r.kind === "tag")
+  if (r.kind === "tag") {
+    // Nothing is pushed to a fetch-only remote, deletions included.
+    const remotes = snap.remotes.filter((x) => x.push).map((x) => x.name);
     return [
       { label: t("menu.tag.goto"), onSelect: () => repo.graph()?.centerOn(r.target) },
+      {
+        label: t("menu.checkout"),
+        hint: t("menu.detached.hint"),
+        disabled: !snap.head.branch && snap.head.target === r.target,
+        onSelect: () => checkoutDetached(repo, `refs/tags/${r.name}`, r.name),
+      },
       notesItem(repo, r.name),
       "separator",
+      ...remotes.map((remote) => ({
+        label: t("tag.push.menu", { remote }),
+        onSelect: () => pushTag(repo, remote, r.name),
+      })),
       { label: t("tag.delete.title"), danger: true, onSelect: () => deleteTag(repo, r.name) },
+      ...remotes.map((remote) => ({
+        label: t("menu.deleteRemoteBranch", { remote }),
+        danger: true,
+        onSelect: () => deleteRemoteTag(repo, remote, r.name),
+      })),
     ];
+  }
   if (r.kind === "remote") {
     const { remote: name, branch } = splitRemote(snap, r.name);
     return [
@@ -172,7 +200,9 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
         onSelect: () => askLocalFor(repo, r, t("branch.fromRemote", { remote: r.name }), `${name}-${branch}`),
       },
       merge,
-      compare,
+      rebaseOnto,
+      compareRefItem(repo, r),
+      backport,
       "separator",
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(repo, r.target) },
       "separator",
@@ -194,7 +224,9 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       onSelect: () => repo.setDialog({ kind: "worktree", branch: r.name }),
     },
     merge,
-    compare,
+    rebaseOnto,
+    compareRefItem(repo, r),
+    backport,
     {
       label: t("pr.new", { noun: nounOf(repo.pulls?.forges ?? []) }),
       icon: "pull",
@@ -236,6 +268,11 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
       icon: "head" as const,
       onSelect: () => void checkout(repo, r.name),
     })),
+    {
+      label: t("menu.checkoutDetached"),
+      disabled: isHead && !snap.head.branch,
+      onSelect: () => checkoutDetached(repo, id, id.slice(0, 7)),
+    },
     "separator" as const,
     {
       label: snap.head.branch ? t("menu.pickInto", { branch: snap.head.branch }) : t("menu.pickIntoHead"),
@@ -293,11 +330,13 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
       onSelect: () => repo.setSheet({ kind: "rebase", from: id, init: null }),
     },
     "separator" as const,
+    ...compareNodeItems(repo, id),
+    "separator" as const,
     { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => copyText(id) },
   ];
 }
 
-/** A commit's changed file: put it back as this commit (or its parent) had it, or follow its history. */
+/** A commit's changed file: put it back as this commit (or its parent) had it, follow its history, or save a copy. */
 export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem[] {
   const restore = (rev: string) =>
     void repo.run(t("file.restored", { file }), () => api.restoreFile(repo.path, rev, file));
@@ -314,6 +353,8 @@ export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem
       hint: "blame",
       onSelect: () => repo.setSheet({ kind: "blame", rev: commit.id, file }),
     },
+    "separator",
+    saveVersionItem(repo, commit, file),
   ];
 }
 
@@ -328,6 +369,11 @@ export function remoteMenu(repo: Repo, name: string): MenuItem[] {
   return [
     { label: t("remote.fetchOne", { name }), icon: "fetch", onSelect: () => void repo.fetchOne(name) },
     { label: t("remote.copyUrl"), onSelect: () => copyText(info?.url ?? "") },
+    {
+      label: t("remote.pushTags"),
+      disabled: info?.push === false || !repo.snap.refs.some((r) => r.kind === "tag"),
+      onSelect: () => void repo.remoteRef(name, { kind: "pushTags" }, t("remote.pushTags.done", { name })),
+    },
     {
       label: info?.push === false ? t("remote.allowPush", { name }) : t("remote.blockPush", { name }),
       onSelect: () => {

@@ -86,7 +86,13 @@ export const refsCommands = {
       demoControls.failNext = null;
       return fail(crash);
     }
-    if (!repo.branches.has(target)) return fail(`Unknown branch '${target}'`);
+    if (!repo.branches.has(target)) {
+      // A tag (by its full ref name) or a commit: HEAD detaches there.
+      const id = repo.tags.get(target.replace(/^refs\/tags\//, "")) ?? repo.commits.get(target)?.id;
+      if (!id) return fail(`error: pathspec '${target}' did not match any file(s) known to git`);
+      repo.detach(id);
+      return delay(res("ok", `HEAD is now at ${id.slice(0, 7)} ${repo.commits.get(id)!.summary}`));
+    }
     const elsewhere = repo.worktrees.find((w) => w.branch === target);
     if (elsewhere) return fail(`fatal: '${target}' is already used by worktree at '${elsewhere.path}'`);
     repo.head = target;

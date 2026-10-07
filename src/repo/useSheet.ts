@@ -28,9 +28,18 @@ export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Ma
       if (!path) return;
       const req = ++diffReq.current;
       const load =
-        source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
+        source.kind === "commit"
+          ? api.commitDiff(path, source.id)
+          : source.kind === "range"
+            ? api.rangeDiff(path, source.from.id, source.to.id, source.mergeBase)
+            : api.worktreeDiff(path, null, source.scope);
+      // Only the latest request lands, and only on the diff it was for: a reply for the other
+      // working-tree tab (or another commit) must not fill this one.
       const land = (files: Awaited<typeof load>, error: string | null) =>
-        req === diffReq.current && setSheet((s) => (s?.kind === "diff" ? { ...s, files, error: error ?? s.error } : s));
+        req === diffReq.current &&
+        setSheet((s) =>
+          s?.kind === "diff" && sameSource(s.source, source) ? { ...s, files, error: error ?? s.error } : s,
+        );
       load.then(
         (files) => land(files, null),
         (e) => land([], String(e)),
@@ -45,7 +54,8 @@ export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Ma
         kind: "diff",
         source,
         title,
-        files: s?.kind === "diff" && s.title === title ? s.files : null,
+        // Keep the files while the same diff reloads; another source starts empty.
+        files: s?.kind === "diff" && s.title === title && sameSource(s.source, source) ? s.files : null,
         error: null,
         path: file,
       }));
@@ -110,3 +120,6 @@ export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Ma
 
   return { sheet, setSheet, conflict, setConflict, loadDiff, rebase };
 }
+
+/** Whether two diff sources show the same thing (same commit, range or working-tree tab). */
+export const sameSource = (a: DiffSource, b: DiffSource) => JSON.stringify(a) === JSON.stringify(b);

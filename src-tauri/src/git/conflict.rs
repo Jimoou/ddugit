@@ -125,7 +125,7 @@ pub fn resolve(path: &str, file: &str, how: &Resolution) -> Result<OpResult> {
 mod tests {
     use super::super::read::snapshot;
     use super::super::testutil::{commit_file, repo, s};
-    use super::super::write::{checkout, create_branch, merge};
+    use super::super::write::{checkout, create_branch, merge, MergeMode};
     use super::super::OpStatus;
     use super::*;
 
@@ -138,7 +138,10 @@ mod tests {
         commit_file(d.path(), "a.txt", "one\nfeature\nthree\n", "feature edit");
         checkout(p, "main").unwrap();
         commit_file(d.path(), "a.txt", "one\nmain\nthree\n", "main edit");
-        assert_eq!(merge(p, "feature", None).unwrap().status, OpStatus::Conflict);
+        assert_eq!(
+            merge(p, "feature", None, MergeMode::Commit, None).unwrap().status,
+            OpStatus::Conflict
+        );
         d
     }
 

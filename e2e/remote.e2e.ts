@@ -333,3 +333,48 @@ test("deletes a branch on its remote from the remote branch's menu, keeping the 
   expect(snap.refs.some((r) => r.kind === "remote" && r.name === "origin/feature/theme")).toBe(false);
   expect(snap.refs.some((r) => r.kind === "local" && r.name === "feature/theme")).toBe(true);
 });
+
+test("pushes tags to a remote and deletes one there, keeping the local tag", async ({ demo }) => {
+  const { page } = demo;
+  const remoteTags = () => page.evaluate(() => window.__ddugitDemo.remoteTags());
+  const tags = page.locator(".sidebar section", { has: page.locator("h3", { hasText: "태그" }) });
+  const tagMenu = async (tag: string, item: string) => {
+    await tags.locator("li", { hasText: tag }).click({ button: "right" });
+    await page.locator(".context-menu").getByRole("menuitem", { name: item }).click();
+  };
+
+  // A new tag goes up right away when asked.
+  const head = (await demo.snapshot()).head.target!;
+  await (await demo.commitMenu(head)).getByText("여기에 태그…").click();
+  const dialog = page.getByRole("dialog", { name: `${head.slice(0, 7)}에 태그` });
+  await dialog.getByPlaceholder("v1.0.0").fill("v0.3.0");
+  await dialog.getByRole("checkbox", { name: "만든 뒤 origin에 바로 올리기 (Push)" }).check();
+  await dialog.getByRole("button", { name: "태그 만들기" }).click();
+  await demo.toast("v0.3.0 태그를 origin에 올렸어요");
+  expect(await remoteTags()).toContain("origin/v0.3.0");
+
+  await tagMenu("v0.2.0", "origin에서 삭제…");
+  const confirm = page.getByRole("dialog", { name: "원격 태그 삭제" });
+  await expect(confirm).toContainText("origin의 태그 v0.2.0");
+  await confirm.getByRole("button", { name: "삭제" }).click();
+  await demo.toast("origin에서 v0.2.0 태그를 지웠어요");
+  expect(await remoteTags()).not.toContain("origin/v0.2.0");
+  expect((await demo.snapshot()).refs.some((r) => r.kind === "tag" && r.name === "v0.2.0")).toBe(true);
+
+  // "Push all tags" from the remote's menu brings it back; missing sign-in opens the help first.
+  await demo.mutateQuietly((d) => (d.failNextRemote = "https"));
+  const origin = page.locator(".sidebar section.remote-sub").filter({ hasText: "origin" });
+  const pushAll = async () => {
+    await origin.getByRole("button", { name: "origin 메뉴" }).click();
+    await page.locator(".context-menu").getByRole("menuitem", { name: "모든 태그 올리기 (Push)" }).click();
+  };
+  await pushAll();
+  await expect(page.locator(".dialog.auth")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await pushAll();
+  await demo.toast("origin에 모든 태그를 올렸어요");
+  expect((await remoteTags()).sort()).toEqual(["origin/v0.1.0", "origin/v0.2.0", "origin/v0.3.0"]);
+
+  await tagMenu("v0.1.0", "origin에 올리기 (Push)");
+  await demo.toast("v0.1.0 태그를 origin에 올렸어요");
+});

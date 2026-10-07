@@ -112,20 +112,39 @@ export const remoteCommands = {
     return res("ok", `branch '${b}' set up to track '${name}/${b}'.`);
   },
 
-  async git_delete_remote_branch({ remote: name, branch, onProgress }) {
+  async git_remote_ref({ remote: name, op, onProgress }) {
     if (repo.fetchOnly.has(name)) return fail(`${name} is fetch-only`);
     const fake = demoControls.failNextRemote;
     if (fake) {
       demoControls.failNextRemote = null;
       return delay(res("auth", AUTH_OUTPUT[fake]));
     }
-    const ref = `${name}/${branch}`;
-    if (!repo.remotes.has(ref)) return res("failed", `error: unable to delete '${branch}': remote ref does not exist`);
     onProgress.onmessage({ phase: "Writing objects", percent: 100 });
     await delay(null, 40);
-    repo.remotes.delete(ref);
-    for (const [local, up] of repo.tracking) if (up === ref) repo.tracking.delete(local);
-    return res("ok", ` - [deleted]         ${branch}`);
+    if (op.kind === "deleteBranch") {
+      const ref = `${name}/${op.name}`;
+      if (!repo.remotes.has(ref))
+        return res("failed", `error: unable to delete '${op.name}': remote ref does not exist`);
+      repo.remotes.delete(ref);
+      for (const [local, up] of repo.tracking) if (up === ref) repo.tracking.delete(local);
+      return res("ok", ` - [deleted]         ${op.name}`);
+    }
+    if (op.kind === "deleteTag") {
+      if (!repo.remoteTags.delete(`${name}/${op.name}`))
+        return res("failed", `error: unable to delete '${op.name}': remote ref does not exist`);
+      return res("ok", ` - [deleted]         ${op.name}`);
+    }
+    const tags = op.kind === "pushTags" ? [...repo.tags.keys()] : [op.name];
+    const lines: string[] = [];
+    for (const tag of tags) {
+      const id = repo.tags.get(tag);
+      if (!id) return res("failed", `error: src refspec refs/tags/${tag} does not match any`);
+      const there = repo.remoteTags.get(`${name}/${tag}`);
+      if (there && there !== id) return res("rejected", ` ! [rejected]        ${tag} -> ${tag} (already exists)`);
+      if (!there) lines.push(` * [new tag]         ${tag} -> ${tag}`);
+      repo.remoteTags.set(`${name}/${tag}`, id);
+    }
+    return res("ok", lines.join("\n") || "Everything up-to-date");
   },
 
   async git_remote({ path, op, onProgress }) {

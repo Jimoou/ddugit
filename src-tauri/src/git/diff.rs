@@ -1,5 +1,5 @@
-//! Diffs via libgit2: a commit against its first parent, or local changes
-//! (all / unstaged / staged) against HEAD and the index.
+//! Diffs via libgit2: a commit against its first parent, two revisions against
+//! each other, or local changes (all / unstaged / staged) against HEAD and the index.
 
 use git2::{Delta, Diff, DiffFindOptions, DiffOptions, Patch, Repository};
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,35 @@ pub fn commit_diff(path: &str, id: &str) -> Result<Vec<FileDiff>> {
         .diff_tree_to_tree(
             parent_tree.as_ref(),
             Some(&commit.tree().map_err(err)?),
+            Some(&mut options()),
+        )
+        .map_err(err)?;
+    find_renames(&mut diff)?;
+    collect(&mut diff)
+}
+
+/// Changes from `from` to `to`. With `merge_base`, from their merge base instead of
+/// `from` itself (`git diff from...to`): what `to` adds since the two went apart.
+pub fn range_diff(path: &str, from: &str, to: &str, merge_base: bool) -> Result<Vec<FileDiff>> {
+    let repo = open(path)?;
+    let commit = |rev: &str| {
+        repo.revparse_single(rev)
+            .and_then(|o| o.peel_to_commit())
+            .map_err(err)
+    };
+    let (a, b) = (commit(from)?, commit(to)?);
+    let base = if merge_base {
+        let id = repo
+            .merge_base(a.id(), b.id())
+            .map_err(|_| format!("{from} and {to} have no common history"))?;
+        repo.find_commit(id).map_err(err)?
+    } else {
+        a
+    };
+    let mut diff = repo
+        .diff_tree_to_tree(
+            Some(&base.tree().map_err(err)?),
+            Some(&b.tree().map_err(err)?),
             Some(&mut options()),
         )
         .map_err(err)?;
@@ -238,7 +267,7 @@ fn header(h: &git2::DiffHunk) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::super::testutil::{commit_file, repo, s};
+    use super::super::testutil::{commit_file, repo, run, s};
     use super::*;
     use std::fs;
 
@@ -261,6 +290,66 @@ mod tests {
         let root = commit_diff(s(d.path()), "HEAD~1").unwrap();
         assert_eq!(root[0].status, "added");
         assert_eq!(root[0].additions, 3);
+    }
+
+    fn head(p: &std::path::Path) -> String {
+        run(p, &["rev-parse", "HEAD"]).trim().to_string()
+    }
+
+    #[test]
+    fn range_diff_between_two_commits() {
+        let d = repo();
+        commit_file(d.path(), "a.txt", "one\n", "first");
+        let first = head(d.path());
+        commit_file(d.path(), "b.txt", "two\n", "second");
+        commit_file(d.path(), "a.txt", "one\nmore\n", "third");
+
+        let files = range_diff(s(d.path()), &first, "HEAD", false).unwrap();
+        let got: Vec<(&str, &str, usize)> = files
+            .iter()
+            .map(|f| (f.path.as_str(), f.status.as_str(), f.additions))
+            .collect();
+        assert_eq!(got, [("a.txt", "modified", 1), ("b.txt", "added", 1)]);
+        // Swapped: the same changes, undone.
+        let back = range_diff(s(d.path()), "HEAD", &first, false).unwrap();
+        assert_eq!(back[1].status, "deleted");
+        assert!(range_diff(s(d.path()), "HEAD", "HEAD", false).unwrap().is_empty());
+        assert!(range_diff(s(d.path()), "nope", "HEAD", false).is_err());
+    }
+
+    #[test]
+    fn range_diff_from_the_merge_base_shows_only_what_the_branch_adds() {
+        let d = repo();
+        commit_file(d.path(), "base.txt", "base\n", "base");
+        run(d.path(), &["checkout", "-qb", "feature"]);
+        commit_file(d.path(), "feature.txt", "f\n", "feature work");
+        run(d.path(), &["checkout", "-q", "main"]);
+        commit_file(d.path(), "main.txt", "m\n", "main moves on");
+
+        let paths = |files: Vec<FileDiff>| files.into_iter().map(|f| f.path).collect::<Vec<_>>();
+        let direct = range_diff(s(d.path()), "main", "feature", false).unwrap();
+        assert_eq!(paths(direct), ["feature.txt", "main.txt"]);
+        let added = range_diff(s(d.path()), "main", "feature", true).unwrap();
+        assert_eq!(added[0].status, "added");
+        assert_eq!(paths(added), ["feature.txt"]);
+        let other_way = range_diff(s(d.path()), "feature", "main", true).unwrap();
+        assert_eq!(paths(other_way), ["main.txt"]);
+    }
+
+    #[test]
+    fn range_diff_finds_renames() {
+        let d = repo();
+        let body: String = (0..20).map(|i| format!("line {i}\n")).collect();
+        commit_file(d.path(), "old.txt", &body, "add");
+        let first = head(d.path());
+        run(d.path(), &["mv", "old.txt", "new.txt"]);
+        commit_file(d.path(), "other.txt", "x\n", "rename and more");
+
+        let files = range_diff(s(d.path()), &first, "HEAD", false).unwrap();
+        assert_eq!(files.len(), 2);
+        let renamed = files.iter().find(|f| f.path == "new.txt").unwrap();
+        assert_eq!(renamed.status, "renamed");
+        assert_eq!(renamed.old_path.as_deref(), Some("old.txt"));
     }
 
     #[test]
@@ -290,7 +379,7 @@ mod tests {
     fn binary_files_have_no_hunks() {
         let d = repo();
         fs::write(d.path().join("bin.dat"), [0u8, 1, 2, 0, 255]).unwrap();
-        crate::git::write::commit(s(d.path()), "bin", &[], false).unwrap();
+        crate::git::write::commit(s(d.path()), "bin", &[], false, Default::default()).unwrap();
         let files = commit_diff(s(d.path()), "HEAD").unwrap();
         assert!(files[0].binary);
         assert!(files[0].hunks.is_empty());

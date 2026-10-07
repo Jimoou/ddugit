@@ -16,21 +16,24 @@ export interface NameRequest {
   free?: boolean;
   /** A second, optional field: a tag message. */
   extra?: { placeholder: string };
-  onSubmit(name: string, extra: string): void;
+  /** An option under the fields, off at first (push the new tag too). */
+  check?: { label: string };
+  onSubmit(name: string, extra: string, checked: boolean): void;
 }
 
 /** Asks for a ref-like name (spaces become dashes) and optionally a second value. */
 export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: boolean; onCancel(): void }) {
-  const { title, placeholder, confirmLabel, initial = "", extra, onSubmit } = req;
+  const { title, placeholder, confirmLabel, initial = "", extra, check, onSubmit } = req;
   const [name, setName] = useState(req.value ?? initial);
   const [message, setMessage] = useState("");
+  const [checked, setChecked] = useState(false);
   const ok = name.trim() !== "" && name.trim() !== initial && !busy;
   return (
     <Modal
       onClose={onCancel}
       title={title}
       onSubmit={() => {
-        if (ok) onSubmit(name.trim(), message.trim());
+        if (ok) onSubmit(name.trim(), message.trim(), checked);
       }}
       actions={
         <>
@@ -59,6 +62,12 @@ export function NameDialog({ req, busy, onCancel }: { req: NameRequest; busy: bo
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
+      )}
+      {check && (
+        <label className="check">
+          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+          {check.label}
+        </label>
       )}
     </Modal>
   );

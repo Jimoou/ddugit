@@ -58,6 +58,14 @@ const SIGN_FAILURES = {
   ssh: 'error: Load key "/home/pilot/.ssh/id_ed25519": incorrect passphrase supplied to decrypt private key?\nfatal: failed to write commit object',
 };
 
+/** Whether a `.gitignore` pattern of the kinds the app writes (`/path`, `/dir/`, `*.ext`) covers `path`. */
+function demoIgnores(pattern: string, path: string) {
+  const p = pattern.replace(/\\(.)/g, "$1");
+  if (p.startsWith("*.")) return path.endsWith(p.slice(1));
+  const anchored = p.replace(/^\//, "");
+  return anchored.endsWith("/") ? path.startsWith(anchored) : path === anchored;
+}
+
 /** A commit in the demo (signing is noted by `git_commit`). */
 function demoCommit({ message, paths, amend, stagedOnly }: Args<"git_commit">): Promise<OpResult> {
   if (!message.trim()) return fail("Commit message is empty");
@@ -98,11 +106,18 @@ export const localCommands = {
       demoControls.signFail = null;
       return delay(res("failed", SIGN_FAILURES[sign]));
     }
+    if (demoControls.preCommitFails && !args.options.noVerify)
+      return delay(res("failed", "lint: 2 problems (no-unused-vars)\nhusky - pre-commit hook exited with code 1"));
     const r = await demoCommit(args);
     const id = demoReadIdentity(args.path);
-    if (r.status === "ok" && id.sign?.value && id.key) demoSigned.add(repo.branches.get(repo.head)!);
+    if (r.status === "ok") {
+      if (id.sign?.value && id.key) demoSigned.add(repo.branches.get(repo.head)!);
+      const trailer = `Signed-off-by: ${id.name?.value} <${id.email?.value}>`;
+      demoControls.lastMessage = args.options.signoff ? `${args.message}\n\n${trailer}` : args.message;
+    }
     return r;
   },
+  commit_template: () => delay(demoControls.commitTemplate, 20),
   identity_read: ({ path }) => delay(demoReadIdentity(path), 40),
   git_identity({ path, op }) {
     const r = demoSetIdentity(path, op);
@@ -126,11 +141,15 @@ export const localCommands = {
     return delay(res("ok"));
   },
 
-  git_stash_push({ message, paths }) {
+  git_stash_push({ message, paths, options }) {
     const set = new Set(paths.length ? paths : repo.changes.map((c) => c.path));
-    const moved = repo.changes.filter((c) => set.has(c.path));
+    const isUntracked = (c: FileChange) => c.unstaged === "untracked" && !c.staged;
+    const moved = repo.changes.filter((c) => set.has(c.path) && (options.untracked || !isUntracked(c)));
     if (!moved.length) return fail("No local changes to save");
-    repo.changes = repo.changes.filter((c) => !set.has(c.path));
+    // `--keep-index` leaves what was staged in place (staged); the rest goes into the stash.
+    repo.changes = repo.changes.flatMap((c) =>
+      !moved.includes(c) ? [c] : options.keepIndex && c.staged ? [{ ...c, unstaged: null }] : [],
+    );
     repo.stashes.unshift({
       message: `On ${repo.head}: ${message || "ddugit stash"}`,
       id: fakeId(),
@@ -152,6 +171,55 @@ export const localCommands = {
       repo.changes.push(...st.changes.filter((c) => !have.has(c.path)));
     }
     if (op !== "apply") repo.stashes.splice(index, 1);
+    return delay(res("ok"));
+  },
+
+  git_stash_branch({ id, name }) {
+    const index = repo.stashes.findIndex((s) => s.id === id);
+    const st = repo.stashes[index];
+    if (!st) return fail("That stash no longer exists; the list has been refreshed");
+    if (repo.branches.has(name)) return fail(`Branch '${name}' already exists`);
+    if (repo.changes.length) return fail("error: Your local changes would be overwritten by checkout.");
+    repo.branches.set(name, st.base);
+    repo.head = name;
+    repo.changes = st.changes.map((c) => ({ ...c }));
+    repo.stashes.splice(index, 1);
+    return delay(res("ok", `Switched to a new branch '${name}'\nDropped ${id}`));
+  },
+
+  git_stage_files({ paths, unstage }) {
+    const set = new Set(paths);
+    for (const c of repo.changes) {
+      if (paths.length && !set.has(c.path)) continue;
+      const kind = c.unstaged ?? c.staged ?? "modified";
+      if (!unstage && c.unstaged) Object.assign(c, { staged: kind === "untracked" ? "added" : kind, unstaged: null });
+      if (unstage && c.staged) Object.assign(c, { staged: null, unstaged: kind === "added" ? "untracked" : kind });
+    }
+    return delay(res("ok"));
+  },
+
+  git_discard_hunks({ file }) {
+    // Demo files have one hunk: discarding it (or some of its lines) drops the file's unstaged change.
+    const c = repo.changes.find((x) => x.path === file && x.unstaged);
+    if (!c) return fail(`No changes to '${file}'`);
+    repo.changes = c.staged
+      ? repo.changes.map((x) => (x === c ? { ...x, unstaged: null } : x))
+      : repo.changes.filter((x) => x !== c);
+    return delay(res("ok"));
+  },
+
+  git_ignore({ patterns, untrack }) {
+    const fresh = patterns.filter((p) => !repo.gitignore.includes(p));
+    if (fresh.length && !repo.gitignore.length && !repo.changes.some((c) => c.path === ".gitignore"))
+      repo.changes.push({ path: ".gitignore", staged: null, unstaged: "untracked", conflicted: false });
+    repo.gitignore.push(...new Set(fresh));
+    const ignored = (path: string) => repo.gitignore.some((p) => demoIgnores(p, path));
+    const gone = new Set(untrack);
+    repo.changes = repo.changes.filter((c) => gone.has(c.path) || !(c.unstaged === "untracked" && ignored(c.path)));
+    for (const path of untrack) {
+      const now = { path, staged: "deleted", unstaged: ignored(path) ? null : "untracked", conflicted: false };
+      repo.changes = [...repo.changes.filter((c) => c.path !== path), now];
+    }
     return delay(res("ok"));
   },
 
@@ -184,6 +252,16 @@ export const localCommands = {
     const status = (i: number) =>
       c.parents.length === 0 || (i === files.length - 1 && h % 4 === 0) ? "added" : "modified";
     return delay(files.map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
+  },
+
+  range_diff({ from, to, mergeBase }) {
+    const unknown = [from, to].find((id) => !repo.commits.has(id));
+    if (unknown) return fail(`Unknown commit ${unknown}`);
+    // The files the commits between the two touched (from the merge base: only `to`'s side).
+    const [a, b] = [repo.ancestors(from), repo.ancestors(to)];
+    const between = [...b].filter((id) => !a.has(id)).concat(mergeBase ? [] : [...a].filter((id) => !b.has(id)));
+    const files = [...new Set(between.flatMap(filesOf))].sort();
+    return delay(files.map((f) => fakeFile(f, hash(f + from + to), `${from.slice(0, 7)} → ${to.slice(0, 7)}`)));
   },
 
   worktree_diff({ file, scope }) {

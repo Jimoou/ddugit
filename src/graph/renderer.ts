@@ -65,8 +65,8 @@ export interface Drag {
   to: Pt;
   target: string | null;
   valid: boolean;
-  /** Plain drag merges; with ⌥/Alt held it cherry-picks; with Shift it reorders (rebase). */
-  mode: "merge" | "pick" | "move";
+  /** Plain drag merges; ⌥/Alt cherry-picks; Shift reorders; ⌘/Ctrl rebases the current branch onto the drop. */
+  mode: "merge" | "pick" | "move" | "rebase";
 }
 
 /** A mark on a commit: bisect ends, the commit under test, the culprit. */
@@ -708,7 +708,13 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const b = s.drag.to;
       const c = s.drag.valid ? "#ffffff" : NEON[src.color];
       const tint =
-        s.drag.mode === "pick" ? NEON[3] : s.drag.mode === "move" ? NEON[4] : s.drag.valid ? NEON[6] : NEON[src.color];
+        s.drag.mode === "pick"
+          ? NEON[3]
+          : s.drag.mode === "move" || s.drag.mode === "rebase"
+            ? NEON[4]
+            : s.drag.valid
+              ? NEON[6]
+              : NEON[src.color];
       ctx.globalCompositeOperation = "lighter";
       for (const [lw, al] of [
         [10, 0.12],

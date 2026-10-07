@@ -52,6 +52,22 @@ export interface StashInfo {
 
 export type StashOp = "apply" | "pop" | "drop";
 
+/** Mirrors `StashOptions` in git/stash.rs. */
+export interface StashOptions {
+  /** New files go into the stash too. */
+  untracked: boolean;
+  /** What is staged stays in the working tree as well (`--keep-index`). */
+  keepIndex: boolean;
+}
+
+/** Mirrors `CommitOptions` in git/write.rs. */
+export interface CommitOptions {
+  /** Skip the pre-commit and commit-msg hooks. */
+  noVerify: boolean;
+  /** Add a `Signed-off-by:` trailer. */
+  signoff: boolean;
+}
+
 export type PickOp = "cherryPick" | "revert";
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
@@ -218,6 +234,8 @@ export interface BranchReport {
 
 /** What a reset does with the changes of the commits it moves past. */
 export type ResetMode = "soft" | "mixed" | "hard";
+/** How a merge brings the other branch in (mirrors `MergeMode` in git/write.rs). */
+export type MergeMode = "commit" | "fastForward" | "squash";
 
 /** One move of HEAD (newest first). `lost`: only the reflog still reaches it. */
 export interface ReflogEntry {
@@ -339,6 +357,13 @@ export interface OpResult {
 }
 
 export type RemoteOp = "fetch" | "pull" | "pullMerge" | "pullRebase" | "push" | "forcePush";
+
+/** A ref sent to, or deleted on, a named remote (`remote.rs`'s `RemoteRefOp`). */
+export type RemoteRefOp =
+  | { kind: "deleteBranch"; name: string }
+  | { kind: "pushTag"; name: string }
+  | { kind: "deleteTag"; name: string }
+  | { kind: "pushTags" };
 
 /** Parsed from git's `--progress` output. */
 export interface Progress {

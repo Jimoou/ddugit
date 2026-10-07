@@ -9,9 +9,11 @@ import type {
   BackportTally,
   BisectOp,
   BisectState,
+  MergeMode,
   Blame,
   BranchReport,
   CommitEdit,
+  CommitOptions,
   ConflictFile,
   DiffScope,
   FileDiff,
@@ -48,6 +50,7 @@ import type {
   RefOp,
   ReflogEntry,
   RemoteOp,
+  RemoteRefOp,
   RepoGlance,
   RepoSnapshot,
   ResetMode,
@@ -56,6 +59,7 @@ import type {
   SshStatus,
   SshTest,
   StashOp,
+  StashOptions,
   SubmoduleOp,
   TodoItem,
   WorktreeOp,
@@ -82,12 +86,22 @@ export interface Commands {
   git_init: [{ dir: string }, OpResult];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
   repo_glance: [{ paths: string[] }, RepoGlance[]];
-  git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
+  git_commit: [
+    { path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean; options: CommitOptions },
+    OpResult,
+  ];
+  commit_template: [{ path: string }, string | null];
+  git_stage_files: [{ path: string; paths: string[]; unstage: boolean }, OpResult];
+  git_discard_hunks: [{ path: string; file: string; hunks: string[]; lines: number[] | null }, OpResult];
+  git_ignore: [{ path: string; patterns: string[]; untrack: string[] }, OpResult];
   git_stage_hunks: [
     { path: string; file: string; hunks: string[]; lines: number[] | null; unstage: boolean },
     OpResult,
   ];
-  git_merge: [{ path: string; source: string; target: string | null }, OpResult];
+  git_merge: [
+    { path: string; source: string; target: string | null; mode: MergeMode; message: string | null },
+    OpResult,
+  ];
   git_abort: [{ path: string }, OpResult];
   git_continue: [{ path: string }, OpResult];
   git_pick: [{ path: string; op: PickOp; id: string; target: string | null }, OpResult];
@@ -101,7 +115,7 @@ export interface Commands {
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_fetch_remote: [{ path: string; name: string; onProgress: Sink<Progress> }, OpResult];
   git_push_to: [{ path: string; remote: string; branch: string | null; onProgress: Sink<Progress> }, OpResult];
-  git_delete_remote_branch: [{ path: string; remote: string; branch: string; onProgress: Sink<Progress> }, OpResult];
+  git_remote_ref: [{ path: string; remote: string; op: RemoteRefOp; onProgress: Sink<Progress> }, OpResult];
   git_skip: [{ path: string }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
   git_reflog: [{ path: string; limit?: number }, ReflogEntry[]];
@@ -148,12 +162,15 @@ export interface Commands {
   open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
+  save_file: [{ path: string; rev: string; file: string; dest: string }, OpResult];
   git_discard: [{ path: string; paths: string[] }, OpResult];
-  git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
+  git_stash_push: [{ path: string; message: string; paths: string[]; options: StashOptions }, OpResult];
+  git_stash_branch: [{ path: string; id: string; name: string }, OpResult];
   git_stash: [{ path: string; op: StashOp; id: string }, OpResult];
   conflict_file: [{ path: string; file: string }, ConflictFile];
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
+  range_diff: [{ path: string; from: string; to: string; mergeBase: boolean }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
   /** `git --version` of the git in use; rejects when it can't run (not installed, not on PATH). */
@@ -162,6 +179,7 @@ export interface Commands {
   report_send: [{ report: NewReport }, string];
   git_rebase: [{ path: string; base: string; steps: RebaseStep[] }, OpResult];
   git_rebase_todo: [{ path: string; base: string }, TodoItem[]];
+  git_rebase_onto: [{ path: string; upstream: string }, OpResult];
   backport_compare: [{ path: string; source: string; target: string }, BackportItem[]];
   backport_ignore: [{ path: string; target: string; id: string; ignore: boolean }, null];
   backport_summary: [{ path: string; source: string; targets: string[] }, BackportTally[]];
@@ -206,12 +224,29 @@ export const api = {
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
   /** Where each repository stands (branch, upstream distance, changes), in `paths` order. */
   glance: (paths: string[]) => call("repo_glance", { paths }),
-  commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
-    call("git_commit", { path, message, paths, amend, stagedOnly }),
+  commit: (
+    path: string,
+    message: string,
+    paths: string[],
+    amend = false,
+    stagedOnly = false,
+    options: CommitOptions = { noVerify: false, signoff: false },
+  ) => call("git_commit", { path, message, paths, amend, stagedOnly, options }),
+  /** The `commit.template` text to start a message from (comment lines left out), or null. */
+  commitTemplate: (path: string) => call("commit_template", { path }),
   /** `hunks` are `DiffHunk.key`s: a hunk that changed on disk since it was shown is refused. */
   stageHunks: (path: string, file: string, hunks: string[], unstage: boolean, lines?: number[]) =>
     call("git_stage_hunks", { path, file, hunks, lines: lines ?? null, unstage }),
-  merge: (path: string, source: string, target: string | null) => call("git_merge", { path, source, target }),
+  /** Stage (or unstage) whole files; `[]` means every change. */
+  stageFiles: (path: string, paths: string[], unstage: boolean) => call("git_stage_files", { path, paths, unstage }),
+  /** Throw away unstaged hunks (or `lines` of one) in the working tree; keys as for `stageHunks`. */
+  discardHunks: (path: string, file: string, hunks: string[], lines?: number[]) =>
+    call("git_discard_hunks", { path, file, hunks, lines: lines ?? null }),
+  /** Add patterns to the top `.gitignore` (skipping ones there), and stop tracking `untrack` (files stay). */
+  ignore: (path: string, patterns: string[], untrack: string[] = []) => call("git_ignore", { path, patterns, untrack }),
+  /** `message` (blank: git's own) is for the merge commit; a squash only stages. */
+  merge: (path: string, source: string, target: string | null, mode: MergeMode, message: string | null) =>
+    call("git_merge", { path, source, target, mode, message }),
   abort: (path: string) => call("git_abort", { path }),
   continueOp: (path: string) => call("git_continue", { path }),
   pick: (path: string, op: PickOp, id: string, target: string | null) => call("git_pick", { path, op, id, target }),
@@ -237,9 +272,9 @@ export const api = {
   pushTo(path: string, remote: string, onProgress: (p: Progress) => void = () => {}, branch: string | null = null) {
     return call("git_push_to", { path, remote, branch, onProgress: progressSink(onProgress, path) });
   },
-  /** Delete `branch` on `remote` (`push --delete`); its remote-tracking branch goes too, local branches stay. */
-  deleteRemoteBranch(path: string, remote: string, branch: string, onProgress: (p: Progress) => void = () => {}) {
-    return call("git_delete_remote_branch", { path, remote, branch, onProgress: progressSink(onProgress, path) });
+  /** Push a tag (or all of them) to `remote`, or delete a branch or tag there; local refs stay. */
+  remoteRef(path: string, remote: string, op: RemoteRefOp, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_remote_ref", { path, remote, op, onProgress: progressSink(onProgress, path) });
   },
   /** Drop the cherry-pick / revert / rebase step that stopped, and go on. */
   skip: (path: string) => call("git_skip", { path }),
@@ -318,8 +353,13 @@ export const api = {
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
   /** Who last changed each line of `file` as of `rev`. */
   blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
+  /** Write `file` as `rev` has it to `dest` (from `pickSaveFile`). */
+  saveFile: (path: string, rev: string, file: string, dest: string) => call("save_file", { path, rev, file, dest }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
-  stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
+  stashPush: (path: string, message: string, paths: string[], options: StashOptions) =>
+    call("git_stash_push", { path, message, paths, options }),
+  /** `git stash branch`: a new branch where the stash was taken, with the stash popped onto it. */
+  stashBranch: (path: string, id: string, name: string) => call("git_stash_branch", { path, id, name }),
   /** By the stash's commit id: positions shift when a stash is pushed elsewhere. */
   stash: (path: string, op: StashOp, id: string) => call("git_stash", { path, op, id }),
   conflictFile: (path: string, file: string) => call("conflict_file", { path, file }),
@@ -335,6 +375,9 @@ export const api = {
     diffCache.set(key, load);
     return load;
   },
+  /** Changes from `from` to `to` (commit ids); with `mergeBase`, from where the two went apart. */
+  rangeDiff: (path: string, from: string, to: string, mergeBase: boolean) =>
+    call("range_diff", { path, from, to, mergeBase }),
   /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
   gitVersion: () => call("git_version", {}),
@@ -346,6 +389,8 @@ export const api = {
   rebase: (path: string, base: string, steps: RebaseStep[]) => call("git_rebase", { path, base, steps }),
   /** git's own plan for a range with merges (`--rebase-merges`), without starting it. */
   rebaseTodo: (path: string, base: string) => call("git_rebase_todo", { path, base }),
+  /** Replay the current branch's own commits on top of `upstream` (plain `git rebase`). */
+  rebaseOnto: (path: string, upstream: string) => call("git_rebase_onto", { path, upstream }),
   backportCompare: (path: string, source: string, target: string) => call("backport_compare", { path, source, target }),
   backportIgnore: (path: string, target: string, id: string, ignore: boolean) =>
     call("backport_ignore", { path, target, id, ignore }),
@@ -368,6 +413,16 @@ export const api = {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ multiple: false, title, filters: [{ name: "Git bundle", extensions: ["bundle"] }] });
     return typeof r === "string" ? r : null;
+  },
+  /** Where to save a file, starting from `name` (the demo answers `/work/<name>` unless told otherwise). */
+  async pickSaveFile(title: string, name: string): Promise<string | null> {
+    if (!isTauri) {
+      const next = demoControls.nextSave;
+      demoControls.nextSave = undefined;
+      return next === undefined ? `/work/${name}` : next;
+    }
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    return save({ title, defaultPath: name });
   },
   async pickFolder(title = t("app.open")): Promise<string | null> {
     if (!isTauri) {

@@ -83,7 +83,7 @@ interface Props {
   onHover?(id: string | null): void;
 }
 
-type DragHint = `${"merge" | "pick" | "move"}:${"idle" | "ok" | "bad"}`;
+type DragHint = `${Drag["mode"]}:${"idle" | "ok" | "bad"}`;
 
 /** Arrow keys as screen directions; turned back into the graph they become a step. */
 const ARROWS: Record<string, Pt> = {
@@ -592,7 +592,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       const t = nodeAt(p);
       s.drag.to = p;
       s.drag.target = t && t !== s.drag.from ? t : null;
-      s.drag.mode = e.shiftKey ? "move" : e.altKey ? "pick" : "merge";
+      s.drag.mode = e.shiftKey ? "move" : e.altKey ? "pick" : e.metaKey || e.ctrlKey ? "rebase" : "merge";
       s.drag.valid = !!s.drag.target && propsRef.current.canDropOn(s.drag.target, s.drag.from, s.drag.mode);
       setCursor(s.drag.valid ? "copy" : s.drag.target ? "not-allowed" : "crosshair");
       wake.current();

@@ -19,6 +19,7 @@ import type {
   OpResult,
   PrReport,
   RebaseStep,
+  RemoteRefOp,
   RepoSnapshot,
   ResetMode,
   StackBranch,
@@ -41,7 +42,17 @@ export type Run = (
   quiet?: boolean,
 ) => Promise<OpResult>;
 
-export type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
+/** One side of a comparison: a commit, and the name it is shown by (a branch, `HEAD`, a short id). */
+export interface CompareSide {
+  id: string;
+  name: string;
+}
+
+export type DiffSource =
+  | { kind: "commit"; id: string }
+  | { kind: "worktree"; scope: "unstaged" | "staged" }
+  /** `from` → `to`; with `mergeBase`, from where the two went apart (what `to` adds). Read-only. */
+  | { kind: "range"; from: CompareSide; to: CompareSide; mergeBase: boolean };
 
 /** The sheet under the graph; opening one replaces the last. (The conflict sheet goes over it, see `Repo.setConflict`.) */
 export type Sheet =
@@ -87,6 +98,8 @@ export interface Repo {
   stacks: StackBranch[];
   bisect: BisectState | null;
   bisectDraft: BisectDraft | null;
+  /** A commit picked to compare with the next one picked ("Select for compare"). */
+  compareBase: CompareSide | null;
   /** Local branches checked out in another worktree → that folder. */
   elsewhere: Record<string, string>;
   /** The commit shown in the panel. */
@@ -98,7 +111,14 @@ export interface Repo {
   run: Run;
   stackRun(label: string, op: StackOp): Promise<void>;
   /** The right panel shows one thing: composer, a stash, or a commit. */
-  show(what: { commit?: string | null; stash?: number | null; composer?: boolean; amend?: boolean }): void;
+  show(what: {
+    commit?: string | null;
+    stash?: number | null;
+    composer?: boolean;
+    amend?: boolean;
+    /** The composer's message to start with. */
+    message?: string;
+  }): void;
   setMenu(menu: Menu | null): void;
   /** Where the last menu opened, for a follow-up menu in the same spot. */
   menuAt(): { x: number; y: number };
@@ -108,6 +128,9 @@ export interface Repo {
   /** Open the conflict sheet over the current one (at `file`, else the first). */
   setConflict(c: { file?: string } | null): void;
   setBisectDraft(d: BisectDraft | null): void;
+  setCompareBase(c: CompareSide | null): void;
+  /** Open the diff sheet on `source` (at `file`, else its first file). */
+  loadDiff(source: DiffSource, title: string, file?: string): void;
   setTrail(t: { file: string; touches: FileTouch[] } | null): void;
   play(e: Effect): void;
   /** Play an effect once the new snapshot is drawn and the camera has come to rest. */
@@ -116,8 +139,8 @@ export interface Repo {
   onOpenPath(path: string): void;
   openUrl(url: string): void;
   fetchOne(name: string): Promise<void>;
-  /** Delete a branch on its remote (after the confirmation in `actions.tsx`). */
-  deleteRemoteBranch(remote: string, branch: string): Promise<void>;
+  /** Push a tag to a remote, or delete a branch or tag there (after any confirmation in `actions.tsx`). */
+  remoteRef(remote: string, op: RemoteRefOp, done: string): Promise<void>;
   canDropOn(target: string, source: string, mode: Drag["mode"]): boolean;
   /** Is `anc` an ancestor of (or) `of`? */
   isAncestor(anc: string, of: string | null): boolean;

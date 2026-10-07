@@ -157,6 +157,9 @@ test("stashes picked files, finds the stash on the graph, and applies, pops and 
   await composer.locator(".files li", { hasText: "src/graph/renderer.ts" }).locator("input").check();
   await page.fill("textarea.message", "half-done glow");
   await composer.getByRole("button", { name: /스태시에 보관/ }).click();
+  const save = page.getByRole("dialog", { name: "스태시에 보관" });
+  await expect(save.getByLabel("메시지 (선택)")).toHaveValue("half-done glow");
+  await save.getByRole("button", { name: "보관", exact: true }).click();
   await demo.toast("스태시에 보관했어요");
   let snap = await demo.snapshot();
   expect(snap.stashes.map((s) => s.message)).toEqual([

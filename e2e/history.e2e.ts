@@ -529,3 +529,153 @@ test("a binary file in conflict is resolved by picking a whole side", async ({ d
   const logo = (await demo.snapshot()).changes.find((c) => c.path === "assets/logo.png")!;
   expect(logo.conflicted).toBe(false);
 });
+
+test("rebases the current branch onto another from the branch menu, saying what it rewrites", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const main = before.refs.find((r) => r.kind === "local" && r.name === "main")!.target;
+  const local = (name: RegExp) => page.locator(".app:not([hidden]) .sidebar li").filter({ hasText: name }).first();
+  await local(/^main$/).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "main 위로 feature/graph-zoom 다시 쌓기 (rebase)…" }).click();
+  const ask = page.getByRole("dialog", { name: "다른 브랜치 위로 rebase" });
+  await expect(ask).toContainText("커밋 3개를 main의 끝 위로");
+  await expect(ask).toContainText("잠시 치워"); // the demo has local edits
+  await expect(ask).not.toContainText("병합 커밋");
+  await ask.getByRole("button", { name: "rebase" }).click();
+  await demo.toast(/main 위로 다시 쌓았어요/);
+  const snap = await demo.snapshot();
+  const byId = new Map(snap.commits.map((c) => [c.id, c]));
+  const chain = [snap.head.target!];
+  for (let i = 0; i < 3; i++) chain.push(byId.get(chain[i])!.parents[0]);
+  expect(chain.slice(0, 3).map((id) => byId.get(id)!.summary)).toEqual([
+    "Zoom to cursor",
+    "Minimap",
+    "Semantic zoom levels",
+  ]);
+  expect(chain[3]).toBe(main);
+
+  // feature/theme has a merge from main among its own commits, and it is pushed.
+  await local(/^feature\/theme$/).dblclick();
+  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
+  await local(/^main$/).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^main 위로 feature\/theme 다시 쌓기/ }).click();
+  await expect(ask).toContainText("병합 커밋 1개");
+  await expect(ask).toContainText("강제 push");
+  await ask.getByRole("button", { name: "취소" }).click();
+  // Onto a branch it already contains: nothing to do, so the entry is off.
+  await local(/^hotfix\/crash$/).click({ button: "right" });
+  await expect(page.getByRole("menuitem", { name: /^hotfix\/crash 위로/ })).toBeDisabled();
+});
+
+test("a rebase onto another branch stopped on conflicts is cancelled from its banner", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  await demo.mutate((d) => (d.conflictNext = true));
+  await page
+    .locator(".app:not([hidden]) .sidebar li")
+    .filter({ hasText: /^main$/ })
+    .first()
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^main 위로 feature\/graph-zoom/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "rebase" }).click();
+  await expect(page.locator(".conflict-sheet")).toBeVisible();
+  const banner = page.locator(".banner", { hasText: "진행 중" });
+  await expect(banner).toContainText("리베이스 진행 중 — 충돌 파일 2개");
+  await banner.getByRole("button", { name: "취소" }).click();
+  await demo.toast("취소했어요");
+  const snap = await demo.snapshot();
+  expect(snap.state).toBe("clean");
+  expect(snap.head.target).toBe(before.head.target);
+});
+
+test("rebases by dragging the current branch's tip onto another tip with ⌘/Ctrl", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const main = before.refs.find((r) => r.kind === "local" && r.name === "main")!.target;
+  const a = (await demo.screenOf(before.head.target!))!;
+  const z = (await demo.screenOf(main))!;
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.keyboard.down("Control");
+  await page.mouse.move(a.x + 40, a.y + 10, { steps: 8 });
+  await page.mouse.move(z.x, z.y, { steps: 12 });
+  await expect(page.locator(".drag-hint")).toHaveText("놓으면 그 브랜치 위로 rebase해요");
+  await page.mouse.up();
+  await page.keyboard.up("Control");
+  await page.getByRole("dialog", { name: "다른 브랜치 위로 rebase" }).getByRole("button", { name: "rebase" }).click();
+  await demo.toast(/main 위로 다시 쌓았어요/);
+  const snap = await demo.snapshot();
+  expect(snap.head.branch).toBe("feature/graph-zoom");
+  expect(snap.head.target).not.toBe(before.head.target);
+});
+
+test("merges with its own message, by fast-forward, or as a squash for the composer", async ({ demo }) => {
+  const { page } = demo;
+  const sidebar = page.locator(".app:not([hidden]) .sidebar");
+  const dialog = page.getByRole("dialog", { name: "병합" });
+  const before = await demo.snapshot();
+  const theme = before.refs.find((r) => r.name === "feature/theme" && r.kind === "local")!.target;
+
+  // Its own message on a merge commit.
+  await sidebar
+    .locator("li")
+    .filter({ hasText: /^feature\/theme$/ })
+    .first()
+    .click({ button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  await dialog.locator("textarea").fill("Bring in the neon theme");
+  await dialog.getByRole("button", { name: "병합", exact: true }).click();
+  await demo.toast(/병합했어요/);
+  let snap = await demo.snapshot();
+  let head = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect(head.summary).toBe("Bring in the neon theme");
+  expect(head.parents).toEqual([before.head.target, theme]);
+
+  // Fast-forward main to a teammate's branch that is ahead of it: no merge commit, no message field.
+  await sidebar
+    .locator("li")
+    .filter({ hasText: /^main$/ })
+    .first()
+    .dblclick();
+  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("main");
+  const orbit = snap.refs.find((r) => r.name === "origin/feature/orbit-sync")!.target;
+  await sidebar
+    .locator("section.remote-sub")
+    .filter({ hasText: "origin" })
+    .locator("li")
+    .filter({ hasText: /orbit-sync/ })
+    .click({ button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  await dialog.getByRole("radio", { name: "fast-forward" }).click();
+  await expect(dialog).toContainText("앞으로 옮겨요");
+  await expect(dialog.locator("textarea")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "병합", exact: true }).click();
+  await demo.toast(/병합했어요/);
+  expect((await demo.snapshot()).head.target).toBe(orbit);
+
+  // Squash: the changes are staged and the composer opens with a message listing the commits.
+  await sidebar
+    .locator("li")
+    .filter({ hasText: /^feature\/theme$/ })
+    .first()
+    .click({ button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  // The last choice is offered first.
+  await expect(dialog.getByRole("radio", { name: "fast-forward" })).toHaveAttribute("aria-checked", "true");
+  await dialog.getByRole("radio", { name: "squash" }).click();
+  await dialog.getByRole("button", { name: "스테이지" }).click();
+  await demo.toast("feature/theme의 변경을 스테이지했어요. 메시지를 확인하고 커밋하세요");
+  snap = await demo.snapshot();
+  expect(snap.head.target).toBe(orbit);
+  expect(snap.state).toBe("clean");
+  expect(snap.changes.some((c) => c.staged)).toBe(true);
+  await expect(page.locator(".composer textarea.message")).toHaveValue(
+    /^feature\/theme\n\n\* Neon theme tokens\n\* Glow shader for edges\n/,
+  );
+  await page.keyboard.press("Control+Enter");
+  await demo.toast("커밋했어요");
+  snap = await demo.snapshot();
+  head = snap.commits.find((c) => c.id === snap.head.target)!;
+  expect(head.parents).toEqual([orbit]);
+  expect(head.summary).toBe("feature/theme");
+});

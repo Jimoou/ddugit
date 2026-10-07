@@ -326,3 +326,33 @@ test("LFS: turns LFS on for the repository, untracks a pattern, and says when gi
   await expect(section.getByRole("button", { name: /추적 해제/ })).toHaveCount(0);
   await expect(section.getByRole("button", { name: "받기" })).toBeDisabled();
 });
+
+test("checks out a tag and a commit without a branch, then goes back to a branch", async ({ demo }) => {
+  const { page } = demo;
+  const branchNow = page.locator(".topbar .branch-now");
+  const tags = page.locator(".sidebar section", { has: page.locator("h3", { hasText: "태그" }) });
+  const v1 = (await demo.snapshot()).refs.find((r) => r.kind === "tag" && r.name === "v0.1.0")!.target;
+
+  await tags.locator("li", { hasText: "v0.1.0" }).click({ button: "right" });
+  await page
+    .locator(".context-menu")
+    .getByRole("menuitem", { name: /체크아웃/ })
+    .click();
+  const confirm = page.getByRole("dialog", { name: "브랜치 없이 체크아웃" });
+  await expect(confirm).toContainText("어느 브랜치에도 속하지 않아서");
+  await confirm.getByRole("button", { name: "체크아웃" }).click();
+  await demo.toast("v0.1.0으로 이동했어요");
+  expect((await demo.snapshot()).head).toMatchObject({ branch: null, target: v1, upstream: null });
+  await expect(branchNow).toContainText(`분리된 HEAD @ ${v1.slice(0, 7)}`);
+
+  // Another commit, from its own menu.
+  const other = (await demo.snapshot()).refs.find((r) => r.kind === "local" && r.name === "feature/theme")!.target;
+  await (await demo.commitMenu(other)).getByText("이 커밋 체크아웃 (분리된 HEAD)…").click();
+  await page.getByRole("dialog", { name: "브랜치 없이 체크아웃" }).getByRole("button", { name: "체크아웃" }).click();
+  await expect(branchNow).toContainText(`분리된 HEAD @ ${other.slice(0, 7)}`);
+
+  await branchNow.click();
+  await page.locator(".context-menu").getByRole("menuitem", { name: "main" }).click();
+  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("main");
+  await expect(branchNow).toContainText("main");
+});

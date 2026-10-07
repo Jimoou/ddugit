@@ -908,3 +908,10 @@ button.demo-pill {
   font-size: inherit;
   color: var(--text-2);
 }
+
+/* A commit picked to compare with the next one: a quiet note, not a warning. */
+.compare-banner {
+  background: var(--glass-strong);
+  border-bottom-color: var(--line);
+  color: var(--text);
+}

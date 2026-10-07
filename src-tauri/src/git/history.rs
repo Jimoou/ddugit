@@ -1,12 +1,12 @@
 //! One file's story: the commits that touched it (following renames) and,
 //! line by line, the commit that last changed each line (blame).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use git2::BlameOptions;
 use serde::Serialize;
 
-use super::{err, git_ok, open, workdir, Result, LITERAL};
+use super::{err, git_ok, open, workdir, OpResult, OpStatus, Result, LITERAL};
 
 /// A commit that changed the file, and the file's path in that commit.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -128,6 +128,59 @@ pub fn blame(path: &str, rev: &str, file: &str) -> Result<Blame> {
     Ok(Blame { lines, hunks })
 }
 
+/// Write `file` as commit `rev` has it (the bytes in git, no filters) to `dest`, an
+/// absolute path chosen in a save dialog. Never into a `.git` folder or this
+/// repository's git directory, where a file would rewrite refs, hooks or config.
+pub fn save_file(path: &str, rev: &str, file: &str, dest: &str) -> Result<OpResult> {
+    let repo = open(path)?;
+    let commit = repo
+        .revparse_single(rev)
+        .and_then(|o| o.peel_to_commit())
+        .map_err(err)?;
+    let entry = commit
+        .tree()
+        .and_then(|t| t.get_path(Path::new(file)))
+        .map_err(|_| format!("'{file}' is not in {}", short(&commit.id().to_string())))?;
+    let blob = repo
+        .find_blob(entry.id())
+        .map_err(|_| format!("'{file}' is not a file"))?;
+    let target = save_target(&repo, Path::new(dest))?;
+    std::fs::write(&target, blob.content()).map_err(|e| format!("Can't write {dest}: {e}"))?;
+    Ok(OpResult {
+        status: OpStatus::Ok,
+        output: dest.to_string(),
+    })
+}
+
+/// Where `dest` really lands (symlinks followed), refused inside any `.git`.
+fn save_target(repo: &git2::Repository, dest: &Path) -> Result<PathBuf> {
+    let name = dest
+        .file_name()
+        .ok_or_else(|| format!("Not a file path: {}", dest.display()))?;
+    if !dest.is_absolute() {
+        return Err(format!("Not an absolute path: {}", dest.display()));
+    }
+    let parent = dest
+        .parent()
+        .and_then(|p| p.canonicalize().ok())
+        .ok_or_else(|| format!("No such folder: {}", dest.display()))?;
+    // An existing file may be a link elsewhere: check where writing would go. A
+    // link to nothing yet would create its target, wherever that is: refused.
+    let target = match dest.canonicalize() {
+        Ok(t) => t,
+        Err(_) if dest.symlink_metadata().is_ok() => {
+            return Err(format!("{} is a link to a missing file", dest.display()))
+        }
+        Err(_) => parent.join(name),
+    };
+    let git_dirs = [repo.path(), repo.commondir()].map(|p| p.canonicalize().unwrap_or_else(|_| p.into()));
+    if target.components().any(|c| c.as_os_str() == ".git") || git_dirs.iter().any(|g| target.starts_with(g))
+    {
+        return Err(format!("Can't save into a .git folder: {}", dest.display()));
+    }
+    Ok(target)
+}
+
 fn short(id: &str) -> &str {
     &id[..id.len().min(7)]
 }
@@ -201,5 +254,64 @@ mod tests {
         assert_eq!(old.lines, ["a", "b", "c"]);
         assert!(old.hunks.iter().all(|h| h.commit == first));
         assert!(blame(s(d.path()), &first, "missing.txt").is_err());
+    }
+
+    #[test]
+    fn saves_a_file_as_a_commit_had_it() {
+        let d = repo();
+        std::fs::create_dir(d.path().join("dir")).unwrap();
+        commit_file(d.path(), "dir/f.txt", "old\n", "first");
+        let first = head(d.path());
+        commit_file(d.path(), "dir/f.txt", "new\n", "second");
+        let out = tempfile::tempdir().unwrap();
+        let dest = out.path().join("f (old).txt");
+
+        let r = save_file(s(d.path()), &first, "dir/f.txt", s(&dest)).unwrap();
+        assert_eq!(r.status, OpStatus::Ok);
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "old\n");
+        // Overwrites what the dialog already confirmed.
+        save_file(s(d.path()), "HEAD", "dir/f.txt", s(&dest)).unwrap();
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "new\n");
+        // The working tree is untouched.
+        assert_eq!(
+            std::fs::read_to_string(d.path().join("dir/f.txt")).unwrap(),
+            "new\n"
+        );
+
+        assert!(save_file(s(d.path()), "HEAD", "missing.txt", s(&dest)).is_err());
+        assert!(save_file(s(d.path()), "HEAD", "dir", s(&dest)).is_err());
+        assert!(save_file(s(d.path()), "HEAD", "dir/f.txt", "relative.txt").is_err());
+        let nowhere = out.path().join("no/such/folder.txt");
+        assert!(save_file(s(d.path()), "HEAD", "dir/f.txt", s(&nowhere)).is_err());
+    }
+
+    #[test]
+    fn never_saves_into_a_git_folder() {
+        let d = repo();
+        commit_file(d.path(), "f.txt", "x\n", "first");
+        for bad in [".git/hooks/pre-commit", ".git/config", ".git"] {
+            let dest = d.path().join(bad);
+            assert!(
+                save_file(s(d.path()), "HEAD", "f.txt", s(&dest)).is_err(),
+                "{bad}"
+            );
+        }
+        assert!(!d.path().join(".git/hooks/pre-commit").exists());
+        // Through a link to the git folder, too.
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(d.path().join(".git"), d.path().join("sneaky")).unwrap();
+            let dest = d.path().join("sneaky/description");
+            assert!(save_file(s(d.path()), "HEAD", "f.txt", s(&dest)).is_err());
+            let hook = d.path().join(".git/hooks/post-checkout");
+            std::os::unix::fs::symlink(&hook, d.path().join("dangling")).unwrap();
+            let dest = d.path().join("dangling");
+            assert!(save_file(s(d.path()), "HEAD", "f.txt", s(&dest)).is_err());
+            assert!(!hook.exists());
+        }
+        // Next to the working files is fine.
+        let ok = d.path().join("copy.txt");
+        save_file(s(d.path()), "HEAD", "f.txt", s(&ok)).unwrap();
+        assert_eq!(std::fs::read_to_string(ok).unwrap(), "x\n");
     }
 }

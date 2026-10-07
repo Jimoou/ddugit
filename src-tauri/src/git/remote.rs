@@ -240,12 +240,30 @@ pub fn push_to(
     Ok(OpResult::with(remote_status(&o, true), o))
 }
 
-/// Delete `branch` on `remote` (`git push <remote> --delete refs/heads/<branch>`). Git drops the
-/// remote-tracking branch with it. Local branches are left alone, and a fetch-only remote refuses.
-pub fn delete_remote_branch(
+/// A ref sent to, or deleted on, a remote named by the user (not HEAD's upstream).
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum RemoteRefOp {
+    /// Delete a branch there; git drops its remote-tracking branch with it. Local branches stay.
+    DeleteBranch {
+        name: String,
+    },
+    PushTag {
+        name: String,
+    },
+    /// Delete a tag there; the local tag stays.
+    DeleteTag {
+        name: String,
+    },
+    /// Every local tag (`--tags`).
+    PushTags,
+}
+
+/// `git push <remote> …` for one `RemoteRefOp`. A fetch-only remote refuses.
+pub fn remote_ref(
     path: &str,
     remote: &str,
-    branch: &str,
+    op: &RemoteRefOp,
     on_progress: impl FnMut(Progress),
 ) -> Result<OpResult> {
     let repo = open(path)?;
@@ -253,9 +271,24 @@ pub fn delete_remote_branch(
     if !pushable(&repo, super::operand(remote)?) {
         return Err(format!("{remote} is fetch-only"));
     }
-    // The full ref name: `branch` can't be read as an option or a refspec.
-    let target = format!("refs/heads/{}", super::operand(branch)?);
-    let args = ["push", "--progress", remote, "--delete", &target];
+    // Full ref names: a name can't be read as an option, nor as a refspec (`+v1` would force it).
+    let (flag, target) = match op {
+        RemoteRefOp::DeleteBranch { name } => {
+            (Some("--delete"), format!("refs/heads/{}", super::operand(name)?))
+        }
+        RemoteRefOp::PushTag { name } => {
+            let name = super::operand(name)?;
+            (None, format!("refs/tags/{name}:refs/tags/{name}"))
+        }
+        RemoteRefOp::DeleteTag { name } => (Some("--delete"), format!("refs/tags/{}", super::operand(name)?)),
+        RemoteRefOp::PushTags => (Some("--tags"), String::new()),
+    };
+    let mut args = vec!["push", "--progress"];
+    args.extend(flag);
+    args.push(remote);
+    if !target.is_empty() {
+        args.push(&target);
+    }
     let o = stream_remote(&dir, &args, on_progress)?;
     Ok(OpResult::with(remote_status(&o, true), o))
 }
@@ -421,7 +454,10 @@ mod tests {
         };
         assert!(!tracking(&a).trim().is_empty());
 
-        let r = delete_remote_branch(s(a.path()), "origin", "old-feature", |_| {}).unwrap();
+        let op = RemoteRefOp::DeleteBranch {
+            name: "old-feature".into(),
+        };
+        let r = remote_ref(s(a.path()), "origin", &op, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         let left = git_ok(origin.path(), &["branch", "--list", "old-feature"]).unwrap();
         assert!(left.trim().is_empty(), "still on the remote: {left}");
@@ -432,15 +468,52 @@ mod tests {
     }
 
     #[test]
-    fn deleting_a_branch_refuses_odd_names_and_fetch_only_remotes() {
+    fn remote_refs_refuse_odd_names_and_fetch_only_remotes() {
         let (_o, a, _b) = setup();
-        assert!(delete_remote_branch(s(a.path()), "origin", "--all", |_| {}).is_err());
+        let del = |name: &str| RemoteRefOp::DeleteBranch { name: name.into() };
+        let tag = RemoteRefOp::PushTag { name: "-v1".into() };
+        assert!(remote_ref(s(a.path()), "origin", &del("--all"), |_| {}).is_err());
+        assert!(remote_ref(s(a.path()), "origin", &tag, |_| {}).is_err());
+        assert!(remote_ref(s(a.path()), "--all", &RemoteRefOp::PushTags, |_| {}).is_err());
         git_ok(
             a.path(),
             &["remote", "set-url", "--push", "origin", super::super::NO_PUSH],
         )
         .unwrap();
-        assert!(delete_remote_branch(s(a.path()), "origin", "main", |_| {}).is_err());
+        assert!(remote_ref(s(a.path()), "origin", &del("main"), |_| {}).is_err());
+        assert!(remote_ref(s(a.path()), "origin", &RemoteRefOp::PushTags, |_| {}).is_err());
+    }
+
+    #[test]
+    fn pushes_and_deletes_tags_on_the_remote() {
+        let (origin, a, _b) = setup();
+        let pa = s(a.path());
+        let on_origin = || git_ok(origin.path(), &["tag", "--list"]).unwrap();
+        git_ok(a.path(), &["tag", "v1"]).unwrap();
+        git_ok(a.path(), &["tag", "-a", "v2", "-m", "second"]).unwrap();
+
+        let push = RemoteRefOp::PushTag { name: "v1".into() };
+        let r = remote_ref(pa, "origin", &push, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(on_origin().trim(), "v1", "only the one tag goes");
+
+        let r = remote_ref(pa, "origin", &RemoteRefOp::PushTags, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(on_origin().split_whitespace().collect::<Vec<_>>(), ["v1", "v2"]);
+
+        // The same name moved locally: git won't replace a tag on the remote without force.
+        git_ok(a.path(), &["tag", "-d", "v1"]).unwrap();
+        commit_file(a.path(), "c.txt", "c", "later");
+        git_ok(a.path(), &["tag", "v1"]).unwrap();
+        let r = remote_ref(pa, "origin", &push, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Rejected, "{}", r.output);
+
+        let del = RemoteRefOp::DeleteTag { name: "v1".into() };
+        let r = remote_ref(pa, "origin", &del, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(on_origin().trim(), "v2");
+        // The local tag stays.
+        assert_eq!(git_ok(a.path(), &["tag", "--list", "v1"]).unwrap().trim(), "v1");
     }
 
     #[test]

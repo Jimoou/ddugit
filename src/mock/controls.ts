@@ -73,12 +73,22 @@ export const demoControls = {
   goneBranches: [] as string[],
   /** Folder the next "choose folder" dialog returns (default: the demo repository). */
   nextFolder: null as string | null,
+  /** Where the next save dialog saves (`null`: cancelled; unset: `/work/<suggested name>`). */
+  nextSave: undefined as string | null | undefined,
+  /** Files saved as a commit had them (`save_file`), oldest first. */
+  saved: [] as { rev: string; file: string; dest: string }[],
   /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */
   conflictNext: false,
   /** The next conflict also stops on a binary file (`assets/logo.png`), resolved by picking a side. */
   binaryConflict: false,
   /** Make the next commit fail while signing, the way gpg or ssh-keygen report it. */
   signFail: null as null | "gpg" | "ssh",
+  /** A pre-commit hook that refuses every commit not made with `--no-verify`. */
+  preCommitFails: false,
+  /** The demo repository's `commit.template` text (comment lines already left out). */
+  commitTemplate: null as string | null,
+  /** The full message of the last demo commit, trailers included. */
+  lastMessage: null as string | null,
   /** git-lfs isn't installed, or LFS is off in the demo repository (`git lfs install` turns it on). */
   lfs: null as null | "missing" | "off",
   /** Make the next backport stop on a commit whose change is already there (nothing to commit). */
@@ -129,6 +139,8 @@ export const demoControls = {
   sent: [] as NewReport[],
   /** Current demo state, read synchronously (e2e assertions). */
   snapshot: () => repo.snapshot(),
+  /** Tags on the remotes as `<remote>/<tag>` (git has no local record of them, so the snapshot doesn't either). */
+  remoteTags: () => [...repo.remoteTags.keys()],
   /** Append `n` commits to the current branch (long straight runs for the graph). */
   grow(n: number) {
     for (let i = 0; i < n; i++) repo.add(repo.head, `Step ${i + 1} of ${n}`);
