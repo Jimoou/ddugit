@@ -70,6 +70,18 @@ export interface CommitOptions {
 
 export type PickOp = "cherryPick" | "revert";
 
+/** Mirrors `CloneOptions` in git/setup.rs. */
+export interface CloneOptions {
+  /** Check out this branch (or tag) instead of the remote's default. */
+  branch: string | null;
+  /** Only the last `depth` commits; null is all of history. */
+  depth: number | null;
+  /** Only the one branch's history. */
+  singleBranch: boolean;
+  /** Also clone the submodules. */
+  submodules: boolean;
+}
+
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
 /** Driving `git bisect`: mark the ends, then judge the commit checked out now. */
 export type BisectOp =

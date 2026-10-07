@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Settings } from "../settings";
+import { type Settings, shortcutLabel } from "../settings";
 import { stashTitle } from "../format";
 import type { RefInfo, RemoteInfo, StashInfo } from "../types";
 import { type Key, t } from "../i18n";
@@ -298,7 +298,7 @@ export function Sidebar(props: Props) {
                   {g.kind === "local" && (
                     <button
                       className="h3-add"
-                      title={t("branch.newMenu")}
+                      title={`${t("branch.newMenu")} (${shortcutLabel("newBranch")})`}
                       aria-label={t("branch.newMenu")}
                       onClick={props.onNewBranch}
                     >

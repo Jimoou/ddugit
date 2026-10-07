@@ -164,7 +164,7 @@ fn blob_in(repo: &git2::Repository, rev: &str, file: &str) -> Result<(String, Ve
 }
 
 /// Where `dest` really lands (symlinks followed), refused inside any `.git`.
-fn save_target(repo: &git2::Repository, dest: &Path) -> Result<PathBuf> {
+pub(super) fn save_target(repo: &git2::Repository, dest: &Path) -> Result<PathBuf> {
     let name = dest
         .file_name()
         .ok_or_else(|| format!("Not a file path: {}", dest.display()))?;

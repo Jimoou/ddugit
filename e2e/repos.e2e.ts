@@ -476,3 +476,39 @@ test("tabs follow the keyboard: new, by number, cycle, home and close, and come 
   await expect(tabs.nth(1)).toHaveAttribute("title", "/work/third");
   await expect(active).toHaveAttribute("title", "/work/third");
 });
+
+test("clones with advanced options: a branch, shallow history and submodules", async ({ demo }) => {
+  const { page } = demo;
+  await page.evaluate(() => (window.__ddugitDemo.nextFolder = "/work"));
+  await page.locator(".tab.on .tab-menu").click();
+  await page
+    .locator(".repo-menu")
+    .getByRole("button", { name: /저장소 복제/ })
+    .click();
+  const dialog = page.locator(".dialog.clone");
+  await dialog.getByPlaceholder("https://github.com/owner/repo.git").fill("https://github.com/acme/rocket.git");
+  await dialog.getByRole("button", { name: "고르기…" }).click();
+  await dialog.getByText("고급", { exact: true }).click();
+  const go = dialog.getByRole("button", { name: "복제" });
+
+  // A branch that would read as an option, and a depth that isn't a count, stop the clone.
+  const branch = dialog.getByPlaceholder("기본 브랜치");
+  await branch.fill("--upload-pack=x");
+  await expect(dialog).toContainText("브랜치 이름에 쓸 수 없는 글자가 있어요");
+  await expect(go).toBeDisabled();
+  await branch.fill("release/2.0");
+  await dialog.getByLabel("최근 이력만 (shallow)").check();
+  await dialog.getByLabel("커밋 수").fill("0");
+  await expect(dialog).toContainText("커밋 수는 1 이상의 정수로 적어 주세요");
+  await expect(go).toBeDisabled();
+  await dialog.getByLabel("커밋 수").fill("25");
+  await dialog.getByLabel("이 브랜치만").check();
+  await dialog.getByLabel("서브모듈도 함께").check();
+  await go.click();
+  await demo.toast("rocket을 복제했어요");
+  expect(await page.evaluate(() => window.__ddugitDemo.lastClone)).toEqual({
+    url: "https://github.com/acme/rocket.git",
+    dest: "/work/rocket",
+    options: { branch: "release/2.0", depth: 25, singleBranch: true, submodules: true },
+  });
+});

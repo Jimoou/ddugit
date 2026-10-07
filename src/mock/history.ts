@@ -226,20 +226,33 @@ export const historyCommands = {
     }
     if (repo.pending) repo.changes = repo.changes.filter((c) => !repo.pending!.files.has(c.path));
     repo.pending = null;
+    repo.skipRest = [];
     repo.state = "clean";
     return delay(res("ok"));
   },
 
-  git_pick({ op, id, target }) {
-    const c = repo.commits.get(id);
-    if (!c) return fail(`Unknown commit ${id}`);
+  git_pick({ op, ids, target, mainline }) {
+    const missing = ids.find((id) => !repo.commits.has(id));
+    if (!ids.length || missing) return fail(`Unknown commit ${missing ?? ""}`);
+    const merges = ids.map((id) => repo.commits.get(id)!.parents.length).filter((n) => n > 1);
+    if (mainline !== null && (!merges.length || mainline < 1 || mainline > Math.min(...merges)))
+      return fail(`A merge here has ${Math.min(...merges, 1)} parents, not ${mainline}`);
     const t = target ?? repo.head;
     if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
-    const summary = op === "revert" ? `Revert "${c.summary}"` : c.summary;
-    if (demoControls.conflictNext)
-      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", id, id.slice(0, 7), { summary });
-    repo.add(t, summary);
+    demoControls.lastPick = { op, ids, mainline };
+    const summaries = ids.map((id) => {
+      const s = repo.commits.get(id)!.summary;
+      return op === "revert" ? `Revert "${s}"` : s;
+    });
+    if (demoControls.conflictNext) {
+      // Stops on the first; "continue" (or "skip") goes on with the rest.
+      repo.skipRest = summaries.slice(1);
+      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", ids[0], ids[0].slice(0, 7), {
+        summary: summaries[0],
+      });
+    }
+    for (const s of summaries) repo.add(t, s);
     return delay(res("ok"));
   },
 
@@ -257,6 +270,8 @@ export const historyCommands = {
     // The real one stages tracked files first (`add -u`), so what is left in conflict goes in as it is.
     const p = repo.pending;
     if (p?.summary) repo.add(repo.head, p.summary);
+    for (const summary of repo.skipRest) repo.add(repo.head, summary);
+    repo.skipRest = [];
     if (p?.tip) repo.branches.set(repo.head, p.tip);
     if (p) repo.changes = repo.changes.filter((c) => !p.files.has(c.path));
     repo.pending = null;

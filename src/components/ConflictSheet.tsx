@@ -31,6 +31,7 @@ const SIDES: Record<string, [ours: Key, theirs: Key]> = {
   rebase: ["cf.side.base", "cf.side.mine"],
   "cherry-pick": ["cf.side.current", "cf.side.picked"],
   revert: ["cf.side.current", "cf.side.reverting"],
+  am: ["cf.side.current", "cf.side.patch"],
 };
 
 /** Bottom sheet for resolving conflicts block by block (or a whole file at once). */

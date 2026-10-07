@@ -43,6 +43,7 @@ import type {
   UpdateInfo,
   OpResult,
   PickOp,
+  CloneOptions,
   PrReport,
   PrOutcome,
   PrTarget,
@@ -87,7 +88,7 @@ interface Sink<T> {
 export interface Commands {
   initial_repo: [Record<string, never>, string | null];
   repo_root: [{ dir: string }, string | null];
-  git_clone: [{ url: string; dest: string; onProgress: Sink<Progress> }, OpResult];
+  git_clone: [{ url: string; dest: string; options: CloneOptions; onProgress: Sink<Progress> }, OpResult];
   git_init: [{ dir: string }, OpResult];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
   repo_glance: [{ paths: string[] }, RepoGlance[]];
@@ -109,7 +110,10 @@ export interface Commands {
   ];
   git_abort: [{ path: string }, OpResult];
   git_continue: [{ path: string }, OpResult];
-  git_pick: [{ path: string; op: PickOp; id: string; target: string | null }, OpResult];
+  git_pick: [{ path: string; op: PickOp; ids: string[]; target: string | null; mainline: number | null }, OpResult];
+  commit_patch: [{ path: string; id: string }, string];
+  save_patch: [{ path: string; id: string; dest: string }, OpResult];
+  apply_patch: [{ path: string; file: string }, OpResult];
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
   git_ref: [{ path: string; op: RefOp }, OpResult];
@@ -227,9 +231,9 @@ export const api = {
   initialRepo: () => (isTauri ? call("initial_repo", {}) : Promise.resolve(null)),
   /** Root of the repository `dir` (a file or folder) belongs to, or null. */
   repoRoot: (dir: string) => call("repo_root", { dir }),
-  /** Clone `url` into `dest` (a new or empty folder). */
-  clone(url: string, dest: string, onProgress: (p: Progress) => void = () => {}) {
-    return call("git_clone", { url, dest, onProgress: progressSink(onProgress) });
+  /** Clone `url` into `dest` (a new or empty folder), as much of it as `options` say. */
+  clone(url: string, dest: string, options: CloneOptions, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_clone", { url, dest, options, onProgress: progressSink(onProgress) });
   },
   /** `git init` (on `main`) in an existing folder. */
   init: (dir: string) => call("git_init", { dir }),
@@ -261,7 +265,17 @@ export const api = {
     call("git_merge", { path, source, target, mode, message }),
   abort: (path: string) => call("git_abort", { path }),
   continueOp: (path: string) => call("git_continue", { path }),
-  pick: (path: string, op: PickOp, id: string, target: string | null) => call("git_pick", { path, op, id, target }),
+  /**
+   * Cherry-pick (oldest first) or revert (newest first) `ids` on `target` (null: HEAD). A merge among them is
+   * taken against parent `mainline` (1-based; null: the first).
+   */
+  pick: (path: string, op: PickOp, ids: string[], target: string | null, mainline: number | null = null) =>
+    call("git_pick", { path, op, ids, target, mainline }),
+  /** Commit `id` as `git format-patch` writes it. */
+  commitPatch: (path: string, id: string) => call("commit_patch", { path, id }),
+  savePatch: (path: string, id: string, dest: string) => call("save_patch", { path, id, dest }),
+  /** Apply a patch file to the current branch: a mailed one as commits (`am`), a plain diff to the working tree. */
+  applyPatch: (path: string, file: string) => call("apply_patch", { path, file }),
   checkout: (path: string, target: string) => call("git_checkout", { path, target }),
   createBranch: (path: string, name: string, at: string | null, switchTo: boolean) =>
     call("git_create_branch", { path, name, at, switch: switchTo }),
@@ -439,6 +453,21 @@ export const api = {
     if (!isTauri) return "/demo/out/demo-acme-2026-10-04-120000.bundle";
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ multiple: false, title, filters: [{ name: "Git bundle", extensions: ["bundle"] }] });
+    return typeof r === "string" ? r : null;
+  },
+  /** A patch file to apply (the demo answers `/work/fix.patch` unless told otherwise). */
+  async pickPatch(title: string): Promise<string | null> {
+    if (!isTauri) {
+      const next = demoControls.nextPatch;
+      demoControls.nextPatch = undefined;
+      return next === undefined ? "/work/fix.patch" : next;
+    }
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const filters = [
+      { name: "Patch", extensions: ["patch", "diff", "mbox", "eml"] },
+      { name: "*", extensions: ["*"] },
+    ];
+    const r = await open({ multiple: false, title, filters });
     return typeof r === "string" ? r : null;
   },
   /** Where to save a file, starting from `name` (the demo answers `/work/<name>` unless told otherwise). */

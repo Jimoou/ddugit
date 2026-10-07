@@ -186,7 +186,7 @@ export const confirmPick = (repo: Repo, id: string, target: string) => {
       void repo
         .run(
           t("pick.done", { target }),
-          () => api.pick(repo.path, "cherryPick", id, target),
+          () => api.pick(repo.path, "cherryPick", [id], target),
           () => centerOnHeadSoon(repo),
         )
         .then((r) => {
@@ -212,7 +212,7 @@ export const confirmRevert = (repo: Repo, id: string) =>
         branch: repo.snap.head.branch ?? "HEAD",
       }),
     },
-    () => void repo.run(t("revert.done"), () => api.pick(repo.path, "revert", id, null)),
+    () => void repo.run(t("revert.done"), () => api.pick(repo.path, "revert", [id], null)),
   );
 
 /** Delete a local branch; if git says it's unmerged, ask again before forcing. */

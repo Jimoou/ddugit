@@ -105,6 +105,9 @@ export interface Repo {
   elsewhere: Record<string, string>;
   /** The commit shown in the panel. */
   selected: string | null;
+  /** Commits picked together (⌘/Ctrl- and Shift-click) for one action on all of them. */
+  picked: string[];
+  setPicked(ids: string[]): void;
   colorOf(id: string): string;
   /** The graph's camera and screen positions (not during render). */
   graph(): GraphHandle | null;

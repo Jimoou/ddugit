@@ -94,6 +94,34 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
   };
 }
 
+/**
+ * Repository commands on ⌘/Ctrl + Shift + a letter (plain ⌘/Ctrl + letter is taken by the
+ * app, the window and the OS: B, F, R, T, W, P for print…). Handled in `repo/CommandKeys.tsx`.
+ */
+export const COMMAND_KEYS = {
+  fetch: "F",
+  pull: "P",
+  push: "U",
+  newBranch: "B",
+  stash: "S",
+  commit: "C",
+} as const;
+export type CommandKey = keyof typeof COMMAND_KEYS;
+
+/** How a command's key reads in menus, tooltips and the shortcut table. */
+export const shortcutLabel = (k: CommandKey) => `⌘/Ctrl + Shift + ${COMMAND_KEYS[k]}`;
+
+type KeyPress = Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">;
+
+/** The command a key press asks for, if any. By key position too, so it works with a Korean input mode on. */
+export function commandOf(e: KeyPress): CommandKey | null {
+  if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return null;
+  const found = Object.entries(COMMAND_KEYS).find(
+    ([, letter]) => e.key.toUpperCase() === letter || e.code === `Key${letter}`,
+  );
+  return found ? (found[0] as CommandKey) : null;
+}
+
 /** `keys` and `what` are dictionary keys, or literal text (key names like "Enter"). */
 interface Shortcut {
   keys: Key | string;
@@ -119,6 +147,7 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
       { keys: "keys.shiftDrag", what: "keys.shiftDrag.what" },
       { keys: "keys.modDrag", what: "keys.modDrag.what" },
       { keys: "keys.rightClick", what: "keys.rightClick.what" },
+      { keys: "keys.pickClick", what: "keys.pickClick.what" },
       { keys: "← / →", what: "keys.leftRight.what" },
       { keys: "↑ / ↓", what: "keys.upDown.what" },
       { keys: "Enter", what: "keys.enter.what" },
@@ -131,6 +160,10 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
       { keys: "⌘/Ctrl + F", what: "keys.find.what" },
       { keys: "Enter / Shift + Enter", what: "keys.findStep.what" },
     ],
+  },
+  {
+    group: "keys.repo",
+    items: (Object.keys(COMMAND_KEYS) as CommandKey[]).map((k) => ({ keys: shortcutLabel(k), what: `keys.cmd.${k}` })),
   },
   {
     group: "keys.commit",

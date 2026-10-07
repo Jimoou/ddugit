@@ -16,6 +16,7 @@ pub mod history;
 pub mod identity;
 pub mod ignore;
 pub mod lfs;
+pub mod patch;
 pub mod pick;
 pub mod read;
 pub mod rebase;

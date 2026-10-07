@@ -133,8 +133,11 @@ command!(git_merge(path: String, source: String, target: Option<String>, mode: M
     -> OpResult => git::write::merge(&path, &source, target.as_deref(), mode, message.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
 command!(git_continue(path: String) -> OpResult => git::write::continue_op(&path));
-command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) -> OpResult
-    => git::pick::pick(&path, op, &id, target.as_deref()));
+command!(git_pick(path: String, op: PickOp, ids: Vec<String>, target: Option<String>, mainline: Option<usize>)
+    -> OpResult => git::pick::pick(&path, op, &ids, target.as_deref(), mainline));
+command!(commit_patch(path: String, id: String) -> String => git::patch::commit_patch(&path, &id));
+command!(save_patch(path: String, id: String, dest: String) -> OpResult => git::patch::save_patch(&path, &id, &dest));
+command!(apply_patch(path: String, file: String) -> OpResult => git::patch::apply_patch(&path, &file));
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
@@ -154,8 +157,8 @@ command!(git_push_to(path: String, remote: String, branch: Option<String>, on_pr
 command!(git_remote_ref(path: String, remote: String, op: RemoteRefOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote_ref(&path, &remote, &op, |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));
-command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
-    => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
+command!(git_clone(url: String, dest: String, options: git::setup::CloneOptions, on_progress: Channel<Progress>)
+    -> OpResult => git::setup::clone(&url, &dest, &options, |p| { let _ = on_progress.send(p); }));
 command!(git_init(dir: String) -> OpResult => git::setup::init(&dir));
 command!(git_reset(path: String, target: String, mode: git::undo::ResetMode) -> OpResult
     => git::undo::reset(&path, &target, mode));
@@ -356,6 +359,9 @@ pub fn run() {
             git_abort,
             git_continue,
             git_pick,
+            commit_patch,
+            save_patch,
+            apply_patch,
             git_checkout,
             git_create_branch,
             git_ref,

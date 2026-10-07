@@ -3,6 +3,7 @@ import { Icon } from "./Icon";
 import type { IconName } from "../icons";
 import { isTauri } from "../api";
 import { type Key, t } from "../i18n";
+import { shortcutLabel } from "../settings";
 import type { HeadInfo, Progress, RemoteOp } from "../types";
 
 interface Props {
@@ -25,7 +26,7 @@ interface Props {
   onRemote(op: RemoteOp): void;
 }
 
-const REMOTE: { op: RemoteOp; icon: IconName; label: string; title: Key }[] = [
+const REMOTE: { op: "fetch" | "pull" | "push"; icon: IconName; label: string; title: Key }[] = [
   { op: "fetch", icon: "fetch", label: "Fetch", title: "top.fetch.title" },
   { op: "pull", icon: "arrowDown", label: "Pull", title: "top.pull.title" },
   { op: "push", icon: "arrowUp", label: "Push", title: "top.push.title" },
@@ -80,7 +81,7 @@ export function TopBar(p: Props) {
               key={op}
               className={`ghost remote ${running ? "running" : ""}`}
               disabled={p.busy}
-              title={op === "push" && !head.upstream ? t("top.push.first") : t(title)}
+              title={`${op === "push" && !head.upstream ? t("top.push.first") : t(title)} (${shortcutLabel(op)})`}
               onClick={() => p.onRemote(op)}
             >
               <Icon name={icon} className="ico" />
@@ -100,7 +101,12 @@ export function TopBar(p: Props) {
         })}
       </div>
 
-      <button className="ghost commit-btn" onClick={p.onCompose} disabled={p.busy}>
+      <button
+        className="ghost commit-btn"
+        onClick={p.onCompose}
+        disabled={p.busy}
+        title={`${t("top.commit.title")} (${shortcutLabel("commit")})`}
+      >
         <Icon name="plus" /> {t("top.commit")} {p.changeCount > 0 && <span className="count">{p.changeCount}</span>}
       </button>
       <button className="ghost" onClick={p.onUndoHistory} title={t("undo.log.open")} aria-label={t("undo.log.open")}>

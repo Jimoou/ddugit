@@ -14,34 +14,61 @@ pub enum PickOp {
     Revert,
 }
 
-/// Apply `op` with commit `id` on `target` (checked out first when it isn't HEAD).
-/// Merge commits are taken relative to their first parent.
-pub fn pick(path: &str, op: PickOp, id: &str, target: Option<&str>) -> Result<OpResult> {
-    super::operand(id)?;
-    let is_merge = {
+/// Apply `op` with `ids` in that order (oldest first to copy, newest first to undo)
+/// on `target` (checked out first when it isn't HEAD). A merge commit is taken
+/// relative to parent `mainline` (1-based, default the first); with several
+/// commits it applies to every merge among them.
+pub fn pick(
+    path: &str,
+    op: PickOp,
+    ids: &[String],
+    target: Option<&str>,
+    mainline: Option<usize>,
+) -> Result<OpResult> {
+    if ids.is_empty() {
+        return Err("No commits to apply".into());
+    }
+    // Fewest parents among the merges: the highest `mainline` every one of them has.
+    let parents = {
         let repo = open(path)?;
-        let c = repo
-            .revparse_single(id)
-            .and_then(|o| o.peel_to_commit())
-            .map_err(err)?;
-        c.parent_count() > 1
+        let mut fewest: Option<usize> = None;
+        for id in ids {
+            super::operand(id)?;
+            let n = repo
+                .revparse_single(id)
+                .and_then(|o| o.peel_to_commit())
+                .map_err(err)?
+                .parent_count();
+            if n > 1 {
+                fewest = Some(fewest.map_or(n, |f| f.min(n)));
+            }
+        }
+        fewest
+    };
+    let mainline = match (parents, mainline) {
+        (None, Some(_)) => return Err("Only a merge commit takes a parent to compare with".into()),
+        (Some(n), Some(m)) if m == 0 || m > n => {
+            return Err(format!("A merge here has {n} parents, not {m}"))
+        }
+        (Some(_), m) => Some(m.unwrap_or(1).to_string()),
+        (None, None) => None,
     };
     let dir = prepare_on(path, target)?;
     let mut args = match op {
         PickOp::CherryPick => vec!["cherry-pick", "-x"],
         PickOp::Revert => vec!["revert", "--no-edit"],
     };
-    if is_merge {
-        args.extend(["-m", "1"]);
+    if let Some(m) = &mainline {
+        args.extend(["-m", m]);
     }
-    args.push(id);
+    args.extend(ids.iter().map(String::as_str));
     Ok(conflict_aware(path, git(&dir, &args)?))
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::read::snapshot;
-    use super::super::testutil::{commit_file, repo, s};
+    use super::super::testutil::{commit_file, repo, run, s};
     use super::super::write::{abort, checkout, continue_op, create_branch, merge, MergeMode};
     use super::super::OpStatus;
     use super::*;
@@ -60,7 +87,14 @@ mod tests {
         commit_file(d.path(), "fix.txt", "fix", "important fix");
         let fix = head_id(p);
 
-        let r = pick(p, PickOp::CherryPick, &fix, Some("main")).unwrap();
+        let r = pick(
+            p,
+            PickOp::CherryPick,
+            std::slice::from_ref(&fix),
+            Some("main"),
+            None,
+        )
+        .unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         let snap = snapshot(p, 10).unwrap();
         assert_eq!(snap.head.branch.as_deref(), Some("main"));
@@ -80,7 +114,7 @@ mod tests {
         let p = s(d.path());
         commit_file(d.path(), "a.txt", "a", "base");
         commit_file(d.path(), "oops.txt", "x", "oops");
-        let r = pick(p, PickOp::Revert, &head_id(p), None).unwrap();
+        let r = pick(p, PickOp::Revert, &[head_id(p)], None, None).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert!(!d.path().join("oops.txt").exists());
 
@@ -89,9 +123,75 @@ mod tests {
         checkout(p, "main").unwrap();
         merge(p, "feature", None, MergeMode::Commit, None).unwrap();
         assert!(d.path().join("f.txt").exists());
-        let r = pick(p, PickOp::Revert, &head_id(p), None).unwrap();
+        let r = pick(p, PickOp::Revert, &[head_id(p)], None, None).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert!(!d.path().join("f.txt").exists());
+    }
+
+    /// Summaries of the current branch's last `n` commits, newest first.
+    fn summaries(p: &str, n: usize) -> Vec<String> {
+        let log = run(std::path::Path::new(p), &["log", "--format=%s", &format!("-{n}")]);
+        log.lines().map(String::from).collect()
+    }
+
+    #[test]
+    fn picks_and_reverts_several_commits_in_the_given_order() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "1\n", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "a.txt", "2\n", "two");
+        let two = head_id(p);
+        commit_file(d.path(), "b.txt", "b\n", "three");
+        let three = head_id(p);
+        commit_file(d.path(), "a.txt", "4\n", "four");
+        let four = head_id(p);
+
+        // Oldest first, skipping one: each lands in order on main.
+        let ids = [two.clone(), four.clone()];
+        let r = pick(p, PickOp::CherryPick, &ids, Some("main"), None).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(summaries(p, 3), ["four", "two", "base"]);
+        assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "4\n");
+        assert!(!d.path().join("b.txt").exists());
+
+        // Newest first undoes them cleanly.
+        checkout(p, "feature").unwrap();
+        let ids = [four, three, two];
+        let r = pick(p, PickOp::Revert, &ids, None, None).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "1\n");
+        assert!(!d.path().join("b.txt").exists());
+        assert_eq!(
+            summaries(p, 3),
+            ["Revert \"two\"", "Revert \"three\"", "Revert \"four\""]
+        );
+
+        assert!(pick(p, PickOp::Revert, &[], None, None).is_err());
+        assert!(pick(p, PickOp::Revert, &["--hard".into()], None, None).is_err());
+        // A parent to compare with is for merges only.
+        assert!(pick(p, PickOp::Revert, &[head_id(p)], None, Some(1)).is_err());
+    }
+
+    #[test]
+    fn reverts_a_merge_against_the_parent_chosen() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "f.txt", "f", "feature");
+        checkout(p, "main").unwrap();
+        commit_file(d.path(), "m.txt", "m", "main work");
+        merge(p, "feature", None, MergeMode::Commit, None).unwrap();
+        let merged = head_id(p);
+        assert!(pick(p, PickOp::Revert, std::slice::from_ref(&merged), None, Some(3)).is_err());
+        assert!(pick(p, PickOp::Revert, std::slice::from_ref(&merged), None, Some(0)).is_err());
+
+        // Against the second parent (feature): what main brought in is undone instead.
+        let r = pick(p, PickOp::Revert, &[merged], None, Some(2)).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert!(d.path().join("f.txt").exists());
+        assert!(!d.path().join("m.txt").exists());
     }
 
     #[test]
@@ -106,7 +206,9 @@ mod tests {
         commit_file(d.path(), "a.txt", "main", "main edit");
 
         assert_eq!(
-            pick(p, PickOp::CherryPick, &theirs, None).unwrap().status,
+            pick(p, PickOp::CherryPick, std::slice::from_ref(&theirs), None, None)
+                .unwrap()
+                .status,
             OpStatus::Conflict
         );
         assert_eq!(snapshot(p, 1).unwrap().state, "cherry-pick");
@@ -114,7 +216,9 @@ mod tests {
         assert_eq!(snapshot(p, 1).unwrap().state, "clean");
 
         assert_eq!(
-            pick(p, PickOp::CherryPick, &theirs, None).unwrap().status,
+            pick(p, PickOp::CherryPick, std::slice::from_ref(&theirs), None, None)
+                .unwrap()
+                .status,
             OpStatus::Conflict
         );
         fs::write(d.path().join("a.txt"), "resolved").unwrap();

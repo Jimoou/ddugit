@@ -1,6 +1,8 @@
 // Ways into a repository: recent ones (with stars), open a folder, clone a
 // URL, or start a new one. Used by the welcome screen and the top bar menu.
 
+import { CLONE_DRAFT, type CloneDraft, cloneOptions } from "../cloneOptions";
+import { CloneAdvanced } from "./CloneAdvanced";
 import { Icon } from "./Icon";
 import { SshSetup } from "./SshSetup";
 import { isSshUrl, toHttps, toSsh } from "../sshUrl";
@@ -216,6 +218,7 @@ export interface CloneInit {
   url?: string;
   parent?: string;
   name?: string;
+  options?: CloneDraft;
 }
 
 /**
@@ -242,20 +245,23 @@ export function CloneDialog(p: {
   const [progress, setProgress] = useState<Progress | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState(p.init.options ?? CLONE_DRAFT);
+  const parsed = cloneOptions(draft);
   const finalName = name ?? nameFromUrl(url);
   const ssh = isSshUrl(url);
   const [sshOpen, setSshOpen] = useState(false);
   const dest = parent && finalName ? joinPath(parent, finalName) : "";
-  const ok = url.trim() !== "" && dest !== "" && !running;
+  const ok = url.trim() !== "" && dest !== "" && !running && "options" in parsed;
 
   const start = async () => {
+    if (!("options" in parsed)) return;
     const [u, d] = [url, dest];
     setRunning(true);
     setError(null);
     setProgress(null);
     let r: OpResult;
     try {
-      r = await api.clone(u, d, setProgress);
+      r = await api.clone(u, d, parsed.options, setProgress);
     } catch (e) {
       r = { status: "failed", output: String(e) };
     }
@@ -263,7 +269,7 @@ export function CloneDialog(p: {
     if (r.status === "ok") {
       writeStored(CLONE_PARENT, parent);
       p.onCloned(d);
-    } else if (r.status === "auth") p.onAuth({ url: u, parent, name: finalName }, r.output);
+    } else if (r.status === "auth") p.onAuth({ url: u, parent, name: finalName, options: draft }, r.output);
     else setError(r.output || t("connect.clone.failed"));
   };
 
@@ -361,6 +367,12 @@ export function CloneDialog(p: {
             />
           </label>
           {dest && <p className="muted small">→ {dest}</p>}
+          <CloneAdvanced
+            value={draft}
+            onChange={setDraft}
+            disabled={running}
+            error={"error" in parsed ? t(parsed.error) : null}
+          />
           {running && (
             <div className="clone-progress" role="status">
               <span>{progress ? `${progress.phase} ${progress.percent}%` : t("connect.clone.starting")}</span>

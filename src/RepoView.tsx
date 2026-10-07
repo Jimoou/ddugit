@@ -48,19 +48,8 @@ import {
 } from "./repo/changes";
 import { BisectBanner, CompareBanner, StateBanner, TrailBanner } from "./repo/Banners";
 import { RepoDialogs } from "./repo/Dialogs";
-import {
-  branchesMenu,
-  fileMenu,
-  nodeMenu,
-  openMenu,
-  prMenu,
-  refMenu,
-  remoteMenu,
-  showPr,
-  submoduleMenu,
-  submoduleRun,
-  worktreeMenu,
-} from "./repo/menus";
+import { branchesMenu, fileMenu, nodeMenu, openMenu, prMenu, refMenu, remoteMenu, showPr } from "./repo/menus";
+import { submoduleMenu, submoduleRun, worktreeMenu } from "./repo/folderMenus";
 import { RepoSheets } from "./repo/Sheets";
 import type { CompareSide, Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
 import { repoOpenMenu } from "./repo/outside";
@@ -70,6 +59,8 @@ import { useRun } from "./repo/useRun";
 import { useSheet } from "./repo/useSheet";
 import { useSearch } from "./repo/useSearch";
 import { useSnapshot } from "./repo/useSnapshot";
+import { CommandKeys } from "./repo/CommandKeys";
+import { addPicks, firstParentLine, togglePick } from "./repo/pickList";
 
 /** How long the pointer rests on a star before its preview card shows. */
 const PEEK_DELAY_MS = 350;
@@ -115,6 +106,8 @@ export function RepoView({
   if (import.meta.env.DEV && path === DEMO_PATH && demoControls.crashTab) throw new Error("Demo tab crashed");
   const { snap, loadError, latest, refresh, loadMore, loadTo } = useSnapshot(path, page, active, onLoaded, toast);
   const [selected, setSelected] = useState<string | null>(null);
+  /** Commits picked together (⌘/Ctrl- and Shift-click) for one action on all of them. */
+  const [pickedIds, setPicked] = useState<string[]>([]);
   const [selectedStash, setSelectedStash] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
@@ -179,6 +172,16 @@ export function RepoView({
   const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
+  // Picks of commits no longer loaded (history rewritten) drop out.
+  const picked = useMemo(() => pickedIds.filter((id) => commitById.has(id)), [pickedIds, commitById]);
+  const pickedSet = useMemo(() => new Set(picked), [picked]);
+  /** ⌘/Ctrl-click toggles a commit (the selected one joins the first time); Shift-click adds the line to it. */
+  const onPick = (id: string, range: boolean) => {
+    const start = picked.length ? picked : selected && selected !== id ? [selected] : [];
+    const anchor = picked[picked.length - 1] ?? selected;
+    const line = range && anchor ? firstParentLine(commitById, anchor, id) : null;
+    setPicked(line ? addPicks(start, line) : togglePick(start, id));
+  };
 
   const { sheet, setSheet, conflict, setConflict, loadDiff, rebase } = useSheet(path, snap, commitById, toast);
   const { busy, run, refuseBusy } = useRun({
@@ -252,7 +255,8 @@ export function RepoView({
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "f") {
+      // ⌘/Ctrl+Shift+F is Fetch (`CommandKeys`).
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         openSearch();
       } else if ((mod && e.key.toLowerCase() === "r") || e.key === "F5") {
@@ -375,6 +379,8 @@ export function RepoView({
     compareBase,
     elsewhere,
     selected,
+    picked,
+    setPicked,
     colorOf,
     graph: () => graph.current,
     toast,
@@ -450,6 +456,7 @@ export function RepoView({
         />
       )}
 
+      <CommandKeys repo={repo} active={active} onRemote={remote.onRemote} />
       <BisectBanner repo={repo} />
       {trail && <TrailBanner repo={repo} trail={trail} />}
       {compareBase && <CompareBanner repo={repo} base={compareBase} />}
@@ -587,13 +594,18 @@ export function RepoView({
               headBranch={snap.head.branch}
               changeCount={snap.changes.length}
               selected={selected}
+              picked={pickedSet}
+              onPick={onPick}
               focus={trailFocus ?? bisect.focus ?? focus}
               badges={bisect.badges}
               trail={trailIds}
               animate={animate}
               space={settings.space}
               glow={settings.glow}
-              onSelect={(id) => (id || !composer ? show({ commit: id }) : undefined)}
+              onSelect={(id) => {
+                setPicked([]);
+                if (id || !composer) show({ commit: id });
+              }}
               onPlus={() => show({ composer: true })}
               stashes={snap.stashes}
               selectedStash={selectedStash}

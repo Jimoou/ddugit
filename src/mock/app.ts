@@ -72,7 +72,9 @@ export const appCommands = {
   initial_repo: () => delay(null, 0),
   // Any folder "is" the demo repository, except ones named like a plain folder.
   repo_root: ({ dir }) => delay(/not-a-repo/.test(dir) ? null : dir, 0),
-  async git_clone({ url, onProgress }) {
+  async git_clone({ url, dest, options, onProgress }) {
+    if (options.branch?.trim().startsWith("-")) return fail(`'${options.branch.trim()}' can't start with '-'`);
+    demoControls.lastClone = { url, dest, options };
     if (demoControls.slow) await delay(null, demoControls.slow);
     const fake = demoControls.failNextRemote;
     if (fake) {

@@ -4,15 +4,61 @@
 use std::path::Path;
 
 use super::remote::{remote_status, stream_remote, Progress};
-use super::{git, OpResult, Result};
+use serde::Deserialize;
+
+use super::{git, operand, OpResult, Result};
+
+/// How much of the repository a clone brings (the dialog's "Advanced" part).
+#[derive(Debug, Deserialize, Default, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CloneOptions {
+    /// Check out this branch (or tag) instead of the remote's default (`--branch`).
+    pub branch: Option<String>,
+    /// Only the last `depth` commits (`--depth`); 0 or unset is all of history.
+    pub depth: Option<u32>,
+    /// Only the one branch's history (`--single-branch`). A shallow clone of every
+    /// branch says `--no-single-branch`, since `--depth` alone means one branch.
+    pub single_branch: bool,
+    /// Also clone and check out the submodules (`--recurse-submodules`).
+    pub submodules: bool,
+}
+
+impl CloneOptions {
+    /// The options as `git clone` arguments; a branch that looks like an option is refused.
+    fn args(&self) -> Result<Vec<String>> {
+        let mut args = Vec::new();
+        if let Some(b) = self.branch.as_deref().map(str::trim).filter(|b| !b.is_empty()) {
+            args.extend(["--branch".into(), operand(b)?.to_string()]);
+        }
+        let depth = self.depth.filter(|&d| d > 0);
+        if let Some(d) = depth {
+            args.push(format!("--depth={d}"));
+        }
+        if self.single_branch {
+            args.push("--single-branch".into());
+        } else if depth.is_some() {
+            args.push("--no-single-branch".into());
+        }
+        if self.submodules {
+            args.push("--recurse-submodules".into());
+        }
+        Ok(args)
+    }
+}
 
 /// `git clone <url> <dest>`; `dest` must not exist yet or be an empty folder.
 /// Progress streams like fetch; missing credentials come back as `Auth`.
-pub fn clone(url: &str, dest: &str, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+pub fn clone(
+    url: &str,
+    dest: &str,
+    options: &CloneOptions,
+    on_progress: impl FnMut(Progress),
+) -> Result<OpResult> {
     let url = url.trim();
     if url.is_empty() {
         return Err("Enter a repository URL".into());
     }
+    let extra = options.args()?;
     let dest = Path::new(dest);
     let parent = dest.parent().filter(|p| p.is_dir()).ok_or_else(|| {
         format!(
@@ -21,7 +67,10 @@ pub fn clone(url: &str, dest: &str, on_progress: impl FnMut(Progress)) -> Result
         )
     })?;
     let target = dest.to_string_lossy();
-    let o = stream_remote(parent, &["clone", "--progress", "--", url, &target], on_progress)?;
+    let mut args = vec!["clone", "--progress"];
+    args.extend(extra.iter().map(String::as_str));
+    args.extend(["--", url, &target]);
+    let o = stream_remote(parent, &args, on_progress)?;
     Ok(OpResult::with(remote_status(&o, false), o))
 }
 
@@ -56,11 +105,108 @@ mod tests {
         commit_file(src.path(), "a.txt", "a", "first");
         let parent = tempfile::tempdir().unwrap();
         let dest = parent.path().join("copy");
-        let r = clone(s(src.path()), s(&dest), |_| {}).unwrap();
+        let r = clone(s(src.path()), s(&dest), &CloneOptions::default(), |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         let snap = snapshot(s(&dest), 10).unwrap();
         assert_eq!(snap.commits[0].summary, "first");
         assert_eq!(snap.head.upstream.as_deref(), Some("origin/main"));
+    }
+
+    /// A bare repository (as `file://` URL, so `--depth` applies) with three commits on
+    /// `main`, a `dev` branch one ahead, and a submodule. Keep the folders while cloning.
+    fn bare_with_branch_and_submodule() -> ([tempfile::TempDir; 2], String) {
+        let lib = repo();
+        commit_file(lib.path(), "lib.txt", "lib", "lib");
+        let src = repo();
+        commit_file(src.path(), "a.txt", "1", "one");
+        commit_file(src.path(), "a.txt", "2", "two");
+        git_ok(src.path(), &["submodule", "add", "-q", s(lib.path()), "libs/lib"]).unwrap();
+        git_ok(src.path(), &["commit", "-qm", "three"]).unwrap();
+        git_ok(src.path(), &["checkout", "-qb", "dev"]).unwrap();
+        commit_file(src.path(), "dev.txt", "d", "dev work");
+        git_ok(src.path(), &["checkout", "-q", "main"]).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let bare = root.path().join("app.git");
+        git_ok(root.path(), &["clone", "-q", "--bare", s(src.path()), s(&bare)]).unwrap();
+        let url = format!("file://{}", bare.display());
+        // `.gitmodules` names `lib`'s folder: it has to stay.
+        ([root, lib], url)
+    }
+
+    #[test]
+    fn clone_options_pick_a_branch_depth_and_submodules() {
+        let (_keep, url) = bare_with_branch_and_submodule();
+        let parent = tempfile::tempdir().unwrap();
+
+        // A branch, shallow, one branch only, with submodules.
+        let dest = parent.path().join("dev");
+        let opts = CloneOptions {
+            branch: Some("dev".into()),
+            depth: Some(1),
+            single_branch: true,
+            submodules: true,
+        };
+        let r = clone(&url, s(&dest), &opts, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(s(&dest), 10).unwrap();
+        assert_eq!(snap.head.branch.as_deref(), Some("dev"));
+        assert_eq!(snap.commits.len(), 1, "shallow: one commit");
+        let remote: Vec<_> = snap
+            .refs
+            .iter()
+            .filter(|r| r.kind == super::super::read::RefKind::Remote)
+            .map(|r| r.name.clone())
+            .collect();
+        assert_eq!(remote, ["origin/dev"]);
+        assert!(dest.join("libs/lib/lib.txt").exists(), "submodule checked out");
+
+        // Shallow but every branch; no submodules.
+        let dest = parent.path().join("all");
+        let opts = CloneOptions {
+            depth: Some(2),
+            ..Default::default()
+        };
+        let r = clone(&url, s(&dest), &opts, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let snap = snapshot(s(&dest), 10).unwrap();
+        assert_eq!(snap.head.branch.as_deref(), Some("main"));
+        assert_eq!(snap.commits.len(), 3, "two on main, dev's own one");
+        assert!(snap.refs.iter().any(|r| r.name == "origin/dev"));
+        assert!(!dest.join("libs/lib/lib.txt").exists());
+
+        // A branch that looks like an option, and one that isn't there.
+        let bad = CloneOptions {
+            branch: Some("--upload-pack=touch x".into()),
+            ..Default::default()
+        };
+        assert!(clone(&url, s(&parent.path().join("bad")), &bad, |_| {}).is_err());
+        let missing = CloneOptions {
+            branch: Some("nope".into()),
+            ..Default::default()
+        };
+        let r = clone(&url, s(&parent.path().join("nope")), &missing, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Failed);
+    }
+
+    #[test]
+    fn clone_options_become_arguments() {
+        let args = |o: CloneOptions| o.args().unwrap();
+        assert!(args(CloneOptions::default()).is_empty());
+        let o = CloneOptions {
+            branch: Some(" v1.0 ".into()),
+            depth: Some(0),
+            ..Default::default()
+        };
+        assert_eq!(args(o), ["--branch", "v1.0"]);
+        let o = CloneOptions {
+            depth: Some(5),
+            submodules: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            args(o),
+            ["--depth=5", "--no-single-branch", "--recurse-submodules"]
+        );
     }
 
     #[test]
@@ -69,10 +215,16 @@ mod tests {
         commit_file(src.path(), "a.txt", "a", "first");
         let parent = tempfile::tempdir().unwrap();
         std::fs::write(parent.path().join("x"), "taken").unwrap();
-        let r = clone(s(src.path()), s(parent.path()), |_| {}).unwrap();
+        let r = clone(s(src.path()), s(parent.path()), &CloneOptions::default(), |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Failed);
-        assert!(clone(s(src.path()), s(&parent.path().join("no/such/dir")), |_| {}).is_err());
-        assert!(clone(" ", s(&parent.path().join("y")), |_| {}).is_err());
+        assert!(clone(
+            s(src.path()),
+            s(&parent.path().join("no/such/dir")),
+            &CloneOptions::default(),
+            |_| {}
+        )
+        .is_err());
+        assert!(clone(" ", s(&parent.path().join("y")), &CloneOptions::default(), |_| {}).is_err());
     }
 
     /// An HTTP server on 127.0.0.1 that answers every request with `status` and
@@ -111,7 +263,7 @@ mod tests {
             let url = http_answering(status);
             let parent = tempfile::tempdir().unwrap();
             let dest = parent.path().join("app");
-            let r = clone(&url, s(&dest), |_| {}).unwrap();
+            let r = clone(&url, s(&dest), &CloneOptions::default(), |_| {}).unwrap();
             assert_eq!(r.status, want, "{status}: {}", r.output);
             assert!(!dest.join(".git").exists(), "{status} left a repository behind");
         }

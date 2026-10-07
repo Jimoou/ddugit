@@ -90,6 +90,8 @@ export interface DrawState {
   plusHover: boolean;
   changeCount: number;
   selected: string | null;
+  /** Commits picked together (⌘/Ctrl-click) for one action on all of them. */
+  picked: Set<string>;
   hovered: string | null;
   focus: Set<string> | null;
   refs: Map<string, RefInfo[]>;
@@ -505,6 +507,16 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, rr + (node.id === s.drag?.target ? 9 : 7), 0, Math.PI * 2);
       ctx.stroke();
+    }
+    if (s.picked.has(node.id)) {
+      // A dashed ring apart from the selection's, so both read at once.
+      ctx.strokeStyle = alpha("#ffffff", 0.9);
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rr + 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
     const badge = s.badges.get(node.id);
     if (badge) drawBadge(ctx, badge, p, rr, s.animate ? time : 0);
