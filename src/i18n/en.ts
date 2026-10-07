@@ -188,7 +188,12 @@ export const en: Record<Key, string> = {
   "license.activate": "Activate with your ddugit.com account",
   "license.activating": "Complete sign-in in your browser. Pro activates automatically…",
   "license.cancel": "Cancel",
-  "license.or": "For an air-gapped machine or a site license, paste the license you received.",
+  "license.or": "Paste the license you received (a site license too) here.",
+  "license.offline":
+    "No internet on this computer? Copy the code below, open ddugit.com/account on a device that's online and paste it under “Activate an offline computer”. Then paste the license you get there below.",
+  "license.deviceCode": "This computer's code",
+  "license.copyCode": "Copy code",
+  "license.copied": "Copied",
   "license.paste": "Paste license",
   "license.apply": "Apply license",
   "license.buy": "Buy a license",

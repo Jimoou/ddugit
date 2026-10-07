@@ -81,7 +81,17 @@ jobs:
         shell: bash
         env:
           PUBKEY: ${{ vars.DDUGIT_LICENSE_PUBKEY }}
+          PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release }}
         run: |
+          # Without the key the app can't check any license ("this build can't check licenses"),
+          # so nobody could turn Pro on: a published build must have it (v1.0.0 shipped without).
+          if [ -z "$PUBKEY" ]; then
+            if [ "$PUBLISH" = "true" ]; then
+              echo "::error::Set the Actions variable DDUGIT_LICENSE_PUBKEY (docs/RELEASE.md) before publishing"
+              exit 1
+            fi
+            echo "::warning::DDUGIT_LICENSE_PUBKEY is not set: this build can't check licenses"
+          fi
           echo "DDUGIT_BUILD_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
           echo "DDUGIT_LICENSE_PUBKEY=$PUBKEY" >> "$GITHUB_ENV"
       # Updates: sign update files with the updater key (its public half is in tauri.conf.json)

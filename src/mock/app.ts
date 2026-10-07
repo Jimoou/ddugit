@@ -110,6 +110,7 @@ export const appCommands = {
   app_info: () => delay({ version: `${appVersion}-demo`, os: "demo", osVersion: navigator.platform, arch: "web" }),
 
   license_status: () => Promise.resolve(demoLicenseStatus()),
+  license_device_code: () => Promise.resolve("demoDeviceCode0123456789abcdefghijklmnopqrs"),
   license_install({ text }) {
     if (!text.trim().startsWith("DDUGIT1.")) return Promise.reject("This is not a ddugit license");
     return Promise.resolve(

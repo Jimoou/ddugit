@@ -185,7 +185,12 @@ export const ko = {
   "license.activate": "ddugit.com 계정으로 활성화",
   "license.activating": "브라우저에서 로그인을 마치면 자동으로 활성화돼요…",
   "license.cancel": "그만두기",
-  "license.or": "폐쇄망·사이트 라이선스는 받은 라이선스를 붙여 넣으세요.",
+  "license.or": "받은 라이선스(사이트 라이선스 포함)를 여기에 붙여 넣으세요.",
+  "license.offline":
+    "인터넷이 안 되는 컴퓨터라면: 아래 코드를 복사해 인터넷이 되는 기기에서 ddugit.com/account의 '오프라인 컴퓨터 활성화'에 붙여 넣으세요. 그곳에서 받은 라이선스를 아래에 붙여 넣으면 됩니다.",
+  "license.deviceCode": "이 컴퓨터의 코드",
+  "license.copyCode": "코드 복사",
+  "license.copied": "복사됨",
   "license.paste": "라이선스 붙여 넣기",
   "license.apply": "라이선스 적용",
   "license.buy": "라이선스 구매",

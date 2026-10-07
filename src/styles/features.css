@@ -446,6 +446,12 @@ button.demo-pill {
 .dialog.settings .license .row {
   margin-top: 8px;
 }
+.dialog.settings .license-code code {
+  font: 11px var(--mono);
+  user-select: all;
+  overflow-wrap: anywhere;
+  flex: 1;
+}
 
 /* The home tab: always first, set apart from the repository tabs. */
 .tab.tab-home {
