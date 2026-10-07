@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { type Key, t } from "../i18n";
-import { copyText, openLink } from "../share";
+import { openLink } from "../share";
 import { refreshPro, usePro } from "../pro";
 import type { LicenseStatus } from "../types";
 
@@ -77,9 +77,6 @@ export function LicenseSection() {
   const [busy, setBusy] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [asking, setAsking] = useState(false);
-  // This computer's code for offline activation: read when the paste section is first opened.
-  const [code, setCode] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Read again whenever Pro changes (e.g. the daily check removed the license).
   useEffect(() => {
@@ -206,23 +203,8 @@ export function LicenseSection() {
                 )}
               </div>
               {/* Air-gapped and site licenses only: out of the way of the usual sign-in. */}
-              <details
-                className="license-paste"
-                onToggle={(e) => {
-                  if (e.currentTarget.open && code === null)
-                    api.licenseDeviceCode().then(setCode, (err) => setError(String(err)));
-                }}
-              >
+              <details className="license-paste">
                 <summary>{t("license.paste")}</summary>
-                <p className="muted small">{t("license.offline")}</p>
-                {code && (
-                  <div className="row license-code">
-                    <code aria-label={t("license.deviceCode")}>{code}</code>
-                    <button onClick={() => copyText(code, () => setCopied(true))}>
-                      {copied ? t("license.copied") : t("license.copyCode")}
-                    </button>
-                  </div>
-                )}
                 <p className="muted small">{t("license.or")}</p>
                 <textarea
                   className="license-text"

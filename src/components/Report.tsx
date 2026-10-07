@@ -38,7 +38,53 @@ export function AboutSection({ onReport }: { onReport(): void }) {
         <button onClick={() => openLink(PRIVACY_URL)}>{t("about.privacy")}</button>
       </div>
       <p className="muted small">{t("about.reportHint")}</p>
+      <UpdateCheck />
     </section>
+  );
+}
+
+type Check =
+  | { state: "idle" | "checking" | "latest" | "installing" }
+  | { state: "found"; version: string }
+  | { state: "failed"; message: string };
+
+/** "Check for updates": the startup notice's check on demand, with the answer (or why it failed) shown. */
+function UpdateCheck() {
+  const [check, setCheck] = useState<Check>({ state: "idle" });
+  const run = () => {
+    setCheck({ state: "checking" });
+    api.updateCheck().then(
+      (u) => setCheck(u ? { state: "found", version: u.version } : { state: "latest" }),
+      (e: unknown) => setCheck({ state: "failed", message: t("about.checkFailed", { error: String(e) }) }),
+    );
+  };
+  const install = () => {
+    setCheck({ state: "installing" });
+    api.updateInstall().then(
+      () => setCheck({ state: "idle" }),
+      (e: unknown) => setCheck({ state: "failed", message: t("update.failed", { error: String(e) }) }),
+    );
+  };
+  const busy = check.state === "checking" || check.state === "installing";
+  return (
+    <div className="update-check">
+      <div className="row">
+        <button disabled={busy} onClick={run}>
+          {check.state === "checking" ? t("about.checking") : t("about.checkUpdates")}
+        </button>
+        {check.state === "found" && (
+          <button className="primary" onClick={install}>
+            {t("update.install")}
+          </button>
+        )}
+      </div>
+      <p className="muted small" role="status">
+        {check.state === "latest" && t("about.latest")}
+        {check.state === "found" && t("update.available", { version: check.version })}
+        {check.state === "installing" && t("update.installing")}
+        {check.state === "failed" && check.message}
+      </p>
+    </div>
   );
 }
 

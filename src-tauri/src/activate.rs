@@ -54,9 +54,24 @@ pub fn activate_in(dir: &Path, open: impl FnOnce(&str) -> Result<()>) -> Result<
     let live = || CURRENT.load(Ordering::SeqCst) == me;
     let (stream, code) = wait_for_code(&listener, &state, Instant::now() + WAIT, live)?;
     let done = exchange(&code, &device).and_then(|text| license::install_in(dir, &text));
-    let page = if done.is_ok() { "ok" } else { "failed" };
+    let page = match &done {
+        Ok(_) => "ok".to_string(),
+        Err(e) => format!("failed&reason={}", failure_reason(e)),
+    };
     redirect(stream, &format!("{SITE}/activate/done?result={page}"));
     done
+}
+
+/// Why an activation failed, as the site's done page names it (it explains each one).
+fn failure_reason(error: &str) -> &'static str {
+    if error == license::OTHER_DEVICE {
+        "other-device"
+    } else if error == license::BAD_SIGNATURE {
+        // The app's built-in public key and ddugit.com's signing key are not a pair.
+        "signature"
+    } else {
+        "server"
+    }
 }
 
 /// 32 random bytes, base64url: the `state` that ties the browser's answer to this request.
@@ -237,6 +252,13 @@ fn deactivate_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_done_page_is_told_why_an_activation_failed() {
+        assert_eq!(failure_reason(license::OTHER_DEVICE), "other-device");
+        assert_eq!(failure_reason(license::BAD_SIGNATURE), "signature");
+        assert_eq!(failure_reason("This license is no longer active."), "server");
+    }
 
     /// A browser coming back: a favicon request first, then `path`. Returns the redirect it got.
     fn browser(port: u16, path: &'static str) -> std::thread::JoinHandle<String> {

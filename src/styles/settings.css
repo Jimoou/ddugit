@@ -456,3 +456,11 @@ kbd {
   font-size: 18px;
   pointer-events: none;
 }
+
+/* Settings → About: check for updates on demand */
+.dialog.settings .update-check {
+  margin-top: 14px;
+}
+.dialog.settings .update-check p:empty {
+  display: none;
+}
