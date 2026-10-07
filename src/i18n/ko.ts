@@ -77,6 +77,8 @@ export const ko = {
   "merge.title": "병합",
   "merge.body": "<b>{source}</b>의 커밋을 <b>{target}</b>에 합쳐 새 병합 커밋을 만들어요.",
   "merge.switch": "먼저 {target} 브랜치로 체크아웃한 뒤 병합해요.",
+  "merge.dirty.squash":
+    "커밋하지 않은 변경 {n}개가 있어요. squash는 변경을 커밋하거나 보관(stash)한 뒤에 할 수 있어요. 충돌로 멈췄을 때 취소하면 작업 트리를 병합 전으로 되돌리기 때문이에요.",
   "merge.dirty": "커밋하지 않은 변경 {n}개가 있어요. 충돌하면 git이 병합을 거부할 수 있어요.",
   "merge.go": "병합",
   "merge.going": "병합 중…",
@@ -1324,7 +1326,7 @@ export const ko = {
   "settings.editor.confirm": "ddugit이 파일을 이 프로그램으로 열게 할까요? 직접 고른 프로그램일 때만 확인을 누르세요.",
   "settings.editor.placeholder": "편집기 실행 파일의 전체 경로",
   "settings.editor.hint":
-    "이름으로 고른 편집기는 PATH에서 찾아요. 셸·인터프리터나 저장소·임시 폴더 안의 프로그램은 쓸 수 없어요.",
+    "이름으로 고른 편집기는 PATH에서 찾아요. 직접 지정한 프로그램은 확인 창에서 경로를 한 번 더 확인해요. 셸·인터프리터나 저장소·임시 폴더 안의 프로그램은 쓸 수 없어요.",
   "settings.diffTool": "외부 비교 도구",
   "settings.mergeTool": "외부 병합 도구",
   "settings.tool.git": "git 설정 따르기 ({tool})",

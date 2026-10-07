@@ -664,16 +664,10 @@ test("merges with its own message, by fast-forward, or as a squash for the compo
   await expect(dialog.getByRole("radio", { name: "fast-forward" })).toHaveAttribute("aria-checked", "true");
   await dialog.getByRole("radio", { name: "squash" }).click();
   // Not over uncommitted work: going back from a squash's conflicts would take it along.
-  await dialog.getByRole("button", { name: "스테이지" }).click();
-  await demo.toast("Commit or stash your changes before a squash merge");
+  await expect(dialog.getByRole("button", { name: "스테이지" })).toBeDisabled();
+  await expect(dialog).toContainText("커밋하거나 보관(stash)한 뒤에");
   await demo.mutate((d) => d.clean());
-  await sidebar
-    .locator("li")
-    .filter({ hasText: /^feature\/theme$/ })
-    .first()
-    .click({ button: "right" });
-  await page.click(".context-menu >> text=에 병합");
-  await dialog.getByRole("radio", { name: "squash" }).click();
+  await expect(dialog.getByRole("button", { name: "스테이지" })).toBeEnabled();
   await dialog.getByRole("button", { name: "스테이지" }).click();
   await demo.toast("feature/theme의 변경을 스테이지했어요. 메시지를 확인하고 커밋하세요");
   snap = await demo.snapshot();

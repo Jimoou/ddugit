@@ -130,6 +130,7 @@ export function RepoDialogs({ repo, dialog, pulls }: Props) {
           switchesBranch={snap.head.branch !== target}
           canFastForward={repo.isAncestor(targetId, sourceId)}
           dirty={snap.changes.length}
+          trackedDirty={snap.changes.filter((c) => c.staged || (c.unstaged && c.unstaged !== "untracked")).length}
           busy={busy}
           onCancel={close}
           onConfirm={(mode, message) => {

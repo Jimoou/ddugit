@@ -78,6 +78,8 @@ export const en: Record<Key, string> = {
   "merge.title": "Merge",
   "merge.body": "Merges <b>{source}</b> into <b>{target}</b> with a new merge commit.",
   "merge.switch": "Checks out {target} first, then merges.",
+  "merge.dirty.squash":
+    "You have {n:uncommitted change|uncommitted changes}. Commit or stash first: cancelling a squash that stopped on conflicts puts the work tree back as it was before the merge.",
   "merge.dirty": "You have {n:uncommitted change|uncommitted changes}. Git may refuse to merge if they conflict.",
   "merge.go": "Merge",
   "merge.going": "Merging…",
@@ -1343,7 +1345,7 @@ export const en: Record<Key, string> = {
   "settings.editor.custom": "Other program…",
   "settings.editor.placeholder": "Full path to the editor",
   "settings.editor.hint":
-    "Editors picked by name are found on PATH. Shells, interpreters and programs inside a repository or temp folder can't be used.",
+    "Editors picked by name are found on PATH. A program you name yourself is confirmed once more in a dialog showing its path. Shells, interpreters and programs inside a repository or temp folder can't be used.",
   "settings.diffTool": "External diff tool",
   "settings.mergeTool": "External merge tool",
   "settings.tool.git": "As set in git ({tool})",
