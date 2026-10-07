@@ -1,6 +1,6 @@
 [package]
 name = "ddugit"
-version = "1.0.0"
+version = "1.0.1"
 description = "ddugit — graph-first Git client"
 authors = ["ddugit"]
 edition = "2021"

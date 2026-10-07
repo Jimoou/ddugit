@@ -122,6 +122,7 @@ export interface Commands {
   license_status: [Record<string, never>, LicenseStatus];
   license_install: [{ text: string }, LicenseStatus];
   license_remove: [Record<string, never>, LicenseStatus];
+  license_device_code: [Record<string, never>, string];
   license_refresh: [Record<string, never>, LicenseRefresh];
   license_activate: [Record<string, never>, LicenseStatus];
   license_activate_cancel: [Record<string, never>, void];
@@ -273,6 +274,8 @@ export const api = {
   licenseStatus: () => call("license_status", {}),
   licenseInstall: (text: string) => call("license_install", { text }),
   licenseRemove: () => call("license_remove", {}),
+  /** This computer's device id: pasted on ddugit.com/account to activate it offline. */
+  licenseDeviceCode: () => call("license_device_code", {}),
   /** Ask ddugit.com whether the license still holds (device removed or refunded → dropped here). */
   licenseRefresh: () => call("license_refresh", {}),
   /** Sign in on ddugit.com in the browser; resolves with the license it sends back (or "Cancelled"). */
