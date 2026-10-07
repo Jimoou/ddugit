@@ -7,14 +7,16 @@ _마지막 갱신: 2026-10-07_
 
 ## 방금 끝난 것
 
-- 앱: 원격 브랜치 삭제(원격 브랜치 메뉴 → "<원격>에서 삭제…", `remote::delete_remote_branch`)
-- 사이트(ddugit-site #35–#40): 404·오류 페이지, 보안 점검 반영(확인된 이메일만 소유로 인정하는 RLS·`private.verified_email()`, 이중 환불 방지, IPv6 /64 rate limit), Git 가이드 4편(ddugit 중심, 스크린샷), 환불 정책 `/refunds`, 웹훅 발신 IP 확인(Paddle `/ips`, 기본 거부), 라이브에서 샌드박스 주문 무시
-- Paddle 라이브 카탈로그(다른 세션에서 API로 생성): 상품 `pro_01m4ae8jk3zscgr59atfbe6hr8`, 가격 `pri_01m4ae8jtk87m1ke5f3ndda7ez`($29 일회), 웹훅 `ntfset_01m4ae8k3heajjsmfyh8k3qd91`, client token `live_a70264fd4cad5fdca1ffd808c01`. 사용자가 Website approval(`ddugit.com`)과 기본 결제 링크(`/checkout`) 설정 완료
+- 누락 기능 1차(#134)·2차(#135) 병합, 코드 점검(보안·정확성 리뷰 에이전트 2개) 결과 수정까지 #135에 포함
+  - 편집기는 백엔드 설정 폴더에 두고 알려진 이름이 아니면 네이티브 확인 창(webview가 실행할 프로그램을 정하지 못함)
+  - 원격에서도 이름 바꾸기는 upstream 이름이 같을 때만(`origin/main`을 지울 수 있던 버그)
+  - 여러 커밋 cherry-pick·revert가 중간에 실패하면 전부 되돌림, 깨진 패치 `am`은 취소
+- v1.1.0 버전 올림 → main에서 Actions "Release"(release 체크) 실행
 
 ## 진행 중
 
-- 누락 기능 1차(#134)·2차 PR을 병합한 뒤 **코드·기능 점검 → v1.1.0 릴리스**(사용자 지시: "모든 구현을 마치면 코드랑 기능 점검하고, 결과 확인한 다음 릴리즈")
-- 실기에서만 확인할 수 있는 것: 외부 열기(Finder·탐색기·터미널·편집기)와 GUI diff·merge 도구는 Linux 빌드의 argv 테스트로만 확인됨 → 릴리스 후 macOS·Windows에서 직접 확인
+- 실기에서만 확인할 수 있는 것: 외부 열기(Finder·탐색기·터미널·편집기·확인 창)와 GUI diff·merge 도구는 Linux의 argv 테스트로만 확인됨 → macOS·Windows에서 직접 확인
+- 저장소에 Claude GitHub App이 없어 PR 이벤트가 세션에 오지 않는다 → `send_later`로 CI 확인
 
 ## 다음 단계 (사용자)
 
