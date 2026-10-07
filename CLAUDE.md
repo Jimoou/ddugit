@@ -38,16 +38,17 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `pick.rs`: cherry-pick / revert
   - `rebase.rs`: 다른 브랜치 위로 다시 쌓기(`onto`: `rebase --autostash <upstream>`, 병합 커밋은 일직선이 된다. 화면은 브랜치 메뉴와 ⌘/Ctrl 끌기 → `actions.tsx`의 `askRebaseOnto`). interactive rebase (UI가 만든 todo를 `sequence.editor`로 넣는다. 편집기 없음). 병합이 섞이면 `--rebase-merges`: git의 todo를 먼저 받아(`todo`, 사본만 남기고 실패하는 편집기) 처리·갈래 안 순서만 바꿔(`apply_plan`) 넣는다. 화면의 같은 로직은 `rebasePlan.ts`의 `todoRuns`·`applyPlan`
   - `refs.rs`: 브랜치 이름 변경·삭제, 태그, 원격 브랜치 체크아웃, 원격 추가·삭제 (`RefOp` 태그 enum 하나)
-  - `stash.rs`: discard, stash
-  - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블), 다른 원격으로 push(`push_to`), 원격 브랜치 삭제(`delete_remote_branch`, `push --delete refs/heads/…`, 가져오기 전용 원격은 거부)
+  - `stash.rs`: discard, stash(`StashOptions`: 추적 안 하는 파일 / `--keep-index`), `stash_branch`
+  - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블), 다른 원격으로 push(`push_to`), 이름 있는 원격의 참조 작업 `remote_ref`(`RemoteRefOp`: deleteBranch / pushTag / deleteTag / pushTags, 전체 참조 이름, 가져오기 전용 원격은 거부). 화면은 `useRemote.remoteRef`, 태그 메뉴(원격마다 push·삭제, 분리된 HEAD로 체크아웃), 원격 메뉴 '모든 태그 올리기', 태그 창의 push 체크박스(`NameRequest.check`)
   - `watch.rs`: 파일 감시 (관련 경로만 걸러 `repo-changed` 이벤트, `lib.rs`의 `Watching` 상태가 하나만 유지)
-  - `diff.rs`: 커밋 diff, 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
+  - `diff.rs`: 커밋 diff, 두 리비전 비교(`range_diff`, `merge_base`면 갈라진 지점부터 `from...to`, 이름 바뀜 포함), 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
   - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
-  - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`)
+  - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`), 파일 단위(`stage_files`: `add -A` / `restore --staged`, 첫 커밋 전엔 `rm --cached`), hunk·줄 버리기(`discard_hunks`: 같은 패치를 작업 트리에 `apply --reverse`)
+  - `ignore.rs`: `.gitignore`(최상위, 중복 건너뜀, CRLF 유지)에 패턴 추가와 추적 중지(`rm --cached`)를 한 번에(`ignore`). 패턴은 `src/ignore.ts`(`ignoreChoices`: `/file`, `*.ext`, `/dir/`, 이스케이프)
   - `bisect.rs`: `git bisect` 시작·좋음·나쁨·건너뛰기와 상태 읽기(refs/bisect/*에서 후보·지금 확인할 커밋·범인). 끝내기는 `write::abort`(bisect reset)
   - `edit.rs`: 지난 커밋 손보기(메시지·작성자·파일별로 둘로 나누기). 부모부터 rebase -i --autostash로 다시 쌓고 대상 바로 뒤에 `exec`을 끼운다. 훅(pre-commit 등)이 거부하면 rebase를 취소해 원래대로 돌리고 훅 출력을 돌려준다. 파일 하나를 어떤 커밋 상태로 되돌리기(`restore_file`)
   - `identity.rs`: 커밋할 사람과 서명(`user.name`·`user.email`·`commit.gpgsign`·`gpg.format`·`user.signingkey`)을 값이 온 곳(`--show-scope`)과 함께 CLI로 읽고, 저장소(local)·전역에 프로필 적용·서명 켜고 끄기·지우기(`IdentityOp`). GPG 비밀 키(`--with-colons`)·SSH 공개 키(`ssh::keys_in`) 목록, 커밋 하나의 서명(`%G?`·`%GS`·`%GK`, 확인 못 한 SSH 서명은 libgit2로 서명 유무). 프로필은 설정(`settings.profiles`, 순수 로직 `identity.ts`), 화면은 `components/Identity.tsx`(커밋 창의 이름 줄·메뉴, 설정의 프로필), 서명 배지는 `Inspector`
-  - `history.rs`: 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
+  - `history.rs`: 어떤 리비전의 파일을 저장(`save_file`, 저장 창 경로, `.git` 안·git 디렉터리에는 쓰지 않음, 심볼릭 링크도 따라가 검사). 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
   - `cleanup.rs`: 브랜치 정리 보고(기준 브랜치에 병합됨 / 원격에서 사라짐(gone) / 마지막 커밋 시각)와 여러 브랜치 한 번에 삭제
   - `undo.rs`: reset(soft/mixed/hard, 진행 중이면 거부), reflog(HEAD가 지나온 자리 + 어느 참조에서도 닿지 않는 `lost` 표시)
   - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)
@@ -68,7 +69,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src-tauri/src/report.rs`: 문제 신고·문의를 `ddugit.com/api/report`로 POST(`activate::post` 공유, 사이트와 같은 길이·이메일 검사). `about.rs`: 앱 버전·OS·아키텍처(`app_info`)와 열 수 있는 링크(https만). 화면은 `components/Report.tsx`(설정 '정보', 신고 창, 'Git을 찾을 수 없어요' 안내). 진단 정보는 순수 로직 `src/report.ts`(세션 오류 로그: 명령 실패는 `api.ts`의 `call`이, 잡히지 않은 오류는 `captureErrors`가 넣는다. `isUnexpected`가 토스트의 '신고' 버튼을 정한다)와 `src/redact.ts`(경로·URL·이메일·토큰 가리기)
 - `src-tauri/src/lib.rs`: Tauri 명령. `command!` 매크로로 한 줄씩 선언하고, 로직은 `git/`에 둔다. Pro 전용은 `command!(pro …)`(여기서 거부), 설정 폴더(라이선스)가 필요하면 `command!(이름(…) in dir -> …)`. 외부 프로그램은 `proc::hidden`(stdin 닫음, Windows 콘솔 창 없음)으로 띄운다
 - `src/api.ts`: 백엔드 호출의 유일한 통로. `Commands` 표 하나로 Tauri와 데모(`src/mock/`)가 같은 명령을 구현한다. 새 명령은 Rust `command!`, `Commands`, mock(영역에 맞는 `src/mock/*.ts`의 `…Commands`) 세 곳에 추가한다.
-- `src/mock/`: 데모 백엔드. `index.ts`가 영역별 명령 표(`app`·`local`·`history`·`refs`·`remote`·`pro`)를 합쳐 `mock`을 내보낸다(빠진 명령은 타입 오류). 가상 저장소와 응답 헬퍼는 `repo.ts`, e2e·개발용 스위치(`window.__ddugitDemo`, 타입 `DemoControls`)와 로드 전 플래그(`DemoFlags`, e2e의 `demoFlags`)는 `controls.ts`
+- `src/mock/`: 데모 백엔드. `index.ts`가 영역별 명령 표(`app`·`local`·`history`·`refs`·`remote`·`pro`)를 합쳐 `mock`을 내보낸다(빠진 명령은 타입 오류). 가상 저장소와 응답 헬퍼는 `repo.ts`(분리된 HEAD는 숨은 `HEAD` 가짜 브랜치 `detach()`, 원격 태그 `remoteTags`), e2e·개발용 스위치(`window.__ddugitDemo`, 타입 `DemoControls`)와 로드 전 플래그(`DemoFlags`, e2e의 `demoFlags`)는 `controls.ts`
 - `src/types.ts`: Rust 구조체와 1:1로 대응한다.
 - `src/recent.ts`: 최근 저장소·즐겨찾기 목록(순수 함수). 저장소 그룹은 `src/groups.ts`(폴더형: 저장소마다 그룹 하나, 대시보드 띠 `bands`). `components/Connect.tsx`가 저장(`useRecent`)과 화면(저장소 메뉴, 첫 화면 목록, clone 창)을 맡는다
 - `src/settings.ts`: 사용자 설정(localStorage, 파싱은 순수 함수)과 단축키 표. 단축키를 바꾸면 `SHORTCUTS`도 고친다.
@@ -81,6 +82,8 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src/RepoView.tsx`: 저장소 하나의 화면 조립(탑바·사이드바·그래프·오른쪽 패널). 보이는 탭(`active`)만 키 입력·파일 감시·탑바를 갖는다. 조각은 `src/repo/`에 있고, 모두 `state.ts`의 `Repo`(스냅숏·`run`·열린 시트/창 setter 등을 묶은 값)를 받는다
   - `useSnapshot.ts`(스냅숏 읽기·순서 번호·감시·포커스), `useRun.tsx`(모든 git 작업이 거치는 `run()`: 한 번에 하나, 바쁨·토스트·새로고침), `useRemote.tsx`(fetch/pull/push·원격 추가와 그 확인·인증·갈라짐 창, 진행 카드)
   - 열린 것은 판별 유니온 하나씩: 그래프 아래 시트 `Sheet`(`useSheet.ts`: diff 파일·rebase todo 읽기, 충돌 시트는 그 위에 따로), 저장소 창 `Dialog`(`Dialogs.tsx`), 원격 창(`useRemote` 안). 그리기는 `Sheets.tsx`·`Dialogs.tsx`
+  - `changes.tsx`: 작업 트리 흐름(커밋, 파일 스테이지, 파일·hunk 버리기, 커밋 창 파일 메뉴 `changeMenu`, stash 보관·꺼내기·브랜치, 사이드바 `stashMenu`). 커밋 창은 두 방식: 파일 고르기, 또는 index('스테이지된 것만', 체크박스가 스테이지). 커밋 옵션 `CommitOptions`(`--no-verify`·`-s`)와 `commit.template`은 `write.rs`
+  - `compare.ts`: 두 리비전 비교를 diff 시트로(`openCompare`, `DiffSource` `range`, 브랜치·커밋 메뉴, `Repo.compareBase` + `CompareBanner`)와 '이 버전을 다른 이름으로 저장…'(`saveVersionItem`, `api.pickSaveFile`)
   - `actions.tsx`: 메뉴·배너·시트가 시작하는 흐름(이름 묻기 `askName`, 확인 `confirmThen`, 체크아웃·cherry-pick·reset·커밋 손보기·worktree 등). `menus.tsx`: 오른쪽 클릭 메뉴(참조·커밋·파일·원격·PR·worktree·서브모듈, 탑바 브랜치 목록). `Banners.tsx`: bisect·파일 이력·진행 중 작업 배너. `useBisect.ts`: bisect 상태·배지
 
 ## Git 워크플로우
