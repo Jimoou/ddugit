@@ -35,9 +35,12 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - `src-tauri/src/git/`: git 계층. **읽기 = libgit2, 쓰기 = git CLI** (`mod.rs`의 `git()` 헬퍼. 실행 파일은 설정의 `set_program`으로 바꿀 수 있다. 이름이 `git`인 절대 경로만 받고, 저장소가 추적하는(무시되지 않는) 파일·임시 폴더·다른 사용자가 쓸 수 있는 파일은 거부한다)
   - `read.rs`: 스냅샷(이력, 참조, HEAD + upstream ahead/behind, 상태). 이력은 libgit2 정렬 revwalk(전체 이력을 먼저 읽는다) 대신 커밋 시각 순으로 직접 걷다가(`TimeWalk`) 페이지 크기에서 멈추고, `children_first`로 자식이 부모보다 앞에 오게 고친다
   - `write.rs`: commit/amend, merge, abort/continue, checkout, branch (`prepare_on`: 상태 확인 + 대상 체크아웃). `merge`는 `MergeMode`(commit `--no-ff` / fastForward `--ff` / squash `--squash`, 스테이지만)와 메시지(`-m`)를 받는다. squash 충돌은 진행 상태가 없어 index로 `conflict`를 판단한다. 화면은 `MergeDialog.tsx`(`squashMessage`로 커밋 창 메시지를 채운다)
-  - `pick.rs`: cherry-pick / revert
+  - `pick.rs`: cherry-pick / revert (여러 id: cherry-pick은 오래된 것부터, revert는 최근 것부터, 병합 revert의 `mainline` 부모)
+  - `patch.rs`: 커밋을 패치로(`format-patch -1 --stdout`, `history::save_target`로 저장하거나 복사), 패치 파일 적용(메일 형식 → `am --3way`, 멈춘 `am`은 cherry-pick처럼 계속·건너뛰기·취소 / 일반 diff → `apply --3way`). 화면은 `repo/patches.ts`(커밋 메뉴, 브랜치 목록의 '패치 적용…')
+  - `search.rs`: 전체 이력 검색(`git log`, 브랜치·원격·태그): 메시지 `--grep`·작성자 `--author`(정규식이 아니면 고정 문자열), 경로(pathspec, 파일 하나면 `--follow`), 내용 `-S`/`-G`. 최근 것부터, 상한과 `more`, 20초에서 멈추고 찾은 만큼 돌려준다(`run_within`)
+  - `tools.rs`: `git difftool`(`DiffTarget`: 작업 트리 / 커밋 대 부모, 파일 하나 또는 `--dir-diff`)과 파일 하나의 `git mergetool`. `--tool`은 알려진 GUI 도구나 git config에 정의된 것만, guitool이 있으면 `--gui`. 도구가 닫힐 때까지 기다리므로 화면은 `run()` 없이 부르고 `repo.refresh()`
   - `rebase.rs`: 다른 브랜치 위로 다시 쌓기(`onto`: `rebase --autostash <upstream>`, 병합 커밋은 일직선이 된다. 화면은 브랜치 메뉴와 ⌘/Ctrl 끌기 → `actions.tsx`의 `askRebaseOnto`). interactive rebase (UI가 만든 todo를 `sequence.editor`로 넣는다. 편집기 없음). 병합이 섞이면 `--rebase-merges`: git의 todo를 먼저 받아(`todo`, 사본만 남기고 실패하는 편집기) 처리·갈래 안 순서만 바꿔(`apply_plan`) 넣는다. 화면의 같은 로직은 `rebasePlan.ts`의 `todoRuns`·`applyPlan`
-  - `refs.rs`: 브랜치 이름 변경·삭제, 태그, 원격 브랜치 체크아웃, 원격 추가·삭제 (`RefOp` 태그 enum 하나)
+  - `refs.rs`: 브랜치 이름 변경·삭제, 태그, 원격 브랜치 체크아웃, 원격 추가·삭제·이름 바꾸기·URL 바꾸기(가져오기 전용은 그대로), upstream 설정·해제(`setUpstream`), 체크아웃 안 한 브랜치 빨리 감기(`fastForward`: libgit2로 확인 후 `git fetch . <upstream>:refs/heads/<b>`, 아니면 `Diverged`) (`RefOp` 태그 enum 하나). 스냅숏의 로컬 참조는 `upstream`(`read::Tracking`: 이름·ahead·behind·gone)을 갖는다
   - `stash.rs`: discard, stash(`StashOptions`: 추적 안 하는 파일 / `--keep-index`), `stash_branch`
   - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블), 다른 원격으로 push(`push_to`), 이름 있는 원격의 참조 작업 `remote_ref`(`RemoteRefOp`: deleteBranch / pushTag / deleteTag / pushTags, 전체 참조 이름, 가져오기 전용 원격은 거부). 화면은 `useRemote.remoteRef`, 태그 메뉴(원격마다 push·삭제, 분리된 HEAD로 체크아웃), 원격 메뉴 '모든 태그 올리기', 태그 창의 push 체크박스(`NameRequest.check`)
   - `watch.rs`: 파일 감시 (관련 경로만 걸러 `repo-changed` 이벤트, `lib.rs`의 `Watching` 상태가 하나만 유지)
@@ -51,7 +54,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `history.rs`: 어떤 리비전의 파일을 저장(`save_file`, 저장 창 경로, `.git` 안·git 디렉터리에는 쓰지 않음, 심볼릭 링크도 따라가 검사). 파일 이력(`log --follow`, 커밋마다 그때의 경로)과 blame(libgit2, 줄 묶음마다 커밋·작성자·시각)
   - `cleanup.rs`: 브랜치 정리 보고(기준 브랜치에 병합됨 / 원격에서 사라짐(gone) / 마지막 커밋 시각)와 여러 브랜치 한 번에 삭제
   - `undo.rs`: reset(soft/mixed/hard, 진행 중이면 거부), reflog(HEAD가 지나온 자리 + 어느 참조에서도 닿지 않는 `lost` 표시)
-  - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)
+  - `setup.rs`: 저장소 들어오기: clone(진행률·인증 실패 구분, `CloneOptions`: 브랜치·depth·single-branch·서브모듈, 화면은 `components/CloneAdvanced.tsx`, 검사는 `cloneOptions.ts`), init(`main`), 경로가 속한 저장소 찾기(끌어다 놓기)
   - `worktree.rs`: worktree 목록(스냅샷의 `worktrees`, libgit2)과 추가·제거·정리(`WorktreeOp`). 화면은 `components/Worktrees.tsx`(사이드바 섹션·추가 창), 다른 worktree 폴더는 `onOpenPath`로 탭에 연다
   - `submodule.rs`: 서브모듈 상태(스냅샷의 `submodules`, libgit2)와 update(`--init --recursive`)·sync(`SubmoduleOp`). 화면은 `components/Submodules.tsx`
   - `lfs.rs`: Git LFS 상태(`git lfs` CLI: 설치·패턴·필터·받지 않은 파일)와 install/pull/track/untrack(`LfsOp`). 스냅샷과 따로 읽는다(셸 실행). 화면은 `components/Lfs.tsx`(사이드바 섹션, 포인터 diff), 순수 로직 `lfs.ts`
@@ -61,6 +64,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `stack.rs`: 스택 브랜치(Pro). 부모와 base(마지막으로 쌓은 부모 끝)를 로컬 config `branch.<이름>.ddugit-parent`·`ddugit-base`에 두고, 다시 쌓기는 스택 맨 아래부터 `rebase --onto <부모> <base> <브랜치>`(amend·squash된 부모의 옛 커밋을 다시 얹지 않는다). 화면은 `components/Stacks.tsx`(사이드바 섹션)와 브랜치 메뉴(`repo/menus.tsx`의 `stackItems`), 순수 로직 `stack.ts`
   - `changelog.rs`: 릴리스 노트(Pro, 화면에서 잠금). 두 리비전 사이 첫 번째 부모 줄의 커밋(PR당 하나)과, 병합마다 들여온 커밋(`inner`, PR 번호 없는 병합에 씀). 시작을 안 주면 직전 태그(`describe --tags <to>^`), 빈 문자열이면 첫 커밋부터. 묶기·Markdown은 순수 로직 `notes.ts`, 화면은 `components/ReleaseNotes.tsx`(태그·로컬 브랜치 메뉴)
 - `src-tauri/src/forge.rs`: GitHub / GitLab의 열린 PR·MR(원격 URL로 forge 판별, 토큰은 `gh`/`glab` → OS 키체인, ureq). github.com·gitlab.com 밖의 호스트는 그 CLI 설정(`hosts.yml`·`config.yml`)에 로그인된 호스트일 때만 CLI 토큰을 쓴다(webview가 정하지 않는다). 원격 URL의 호스트는 `normalize_host`로 검사한다. 키체인 서비스는 `keychain.rs`(forge 토큰 `ddugit-forge`, 기기 ID `ddugit-device`, 옛 `ddugit`에서 옮겨 온다). 토큰은 webview로 넘기지 않는다. `forge/repos.rs`: 로그인한 사용자의 저장소 목록(clone·원격 추가에서 고르기, `components/ForgeRepoPicker.tsx`, 순수 로직 `forgeRepos.ts`의 `FORGE_SOURCES`·검색). `forge/create.rs`: PR·MR 만들기(REST, 기본 브랜치·비공개 확인 후 POST, 이미 열림은 기존 링크). 화면은 `components/CreatePr.tsx`(브랜치 메뉴·PR 섹션 머리), 순수 로직 `prDraft.ts`
+- `src-tauri/src/open.rs`: 앱 밖에서 열기(파일 관리자·기본 앱·터미널·편집기, `OpenHow`). `inside()`가 경로를 작업 트리 안으로 묶는다(`..`·밖으로 나가는 심볼릭 링크·`.git` 거부). 기본 앱으로는 실행 파일을 열지 않는다(`RUNS`, 실행 비트). 인자는 OS별 순수 함수(`terminal_launch`·`editor_launch`)로 만들고 셸을 거치지 않는다. `open/editor.rs`가 편집기를 검사(알려진 이름은 PATH에서, 전체 경로는 셸·인터프리터가 아니고 `git::planted` 통과). 편집기는 webview가 아니라 설정 폴더(`editor` 파일)에 두고(`set_editor`, 알려진 이름이 아니면 경로를 보여 주는 네이티브 확인 창), 열기 요청은 "편집기로"만 말한다. 콘솔 터미널(Windows `cmd`)은 `proc::hidden`을 거치지 않는다(stdin을 닫으면 바로 꺼진다). '이 버전 열기'는 앱 캐시에 읽기 전용 사본. 화면은 `src/repo/outside.ts`(메뉴 항목, `mergeInTool`), 설정 → 외부 프로그램(`components/ExternalSettings.tsx`, 순수 로직 `src/external.ts`)
 - `src-tauri/src/ssh.rs`: SSH 준비(키 목록·생성, 호스트 키 지문을 GitHub·GitLab 공개 지문과 비교해 known_hosts에 추가, 연결 확인). 시스템 OpenSSH, 프롬프트 없음
 - `src-tauri/src/update.rs`: 앱 자동 업데이트(tauri-plugin-updater). 확인 주소는 빌드 때 `DDUGIT_UPDATE_URL`(Supabase의 `latest.json`, 없으면 업데이트 안 함), 서명 공개키는 `tauri.conf.json`. 화면은 `components/Update.tsx`(시작할 때와 6시간마다 확인)
 - `src-tauri/src/pro.rs`: Free / Pro 판정(이 기기의 유효한 라이선스 또는 사이트 라이선스, 체험 없음). Pro 경계: 비공개·회사 서버 저장소의 PR 연동(`forge::report`의 `locked`), 백포트 실행·폐쇄망 반출입·스택 쌓기·대시보드 일괄 브랜치 전환(`pro::require`), 대시보드 3개 초과·릴리스 노트·일괄 Pull(화면). 화면 쪽은 `src/pro.ts`(상태 공유, `offerPro`)와 `components/ProOffer.tsx`
@@ -80,9 +84,12 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
 - 창 테두리: `src/chrome.ts`가 데스크톱 앱의 OS를 보고 정한다. macOS는 `tauri.macos.conf.json`(신호등을 탭 줄 위에 겹침), Windows는 `tauri.windows.conf.json`(`decorations: false`, 탭 줄 끝 `components/WindowControls.tsx`), Linux·데모는 시스템 제목 표시줄. 탭 줄의 빈 곳은 `data-tauri-drag-region`(창 끌기·더블클릭 최대화). 플랫폼 설정 파일은 창 객체 전체를 다시 적는다(배열은 통째로 바뀐다)
 - `src/App.tsx`: 창(탭 셸). 탭(`tabs.ts`, 순수 함수), 설정, 저장소 연결(clone·init·끌어다 놓기), 알림. 탭마다 `RepoView`를 띄워 두고 안 보이는 탭은 `hidden`으로 숨긴다(상태 유지). 단축키 중 창 전체 것(탭, `?`)은 여기서 처리한다
 - `src/RepoView.tsx`: 저장소 하나의 화면 조립(탑바·사이드바·그래프·오른쪽 패널). 보이는 탭(`active`)만 키 입력·파일 감시·탑바를 갖는다. 조각은 `src/repo/`에 있고, 모두 `state.ts`의 `Repo`(스냅숏·`run`·열린 시트/창 setter 등을 묶은 값)를 받는다
-  - `useSnapshot.ts`(스냅숏 읽기·순서 번호·감시·포커스), `useRun.tsx`(모든 git 작업이 거치는 `run()`: 한 번에 하나, 바쁨·토스트·새로고침), `useRemote.tsx`(fetch/pull/push·원격 추가와 그 확인·인증·갈라짐 창, 진행 카드)
+  - `useSnapshot.ts`(스냅숏 읽기·순서 번호·감시·포커스, `loadTo(n)`: 그만큼 읽힐 때까지), `useRun.tsx`(모든 git 작업이 거치는 `run()`: 한 번에 하나, 바쁨·토스트·새로고침), `useRemote.tsx`(fetch/pull/push·원격 추가와 그 확인·인증·갈라짐 창, 진행 카드)
   - 열린 것은 판별 유니온 하나씩: 그래프 아래 시트 `Sheet`(`useSheet.ts`: diff 파일·rebase todo 읽기, 충돌 시트는 그 위에 따로), 저장소 창 `Dialog`(`Dialogs.tsx`), 원격 창(`useRemote` 안). 그리기는 `Sheets.tsx`·`Dialogs.tsx`
   - `changes.tsx`: 작업 트리 흐름(커밋, 파일 스테이지, 파일·hunk 버리기, 커밋 창 파일 메뉴 `changeMenu`, stash 보관·꺼내기·브랜치, 사이드바 `stashMenu`). 커밋 창은 두 방식: 파일 고르기, 또는 index('스테이지된 것만', 체크박스가 스테이지). 커밋 옵션 `CommitOptions`(`--no-verify`·`-s`)와 `commit.template`은 `write.rs`
+  - `tracking.tsx`: 브랜치와 원격. 로컬 브랜치 메뉴(`trackingItems`: push·빨리 감기·따라가기·그만두기), 이름 바꾸기와 '원격에서도'(새 이름 push → 옛 브랜치 삭제, 일부 실패는 따로 알림), 원격 메뉴의 이름·URL 바꾸기(`remoteEditItems`)
+  - `useSearch.ts`: 검색 막대(⌘/Ctrl+F, `components/SearchBar.tsx`). 그래프 모드는 읽어 둔 커밋을 바로 거르고(`graph/search.ts`), 나머지 모드는 Enter로 `search_commits`. 읽지 않은 이력의 결과는 `useSnapshot.loadTo`로 두 배씩(`REVEAL_MAX`까지) 읽어 고르고 가운데로
+  - 여러 커밋 고르기: `GraphCanvas`의 ⌘/Ctrl·Shift 클릭(`picked`, `onPick`), 목록 로직 `repo/pickList.ts`, 메뉴와 병합 부모 고르기 `repo/picks.tsx`. 저장소 단축키는 ⌘/Ctrl+Shift+글자(`settings.ts`의 `COMMAND_KEYS`·`commandOf`·`shortcutLabel`, 처리는 `repo/CommandKeys.tsx`). worktree·서브모듈 메뉴는 `repo/folderMenus.ts`
   - `compare.ts`: 두 리비전 비교를 diff 시트로(`openCompare`, `DiffSource` `range`, 브랜치·커밋 메뉴, `Repo.compareBase` + `CompareBanner`)와 '이 버전을 다른 이름으로 저장…'(`saveVersionItem`, `api.pickSaveFile`)
   - `actions.tsx`: 메뉴·배너·시트가 시작하는 흐름(이름 묻기 `askName`, 확인 `confirmThen`, 체크아웃·cherry-pick·reset·커밋 손보기·worktree 등). `menus.tsx`: 오른쪽 클릭 메뉴(참조·커밋·파일·원격·PR·worktree·서브모듈, 탑바 브랜치 목록). `Banners.tsx`: bisect·파일 이력·진행 중 작업 배너. `useBisect.ts`: bisect 상태·배지
 

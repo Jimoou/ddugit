@@ -4,6 +4,7 @@ import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
 import { Icon } from "./Icon";
+import { ExternalSection } from "./ExternalSettings";
 import { ProfilesSection } from "./Identity";
 import { AboutSection } from "./Report";
 import { LicenseSection } from "./License";
@@ -11,7 +12,7 @@ import { Segmented } from "./Segmented";
 import { Modal } from "./Modal";
 
 /** The settings, one at a time beside a list of them. */
-const SETTINGS_SECTIONS = ["screen", "profiles", "license", "git", "shortcuts", "about"] as const;
+const SETTINGS_SECTIONS = ["screen", "profiles", "license", "git", "external", "shortcuts", "about"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
 const SECTION_LABEL: Record<SettingsSection, () => string> = {
@@ -19,6 +20,7 @@ const SECTION_LABEL: Record<SettingsSection, () => string> = {
   profiles: () => t("identity.profiles"),
   license: () => t("license.title"),
   git: () => "Git",
+  external: () => t("settings.external"),
   shortcuts: () => t("settings.shortcuts"),
   about: () => t("about.title"),
 };
@@ -71,6 +73,7 @@ export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Pr
           )}
           {section === "license" && <LicenseSection />}
           {section === "git" && <GitSection settings={settings} onChange={onChange} />}
+          {section === "external" && <ExternalSection apps={settings} onChange={onChange} />}
           {section === "shortcuts" && <ShortcutsSection />}
           {section === "about" && <AboutSection onReport={onReport} />}
         </div>

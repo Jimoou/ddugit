@@ -27,6 +27,10 @@ export const refsCommands = {
         const id = repo.branches.get(op.from);
         if (!id) return fail(`branch '${op.from}' not found`);
         if (repo.branches.has(op.to)) return fail(`a branch named '${op.to}' already exists`);
+        // Like git, the new name follows what the old one did.
+        const up = repo.upstream(op.from);
+        repo.tracking.delete(op.from);
+        repo.tracking.set(op.to, up);
         repo.branches.delete(op.from);
         repo.branches.set(op.to, id);
         if (repo.head === op.from) repo.head = op.to;
@@ -67,6 +71,44 @@ export const refsCommands = {
         if (!repo.remoteUrls.delete(op.name)) return fail(`error: No such remote: '${op.name}'`);
         for (const r of [...repo.remotes.keys()]) if (r.startsWith(`${op.name}/`)) repo.remotes.delete(r);
         return delay(res("ok"));
+      case "renameRemote": {
+        const { from, to } = op;
+        if (!repo.remoteUrls.has(from)) return delay(res("failed", `error: No such remote: '${from}'`));
+        if (repo.remoteUrls.has(to)) return delay(res("failed", `error: remote ${to} already exists.`));
+        const moved = (ref: string) => (ref.startsWith(`${from}/`) ? `${to}/${ref.slice(from.length + 1)}` : ref);
+        // Branches keep following their remote branch under its new name.
+        for (const b of repo.branches.keys()) {
+          const up = repo.upstream(b);
+          if (up?.startsWith(`${from}/`)) repo.tracking.set(b, moved(up));
+        }
+        repo.remotes = new Map([...repo.remotes].map(([ref, id]) => [moved(ref), id]));
+        repo.remoteTags = new Map([...repo.remoteTags].map(([ref, id]) => [moved(ref), id]));
+        repo.remoteUrls = new Map([...repo.remoteUrls].map(([n, url]) => [n === from ? to : n, url]));
+        if (repo.fetchOnly.delete(from)) repo.fetchOnly.add(to);
+        return delay(res("ok"));
+      }
+      case "setRemoteUrl":
+        if (!repo.remoteUrls.has(op.name)) return delay(res("failed", `error: No such remote '${op.name}'`));
+        if (!op.url.trim()) return fail("Enter the remote's URL");
+        repo.remoteUrls.set(op.name, op.url.trim());
+        return delay(res("ok"));
+      case "setUpstream":
+        if (!repo.branches.has(op.branch)) return fail(`branch '${op.branch}' not found`);
+        if (op.upstream && !repo.remotes.has(op.upstream))
+          return delay(res("failed", `fatal: the requested upstream branch '${op.upstream}' does not exist`));
+        repo.tracking.set(op.branch, op.upstream);
+        return delay(res("ok"));
+      case "fastForward": {
+        const up = repo.upstream(op.branch);
+        if (op.branch === repo.head) return fail(`'${op.branch}' is checked out; pull it instead`);
+        if (!up) return fail(`'${op.branch}' follows no upstream branch`);
+        const [ahead, behind] = repo.aheadBehind(op.branch);
+        if (!behind) return delay(res("ok", "Already up to date."));
+        if (ahead)
+          return delay(res("diverged", `'${op.branch}' and ${up} each have their own commits: not a fast-forward`));
+        repo.branches.set(op.branch, repo.remotes.get(up)!);
+        return delay(res("ok"));
+      }
       case "checkoutRemote": {
         const local = op.name ?? op.remoteRef.replace(/^[^/]+\//, "");
         if (op.name && repo.branches.has(op.name)) return fail(`Branch '${op.name}' already exists`);

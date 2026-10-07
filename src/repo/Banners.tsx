@@ -155,6 +155,7 @@ const IN_PROGRESS: Record<string, { canContinue: boolean }> = {
   rebase: { canContinue: true },
   "cherry-pick": { canContinue: true },
   revert: { canContinue: true },
+  am: { canContinue: true },
 };
 
 /** Banner name and hint for a repository state; unknown states show as-is. */

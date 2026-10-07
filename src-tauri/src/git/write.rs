@@ -168,7 +168,7 @@ pub fn merge(
     Ok(conflict_aware(path, o))
 }
 
-fn has_conflicts(path: &str) -> bool {
+pub(super) fn has_conflicts(path: &str) -> bool {
     open(path)
         .and_then(|r| r.index().map_err(super::err))
         .is_ok_and(|i| i.has_conflicts())
@@ -187,7 +187,7 @@ pub(super) fn conflict_aware(path: &str, o: Output) -> OpResult {
     }
 }
 
-/// Abort the merge / rebase / cherry-pick / revert in progress.
+/// Abort the merge / rebase / cherry-pick / revert / am in progress.
 pub fn abort(path: &str) -> Result<OpResult> {
     let repo = open(path)?;
     let state = state_name(repo.state());
@@ -202,14 +202,14 @@ pub fn abort(path: &str) -> Result<OpResult> {
     Ok(git(&workdir(&repo)?, args)?.into())
 }
 
-/// Continue a rebase / cherry-pick / revert after conflicts were resolved
+/// Continue a rebase / cherry-pick / revert / am after conflicts were resolved
 /// (stages the tracked files first: conflicted paths are always tracked, and an
 /// unrelated untracked file such as `.env` must not slip into the rewritten
 /// commit). A merge is concluded by committing instead.
 pub fn continue_op(path: &str) -> Result<OpResult> {
     let repo = open(path)?;
     let state = state_name(repo.state());
-    if !matches!(state, "rebase" | "cherry-pick" | "revert") {
+    if !matches!(state, "rebase" | "cherry-pick" | "revert" | "am") {
         return Err(format!("Nothing to continue ({state})"));
     }
     let dir = workdir(&repo)?;
@@ -218,11 +218,11 @@ pub fn continue_op(path: &str) -> Result<OpResult> {
     Ok(conflict_aware(path, o))
 }
 
-/// Drop the step a cherry-pick / revert / rebase stopped on and go on with the rest.
+/// Drop the step (commit, patch) a cherry-pick / revert / rebase / am stopped on and go on with the rest.
 pub fn skip(path: &str) -> Result<OpResult> {
     let repo = open(path)?;
     let state = state_name(repo.state());
-    if !matches!(state, "rebase" | "cherry-pick" | "revert") {
+    if !matches!(state, "rebase" | "cherry-pick" | "revert" | "am") {
         return Err(format!("Nothing to skip ({state})"));
     }
     let o = git(&workdir(&repo)?, &[state, "--skip"])?;
@@ -447,8 +447,14 @@ mod tests {
         checkout(p, "main").unwrap();
         commit_file(d.path(), "a.txt", "main", "main edit");
         let feat = git_ok(d.path(), &["rev-parse", "feature"]).unwrap();
-        let r =
-            super::super::pick::pick(p, super::super::pick::PickOp::CherryPick, feat.trim(), None).unwrap();
+        let r = super::super::pick::pick(
+            p,
+            super::super::pick::PickOp::CherryPick,
+            &[feat.trim().to_string()],
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
         fs::write(d.path().join("a.txt"), "resolved").unwrap();
         fs::write(d.path().join(".env"), "SECRET=1").unwrap();

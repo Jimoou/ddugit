@@ -1,5 +1,5 @@
-// Right-click menus of a repository tab: refs, commits, files, remotes, pull requests,
-// worktrees and submodules. Entries that don't apply are disabled, not hidden.
+// Right-click menus of a repository tab: refs, commits, files, remotes and pull requests
+// (worktrees and submodules: `folderMenus.ts`). Entries that don't apply are disabled, not hidden.
 
 import { api } from "../api";
 import type { MenuItem } from "../components/ContextMenu";
@@ -7,9 +7,8 @@ import { nounOf, prOf } from "../components/Pulls";
 import { t } from "../i18n";
 import { offerPro } from "../pro";
 import { rebaseRange } from "../rebasePlan";
-import { joinPath } from "../recent";
 import { copyText } from "../share";
-import type { CommitInfo, PullRequest, RefInfo, SubmoduleInfo, SubmoduleOp, WorktreeInfo } from "../types";
+import type { CommitInfo, PullRequest, RefInfo } from "../types";
 import {
   askBranchAt,
   askLocalFor,
@@ -23,7 +22,6 @@ import {
   checkoutRef,
   confirmPick,
   confirmRevert,
-  confirmThen,
   deleteBranch,
   deleteRemoteBranch,
   deleteRemoteTag,
@@ -34,15 +32,17 @@ import {
   pushTag,
   refRun,
   removeRemote,
-  removeWorktree,
-  renameBranch,
-  richBody,
   showCommit,
   undoLastCommit,
 } from "./actions";
 import { compareNodeItems, compareRefItem, saveVersionItem } from "./compare";
+import { difftoolItem, openItems, versionItem } from "./outside";
+import { applyPatchItem, patchItems } from "./patches";
+import { confirmRevertMerge, pickedItems } from "./picks";
 import type { Repo } from "./state";
+import { remoteEditItems, renameBranch, trackingItems } from "./tracking";
 import { splitRemote } from "./useRemote";
+import { shortcutLabel } from "../settings";
 
 /** Open a menu at the pointer. */
 export const openMenu = (repo: Repo, x: number, y: number, title: string | undefined, items: MenuItem[]) =>
@@ -205,6 +205,13 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       backport,
       "separator",
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(repo, r.target) },
+      {
+        // E.g. back to origin/main after diverging from it.
+        label: t("menu.resetTo", { branch: snap.head.branch ?? "HEAD" }),
+        icon: "history",
+        disabled: snap.state !== "clean" || !snap.head.target || r.target === snap.head.target,
+        onSelect: () => askReset(repo, r.target, undefined, r.name),
+      },
       "separator",
       {
         label: t("menu.deleteRemoteBranch", { remote: name }),
@@ -234,6 +241,8 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       onSelect: () => repo.setDialog({ kind: "pr", from: r.name }),
     },
     "separator",
+    ...trackingItems(repo, r),
+    "separator",
     ...stackItems(repo, r.name),
     notesItem(repo, r.name),
     "separator",
@@ -254,13 +263,15 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
   const locals = snap.refs.filter((r) => r.kind === "local" && r.target === id && r.name !== snap.head.branch);
   const range = onHead && !isHead && head ? rebaseRange(commitById, head, id) : null;
   // Past-commit edits replay everything after it: no merges on the way, not a merge itself.
-  const parentOf = commitById.get(id)?.parents ?? [];
+  const commit = commitById.get(id);
+  const parentOf = commit?.parents ?? [];
   const editable =
     clean &&
     onHead &&
     parentOf.length <= 1 &&
     (isHead || !parentOf.length || typeof rebaseRange(commitById, head!, parentOf[0]) !== "string");
   return [
+    ...pickedItems(repo, id),
     { label: t("menu.branchHere"), icon: "branch", onSelect: () => askBranchAt(repo, id) },
     { label: t("menu.tagHere"), icon: "tag", onSelect: () => askTagAt(repo, id) },
     ...locals.map((r) => ({
@@ -282,10 +293,10 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
       onSelect: () => confirmPick(repo, id, snap.head.branch!),
     },
     {
-      label: t("menu.revert"),
+      label: parentOf.length > 1 ? t("menu.revertMerge") : t("menu.revert"),
       icon: "undo",
       disabled: !clean || !onHead,
-      onSelect: () => confirmRevert(repo, id),
+      onSelect: () => (commit && parentOf.length > 1 ? confirmRevertMerge(repo, commit) : confirmRevert(repo, id)),
     },
     {
       label: t("menu.amend"),
@@ -301,7 +312,8 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
     {
       label: t("undo.toHere"),
       icon: "history",
-      disabled: !clean || !onHead || isHead,
+      // Off HEAD's line too: the dialog counts what leaves and what comes in.
+      disabled: !clean || isHead || !head,
       onSelect: () => askReset(repo, id),
     },
     "separator" as const,
@@ -331,12 +343,14 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
     },
     "separator" as const,
     ...compareNodeItems(repo, id),
+    difftoolItem(repo, { kind: "commit", id, file: null }),
     "separator" as const,
+    ...(commit ? patchItems(repo, commit) : []),
     { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => copyText(id) },
   ];
 }
 
-/** A commit's changed file: put it back as this commit (or its parent) had it, follow its history, or save a copy. */
+/** A commit's changed file: put it back as this commit (or its parent) had it, follow its history, open or save a copy, or open the file itself. */
 export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem[] {
   const restore = (rev: string) =>
     void repo.run(t("file.restored", { file }), () => api.restoreFile(repo.path, rev, file));
@@ -354,7 +368,11 @@ export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem
       onSelect: () => repo.setSheet({ kind: "blame", rev: commit.id, file }),
     },
     "separator",
+    versionItem(repo, commit, file),
     saveVersionItem(repo, commit, file),
+    difftoolItem(repo, { kind: "commit", id: commit.id, file }),
+    "separator",
+    ...openItems(repo, file),
   ];
 }
 
@@ -385,63 +403,9 @@ export function remoteMenu(repo: Repo, name: string): MenuItem[] {
         });
       },
     },
+    ...remoteEditItems(repo, name),
     "separator",
     removeRemoteItem(repo, name),
-  ];
-}
-
-export function worktreeMenu(repo: Repo, w: WorktreeInfo): MenuItem[] {
-  return [
-    { label: t("wt.menu.open"), disabled: w.current || w.missing, onSelect: () => repo.onOpenPath(w.path) },
-    { label: t("wt.menu.copy"), onSelect: () => copyText(w.path) },
-    "separator",
-    ...(w.missing
-      ? [
-          {
-            label: t("wt.menu.prune"),
-            onSelect: () => void repo.run(t("wt.pruned"), () => api.worktree(repo.path, { kind: "prune" })),
-          },
-        ]
-      : []),
-    {
-      label: t("wt.menu.remove"),
-      danger: true,
-      disabled: w.main || w.current || w.missing,
-      onSelect: () =>
-        confirmThen(
-          repo,
-          {
-            title: t("wt.remove.title"),
-            danger: true,
-            confirmLabel: t("wt.remove.go"),
-            body: richBody("wt.remove.body", { path: w.path, branch: w.branch ?? "HEAD" }),
-          },
-          () => removeWorktree(repo, w),
-        ),
-    },
-  ];
-}
-
-export const submoduleRun = async (repo: Repo, label: string, op: SubmoduleOp) => {
-  const r = await repo.run(label, () => api.submodule(repo.path, op));
-  if (r.status === "auth") repo.toast("err", t("sub.auth"));
-};
-
-export function submoduleMenu(repo: Repo, m: SubmoduleInfo): MenuItem[] {
-  return [
-    {
-      label: t("sub.menu.open"),
-      disabled: m.state === "uninitialized",
-      onSelect: () => repo.onOpenPath(joinPath(repo.snap.path, m.path)),
-    },
-    {
-      label: t("sub.menu.update"),
-      disabled: m.state === "clean",
-      onSelect: () => void submoduleRun(repo, t("sub.updated"), { kind: "update", path: m.path }),
-    },
-    "separator",
-    { label: t("sub.menu.copyUrl"), disabled: !m.url, onSelect: () => copyText(m.url ?? "") },
-    { label: t("sub.menu.sync"), onSelect: () => void submoduleRun(repo, t("sub.synced"), { kind: "sync" }) },
   ];
 }
 
@@ -451,7 +415,13 @@ export function branchesMenu(repo: Repo): MenuItem[] {
   const head = snap.head.branch;
   const localNames = new Set(snap.refs.filter((r) => r.kind === "local").map((r) => r.name));
   return [
-    { label: t("branch.newMenu"), icon: "plus" as const, onSelect: () => askNewBranch(repo) },
+    {
+      label: t("branch.newMenu"),
+      icon: "plus" as const,
+      hint: shortcutLabel("newBranch"),
+      onSelect: () => askNewBranch(repo),
+    },
+    applyPatchItem(repo),
     "separator" as const,
     ...snap.refs
       .filter((r) => r.kind === "local")

@@ -18,6 +18,8 @@ import type {
   DiffScope,
   FileDiff,
   FileTouch,
+  SearchKind,
+  SearchResult,
   ForgeKind,
   ForgeRepos,
   HostKey,
@@ -41,6 +43,7 @@ import type {
   UpdateInfo,
   OpResult,
   PickOp,
+  CloneOptions,
   PrReport,
   PrOutcome,
   PrTarget,
@@ -63,6 +66,9 @@ import type {
   SubmoduleOp,
   TodoItem,
   WorktreeOp,
+  OpenHow,
+  DiffTarget,
+  ToolSetup,
 } from "./types";
 import { t } from "./i18n";
 
@@ -82,7 +88,7 @@ interface Sink<T> {
 export interface Commands {
   initial_repo: [Record<string, never>, string | null];
   repo_root: [{ dir: string }, string | null];
-  git_clone: [{ url: string; dest: string; onProgress: Sink<Progress> }, OpResult];
+  git_clone: [{ url: string; dest: string; options: CloneOptions; onProgress: Sink<Progress> }, OpResult];
   git_init: [{ dir: string }, OpResult];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
   repo_glance: [{ paths: string[] }, RepoGlance[]];
@@ -104,7 +110,10 @@ export interface Commands {
   ];
   git_abort: [{ path: string }, OpResult];
   git_continue: [{ path: string }, OpResult];
-  git_pick: [{ path: string; op: PickOp; id: string; target: string | null }, OpResult];
+  git_pick: [{ path: string; op: PickOp; ids: string[]; target: string | null; mainline: number | null }, OpResult];
+  commit_patch: [{ path: string; id: string }, string];
+  save_patch: [{ path: string; id: string; dest: string }, OpResult];
+  apply_patch: [{ path: string; file: string }, OpResult];
   git_checkout: [{ path: string; target: string }, OpResult];
   git_create_branch: [{ path: string; name: string; at: string | null; switch: boolean }, OpResult];
   git_ref: [{ path: string; op: RefOp }, OpResult];
@@ -161,6 +170,7 @@ export interface Commands {
   forge_repos: [{ path: string; kind: ForgeKind; host: string }, ForgeRepos];
   open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
+  search_commits: [{ path: string; query: string; kind: SearchKind; regex: boolean; limit: number }, SearchResult];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
   save_file: [{ path: string; rev: string; file: string; dest: string }, OpResult];
   git_discard: [{ path: string; paths: string[] }, OpResult];
@@ -173,6 +183,12 @@ export interface Commands {
   range_diff: [{ path: string; from: string; to: string; mergeBase: boolean }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
+  open_in: [{ path: string; file: string | null; how: OpenHow }, null];
+  open_version: [{ path: string; rev: string; file: string; editor: boolean }, null];
+  set_editor: [{ program: string; prompt: string }, string];
+  tool_setup: [Record<string, never>, ToolSetup];
+  git_difftool: [{ path: string; target: DiffTarget; tool: string | null }, OpResult];
+  git_mergetool: [{ path: string; file: string; tool: string | null }, OpResult];
   /** `git --version` of the git in use; rejects when it can't run (not installed, not on PATH). */
   git_version: [Record<string, never>, string];
   app_info: [Record<string, never>, AppInfo];
@@ -215,9 +231,9 @@ export const api = {
   initialRepo: () => (isTauri ? call("initial_repo", {}) : Promise.resolve(null)),
   /** Root of the repository `dir` (a file or folder) belongs to, or null. */
   repoRoot: (dir: string) => call("repo_root", { dir }),
-  /** Clone `url` into `dest` (a new or empty folder). */
-  clone(url: string, dest: string, onProgress: (p: Progress) => void = () => {}) {
-    return call("git_clone", { url, dest, onProgress: progressSink(onProgress) });
+  /** Clone `url` into `dest` (a new or empty folder), as much of it as `options` say. */
+  clone(url: string, dest: string, options: CloneOptions, onProgress: (p: Progress) => void = () => {}) {
+    return call("git_clone", { url, dest, options, onProgress: progressSink(onProgress) });
   },
   /** `git init` (on `main`) in an existing folder. */
   init: (dir: string) => call("git_init", { dir }),
@@ -249,7 +265,17 @@ export const api = {
     call("git_merge", { path, source, target, mode, message }),
   abort: (path: string) => call("git_abort", { path }),
   continueOp: (path: string) => call("git_continue", { path }),
-  pick: (path: string, op: PickOp, id: string, target: string | null) => call("git_pick", { path, op, id, target }),
+  /**
+   * Cherry-pick (oldest first) or revert (newest first) `ids` on `target` (null: HEAD). A merge among them is
+   * taken against parent `mainline` (1-based; null: the first).
+   */
+  pick: (path: string, op: PickOp, ids: string[], target: string | null, mainline: number | null = null) =>
+    call("git_pick", { path, op, ids, target, mainline }),
+  /** Commit `id` as `git format-patch` writes it. */
+  commitPatch: (path: string, id: string) => call("commit_patch", { path, id }),
+  savePatch: (path: string, id: string, dest: string) => call("save_patch", { path, id, dest }),
+  /** Apply a patch file to the current branch: a mailed one as commits (`am`), a plain diff to the working tree. */
+  applyPatch: (path: string, file: string) => call("apply_patch", { path, file }),
   checkout: (path: string, target: string) => call("git_checkout", { path, target }),
   createBranch: (path: string, name: string, at: string | null, switchTo: boolean) =>
     call("git_create_branch", { path, name, at, switch: switchTo }),
@@ -351,6 +377,9 @@ export const api = {
   openUrl: (path: string, url: string) => call("open_url", { path, url }),
   /** Commits reachable from `rev` that changed `file` (following renames), newest first. */
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
+  /** Up to `limit` commits in the whole history matching `query`, newest first (plain text unless `regex`). */
+  searchCommits: (path: string, query: string, kind: SearchKind, regex: boolean, limit: number) =>
+    call("search_commits", { path, query, kind, regex, limit }),
   /** Who last changed each line of `file` as of `rev`. */
   blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
   /** Write `file` as `rev` has it to `dest` (from `pickSaveFile`). */
@@ -381,6 +410,21 @@ export const api = {
   /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
   gitVersion: () => call("git_version", {}),
+  /** Show `file` (null: the repository's folder) in the file manager, its default app, a terminal or an editor. */
+  openIn: (path: string, file: string | null, how: OpenHow) => call("open_in", { path, file, how }),
+  /** Open `file` as `rev` has it (a read-only copy) in the editor from the settings, else the default app. */
+  openVersion: (path: string, rev: string, file: string, editor: boolean) =>
+    call("open_version", { path, rev, file, editor }),
+  /**
+   * Make `program` the editor ("" forgets it): the backend keeps it and answers the path it runs.
+   * A program it doesn't know by name is shown in a native dialog (`prompt` above its path) first.
+   */
+  setEditor: (program: string, prompt: string) => call("set_editor", { program: program.trim(), prompt }),
+  toolSetup: () => call("tool_setup", {}),
+  /** Runs until the tool's window closes: not through `run()`, so other git work isn't held up. */
+  difftool: (path: string, target: DiffTarget, tool: string | null) => call("git_difftool", { path, target, tool }),
+  /** Like `difftool`; the conflict is resolved once the tool saved and git staged the file. */
+  mergetool: (path: string, file: string, tool: string | null) => call("git_mergetool", { path, file, tool }),
   /** App version, OS and architecture (problem reports). */
   appInfo: () => call("app_info", {}),
   /** Send a problem report or question to ddugit.com; resolves with its id, rejects with the reason. */
@@ -412,6 +456,21 @@ export const api = {
     if (!isTauri) return "/demo/out/demo-acme-2026-10-04-120000.bundle";
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ multiple: false, title, filters: [{ name: "Git bundle", extensions: ["bundle"] }] });
+    return typeof r === "string" ? r : null;
+  },
+  /** A patch file to apply (the demo answers `/work/fix.patch` unless told otherwise). */
+  async pickPatch(title: string): Promise<string | null> {
+    if (!isTauri) {
+      const next = demoControls.nextPatch;
+      demoControls.nextPatch = undefined;
+      return next === undefined ? "/work/fix.patch" : next;
+    }
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const filters = [
+      { name: "Patch", extensions: ["patch", "diff", "mbox", "eml"] },
+      { name: "*", extensions: ["*"] },
+    ];
+    const r = await open({ multiple: false, title, filters });
     return typeof r === "string" ? r : null;
   },
   /** Where to save a file, starting from `name` (the demo answers `/work/<name>` unless told otherwise). */

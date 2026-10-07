@@ -1,10 +1,12 @@
 // The demo's switches for development and e2e (`window.__ddugitDemo`), the flags a page sets before it loads, and the demo license.
 
 import type {
+  CloneOptions,
   FileDiff,
   LicenseInfo,
   LicenseStatus,
   NewReport,
+  PickOp,
   ProStatus,
   RefInfo,
   RepoSnapshot,
@@ -75,8 +77,22 @@ export const demoControls = {
   nextFolder: null as string | null,
   /** Where the next save dialog saves (`null`: cancelled; unset: `/work/<suggested name>`). */
   nextSave: undefined as string | null | undefined,
+  /** What was opened outside the app (file manager, default app, terminal, editor, diff and merge tools), oldest first. */
+  opened: [] as { what: string; file: string | null; with?: string }[],
+  /** Make the next merge tool give up without resolving (as if closed unsaved). */
+  mergetoolFails: false,
+  /** The merge tool's window stays open (the call doesn't return) until this is cleared. */
+  mergetoolOpen: false,
   /** Files saved as a commit had them (`save_file`), oldest first. */
   saved: [] as { rev: string; file: string; dest: string }[],
+  /** Commits saved as patch files (`save_patch`), oldest first. */
+  savedPatches: [] as { id: string; dest: string }[],
+  /** The patch file the next "apply patch" dialog picks (`null`: cancelled; unset: `/work/fix.patch`, a mailed patch; a `.diff` is a plain diff). */
+  nextPatch: undefined as string | null | undefined,
+  /** The last clone asked for, with its options. */
+  lastClone: null as { url: string; dest: string; options: CloneOptions } | null,
+  /** The last cherry-pick or revert asked for: its commits in order and the merge parent. */
+  lastPick: null as { op: PickOp; ids: string[]; mainline: number | null } | null,
   /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */
   conflictNext: false,
   /** The next conflict also stops on a binary file (`assets/logo.png`), resolved by picking a side. */
@@ -162,6 +178,10 @@ export const demoControls = {
   /** A new commit on `branch` (e.g. the bottom of a stack moving on). */
   commitOn(branch: string, summary: string) {
     repo.add(branch, summary);
+  },
+  /** A teammate's commit on remote branch `ref` (e.g. `origin/main`), as a fetch would bring it. */
+  commitOnRemote(ref: string, summary: string) {
+    repo.remotes.set(ref, repo.commit([repo.remotes.get(ref)!], summary, "Minji"));
   },
 };
 export type DemoControls = typeof demoControls;

@@ -186,7 +186,7 @@ export const confirmPick = (repo: Repo, id: string, target: string) => {
       void repo
         .run(
           t("pick.done", { target }),
-          () => api.pick(repo.path, "cherryPick", id, target),
+          () => api.pick(repo.path, "cherryPick", [id], target),
           () => centerOnHeadSoon(repo),
         )
         .then((r) => {
@@ -212,7 +212,7 @@ export const confirmRevert = (repo: Repo, id: string) =>
         branch: repo.snap.head.branch ?? "HEAD",
       }),
     },
-    () => void repo.run(t("revert.done"), () => api.pick(repo.path, "revert", id, null)),
+    () => void repo.run(t("revert.done"), () => api.pick(repo.path, "revert", [id], null)),
   );
 
 /** Delete a local branch; if git says it's unmerged, ask again before forcing. */
@@ -239,18 +239,6 @@ export const deleteBranch = (repo: Repo, name: string) =>
         () => void refRun(repo, t("branch.delete.done", { name }), { kind: "deleteBranch", name, force: true }),
       );
     },
-  );
-
-export const renameBranch = (repo: Repo, from: string) =>
-  askName(
-    repo,
-    {
-      title: t("branch.rename.title"),
-      placeholder: t("branch.rename.placeholder"),
-      confirmLabel: t("branch.rename.go"),
-      initial: from,
-    },
-    (to) => void refRun(repo, t("branch.rename.done", { name: to }), { kind: "renameBranch", from, to }),
   );
 
 export const deleteTag = (repo: Repo, name: string) =>
@@ -407,19 +395,24 @@ export const doReset = (
     },
   );
 
-/** Ask how to go back to `target` (a commit, maybe one only the reflog knows). */
+/**
+ * Ask how to move the branch to `target`: back along it, onto another line (a remote branch after
+ * diverging), or to a commit only the reflog knows.
+ */
 export const askReset = (repo: Repo, target: string, initial?: ResetMode, summary?: string) => {
   const { snap, commitById } = repo;
-  if (!snap.head.target) return;
-  // Commits leaving the branch; unknown for a commit only the reflog has (it isn't loaded).
-  const passed = commitById.has(target)
-    ? [...ancestors(snap.commits, snap.head.target)].filter((c) => !repo.isAncestor(c, target)).length
-    : 0;
+  const head = snap.head.target;
+  if (!head) return;
+  // Commits leaving the branch and coming onto it; unknown for a commit only the reflog has (it isn't loaded).
+  const loaded = commitById.has(target);
+  const passed = loaded ? [...ancestors(snap.commits, head)].filter((c) => !repo.isAncestor(c, target)).length : 0;
+  const incoming = loaded ? [...ancestors(snap.commits, target)].filter((c) => !repo.isAncestor(c, head)).length : 0;
   repo.setDialog({
     kind: "reset",
     target,
     summary: summary ?? commitById.get(target)?.summary ?? target.slice(0, 7),
     passed,
+    incoming,
     // More commits leave the branch than are unpushed: some were pushed.
     pushed: !!snap.head.upstream && passed > snap.head.ahead,
     initial,

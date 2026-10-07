@@ -7,6 +7,7 @@ mod git;
 mod http;
 mod keychain;
 mod license;
+mod open;
 mod pro;
 mod proc;
 mod report;
@@ -132,8 +133,11 @@ command!(git_merge(path: String, source: String, target: Option<String>, mode: M
     -> OpResult => git::write::merge(&path, &source, target.as_deref(), mode, message.as_deref()));
 command!(git_abort(path: String) -> OpResult => git::write::abort(&path));
 command!(git_continue(path: String) -> OpResult => git::write::continue_op(&path));
-command!(git_pick(path: String, op: PickOp, id: String, target: Option<String>) -> OpResult
-    => git::pick::pick(&path, op, &id, target.as_deref()));
+command!(git_pick(path: String, op: PickOp, ids: Vec<String>, target: Option<String>, mainline: Option<usize>)
+    -> OpResult => git::pick::pick(&path, op, &ids, target.as_deref(), mainline));
+command!(commit_patch(path: String, id: String) -> String => git::patch::commit_patch(&path, &id));
+command!(save_patch(path: String, id: String, dest: String) -> OpResult => git::patch::save_patch(&path, &id, &dest));
+command!(apply_patch(path: String, file: String) -> OpResult => git::patch::apply_patch(&path, &file));
 command!(git_checkout(path: String, target: String) -> OpResult => git::write::checkout(&path, &target));
 command!(git_create_branch(path: String, name: String, at: Option<String>, switch: bool) -> OpResult
     => git::write::create_branch(&path, &name, at.as_deref(), switch));
@@ -153,8 +157,8 @@ command!(git_push_to(path: String, remote: String, branch: Option<String>, on_pr
 command!(git_remote_ref(path: String, remote: String, op: RemoteRefOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote_ref(&path, &remote, &op, |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));
-command!(git_clone(url: String, dest: String, on_progress: Channel<Progress>) -> OpResult
-    => git::setup::clone(&url, &dest, |p| { let _ = on_progress.send(p); }));
+command!(git_clone(url: String, dest: String, options: git::setup::CloneOptions, on_progress: Channel<Progress>)
+    -> OpResult => git::setup::clone(&url, &dest, &options, |p| { let _ = on_progress.send(p); }));
 command!(git_init(dir: String) -> OpResult => git::setup::init(&dir));
 command!(git_reset(path: String, target: String, mode: git::undo::ResetMode) -> OpResult
     => git::undo::reset(&path, &target, mode));
@@ -236,6 +240,8 @@ command!(git_version() -> String => git::version(None));
 command!(report_send(report: report::NewReport) -> String => report::send(&report));
 command!(file_log(path: String, rev: String, file: String) -> Vec<git::history::FileTouch>
     => git::history::file_log(&path, &rev, &file));
+command!(search_commits(path: String, query: String, kind: git::search::SearchKind, regex: bool, limit: usize)
+    -> git::search::SearchResult => git::search::search(&path, &query, kind, regex, limit));
 command!(git_blame(path: String, rev: String, file: String) -> git::history::Blame
     => git::history::blame(&path, &rev, &file));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
@@ -252,6 +258,57 @@ command!(range_diff(path: String, from: String, to: String, merge_base: bool) ->
     => git::diff::range_diff(&path, &from, &to, merge_base));
 command!(save_file(path: String, rev: String, file: String, dest: String) -> OpResult
     => git::history::save_file(&path, &rev, &file, &dest));
+// Outside the app: a path inside the repository's work tree only (`open::inside`).
+command!(open_in(path: String, file: Option<String>, how: open::OpenHow) in dir -> ()
+    => open::open(&dir, &path, file.as_deref(), &how));
+
+/// Make `program` the editor ("" forgets it) and answer the path it runs. A
+/// program that isn't one the settings name needs the user's yes in a native
+/// dialog showing its path (`prompt` above it): the webview alone can't pick
+/// what runs.
+#[tauri::command]
+async fn set_editor(app: tauri::AppHandle, program: String, prompt: String) -> Result<String, String> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        let program = program.trim();
+        if !program.is_empty() && !open::known_editor(program) {
+            let real = open::editor(program)?;
+            let yes = app
+                .dialog()
+                .message(format!("{prompt}\n\n{}", real.display()))
+                .buttons(MessageDialogButtons::OkCancel)
+                .blocking_show();
+            if !yes {
+                return Err("Cancelled".into());
+            }
+        }
+        open::save_editor(&dir, program)
+    })
+    .await
+}
+command!(tool_setup() -> git::tools::ToolSetup => Ok(git::tools::setup(None)));
+// These two wait for the tool's window to close: the UI doesn't queue them with other git work.
+command!(git_difftool(path: String, target: git::tools::DiffTarget, tool: Option<String>) -> OpResult
+    => git::tools::difftool(&path, &target, tool.as_deref()));
+command!(git_mergetool(path: String, file: String, tool: Option<String>) -> OpResult
+    => git::tools::mergetool(&path, &file, tool.as_deref()));
+
+/// Open `file` as commit `rev` has it: a read-only copy in the app's cache, in the editor or the default app.
+#[tauri::command]
+async fn open_version(
+    app: tauri::AppHandle,
+    path: String,
+    rev: String,
+    file: String,
+    editor: bool,
+) -> Result<(), String> {
+    use tauri::Manager;
+    let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let config = license_dir(&app)?;
+    blocking(move || open::open_version(&cache, &config, &path, &rev, &file, editor)).await
+}
+
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref(), scope));
 
@@ -327,6 +384,9 @@ pub fn run() {
             git_abort,
             git_continue,
             git_pick,
+            commit_patch,
+            save_patch,
+            apply_patch,
             git_checkout,
             git_create_branch,
             git_ref,
@@ -348,6 +408,7 @@ pub fn run() {
             git_bisect,
             bisect_state,
             file_log,
+            search_commits,
             pull_requests,
             pr_target,
             pr_create,
@@ -392,6 +453,12 @@ pub fn run() {
             range_diff,
             save_file,
             worktree_diff,
+            open_in,
+            open_version,
+            set_editor,
+            tool_setup,
+            git_difftool,
+            git_mergetool,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -39,8 +39,18 @@ export function useSnapshot(
   const answered = useRef(0);
   /** The last read failure already shown, so a watcher burst doesn't repeat it. */
   const shownError = useRef<string | null>(null);
+  /** Callers of `loadTo` waiting for a snapshot read with at least their number of commits. */
+  const waiting = useRef<{ n: number; done(s: RepoSnapshot | null): void }[]>([]);
+  /** How many commits the applied snapshot was read with. */
+  const readWith = useRef(0);
   const refresh = useCallback((): Promise<void> => {
     const n = ++asked.current;
+    /** Answer the waiters this read covers (a failed read answers them all). */
+    const settle = (s: RepoSnapshot | null) => {
+      const ready = waiting.current.filter((w) => !s || w.n <= limit);
+      waiting.current = waiting.current.filter((w) => !ready.includes(w));
+      for (const w of ready) w.done(s);
+    };
     const newest = () => {
       if (n < answered.current) return false;
       answered.current = n;
@@ -52,9 +62,12 @@ export function useSnapshot(
         if (!latest.current) onLoaded(path, s.name);
         applySnapshot(s);
         shownError.current = null;
+        readWith.current = limit;
+        settle(s);
       },
       (e) => {
         if (!newest()) return;
+        settle(null);
         const text = String(e);
         setLoadError(text);
         // Before the first load the error fills the tab; after it (the folder moved, say) the old graph stays up.
@@ -64,8 +77,10 @@ export function useSnapshot(
     );
   }, [path, limit, applySnapshot, onLoaded, toast]);
   const refreshNow = useRef(refresh);
+  const limitNow = useRef(limit);
   useEffect(() => {
     refreshNow.current = refresh;
+    limitNow.current = limit;
   });
 
   // Read the repository when its tab shows, and again for a new history size ("load more").
@@ -100,5 +115,14 @@ export function useSnapshot(
   }, [active, refresh]);
 
   const loadMore = useCallback(() => setLimit((l) => l + page), [page]);
-  return { snap, loadError, latest, refresh, loadMore };
+  /** Read at least `n` commits of history: the snapshot once applied (null if the read failed). */
+  const loadTo = useCallback((n: number): Promise<RepoSnapshot | null> => {
+    if (readWith.current >= n) return Promise.resolve(latest.current);
+    const read = new Promise<RepoSnapshot | null>((done) => waiting.current.push({ n, done }));
+    // A larger size reads by itself (the effect above); the current one may have no read on the way.
+    if (n > limitNow.current) setLimit((l) => Math.max(l, n));
+    else void refreshNow.current();
+    return read;
+  }, []);
+  return { snap, loadError, latest, refresh, loadMore, loadTo };
 }

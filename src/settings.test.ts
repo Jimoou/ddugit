@@ -25,6 +25,13 @@ describe("parseSettings", () => {
       closedSections: [],
       confirmRemote: { fetch: false, pull: true, push: true },
       profiles: [],
+      editor: "",
+      diffTool: "",
+      mergeTool: "",
+    });
+    expect(parseSettings(JSON.stringify({ editor: "code", diffTool: "-x" }), base)).toMatchObject({
+      editor: "code",
+      diffTool: "",
     });
     expect(parseSettings(JSON.stringify({ confirmRemote: { push: false, pull: "x" } }), base).confirmRemote).toEqual({
       fetch: false,

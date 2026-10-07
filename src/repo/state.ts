@@ -8,6 +8,7 @@ import type { EditMode } from "../components/EditCommit";
 import type { Effect } from "../components/Fx";
 import type { NameRequest } from "../components/NameDialog";
 import type { GraphHandle } from "../graph/GraphCanvas";
+import type { ExternalApps } from "../external";
 import type { Drag } from "../graph/renderer";
 import type { Pt } from "../graph/scene";
 import type { MissionId } from "../missions";
@@ -69,7 +70,16 @@ export type Dialog =
   | { kind: "name"; req: NameRequest }
   | { kind: "merge"; sourceId: string; targetId: string; source: string; target: string }
   /** "Go back to this commit": the target and what the dialog needs to explain it. */
-  | { kind: "reset"; target: string; summary: string; passed: number; pushed: boolean; initial?: ResetMode }
+  | {
+      kind: "reset";
+      target: string;
+      summary: string;
+      passed: number;
+      /** Commits the branch gains (the target is on another line). */
+      incoming: number;
+      pushed: boolean;
+      initial?: ResetMode;
+    }
   /** Touching up a past commit: which edit, and its files (loaded for splitting). */
   | { kind: "edit"; mode: EditMode; id: string; files: FileDiff[] | null; rewrites: number; pushed: boolean }
   /** Adding a worktree, maybe for a branch picked from its menu. */
@@ -104,11 +114,18 @@ export interface Repo {
   elsewhere: Record<string, string>;
   /** The commit shown in the panel. */
   selected: string | null;
+  /** Commits picked together (⌘/Ctrl- and Shift-click) for one action on all of them. */
+  picked: string[];
+  setPicked(ids: string[]): void;
   colorOf(id: string): string;
   /** The graph's camera and screen positions (not during render). */
   graph(): GraphHandle | null;
   toast: Toast;
   run: Run;
+  /** Read the repository again (after work that doesn't go through `run`). */
+  refresh(): void;
+  /** The editor and diff / merge tools from the settings. */
+  external: ExternalApps;
   stackRun(label: string, op: StackOp): Promise<void>;
   /** The right panel shows one thing: composer, a stash, or a commit. */
   show(what: {
@@ -139,8 +156,13 @@ export interface Repo {
   onOpenPath(path: string): void;
   openUrl(url: string): void;
   fetchOne(name: string): Promise<void>;
-  /** Push a tag to a remote, or delete a branch or tag there (after any confirmation in `actions.tsx`). */
-  remoteRef(remote: string, op: RemoteRefOp, done: string): Promise<void>;
+  /**
+   * Push `branch` (default: the current one) to `remote` and follow it there; `done` is the toast.
+   * True when it went up (a refusal or missing sign-in has been explained already).
+   */
+  pushTo(remote: string, branch?: string | null, done?: string): Promise<boolean>;
+  /** Push a tag to a remote, or delete a branch or tag there (after any confirmation in `actions.tsx`); true when done. */
+  remoteRef(remote: string, op: RemoteRefOp, done: string): Promise<boolean>;
   canDropOn(target: string, source: string, mode: Drag["mode"]): boolean;
   /** Is `anc` an ancestor of (or) `of`? */
   isAncestor(anc: string, of: string | null): boolean;

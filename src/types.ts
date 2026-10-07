@@ -22,6 +22,18 @@ export interface RefInfo {
   checks?: Checks | null;
   /** `pr` refs only: drawn as a mark after the name (approved / changes requested). */
   review?: Review | null;
+  /** Local branches only: the branch it follows, if any. */
+  upstream?: Tracking;
+}
+
+/** Where a local branch stands against its upstream. */
+export interface Tracking {
+  /** e.g. `origin/main`. */
+  name: string;
+  ahead: number;
+  behind: number;
+  /** Configured, but the remote branch is gone (deleted there and pruned). */
+  gone: boolean;
 }
 
 export interface HeadInfo {
@@ -69,6 +81,18 @@ export interface CommitOptions {
 }
 
 export type PickOp = "cherryPick" | "revert";
+
+/** Mirrors `CloneOptions` in git/setup.rs. */
+export interface CloneOptions {
+  /** Check out this branch (or tag) instead of the remote's default. */
+  branch: string | null;
+  /** Only the last `depth` commits; null is all of history. */
+  depth: number | null;
+  /** Only the one branch's history. */
+  singleBranch: boolean;
+  /** Also clone the submodules. */
+  submodules: boolean;
+}
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */
 /** Driving `git bisect`: mark the ends, then judge the commit checked out now. */
@@ -188,6 +212,26 @@ export interface ForgeRepos {
   repos: ForgeRepo[];
 }
 
+/** What a search over the whole history looks at (`search.rs`). */
+export type SearchKind = "message" | "author" | "path" | "content";
+
+export interface SearchHit {
+  id: string;
+  summary: string;
+  author: string;
+  /** Commit time, seconds since the epoch. */
+  time: number;
+}
+
+export interface SearchResult {
+  /** Newest first. */
+  hits: SearchHit[];
+  /** More commits match than `hits` holds (the limit, or the time limit, cut the search). */
+  more: boolean;
+  /** The search ran out of time; `hits` is what it found until then. */
+  timedOut: boolean;
+}
+
 /** A commit that changed a file, and the file's path in it (renames are followed). */
 export interface FileTouch {
   id: string;
@@ -294,7 +338,14 @@ export type RefOp =
   | { kind: "checkoutRemote"; remoteRef: string; name?: string }
   | { kind: "addRemote"; name: string; url: string; fetchOnly?: boolean }
   | { kind: "setPushable"; name: string; pushable: boolean }
-  | { kind: "removeRemote"; name: string };
+  | { kind: "removeRemote"; name: string }
+  | { kind: "renameRemote"; from: string; to: string }
+  /** A fetch-only remote stays fetch-only. */
+  | { kind: "setRemoteUrl"; name: string; url: string }
+  /** `upstream`: a remote branch like `origin/main`; null stops tracking. */
+  | { kind: "setUpstream"; branch: string; upstream: string | null }
+  /** A branch that isn't checked out, up to its upstream; `diverged` when that isn't a fast-forward. */
+  | { kind: "fastForward"; branch: string };
 
 export interface RepoSnapshot {
   path: string;
@@ -651,4 +702,20 @@ export interface NewReport {
   message: string;
   email: string | null;
   diagnostics: string | null;
+}
+
+/** Mirrors `OpenHow` in open.rs: how to open a path of the repository outside the app. */
+export type OpenHow = { kind: "reveal" } | { kind: "default" } | { kind: "terminal" } | { kind: "editor" };
+
+/** Mirrors `DiffTarget` in git/tools.rs; no `file`: every file at once (`--dir-diff`). */
+export type DiffTarget =
+  { kind: "worktree"; staged: boolean; file: string | null } | { kind: "commit"; id: string; file: string | null };
+
+/** The diff and merge tools git is set up with (git/tools.rs `ToolSetup`). */
+export interface ToolSetup {
+  diff: string | null;
+  merge: string | null;
+  customDiff: string[];
+  customMerge: string[];
+  known: string[];
 }

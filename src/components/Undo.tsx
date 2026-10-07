@@ -23,6 +23,8 @@ export function ResetDialog(p: {
   summary: string;
   /** Commits that leave the branch (0: it moves somewhere else, e.g. back to a lost commit). */
   passed: number;
+  /** Commits the branch gains: the target is on another line (e.g. the remote branch after diverging). */
+  incoming: number;
   /** Some of them are already pushed (a force push will be needed). */
   pushed: boolean;
   /** Uncommitted changes that a hard reset throws away. */
@@ -54,7 +56,9 @@ export function ResetDialog(p: {
       }
     >
       <p>
-        {p.passed > 0 ? (
+        {p.incoming > 0 ? (
+          <Rich k="undo.bodyOther" vars={{ branch: p.branch, summary: p.summary, n: p.passed, m: p.incoming }} />
+        ) : p.passed > 0 ? (
           <Rich k="undo.body" vars={{ branch: p.branch, summary: p.summary, n: p.passed }} />
         ) : (
           <Rich k="undo.moveTo" vars={{ branch: p.branch, summary: p.summary }} />
@@ -71,6 +75,8 @@ export function ResetDialog(p: {
           </label>
         ))}
       </div>
+      {/* Onto another line, soft / mixed leave today's files: every difference shows up as a change. */}
+      {p.incoming > 0 && mode !== "hard" && <p className="note">{t("undo.other.keep")}</p>}
       {/* One note about what can be recovered: a hard reset over uncommitted changes can't be undone. */}
       {mode === "hard" && p.dirty > 0 ? (
         <p className="note warn">{t("undo.hard.dirty", { n: p.dirty })}</p>

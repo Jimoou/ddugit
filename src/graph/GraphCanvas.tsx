@@ -26,6 +26,7 @@ import type { NodeBadge } from "./renderer";
 
 const NO_BADGES = new Map<string, NodeBadge>();
 const NO_TRAIL: string[] = [];
+const NO_PICKS = new Set<string>();
 import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
@@ -51,6 +52,8 @@ interface Props {
   headBranch: string | null;
   changeCount: number;
   selected: string | null;
+  /** Commits picked together for one action (see `onPick`). */
+  picked?: Set<string>;
   focus: Set<string> | null;
   /** Marks drawn on commits (bisect). */
   badges?: Map<string, NodeBadge>;
@@ -61,6 +64,8 @@ interface Props {
   space: boolean;
   glow: boolean;
   onSelect(id: string | null): void;
+  /** A commit ⌘/Ctrl-clicked (`range`: Shift-clicked), to pick it along with others. */
+  onPick?(id: string, range: boolean): void;
   onPlus(): void;
   stashes: StashInfo[];
   selectedStash: number | null;
@@ -126,9 +131,14 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   const runs = useMemo(() => {
     const bases = new Set(props.stashes.map((x) => x.base));
     const keep = (id: string) =>
-      refsByCommit.has(id) || id === props.headId || id === props.incoming || bases.has(id) || !!props.badges?.has(id);
+      refsByCommit.has(id) ||
+      id === props.headId ||
+      id === props.incoming ||
+      bases.has(id) ||
+      !!props.badges?.has(id) ||
+      !!props.picked?.has(id);
     return straightRuns(scene.layout, keep);
-  }, [scene, refsByCommit, props.headId, props.incoming, props.stashes, props.badges]);
+  }, [scene, refsByCommit, props.headId, props.incoming, props.stashes, props.badges, props.picked]);
   const runOf = useMemo(() => runIndex(runs), [runs]);
   const runsRef = useRef({ runs, runOf });
   runsRef.current = { runs, runOf };
@@ -422,6 +432,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         plusHover: s.plusHover,
         changeCount: p.changeCount,
         selected: p.selected,
+        picked: p.picked ?? NO_PICKS,
         hovered: s.hovered,
         focus: p.focus,
         refs: refsByCommit,
@@ -614,6 +625,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     if (s.drag) {
       if (s.drag.valid && s.drag.target) propsRef.current.onDrop(s.drag.from, s.drag.target, s.drag.mode);
       s.drag = null;
+    } else if (s.press && (e.metaKey || e.ctrlKey || e.shiftKey) && propsRef.current.onPick) {
+      propsRef.current.onPick(s.press.id, e.shiftKey);
     } else if (s.press) {
       propsRef.current.onSelect(s.press.id === propsRef.current.selected ? null : s.press.id);
     } else if (s.pan && !s.pan.moved && !onPlus(p)) {

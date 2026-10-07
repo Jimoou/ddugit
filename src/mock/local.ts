@@ -98,6 +98,17 @@ function demoCommit({ message, paths, amend, stagedOnly }: Args<"git_commit">): 
   return delay(res("ok", `[${repo.head}] ${message}`));
 }
 
+/** A demo commit as `git format-patch` would write it. */
+const patchOf: Table["commit_patch"] = ({ id }) => {
+  const c = repo.commits.get(id);
+  if (!c) return fail(`Unknown commit ${id}`);
+  if (c.parents.length > 1) return fail("A merge commit has no single patch");
+  const date = new Date(c.time * 1000).toUTCString();
+  const diffs = filesOf(id).map((f) => `diff --git a/${f} b/${f}\n--- a/${f}\n+++ b/${f}\n@@ -1 +1 @@\n-old\n+new\n`);
+  const head = `From ${id} Mon Sep 17 00:00:00 2001\nFrom: ${c.author} <${c.email}>\nDate: ${date}`;
+  return delay(`${head}\nSubject: [PATCH] ${c.summary}\n\n---\n${diffs.join("")}--\n2.47.0\n`);
+};
+
 export const localCommands = {
   repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
   async git_commit(args) {
@@ -240,6 +251,23 @@ export const localCommands = {
     return delay(res("ok"));
   },
 
+  git_difftool({ target, tool }) {
+    demoControls.opened.push({ what: `difftool:${target.kind}`, file: target.file, with: tool ?? undefined });
+    return delay(res("ok"));
+  },
+  async git_mergetool({ file, tool }) {
+    demoControls.opened.push({ what: "mergetool", file, with: tool ?? undefined });
+    const c = repo.changes.find((x) => x.path === file && x.conflicted);
+    if (!c) return fail(`'${file}' is not in conflict`);
+    while (demoControls.mergetoolOpen) await delay(null, 50);
+    if (demoControls.mergetoolFails) {
+      demoControls.mergetoolFails = false;
+      return delay(res("failed", `'${file}' is still in conflict`));
+    }
+    Object.assign(c, { conflicted: false, staged: "modified", unstaged: null });
+    return delay(res("ok"));
+  },
+
   commit_diff({ id }) {
     const st = repo.stashes.find((x) => x.id === id);
     if (st)
@@ -252,6 +280,29 @@ export const localCommands = {
     const status = (i: number) =>
       c.parents.length === 0 || (i === files.length - 1 && h % 4 === 0) ? "added" : "modified";
     return delay(files.map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
+  },
+
+  commit_patch: patchOf,
+  async save_patch({ path, id, dest }) {
+    await patchOf({ path, id });
+    if (dest.split(/[\\/]/).includes(".git")) return fail(`Can't save into a .git folder: ${dest}`);
+    demoControls.savedPatches.push({ id, dest });
+    return delay(res("ok", dest));
+  },
+  apply_patch({ file }) {
+    if (repo.state !== "clean") return fail(`Repository is in the middle of a ${repo.state}; finish or abort it first`);
+    const name = file.split(/[\\/]/).pop() ?? file;
+    // A plain diff: the change is left in the working tree (stopping on conflicts with nothing in progress).
+    if (name.endsWith(".diff")) {
+      if (demoControls.conflictNext) return stopOnConflict("clean", name, name);
+      repo.changes.push({ path: "src/patched.ts", staged: "modified", unstaged: null, conflicted: false });
+      return delay(res("ok"));
+    }
+    // A mailed patch: `am` makes its commit, or stops part-way on a conflict.
+    const summary = `Apply ${name.replace(/\.(patch|mbox|eml)$/, "")}`;
+    if (demoControls.conflictNext) return stopOnConflict("am", name, name, { summary });
+    repo.add(repo.head, summary);
+    return delay(res("ok", `Applying: ${summary}`));
   },
 
   range_diff({ from, to, mergeBase }) {

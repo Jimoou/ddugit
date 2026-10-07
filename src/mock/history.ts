@@ -3,7 +3,7 @@
 import type { Blame, CommitInfo, TodoItem } from "../types";
 import { applyPlan } from "../rebasePlan";
 import { demoControls } from "./controls";
-import { type Table, delay, fail, filesOf, hash, repo, res } from "./repo";
+import { type Table, delay, fail, fakeFile, filesOf, hash, repo, res } from "./repo";
 
 // --- demo conflicts ------------------------------------------------------------
 
@@ -102,6 +102,45 @@ const fileLog: Table["file_log"] = ({ rev, file }) => {
   return delay(repo.order.filter((id) => seen.has(id) && filesOf(id).includes(file)).map((id) => ({ id, path: file })));
 };
 
+/** A git pathspec as the demo understands it: the file, a folder above it, or a glob. */
+function pathMatches(spec: string, file: string) {
+  const s = spec.replace(/\/+$/, "");
+  if (file === s || file.startsWith(`${s}/`)) return true;
+  const glob = s
+    .replace(/[.+^${}()|\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  return /[*?]/.test(s) && new RegExp(`^${glob}$`).test(file);
+}
+
+const searchCommits: Table["search_commits"] = ({ query, kind, regex, limit }) => {
+  const q = query.trim();
+  let test: (text: string) => boolean;
+  try {
+    const re = regex ? new RegExp(q, "i") : null;
+    test = (text) => (re ? re.test(text) : text.toLowerCase().includes(q.toLowerCase()));
+  } catch (e) {
+    return fail(`fatal: invalid regular expression: ${String(e)}`);
+  }
+  // The changed lines of the demo's made-up diff for a commit (what `-S` / `-G` look through).
+  const changed = (c: CommitInfo) =>
+    filesOf(c.id)
+      .flatMap((f) => fakeFile(f, hash(c.id), c.summary).hunks.flatMap((h) => h.lines))
+      .filter((l) => l.kind !== " ")
+      .map((l) => l.text);
+  const matches = (c: CommitInfo) =>
+    kind === "message"
+      ? test(c.message)
+      : kind === "author"
+        ? test(`${c.author} <${c.email}>`)
+        : kind === "path"
+          ? filesOf(c.id).some((f) => pathMatches(q, f))
+          : changed(c).some(test);
+  const found = q ? repo.snapshot().commits.filter(matches) : [];
+  const hits = found.slice(0, limit).map(({ id, summary, author, time }) => ({ id, summary, author, time }));
+  return delay({ hits, more: found.length > limit, timedOut: false });
+};
+
 /** Marks a binary file among the demo's conflicted files (`conflict_file` shows no text for it). */
 export const DEMO_BINARY = "\0binary";
 
@@ -187,20 +226,33 @@ export const historyCommands = {
     }
     if (repo.pending) repo.changes = repo.changes.filter((c) => !repo.pending!.files.has(c.path));
     repo.pending = null;
+    repo.skipRest = [];
     repo.state = "clean";
     return delay(res("ok"));
   },
 
-  git_pick({ op, id, target }) {
-    const c = repo.commits.get(id);
-    if (!c) return fail(`Unknown commit ${id}`);
+  git_pick({ op, ids, target, mainline }) {
+    const missing = ids.find((id) => !repo.commits.has(id));
+    if (!ids.length || missing) return fail(`Unknown commit ${missing ?? ""}`);
+    const merges = ids.map((id) => repo.commits.get(id)!.parents.length).filter((n) => n > 1);
+    if (mainline !== null && (!merges.length || mainline < 1 || mainline > Math.min(...merges)))
+      return fail(`A merge here has ${Math.min(...merges, 1)} parents, not ${mainline}`);
     const t = target ?? repo.head;
     if (!repo.branches.has(t)) return fail(`Unknown branch '${t}'`);
     repo.head = t;
-    const summary = op === "revert" ? `Revert "${c.summary}"` : c.summary;
-    if (demoControls.conflictNext)
-      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", id, id.slice(0, 7), { summary });
-    repo.add(t, summary);
+    demoControls.lastPick = { op, ids, mainline };
+    const summaries = ids.map((id) => {
+      const s = repo.commits.get(id)!.summary;
+      return op === "revert" ? `Revert "${s}"` : s;
+    });
+    if (demoControls.conflictNext) {
+      // Stops on the first; "continue" (or "skip") goes on with the rest.
+      repo.skipRest = summaries.slice(1);
+      return stopOnConflict(op === "revert" ? "revert" : "cherry-pick", ids[0], ids[0].slice(0, 7), {
+        summary: summaries[0],
+      });
+    }
+    for (const s of summaries) repo.add(t, s);
     return delay(res("ok"));
   },
 
@@ -218,6 +270,8 @@ export const historyCommands = {
     // The real one stages tracked files first (`add -u`), so what is left in conflict goes in as it is.
     const p = repo.pending;
     if (p?.summary) repo.add(repo.head, p.summary);
+    for (const summary of repo.skipRest) repo.add(repo.head, summary);
+    repo.skipRest = [];
     if (p?.tip) repo.branches.set(repo.head, p.tip);
     if (p) repo.changes = repo.changes.filter((c) => !p.files.has(c.path));
     repo.pending = null;
@@ -327,6 +381,7 @@ export const historyCommands = {
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
   file_log: fileLog,
+  search_commits: searchCommits,
   async save_file({ path, rev, file, dest }) {
     if (!(await fileLog({ path, rev, file })).length) return fail(`'${file}' is not in ${rev.slice(0, 7)}`);
     if (dest.split(/[\\/]/).includes(".git")) return fail(`Can't save into a .git folder: ${dest}`);
