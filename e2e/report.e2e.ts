@@ -102,3 +102,16 @@ test("a missing git is reported at startup with a way to fix it", async ({ page 
     page.getByRole("dialog", { name: "설정" }).getByRole("tab", { name: "Git", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
 });
+
+test("settings → About checks for updates on demand and offers the new version", async ({ page, demo }) => {
+  await page.locator(".tabrow-settings").click();
+  const settings = page.getByRole("dialog", { name: "설정" });
+  await settings.getByRole("tab", { name: "정보" }).click();
+  const check = settings.getByRole("button", { name: "업데이트 확인" });
+  await check.click();
+  await expect(settings.locator(".update-check")).toContainText("최신 버전을 쓰고 있어요.");
+  await demo.mutate((d) => (d.update = { version: "9.9.9", notes: null }));
+  await check.click();
+  await expect(settings.locator(".update-check")).toContainText("9.9.9");
+  await expect(settings.locator(".update-check").getByRole("button", { name: "업데이트하고 다시 시작" })).toBeVisible();
+});

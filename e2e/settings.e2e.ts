@@ -49,9 +49,7 @@ test("settings: a commercial license is pasted, shown and removed", async ({ dem
   // Pasting is for air-gapped and site licenses: folded away until asked for.
   await expect(lic.getByLabel("라이선스 붙여 넣기")).toBeHidden();
   await lic.locator(".license-paste summary").click();
-  // An offline computer shows its code, to activate it on ddugit.com/account from another device.
-  await expect(lic.getByLabel("이 컴퓨터의 코드")).toHaveText("demoDeviceCode0123456789abcdefghijklmnopqrs");
-  await expect(lic.getByRole("button", { name: "코드 복사" })).toBeVisible();
+  await expect(lic).toContainText("오프라인 활성화 코드");
   await lic.getByLabel("라이선스 붙여 넣기").fill("not a license");
   await lic.getByRole("button", { name: "라이선스 적용" }).click();
   await expect(lic.locator(".note.warn")).toContainText("not a ddugit license");

@@ -167,8 +167,6 @@ fn license_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 command!(license_status() in dir -> license::LicenseStatus => Ok(license::status_in(&dir)));
 command!(license_install(text: String) in dir -> license::LicenseStatus => license::install_in(&dir, &text));
 command!(license_remove() in dir -> license::LicenseStatus => license::remove_in(&dir));
-// This computer's device id, for activating an offline computer on ddugit.com/account.
-command!(license_device_code() in dir -> String => device::id_in(&dir));
 
 #[tauri::command]
 async fn update_check(app: tauri::AppHandle) -> Result<Option<update::UpdateInfo>, String> {
@@ -333,7 +331,6 @@ pub fn run() {
             license_status,
             license_install,
             license_remove,
-            license_device_code,
             license_refresh,
             license_activate,
             license_activate_cancel,

@@ -27,9 +27,12 @@ fn endpoint(raw: Option<&str>) -> Result<Option<tauri::Url>, String> {
     }
 }
 
+/// What a build without an update address answers (dev and local builds).
+pub const NOT_UPDATABLE: &str = "This build doesn't check for updates";
+
 async fn find(app: &tauri::AppHandle) -> Result<Option<tauri_plugin_updater::Update>, String> {
     let Some(url) = endpoint(ENDPOINT)? else {
-        return Ok(None);
+        return Err(NOT_UPDATABLE.into());
     };
     let updater = app
         .updater_builder()

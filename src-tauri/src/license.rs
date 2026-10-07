@@ -110,7 +110,7 @@ pub fn verify_with(text: &str, key: &VerifyingKey) -> Result<LicenseInfo> {
         .try_into()
         .map_err(|_| "The license is damaged")?;
     key.verify(&payload, &Signature::from_bytes(&sig))
-        .map_err(|_| "The license signature doesn't check out".to_string())?;
+        .map_err(|_| BAD_SIGNATURE.to_string())?;
     serde_json::from_slice(&payload).map_err(|_| "The license is damaged".into())
 }
 
@@ -179,6 +179,8 @@ fn this_device(dir: &Path) -> Option<String> {
 }
 
 pub const OTHER_DEVICE: &str = "This license belongs to another computer.";
+/// A license not signed by the key this build trusts.
+pub const BAD_SIGNATURE: &str = "The license signature doesn't check out";
 
 fn expired(info: &LicenseInfo, today: &str) -> bool {
     info.expires.as_deref().is_some_and(|e| today > e)
