@@ -172,7 +172,7 @@ mod tests {
         let pointer = "version https://git-lfs.github.com/spec/v1\noid sha256:\
             2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\nsize 3\n";
         std::fs::write(d.path().join("a.bin"), pointer).unwrap();
-        let c = super::super::write::commit(p, "pointer", &[], false).unwrap();
+        let c = super::super::write::commit(p, "pointer", &[], false, Default::default()).unwrap();
         assert_eq!(c.status, OpStatus::Ok, "{}", c.output);
         let st = status(p).unwrap();
         assert_eq!(

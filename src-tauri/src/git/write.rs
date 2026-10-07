@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use git2::{BranchType, Oid, RepositoryState};
+use serde::Deserialize;
 
 use super::literal;
 use super::read::read_head;
@@ -11,10 +12,43 @@ use super::{
     Result, LITERAL,
 };
 
+/// Extra switches for a commit, picked in the composer.
+#[derive(Debug, Deserialize, Default, Clone, Copy)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CommitOptions {
+    /// `--no-verify`: skip the pre-commit and commit-msg hooks.
+    pub no_verify: bool,
+    /// `--signoff`: add a `Signed-off-by:` trailer with the committer's identity.
+    pub signoff: bool,
+}
+
+impl CommitOptions {
+    /// `git commit -m <message>` with these switches (and `--amend`).
+    fn args(self, message: &str, amend: bool) -> Vec<&str> {
+        let mut args = vec!["commit", "-m", message];
+        for (on, flag) in [
+            (amend, "--amend"),
+            (self.no_verify, "--no-verify"),
+            (self.signoff, "--signoff"),
+        ] {
+            if on {
+                args.push(flag);
+            }
+        }
+        args
+    }
+}
+
 /// Commit the given paths (exactly those, regardless of what else is staged).
 /// An empty `paths` commits everything that has changed — except with `amend`,
 /// where it means "only reword the last commit".
-pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Result<OpResult> {
+pub fn commit(
+    path: &str,
+    message: &str,
+    paths: &[String],
+    amend: bool,
+    opts: CommitOptions,
+) -> Result<OpResult> {
     if message.trim().is_empty() {
         return Err("Commit message is empty".into());
     }
@@ -22,10 +56,7 @@ pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Resul
     let ps: Vec<&str> = paths.iter().map(String::as_str).collect();
     // `commit` runs hooks, so its paths are spelled literal one by one (see `LITERAL`).
     let specs: Vec<String> = ps.iter().map(|p| literal(p)).collect();
-    let mut commit: Vec<&str> = vec!["commit", "-m", message];
-    if amend {
-        commit.push("--amend");
-    }
+    let mut commit = opts.args(message, amend);
     if amend && ps.is_empty() {
         commit.push("--only"); // reword: ignore whatever is staged
     } else {
@@ -41,15 +72,28 @@ pub fn commit(path: &str, message: &str, paths: &[String], amend: bool) -> Resul
 }
 
 /// Commit exactly what is staged in the index (after hunk staging).
-pub fn commit_index(path: &str, message: &str, amend: bool) -> Result<OpResult> {
+pub fn commit_index(path: &str, message: &str, amend: bool, opts: CommitOptions) -> Result<OpResult> {
     if message.trim().is_empty() {
         return Err("Commit message is empty".into());
     }
-    let mut args = vec!["commit", "-m", message];
-    if amend {
-        args.push("--amend");
-    }
-    Ok(git(&repo_dir(path)?, &args)?.into())
+    Ok(git(&repo_dir(path)?, &opts.args(message, amend))?.into())
+}
+
+/// The `commit.template` file's text to start a message from, without its `#`
+/// comment lines (a message given with `-m` would keep them). `None` when no
+/// template is set, it can't be read, or nothing is left of it.
+pub fn commit_template(path: &str) -> Result<Option<String>> {
+    let repo = open(path)?;
+    let Ok(file) = repo.config().and_then(|c| c.get_path("commit.template")) else {
+        return Ok(None);
+    };
+    // A relative path is relative to where git runs: the top of the working tree.
+    let Ok(text) = std::fs::read_to_string(workdir(&repo)?.join(file)) else {
+        return Ok(None);
+    };
+    let kept: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
+    let body = kept.join("\n").trim_end().to_string();
+    Ok((!body.trim().is_empty()).then_some(body))
 }
 
 /// Refuse to start while another operation is half-done.
@@ -420,7 +464,7 @@ mod tests {
         let d = repo();
         fs::write(d.path().join("a.txt"), "a").unwrap();
         fs::write(d.path().join("b.txt"), "b").unwrap();
-        let r = commit(s(d.path()), "add a", &["a.txt".into()], false).unwrap();
+        let r = commit(s(d.path()), "add a", &["a.txt".into()], false, Default::default()).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
 
         let snap = snapshot(s(d.path()), 100).unwrap();
@@ -437,7 +481,14 @@ mod tests {
         let d = repo();
         fs::write(d.path().join("a?.txt"), "a").unwrap();
         fs::write(d.path().join("ab.txt"), "b").unwrap();
-        let r = commit(s(d.path()), "only a?", &["a?.txt".into()], false).unwrap();
+        let r = commit(
+            s(d.path()),
+            "only a?",
+            &["a?.txt".into()],
+            false,
+            Default::default(),
+        )
+        .unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         let snap = snapshot(s(d.path()), 100).unwrap();
         assert_eq!(snap.changes.len(), 1);
@@ -507,7 +558,12 @@ mod tests {
         fs::write(d.path().join("c.txt"), "c").unwrap();
 
         // Reword only: the untracked c.txt must not sneak in.
-        assert_eq!(commit(p, "typo message", &[], true).unwrap().status, OpStatus::Ok);
+        assert_eq!(
+            commit(p, "typo message", &[], true, Default::default())
+                .unwrap()
+                .status,
+            OpStatus::Ok
+        );
         let snap = snapshot(p, 10).unwrap();
         assert_eq!(snap.commits.len(), 2);
         assert_eq!(snap.commits[0].summary, "typo message");
@@ -515,7 +571,9 @@ mod tests {
 
         // Amend with a file.
         assert_eq!(
-            commit(p, "typo message", &["c.txt".into()], true).unwrap().status,
+            commit(p, "typo message", &["c.txt".into()], true, Default::default())
+                .unwrap()
+                .status,
             OpStatus::Ok
         );
         let snap = snapshot(p, 10).unwrap();
@@ -606,7 +664,7 @@ mod tests {
         assert_eq!(snap.state, "clean");
         let f = snap.changes.iter().find(|c| c.path == "f.txt").unwrap();
         assert_eq!(f.staged.as_deref(), Some("added"));
-        let r = commit(p, "feature, squashed", &[], false).unwrap();
+        let r = commit(p, "feature, squashed", &[], false, CommitOptions::default()).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(snapshot(p, 10).unwrap().commits[0].parents.len(), 1);
     }
@@ -623,5 +681,62 @@ mod tests {
         let r = merge(p, "feature", None, MergeMode::Squash, None).unwrap();
         assert_eq!(r.status, OpStatus::Conflict, "{}", r.output);
         assert!(snapshot(p, 10).unwrap().changes.iter().any(|c| c.conflicted));
+    }
+
+    #[cfg(unix)] // the hook is a shell script made executable
+    #[test]
+    fn no_verify_skips_a_refusing_pre_commit_hook() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        let hook = d.path().join(".git/hooks/pre-commit");
+        fs::write(&hook, "#!/bin/sh\necho 'lint failed' >&2\nexit 1\n").unwrap();
+        fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(d.path().join("a.txt"), "edit").unwrap();
+
+        let r = commit(p, "blocked", &[], false, CommitOptions::default()).unwrap();
+        assert_eq!(r.status, OpStatus::Failed);
+        assert!(r.output.contains("lint failed"), "{}", r.output);
+        let skip = CommitOptions {
+            no_verify: true,
+            ..Default::default()
+        };
+        let r = commit(p, "past the hook", &[], false, skip).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        fs::write(d.path().join("a.txt"), "again").unwrap();
+        git_ok(d.path(), &["add", "a.txt"]).unwrap();
+        let r = commit_index(p, "index past the hook", false, skip).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(snapshot(p, 5).unwrap().commits.len(), 3);
+    }
+
+    #[test]
+    fn signoff_adds_the_trailer() {
+        let d = repo();
+        let p = s(d.path());
+        fs::write(d.path().join("a.txt"), "a").unwrap();
+        let opts = CommitOptions {
+            signoff: true,
+            ..Default::default()
+        };
+        let r = commit(p, "signed off", &[], false, opts).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        let body = git_ok(d.path(), &["log", "-1", "--format=%B"]).unwrap();
+        assert!(body.contains("Signed-off-by: Test <t@example.com>"), "{body}");
+    }
+
+    #[test]
+    fn reads_the_commit_template_without_comments() {
+        let d = repo();
+        let p = s(d.path());
+        assert_eq!(commit_template(p).unwrap(), None);
+        fs::write(d.path().join(".msg"), "feat: \n\n# Why this change?\nRefs: #\n").unwrap();
+        git_ok(d.path(), &["config", "commit.template", ".msg"]).unwrap();
+        assert_eq!(commit_template(p).unwrap().as_deref(), Some("feat: \n\nRefs: #"));
+        fs::write(d.path().join(".msg"), "# only comments\n").unwrap();
+        assert_eq!(commit_template(p).unwrap(), None);
+        git_ok(d.path(), &["config", "commit.template", "missing.txt"]).unwrap();
+        assert_eq!(commit_template(p).unwrap(), None);
     }
 }

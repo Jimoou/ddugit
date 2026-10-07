@@ -137,6 +137,13 @@
   flex-direction: column;
   gap: 8px;
 }
+.composer .commit-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+}
 
 .refs {
   display: flex;

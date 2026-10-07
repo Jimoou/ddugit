@@ -52,6 +52,22 @@ export interface StashInfo {
 
 export type StashOp = "apply" | "pop" | "drop";
 
+/** Mirrors `StashOptions` in git/stash.rs. */
+export interface StashOptions {
+  /** New files go into the stash too. */
+  untracked: boolean;
+  /** What is staged stays in the working tree as well (`--keep-index`). */
+  keepIndex: boolean;
+}
+
+/** Mirrors `CommitOptions` in git/write.rs. */
+export interface CommitOptions {
+  /** Skip the pre-commit and commit-msg hooks. */
+  noVerify: boolean;
+  /** Add a `Signed-off-by:` trailer. */
+  signoff: boolean;
+}
+
 export type PickOp = "cherryPick" | "revert";
 
 /** Mirrors `RebaseAction` / `RebaseStep` in git/rebase.rs. */

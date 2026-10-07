@@ -13,6 +13,7 @@ import type {
   Blame,
   BranchReport,
   CommitEdit,
+  CommitOptions,
   ConflictFile,
   DiffScope,
   FileDiff,
@@ -58,6 +59,7 @@ import type {
   SshStatus,
   SshTest,
   StashOp,
+  StashOptions,
   SubmoduleOp,
   TodoItem,
   WorktreeOp,
@@ -84,7 +86,14 @@ export interface Commands {
   git_init: [{ dir: string }, OpResult];
   repo_snapshot: [{ path: string; limit?: number }, RepoSnapshot];
   repo_glance: [{ paths: string[] }, RepoGlance[]];
-  git_commit: [{ path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean }, OpResult];
+  git_commit: [
+    { path: string; message: string; paths: string[]; amend: boolean; stagedOnly: boolean; options: CommitOptions },
+    OpResult,
+  ];
+  commit_template: [{ path: string }, string | null];
+  git_stage_files: [{ path: string; paths: string[]; unstage: boolean }, OpResult];
+  git_discard_hunks: [{ path: string; file: string; hunks: string[]; lines: number[] | null }, OpResult];
+  git_ignore: [{ path: string; patterns: string[]; untrack: string[] }, OpResult];
   git_stage_hunks: [
     { path: string; file: string; hunks: string[]; lines: number[] | null; unstage: boolean },
     OpResult,
@@ -154,7 +163,8 @@ export interface Commands {
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
   git_discard: [{ path: string; paths: string[] }, OpResult];
-  git_stash_push: [{ path: string; message: string; paths: string[] }, OpResult];
+  git_stash_push: [{ path: string; message: string; paths: string[]; options: StashOptions }, OpResult];
+  git_stash_branch: [{ path: string; id: string; name: string }, OpResult];
   git_stash: [{ path: string; op: StashOp; id: string }, OpResult];
   conflict_file: [{ path: string; file: string }, ConflictFile];
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
@@ -212,11 +222,26 @@ export const api = {
   snapshot: (path: string, limit?: number) => call("repo_snapshot", { path, limit }),
   /** Where each repository stands (branch, upstream distance, changes), in `paths` order. */
   glance: (paths: string[]) => call("repo_glance", { paths }),
-  commit: (path: string, message: string, paths: string[], amend = false, stagedOnly = false) =>
-    call("git_commit", { path, message, paths, amend, stagedOnly }),
+  commit: (
+    path: string,
+    message: string,
+    paths: string[],
+    amend = false,
+    stagedOnly = false,
+    options: CommitOptions = { noVerify: false, signoff: false },
+  ) => call("git_commit", { path, message, paths, amend, stagedOnly, options }),
+  /** The `commit.template` text to start a message from (comment lines left out), or null. */
+  commitTemplate: (path: string) => call("commit_template", { path }),
   /** `hunks` are `DiffHunk.key`s: a hunk that changed on disk since it was shown is refused. */
   stageHunks: (path: string, file: string, hunks: string[], unstage: boolean, lines?: number[]) =>
     call("git_stage_hunks", { path, file, hunks, lines: lines ?? null, unstage }),
+  /** Stage (or unstage) whole files; `[]` means every change. */
+  stageFiles: (path: string, paths: string[], unstage: boolean) => call("git_stage_files", { path, paths, unstage }),
+  /** Throw away unstaged hunks (or `lines` of one) in the working tree; keys as for `stageHunks`. */
+  discardHunks: (path: string, file: string, hunks: string[], lines?: number[]) =>
+    call("git_discard_hunks", { path, file, hunks, lines: lines ?? null }),
+  /** Add patterns to the top `.gitignore` (skipping ones there), and stop tracking `untrack` (files stay). */
+  ignore: (path: string, patterns: string[], untrack: string[] = []) => call("git_ignore", { path, patterns, untrack }),
   /** `message` (blank: git's own) is for the merge commit; a squash only stages. */
   merge: (path: string, source: string, target: string | null, mode: MergeMode, message: string | null) =>
     call("git_merge", { path, source, target, mode, message }),
@@ -327,7 +352,10 @@ export const api = {
   /** Who last changed each line of `file` as of `rev`. */
   blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
-  stashPush: (path: string, message: string, paths: string[]) => call("git_stash_push", { path, message, paths }),
+  stashPush: (path: string, message: string, paths: string[], options: StashOptions) =>
+    call("git_stash_push", { path, message, paths, options }),
+  /** `git stash branch`: a new branch where the stash was taken, with the stash popped onto it. */
+  stashBranch: (path: string, id: string, name: string) => call("git_stash_branch", { path, id, name }),
   /** By the stash's commit id: positions shift when a stash is pushed elsewhere. */
   stash: (path: string, op: StashOp, id: string) => call("git_stash", { path, op, id }),
   conflictFile: (path: string, file: string) => call("conflict_file", { path, file }),

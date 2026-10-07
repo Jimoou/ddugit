@@ -1,10 +1,30 @@
-//! Partial staging: move individual hunks, or single lines of a hunk, between
-//! the working tree and the index.
+//! Staging: move whole files, individual hunks, or single lines of a hunk
+//! between the working tree and the index, or throw hunks and lines away.
 
-use git2::Patch;
+use git2::{Patch, Repository};
 
 use super::diff::{hunk_key, local_diff, DiffScope};
-use super::{err, git_input, open, workdir, OpResult, Result};
+use super::{err, git, git_input, open, workdir, OpResult, Result, LITERAL};
+
+/// Stage (or with `unstage`, unstage) whole files; an empty `paths` means every change.
+/// Staging takes deletions and new files too (`add -A`); unstaging puts the index back
+/// to HEAD, or empties it for those paths on a branch with no commit yet.
+pub fn stage_files(path: &str, paths: &[String], unstage: bool) -> Result<OpResult> {
+    let repo = open(path)?;
+    let dir = workdir(&repo)?;
+    let mut args = match (unstage, repo.head().is_ok()) {
+        (false, _) => vec![LITERAL, "add", "-A"],
+        (true, true) => vec![LITERAL, "restore", "--staged"],
+        (true, false) => vec![LITERAL, "rm", "--cached", "-r", "-q", "--ignore-unmatch"],
+    };
+    args.push("--");
+    if paths.is_empty() {
+        args.push("."); // run at the top of the working tree: everything
+    } else {
+        args.extend(paths.iter().map(String::as_str));
+    }
+    Ok(git(&dir, &args)?.into())
+}
 
 /// Stage (or with `unstage`, unstage) the hunks of `file` whose `key`s are given —
 /// the keys `worktree_diff` showed for the unstaged (or staged) scope. A key that
@@ -18,25 +38,56 @@ pub fn stage_hunks(
     lines: Option<&[usize]>,
     unstage: bool,
 ) -> Result<OpResult> {
-    if keys.is_empty() {
-        return Err("No hunks selected".into());
-    }
-    if lines.is_some() && keys.len() != 1 {
-        return Err("Lines can be picked from one hunk at a time".into());
-    }
     let repo = open(path)?;
     let scope = if unstage {
         DiffScope::Staged
     } else {
         DiffScope::Unstaged
     };
-    let diff = local_diff(&repo, Some(file), scope)?;
-    let mut patch = Patch::from_diff(&diff, 0).map_err(err)?.ok_or_else(|| {
-        format!(
-            "No textual changes to {} in '{file}'",
-            if unstage { "unstage" } else { "stage" }
-        )
-    })?;
+    let partial = picked_patch(&repo, file, keys, lines, scope, unstage)?;
+    let mut args = vec!["apply", "--cached", "--whitespace=nowarn"];
+    if unstage {
+        args.push("--reverse");
+    }
+    args.push("-");
+    Ok(git_input(&workdir(&repo)?, &args, &partial)?.into())
+}
+
+/// Throw away the unstaged hunks of `file` whose `key`s are given (or, with `lines`,
+/// those lines of the one hunk): the working tree goes back to the index there. The
+/// index is not touched. Discarding a whole new file deletes it; discarding some of
+/// its lines keeps the file without them.
+pub fn discard_hunks(path: &str, file: &str, keys: &[String], lines: Option<&[usize]>) -> Result<OpResult> {
+    let repo = open(path)?;
+    let mut partial = picked_patch(&repo, file, keys, lines, DiffScope::Unstaged, true)?;
+    if lines.is_some() {
+        partial = in_place(&partial);
+    }
+    let args = ["apply", "--reverse", "--whitespace=nowarn", "-"];
+    Ok(git_input(&workdir(&repo)?, &args, &partial)?.into())
+}
+
+/// The patch of `file`'s hunks with the given keys in `scope` (unstaged: index → work
+/// tree, staged: HEAD → index), narrowed to `lines` of the one hunk when given.
+/// `reverse`: it will be applied in reverse, which decides what an unpicked line becomes.
+fn picked_patch(
+    repo: &Repository,
+    file: &str,
+    keys: &[String],
+    lines: Option<&[usize]>,
+    scope: DiffScope,
+    reverse: bool,
+) -> Result<Vec<u8>> {
+    if keys.is_empty() {
+        return Err("No hunks selected".into());
+    }
+    if lines.is_some() && keys.len() != 1 {
+        return Err("Lines can be picked from one hunk at a time".into());
+    }
+    let diff = local_diff(repo, Some(file), scope)?;
+    let mut patch = Patch::from_diff(&diff, 0)
+        .map_err(err)?
+        .ok_or_else(|| format!("No textual changes in '{file}'"))?;
     let now = (0..patch.num_hunks())
         .map(|h| hunk_key(&patch, h))
         .collect::<Result<Vec<_>>>()?;
@@ -49,15 +100,40 @@ pub fn stage_hunks(
     let buf = patch.to_buf().map_err(err)?;
     let mut partial = select_hunks(&buf, &hunks)?;
     if let Some(lines) = lines {
-        partial = select_lines(&partial, lines, unstage)?;
+        partial = select_lines(&partial, lines, reverse)?;
     }
+    Ok(partial)
+}
 
-    let mut args = vec!["apply", "--cached", "--whitespace=nowarn"];
-    if unstage {
-        args.push("--reverse");
+/// A patch that creates a file, rewritten to change the file in place: taking back
+/// some lines of a new file must leave the rest, not delete the file.
+fn in_place(patch: &[u8]) -> Vec<u8> {
+    // The new side's name, `b/name` (or `"b/name"` when quoted), spelled as an old side: `a/name`.
+    let old_side = lines_of(patch).find_map(|l| {
+        let new = l.strip_prefix(b"+++ ")?;
+        let (quote, name) = match new.strip_prefix(b"\"b/") {
+            Some(name) => (&b"\""[..], name),
+            None => (&b""[..], new.strip_prefix(b"b/")?),
+        };
+        Some([b"--- ", quote, b"a/", name].concat())
+    });
+    let Some(old_side) = old_side else {
+        return patch.to_vec();
+    };
+    let mut out = Vec::new();
+    let mut head = true;
+    for line in lines_of(patch) {
+        head &= !line.starts_with(b"@@");
+        if head && line.starts_with(b"new file mode") {
+            continue;
+        }
+        if head && line.starts_with(b"--- /dev/null") {
+            out.extend_from_slice(&old_side);
+        } else {
+            out.extend_from_slice(line);
+        }
     }
-    args.push("-");
-    Ok(git_input(&workdir(&repo)?, &args, &partial)?.into())
+    out
 }
 
 /// `patch` split after each `\n`, the last piece kept even without one.
@@ -334,7 +410,9 @@ mod tests {
         assert_eq!(hunks(p, DiffScope::Unstaged), 1);
 
         assert_eq!(
-            commit_index(p, "bottom only", false).unwrap().status,
+            commit_index(p, "bottom only", false, Default::default())
+                .unwrap()
+                .status,
             OpStatus::Ok
         );
         let committed = super::super::git_ok(d.path(), &["show", "HEAD:f.txt"]).unwrap();
@@ -425,6 +503,127 @@ mod tests {
         assert!(stage(p, "f.txt", &[0], Some(&[0]), false).is_err());
         assert!(stage(p, "f.txt", &[0], Some(&[9]), false).is_err());
         assert!(stage(p, "f.txt", &[0, 1], Some(&[1]), false).is_err());
+    }
+
+    fn staged_paths(d: &tempfile::TempDir) -> Vec<String> {
+        snapshot(s(d.path()), 5)
+            .unwrap()
+            .changes
+            .into_iter()
+            .filter(|c| c.staged.is_some())
+            .map(|c| c.path)
+            .collect()
+    }
+
+    #[test]
+    fn stage_and_unstage_whole_files() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        commit_file(d.path(), "gone.txt", "g", "base 2");
+        fs::write(d.path().join("a.txt"), "edit").unwrap();
+        fs::write(d.path().join("new[1].txt"), "n").unwrap();
+        fs::remove_file(d.path().join("gone.txt")).unwrap();
+
+        let r = stage_files(p, &["new[1].txt".into(), "gone.txt".into()], false).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(staged_paths(&d), vec!["gone.txt", "new[1].txt"]);
+        let r = stage_files(p, &["gone.txt".into()], true).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(staged_paths(&d), vec!["new[1].txt"]);
+        // Everything, then nothing.
+        stage_files(p, &[], false).unwrap();
+        assert_eq!(staged_paths(&d).len(), 3);
+        stage_files(p, &[], true).unwrap();
+        assert!(staged_paths(&d).is_empty());
+        assert_eq!(fs::read_to_string(d.path().join("a.txt")).unwrap(), "edit");
+    }
+
+    #[test]
+    fn unstage_files_before_the_first_commit() {
+        let d = repo();
+        let p = s(d.path());
+        fs::write(d.path().join("a.txt"), "a").unwrap();
+        fs::write(d.path().join("b.txt"), "b").unwrap();
+        stage_files(p, &[], false).unwrap();
+        assert_eq!(staged_paths(&d).len(), 2);
+        let r = stage_files(p, &["a.txt".into()], true).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(staged_paths(&d), vec!["b.txt"]);
+        assert!(d.path().join("a.txt").exists());
+        stage_files(p, &[], true).unwrap();
+        assert!(staged_paths(&d).is_empty());
+    }
+
+    /// `discard_hunks` with the keys of the unstaged hunks `at`.
+    fn discard(p: &str, file: &str, at: &[usize], lines: Option<&[usize]>) -> OpResult {
+        let diff = worktree_diff(p, Some(file), DiffScope::Unstaged).unwrap();
+        let keys: Vec<String> = at.iter().map(|&i| diff[0].hunks[i].key.clone()).collect();
+        let r = discard_hunks(p, file, &keys, lines).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        r
+    }
+
+    #[test]
+    fn discard_one_hunk_keeps_the_other_and_the_index() {
+        let d = two_hunk_repo();
+        let p = s(d.path());
+        // Stage the top hunk first: discarding works against the index.
+        stage(p, "f.txt", &[0], None, false).unwrap();
+        fs::write(
+            d.path().join("f.txt"),
+            fs::read_to_string(d.path().join("f.txt"))
+                .unwrap()
+                .replace("line 15\n", "MIDDLE\n"),
+        )
+        .unwrap();
+        assert_eq!(hunks(p, DiffScope::Unstaged), 2);
+        discard(p, "f.txt", &[0], None);
+        let now = fs::read_to_string(d.path().join("f.txt")).unwrap();
+        assert!(now.contains("TOP") && !now.contains("MIDDLE") && now.contains("BOTTOM"));
+        let staged = super::super::git_ok(d.path(), &["show", ":f.txt"]).unwrap();
+        assert!(staged.contains("TOP") && !staged.contains("BOTTOM"));
+    }
+
+    #[test]
+    fn discard_single_lines() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "f.txt", "a\nb\nc\n", "base");
+        fs::write(d.path().join("f.txt"), "A\nb\nC\n").unwrap();
+        // Hunk lines: 0 -a, 1 +A, 2 " b", 3 -c, 4 +C. Take back the bottom change only.
+        discard(p, "f.txt", &[0], Some(&[3, 4]));
+        assert_eq!(fs::read_to_string(d.path().join("f.txt")).unwrap(), "A\nb\nc\n");
+        // Only the addition of the top change: "a" stays deleted, "A" goes.
+        discard(p, "f.txt", &[0], Some(&[1]));
+        assert_eq!(fs::read_to_string(d.path().join("f.txt")).unwrap(), "b\nc\n");
+    }
+
+    #[test]
+    fn discard_lines_or_all_of_a_new_file() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        fs::write(d.path().join("new.txt"), "1\n2\n3\n").unwrap();
+        discard(p, "new.txt", &[0], Some(&[1]));
+        assert_eq!(fs::read_to_string(d.path().join("new.txt")).unwrap(), "1\n3\n");
+        discard(p, "new.txt", &[0], None);
+        assert!(!d.path().join("new.txt").exists());
+        // A stale key is refused, like staging.
+        fs::write(d.path().join("a.txt"), "b").unwrap();
+        assert!(discard_hunks(p, "a.txt", &["stale".into()], None).is_err());
+    }
+
+    #[test]
+    fn in_place_turns_a_creation_into_an_edit() {
+        let patch = b"diff --git a/n b/n\nnew file mode 100644\nindex 0000000..1\n--- /dev/null\n+++ b/n\n@@ -1,2 +1,3 @@\n 1\n+2\n 3\n";
+        let out = String::from_utf8(in_place(patch)).unwrap();
+        assert_eq!(
+            out,
+            "diff --git a/n b/n\nindex 0000000..1\n--- a/n\n+++ b/n\n@@ -1,2 +1,3 @@\n 1\n+2\n 3\n"
+        );
+        let quoted = in_place(b"--- /dev/null\n+++ \"b/\\303\\251\"\n@@ -1 +1 @@\n");
+        assert!(quoted.starts_with(b"--- \"a/\\303\\251\"\n"));
     }
 
     #[test]

@@ -14,6 +14,7 @@ import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { CommitInfo, TodoItem } from "../types";
 import { askName, askReset, confirmThen, deleteBranches, richBody, showCommit } from "./actions";
+import { discardHunk, stageFiles } from "./changes";
 import { closeSheet, type Repo, type Sheet } from "./state";
 import type { useSheet } from "./useSheet";
 
@@ -195,6 +196,7 @@ export function RepoSheets({ repo, sheet, conflict, rebase, loadDiff, askRemote 
     case "diff": {
       const { source } = sheet;
       const staged = source.kind === "worktree" && source.scope === "staged";
+      const hunkKey = (file: string, hunk: number) => sheet.files?.find((f) => f.path === file)?.hunks[hunk]?.key ?? "";
       return (
         <DiffSheet
           title={sheet.title}
@@ -209,14 +211,11 @@ export function RepoSheets({ repo, sheet, conflict, rebase, loadDiff, askRemote 
                   onScope: (scope) => loadDiff({ kind: "worktree", scope }, sheet.title, sheet.path),
                   onHunk: (file, hunk, lines) =>
                     void run(staged ? t("stage.unstaged") : t("stage.staged"), () =>
-                      api.stageHunks(
-                        path,
-                        file,
-                        [sheet.files?.find((f) => f.path === file)?.hunks[hunk]?.key ?? ""],
-                        staged,
-                        lines,
-                      ),
+                      api.stageHunks(path, file, [hunkKey(file, hunk)], staged, lines),
                     ),
+                  onDiscard: (file, hunk, lines) => discardHunk(repo, file, hunkKey(file, hunk), lines),
+                  onFile: (file) => void stageFiles(repo, [file], staged),
+                  onAll: () => void stageFiles(repo, [], staged),
                 }
               : undefined
           }

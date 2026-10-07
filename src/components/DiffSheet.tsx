@@ -27,6 +27,12 @@ interface Staging {
   onScope(scope: Staging["scope"]): void;
   /** With `lines`, only those lines (indices into the hunk's lines) move. */
   onHunk(file: string, hunk: number, lines?: number[]): void;
+  /** Throw an unstaged hunk (or `lines` of it) away; the caller confirms. */
+  onDiscard(file: string, hunk: number, lines?: number[]): void;
+  /** Stage (or, in the staged tab, unstage) the whole file. */
+  onFile(file: string): void;
+  /** Stage (or unstage) every file in the tab. */
+  onAll(): void;
 }
 
 const STATUS: Record<string, string> = {
@@ -126,6 +132,11 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
             ]}
           />
         )}
+        {stage && (
+          <button disabled={stage.busy || !files?.length} onClick={stage.onAll}>
+            {t(stage.scope === "unstaged" ? "diff.stageAll" : "diff.unstageAll")}
+          </button>
+        )}
         <span className="muted keys">
           <Rich k="diff.keys" />
         </span>
@@ -161,6 +172,15 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
 
         <div className="diff-body" ref={body}>
           {error && <p className="note warn">{error}</p>}
+          {current && stage && (
+            <div className="file-bar">
+              <span className="path">{current.path}</span>
+              <button disabled={stage.busy} onClick={() => stage.onFile(current.path)}>
+                <Icon name={stage.scope === "unstaged" ? "plus" : "minus"} size={12} />{" "}
+                {t(stage.scope === "unstaged" ? "diff.stageFile" : "diff.unstageFile")}
+              </button>
+            </div>
+          )}
           {current && <FileView file={current} stage={stage} />}
         </div>
       </div>
@@ -243,24 +263,34 @@ function FileView({ file, stage }: { file: FileDiff; stage?: Staging }) {
         </tr>
       );
     const lines = pick && pick.hunk === r.hunk ? pick.lines : [];
+    const sorted = lines.length ? [...lines].sort((a, b) => a - b) : undefined;
     if (r.kind === "hunk")
       return (
         <tr key={i} className="hunk">
           <td colSpan={4}>
             <span>{file.hunks[r.hunk].header}</span>
             {stage && (
-              <button
-                className="hunk-btn"
-                disabled={stage.busy}
-                onClick={() =>
-                  stage.onHunk(file.path, r.hunk, lines.length ? [...lines].sort((a, b) => a - b) : undefined)
-                }
-              >
-                <Icon name={stage.scope === "unstaged" ? "plus" : "minus"} size={12} />{" "}
-                {lines.length
-                  ? t(staging ? "diff.stageLines" : "diff.unstageLines", { n: lines.length })
-                  : t(staging ? "diff.stageHunk" : "diff.unstageHunk")}
-              </button>
+              <span className="hunk-btns">
+                <button
+                  className="hunk-btn"
+                  disabled={stage.busy}
+                  onClick={() => stage.onHunk(file.path, r.hunk, sorted)}
+                >
+                  <Icon name={stage.scope === "unstaged" ? "plus" : "minus"} size={12} />{" "}
+                  {lines.length
+                    ? t(staging ? "diff.stageLines" : "diff.unstageLines", { n: lines.length })
+                    : t(staging ? "diff.stageHunk" : "diff.unstageHunk")}
+                </button>
+                {staging && (
+                  <button
+                    className="hunk-btn danger ghost"
+                    disabled={stage.busy}
+                    onClick={() => stage.onDiscard(file.path, r.hunk, sorted)}
+                  >
+                    {lines.length ? t("diff.discardLines", { n: lines.length }) : t("diff.discardHunk")}
+                  </button>
+                )}
+              </span>
             )}
           </td>
         </tr>

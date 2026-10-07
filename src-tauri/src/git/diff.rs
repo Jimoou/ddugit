@@ -290,7 +290,7 @@ mod tests {
     fn binary_files_have_no_hunks() {
         let d = repo();
         fs::write(d.path().join("bin.dat"), [0u8, 1, 2, 0, 255]).unwrap();
-        crate::git::write::commit(s(d.path()), "bin", &[], false).unwrap();
+        crate::git::write::commit(s(d.path()), "bin", &[], false, Default::default()).unwrap();
         let files = commit_diff(s(d.path()), "HEAD").unwrap();
         assert!(files[0].binary);
         assert!(files[0].hunks.is_empty());

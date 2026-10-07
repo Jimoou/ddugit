@@ -79,6 +79,12 @@ export const demoControls = {
   binaryConflict: false,
   /** Make the next commit fail while signing, the way gpg or ssh-keygen report it. */
   signFail: null as null | "gpg" | "ssh",
+  /** A pre-commit hook that refuses every commit not made with `--no-verify`. */
+  preCommitFails: false,
+  /** The demo repository's `commit.template` text (comment lines already left out). */
+  commitTemplate: null as string | null,
+  /** The full message of the last demo commit, trailers included. */
+  lastMessage: null as string | null,
   /** git-lfs isn't installed, or LFS is off in the demo repository (`git lfs install` turns it on). */
   lfs: null as null | "missing" | "off",
   /** Make the next backport stop on a commit whose change is already there (nothing to commit). */

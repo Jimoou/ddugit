@@ -21,8 +21,8 @@ use git::read::RepoSnapshot;
 use git::rebase::{RebaseStep, TodoItem};
 use git::refs::RefOp;
 use git::remote::{Progress, RemoteOp, RemoteRefOp};
-use git::stash::StashOp;
-use git::write::MergeMode;
+use git::stash::{StashOp, StashOptions};
+use git::write::{CommitOptions, MergeMode};
 use git::OpResult;
 use tauri::ipc::Channel;
 
@@ -74,14 +74,21 @@ macro_rules! command {
 command!(repo_snapshot(path: String, limit: Option<usize>) -> RepoSnapshot
     => git::read::snapshot(&path, limit.unwrap_or(3000)));
 command!(repo_glance(paths: Vec<String>) -> Vec<git::glance::RepoGlance> => Ok(git::glance::glance(&paths)));
-command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool, staged_only: bool) -> OpResult
+command!(git_commit(path: String, message: String, paths: Vec<String>, amend: bool, staged_only: bool, options: CommitOptions) -> OpResult
 => if staged_only {
-    git::write::commit_index(&path, &message, amend)
+    git::write::commit_index(&path, &message, amend, options)
 } else {
-    git::write::commit(&path, &message, &paths, amend)
+    git::write::commit(&path, &message, &paths, amend, options)
 });
+command!(commit_template(path: String) -> Option<String> => git::write::commit_template(&path));
 command!(git_stage_hunks(path: String, file: String, hunks: Vec<String>, lines: Option<Vec<usize>>, unstage: bool) -> OpResult
     => git::stage::stage_hunks(&path, &file, &hunks, lines.as_deref(), unstage));
+command!(git_discard_hunks(path: String, file: String, hunks: Vec<String>, lines: Option<Vec<usize>>) -> OpResult
+    => git::stage::discard_hunks(&path, &file, &hunks, lines.as_deref()));
+command!(git_stage_files(path: String, paths: Vec<String>, unstage: bool) -> OpResult
+    => git::stage::stage_files(&path, &paths, unstage));
+command!(git_ignore(path: String, patterns: Vec<String>, untrack: Vec<String>) -> OpResult
+    => git::ignore::ignore(&path, &patterns, &untrack));
 command!(backport_compare(path: String, source: String, target: String) -> Vec<BackportItem>
     => git::backport::compare(&path, &source, &target));
 // Backport actions are Pro; comparing branches stays Free.
@@ -232,8 +239,10 @@ command!(file_log(path: String, rev: String, file: String) -> Vec<git::history::
 command!(git_blame(path: String, rev: String, file: String) -> git::history::Blame
     => git::history::blame(&path, &rev, &file));
 command!(git_discard(path: String, paths: Vec<String>) -> OpResult => git::stash::discard(&path, &paths));
-command!(git_stash_push(path: String, message: String, paths: Vec<String>) -> OpResult
-    => git::stash::stash_push(&path, &message, &paths));
+command!(git_stash_push(path: String, message: String, paths: Vec<String>, options: StashOptions) -> OpResult
+    => git::stash::stash_push(&path, &message, &paths, options));
+command!(git_stash_branch(path: String, id: String, name: String) -> OpResult
+    => git::stash::stash_branch(&path, &id, &name));
 command!(git_stash(path: String, op: StashOp, id: String) -> OpResult => git::stash::stash(&path, op, &id));
 command!(conflict_file(path: String, file: String) -> ConflictFile => git::conflict::conflict_file(&path, &file));
 command!(git_resolve(path: String, file: String, how: Resolution) -> OpResult
@@ -294,6 +303,10 @@ pub fn run() {
             repo_glance,
             git_commit,
             git_stage_hunks,
+            git_discard_hunks,
+            git_stage_files,
+            git_ignore,
+            commit_template,
             set_git_path,
             git_version,
             app_info,
@@ -367,6 +380,7 @@ pub fn run() {
             git_blame,
             git_discard,
             git_stash_push,
+            git_stash_branch,
             git_stash,
             conflict_file,
             git_resolve,

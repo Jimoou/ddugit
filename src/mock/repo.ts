@@ -72,6 +72,8 @@ class MockRepo {
    */
   pending: { source: string; label: string; files: Map<string, string>; summary?: string; tip?: string } | null = null;
   stashes: { message: string; id: string; base: string; time: number; changes: FileChange[] }[] = [];
+  /** Lines of the top-level `.gitignore` (none at first). */
+  gitignore: string[] = [];
   /** Target branch → commits ignored for it. */
   backportIgnored = new Map<string, Set<string>>();
   remoteUrls = new Map([["origin", "https://github.com/ddugit/ddugit-demo.git"]]);

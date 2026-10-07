@@ -14,6 +14,7 @@ pub mod edit;
 pub mod glance;
 pub mod history;
 pub mod identity;
+pub mod ignore;
 pub mod lfs;
 pub mod pick;
 pub mod read;
@@ -644,7 +645,7 @@ pub(crate) mod testutil {
     /// Write `file` and commit everything with `msg`.
     pub fn commit_file(p: &Path, file: &str, content: &str, msg: &str) {
         fs::write(p.join(file), content).unwrap();
-        let r = super::write::commit(s(p), msg, &[], false).unwrap();
+        let r = super::write::commit(s(p), msg, &[], false, Default::default()).unwrap();
         assert_eq!(r.status, super::OpStatus::Ok, "{}", r.output);
     }
 }
