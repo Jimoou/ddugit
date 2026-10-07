@@ -108,12 +108,13 @@ export function useSearch({ path, snap, latest, loadTo, show, graph, toast }: Op
     setAsking(k);
     try {
       const r = await api.searchCommits(path, s.query.trim(), s.mode, s.regex, HISTORY_HITS);
+      // A late answer to an earlier question is dropped: it would hide the current one.
+      if (keyNow.current !== k) return;
       setFound({ key: k, result: r });
-      if (keyNow.current === k)
-        void goTo(
-          0,
-          r.hits.map((h) => h.id),
-        );
+      void goTo(
+        0,
+        r.hits.map((h) => h.id),
+      );
     } catch (e) {
       toast("err", String(e));
     } finally {
@@ -141,7 +142,7 @@ export function useSearch({ path, snap, latest, loadTo, show, graph, toast }: Op
     onMode: (m) => update({ ...search, mode: m, index: 0 }),
     onRegex: (regex) => update({ ...search, regex, index: 0 }),
     onEnter(dir) {
-      if (search.mode !== "loaded" && !result) return void ask(search);
+      if (search.mode !== "loaded" && !result) return void (asking === key || ask(search));
       if (matches.length) return void goTo(search.index + dir);
       if (search.mode === "loaded") update({ ...search, mode: "message", index: 0 });
     },

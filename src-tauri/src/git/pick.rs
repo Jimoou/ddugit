@@ -54,15 +54,36 @@ pub fn pick(
         (None, None) => None,
     };
     let dir = prepare_on(path, target)?;
+    let name = match op {
+        PickOp::CherryPick => "cherry-pick",
+        PickOp::Revert => "revert",
+    };
+    // A list git left behind (stopped without anything in progress, or a stop
+    // concluded by a plain commit) would make this one "already in progress".
+    if leftover_list(path)? {
+        git(&dir, &[name, "--quit"])?;
+    }
     let mut args = match op {
-        PickOp::CherryPick => vec!["cherry-pick", "-x"],
-        PickOp::Revert => vec!["revert", "--no-edit"],
+        PickOp::CherryPick => vec![name, "-x"],
+        PickOp::Revert => vec![name, "--no-edit"],
     };
     if let Some(m) = &mainline {
         args.extend(["-m", m]);
     }
     args.extend(ids.iter().map(String::as_str));
-    Ok(conflict_aware(path, git(&dir, &args)?))
+    let o = git(&dir, &args)?;
+    // Failed part way (not a conflict, e.g. a file in the way): put back the
+    // commits already applied, so it is all or nothing and nothing is left half done.
+    if !o.ok && leftover_list(path)? {
+        git(&dir, &[name, "--abort"])?;
+    }
+    Ok(conflict_aware(path, o))
+}
+
+/// A cherry-pick / revert list on disk with no step in progress.
+fn leftover_list(path: &str) -> Result<bool> {
+    let repo = open(path)?;
+    Ok(repo.state() == git2::RepositoryState::Clean && repo.path().join("sequencer").is_dir())
 }
 
 #[cfg(test)]
@@ -76,6 +97,32 @@ mod tests {
 
     fn head_id(p: &str) -> String {
         snapshot(p, 1).unwrap().head.target.unwrap()
+    }
+
+    #[test]
+    fn several_commits_that_fail_part_way_leave_nothing_behind() {
+        let d = repo();
+        let p = s(d.path());
+        commit_file(d.path(), "a.txt", "a", "base");
+        create_branch(p, "feature", None, true).unwrap();
+        commit_file(d.path(), "one.txt", "1", "one");
+        let one = head_id(p);
+        commit_file(d.path(), "two.txt", "2", "two");
+        let two = head_id(p);
+        checkout(p, "main").unwrap();
+        let before = head_id(p);
+        // The second commit would overwrite a file that isn't tracked here.
+        fs::write(d.path().join("two.txt"), "mine").unwrap();
+        let ids = [one.clone(), two.clone()];
+        let r = pick(p, PickOp::CherryPick, &ids, None, None).unwrap();
+        assert_eq!(r.status, OpStatus::Failed, "{}", r.output);
+        assert_eq!(head_id(p), before, "the first copy is put back");
+        assert!(!d.path().join(".git/sequencer").exists());
+        assert_eq!(fs::read_to_string(d.path().join("two.txt")).unwrap(), "mine");
+        // Out of the way, it goes through.
+        fs::remove_file(d.path().join("two.txt")).unwrap();
+        let r = pick(p, PickOp::CherryPick, &ids, None, None).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
     }
 
     #[test]

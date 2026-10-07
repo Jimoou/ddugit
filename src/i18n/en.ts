@@ -1334,6 +1334,7 @@ export const en: Record<Key, string> = {
   "settings.external": "External apps",
   "settings.editor": "Open files with",
   "settings.editor.default": "System default app",
+  "settings.editor.confirm": "Let ddugit open files with this program? Only confirm if you chose it yourself.",
   "settings.editor.custom": "Other program…",
   "settings.editor.placeholder": "Full path to the editor",
   "settings.editor.hint":

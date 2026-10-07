@@ -184,8 +184,8 @@ export interface Commands {
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
   open_in: [{ path: string; file: string | null; how: OpenHow }, null];
-  open_version: [{ path: string; rev: string; file: string; editor: string | null }, null];
-  check_editor: [{ program: string }, string];
+  open_version: [{ path: string; rev: string; file: string; editor: boolean }, null];
+  set_editor: [{ program: string; prompt: string }, string];
   tool_setup: [Record<string, never>, ToolSetup];
   git_difftool: [{ path: string; target: DiffTarget; tool: string | null }, OpResult];
   git_mergetool: [{ path: string; file: string; tool: string | null }, OpResult];
@@ -412,11 +412,14 @@ export const api = {
   gitVersion: () => call("git_version", {}),
   /** Show `file` (null: the repository's folder) in the file manager, its default app, a terminal or an editor. */
   openIn: (path: string, file: string | null, how: OpenHow) => call("open_in", { path, file, how }),
-  /** Open `file` as `rev` has it (a read-only copy) in `editor`, else the default app. */
-  openVersion: (path: string, rev: string, file: string, editor: string | null) =>
+  /** Open `file` as `rev` has it (a read-only copy) in the editor from the settings, else the default app. */
+  openVersion: (path: string, rev: string, file: string, editor: boolean) =>
     call("open_version", { path, rev, file, editor }),
-  /** The editor `program` names, as the path it runs; rejects one that isn't allowed. */
-  checkEditor: (program: string) => call("check_editor", { program: program.trim() }),
+  /**
+   * Make `program` the editor ("" forgets it): the backend keeps it and answers the path it runs.
+   * A program it doesn't know by name is shown in a native dialog (`prompt` above its path) first.
+   */
+  setEditor: (program: string, prompt: string) => call("set_editor", { program: program.trim(), prompt }),
   toolSetup: () => call("tool_setup", {}),
   /** Runs until the tool's window closes: not through `run()`, so other git work isn't held up. */
   difftool: (path: string, target: DiffTarget, tool: string | null) => call("git_difftool", { path, target, tool }),

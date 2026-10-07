@@ -22,9 +22,10 @@ export function CommandKeys({ repo, active, onRemote }: Props) {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const k = commandOf(e);
-      // A field's own keys stay its own; a dialog over the tab owns the keyboard.
-      if (!k || e.defaultPrevented || isTypingTarget(e.target)) return;
-      if ((e.target as Element).closest?.("[aria-modal]")) return;
+      // A field's own keys stay its own, and a held key runs its command once.
+      if (!k || e.repeat || e.defaultPrevented || isTypingTarget(e.target)) return;
+      // A dialog over the tab, or an open menu, owns the keyboard.
+      if ((e.target as Element).closest?.("[aria-modal]") || document.querySelector(".context-menu")) return;
       e.preventDefault();
       // Running work refuses another (with a word) in `run`.
       if (k === "fetch" || k === "pull" || k === "push") onRemote(k);

@@ -259,10 +259,34 @@ command!(range_diff(path: String, from: String, to: String, merge_base: bool) ->
 command!(save_file(path: String, rev: String, file: String, dest: String) -> OpResult
     => git::history::save_file(&path, &rev, &file, &dest));
 // Outside the app: a path inside the repository's work tree only (`open::inside`).
-command!(open_in(path: String, file: Option<String>, how: open::OpenHow) -> ()
-    => open::open(&path, file.as_deref(), &how));
-command!(check_editor(program: String) -> String
-    => open::editor(&program).map(|p| p.to_string_lossy().into_owned()));
+command!(open_in(path: String, file: Option<String>, how: open::OpenHow) in dir -> ()
+    => open::open(&dir, &path, file.as_deref(), &how));
+
+/// Make `program` the editor ("" forgets it) and answer the path it runs. A
+/// program that isn't one the settings name needs the user's yes in a native
+/// dialog showing its path (`prompt` above it): the webview alone can't pick
+/// what runs.
+#[tauri::command]
+async fn set_editor(app: tauri::AppHandle, program: String, prompt: String) -> Result<String, String> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    let dir = license_dir(&app)?;
+    blocking(move || {
+        let program = program.trim();
+        if !program.is_empty() && !open::known_editor(program) {
+            let real = open::editor(program)?;
+            let yes = app
+                .dialog()
+                .message(format!("{prompt}\n\n{}", real.display()))
+                .buttons(MessageDialogButtons::OkCancel)
+                .blocking_show();
+            if !yes {
+                return Err("Cancelled".into());
+            }
+        }
+        open::save_editor(&dir, program)
+    })
+    .await
+}
 command!(tool_setup() -> git::tools::ToolSetup => Ok(git::tools::setup(None)));
 // These two wait for the tool's window to close: the UI doesn't queue them with other git work.
 command!(git_difftool(path: String, target: git::tools::DiffTarget, tool: Option<String>) -> OpResult
@@ -270,18 +294,19 @@ command!(git_difftool(path: String, target: git::tools::DiffTarget, tool: Option
 command!(git_mergetool(path: String, file: String, tool: Option<String>) -> OpResult
     => git::tools::mergetool(&path, &file, tool.as_deref()));
 
-/// Open `file` as commit `rev` has it: a read-only copy in the app's cache, in `editor` or the default app.
+/// Open `file` as commit `rev` has it: a read-only copy in the app's cache, in the editor or the default app.
 #[tauri::command]
 async fn open_version(
     app: tauri::AppHandle,
     path: String,
     rev: String,
     file: String,
-    editor: Option<String>,
+    editor: bool,
 ) -> Result<(), String> {
     use tauri::Manager;
     let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    blocking(move || open::open_version(&cache, &path, &rev, &file, editor.as_deref())).await
+    let config = license_dir(&app)?;
+    blocking(move || open::open_version(&cache, &config, &path, &rev, &file, editor)).await
 }
 
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
@@ -430,7 +455,7 @@ pub fn run() {
             worktree_diff,
             open_in,
             open_version,
-            check_editor,
+            set_editor,
             tool_setup,
             git_difftool,
             git_mergetool,

@@ -70,6 +70,39 @@ pub fn editor(program: &str) -> Result<PathBuf> {
     Ok(real)
 }
 
+/// The settings' editor, kept in the app's config folder rather than the
+/// webview's storage: the webview says "the editor", never which program.
+const STORED: &str = "editor";
+
+/// Is `program` one the settings offer by name (no confirmation needed)?
+pub fn known(program: &str) -> bool {
+    EDITORS.contains(&program.trim())
+}
+
+/// The editor `save` kept in `dir`, checked again (it may have moved or been replaced).
+pub fn stored(dir: &Path) -> Result<PathBuf> {
+    let program = std::fs::read_to_string(dir.join(STORED))
+        .map_err(|_| "No editor is set: choose one in Settings".to_string())?;
+    editor(program.trim())
+}
+
+/// Keep `program` as the editor ("" forgets it); answers the path it runs ("" when forgotten).
+/// A program that isn't a known name must have been confirmed by the user first (`lib.rs`).
+pub fn save(dir: &Path, program: &str) -> Result<String> {
+    let program = program.trim();
+    let file = dir.join(STORED);
+    if program.is_empty() {
+        return match std::fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+            _ => Ok(String::new()),
+        };
+    }
+    let real = editor(program)?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::write(&file, program).map_err(|e| e.to_string())?;
+    Ok(real.to_string_lossy().into_owned())
+}
+
 /// How to open `target` in `editor` (checked by [`editor`]): a macOS app
 /// bundle through `open -a`, any other program with the path as its argument.
 /// `target` is absolute, so it can't pass for an option.
@@ -129,5 +162,16 @@ mod tests {
         assert_eq!(bare_name(Path::new("/py/Python3.12.EXE")), "python");
         assert_eq!(bare_name(Path::new("/usr/bin/node-18")), "node");
         assert_eq!(bare_name(Path::new("/usr/bin/code")), "code");
+    }
+
+    #[test]
+    fn the_editor_is_kept_in_the_config_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = dir.path().join("cfg");
+        assert!(stored(&cfg).unwrap_err().contains("No editor"));
+        assert!(save(&cfg, "sh").is_err());
+        assert!(!cfg.join(STORED).exists(), "a refused program isn't kept");
+        assert_eq!(save(&cfg, "").unwrap(), "");
+        assert!(known("code") && !known("/usr/bin/code") && !known("sh"));
     }
 }

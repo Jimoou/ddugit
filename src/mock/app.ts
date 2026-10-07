@@ -68,6 +68,16 @@ function demoGlanceBase(path: string): RepoGlance {
   };
 }
 
+/** The editor `set_editor` kept (the backend keeps it in its config folder; here, the stored settings' pick). */
+let demoEditor = (() => {
+  try {
+    const e = (JSON.parse(localStorage.getItem("ddugit.settings") ?? "{}") as { editor?: unknown }).editor;
+    return typeof e === "string" ? e : "";
+  } catch {
+    return "";
+  }
+})();
+
 export const appCommands = {
   initial_repo: () => delay(null, 0),
   // Any folder "is" the demo repository, except ones named like a plain folder.
@@ -102,21 +112,38 @@ export const appCommands = {
     // Nothing leaves the demo: note what would have opened (e2e reads `opened`).
     if (file?.split("/").includes("..") || file?.split("/").includes(".git"))
       return fail(`'${file}' is not a path inside the repository`);
-    demoControls.opened.push({ what: how.kind, file, with: how.kind === "editor" ? how.program : undefined });
+    if (how.kind === "editor" && !demoEditor) return fail("No editor is set: choose one in Settings");
+    demoControls.opened.push({ what: how.kind, file, with: how.kind === "editor" ? demoEditor : undefined });
     return delay(null);
   },
   open_version({ rev, file, editor }) {
-    demoControls.opened.push({ what: "version", file: `${file}@${rev.slice(0, 7)}`, with: editor ?? undefined });
+    demoControls.opened.push({
+      what: "version",
+      file: `${file}@${rev.slice(0, 7)}`,
+      with: editor ? demoEditor || undefined : undefined,
+    });
     return delay(null);
   },
-  check_editor({ program }) {
-    // Like `open::editor`: a known name, or a full path that isn't a shell.
+  set_editor({ program }) {
+    // Like `open::editor` + `save`: a known name, or a full path that isn't a shell (the native
+    // confirmation is taken as a yes here). Kept for `open_in`, as the backend keeps it.
+    if (!program) {
+      demoEditor = "";
+      return delay("");
+    }
     const known = ["code", "cursor", "subl", "idea", "zed"];
     const name = program.split(/[\\/]/).pop()?.toLowerCase() ?? "";
     if (/^(sh|bash|zsh|python\d*|node|cmd|powershell)(\.exe)?$/.test(name))
       return fail(`'${program}' runs files instead of editing them`);
-    if (known.includes(program)) return delay(`/usr/local/bin/${program}`);
-    if (program.startsWith("/") || /^[A-Za-z]:\\/.test(program)) return delay(program);
+    const real = known.includes(program)
+      ? `/usr/local/bin/${program}`
+      : program.startsWith("/") || /^[A-Za-z]:\\/.test(program)
+        ? program
+        : null;
+    if (real) {
+      demoEditor = program;
+      return delay(real);
+    }
     return fail(`'${program}' is not an editor ddugit knows (give its full path)`);
   },
   tool_setup: () =>

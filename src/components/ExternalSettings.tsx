@@ -20,14 +20,14 @@ export function ExternalSection({ apps, onChange }: Props) {
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const tools = useLoaded("tools", () => api.toolSetup()).data;
 
-  /** Keep `editor` once the backend accepts it (it says where the program is). */
+  /** Keep `editor` once the backend has taken it (it says where the program is). */
   const applyEditor = async (editor: string) => {
-    if (!editor.trim()) {
-      setStatus(null);
-      return onChange({ editor: "" });
-    }
     try {
-      const at = await api.checkEditor(editor);
+      const at = await api.setEditor(editor, t("settings.editor.confirm"));
+      if (!editor.trim()) {
+        setStatus(null);
+        return onChange({ editor: "" });
+      }
       setStatus({ ok: true, text: at });
       onChange({ editor: editor.trim() });
     } catch (e) {

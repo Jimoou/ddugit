@@ -1316,6 +1316,7 @@ export const ko = {
   "settings.editor": "파일 열 프로그램",
   "settings.editor.default": "시스템 기본 앱",
   "settings.editor.custom": "직접 지정…",
+  "settings.editor.confirm": "ddugit이 파일을 이 프로그램으로 열게 할까요? 직접 고른 프로그램일 때만 확인을 누르세요.",
   "settings.editor.placeholder": "편집기 실행 파일의 전체 경로",
   "settings.editor.hint":
     "이름으로 고른 편집기는 PATH에서 찾아요. 셸·인터프리터나 저장소·임시 폴더 안의 프로그램은 쓸 수 없어요.",

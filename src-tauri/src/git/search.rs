@@ -116,6 +116,8 @@ fn log_args(
         "log.showSignature=false",
         "log",
         "--no-color",
+        // Content search reads every blob: never through the user's textconv filters.
+        "--no-textconv",
         "--format=%H%x1f%an%x1f%ct%x1f%s",
     ]
     .map(String::from)

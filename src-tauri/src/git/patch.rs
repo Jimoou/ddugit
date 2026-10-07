@@ -84,7 +84,17 @@ pub fn apply_patch(path: &str, file: &str) -> Result<OpResult> {
     let mail = is_mail(&String::from_utf8_lossy(&text[..text.len().min(8192)]));
     let dir = prepare_on(path, None)?;
     if mail {
-        return Ok(conflict_aware(path, git(&dir, &["am", "--3way", file])?));
+        let o = git(&dir, &["am", "--3way", file])?;
+        if !o.ok && !has_conflicts(path) {
+            // Nothing to resolve (a broken or already applied patch): don't leave
+            // `am` waiting, and put back any patches of the series it applied.
+            git(&dir, &["am", "--abort"])?;
+            return Ok(OpResult {
+                status: OpStatus::Failed,
+                output: o.text,
+            });
+        }
+        return Ok(conflict_aware(path, o));
     }
     let o = git(&dir, &["apply", "--3way", file])?;
     let status = match (o.ok, has_conflicts(path)) {

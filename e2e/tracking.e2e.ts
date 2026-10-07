@@ -90,6 +90,20 @@ test("renames a branch on its remote too", async ({ demo }) => {
   expect(glow.upstream?.name).toBe("origin/feature/glow");
 });
 
+test("a branch following a remote branch of another name is renamed only here", async ({ demo }) => {
+  const { page } = demo;
+  await branchMenu(page, "feature/login", "따라갈 원격 브랜치 정하기…");
+  await page
+    .locator(".context-menu")
+    .getByRole("menuitem", { name: /^origin\/main/ })
+    .click();
+  await demo.toast(/feature\/login.? 이제 origin\/main.? 따라가요/);
+  await branchMenu(page, "feature/login", "이름 바꾸기…");
+  const rename = page.getByRole("dialog", { name: "브랜치 이름 바꾸기" });
+  // Renaming "there" would delete origin/main.
+  await expect(rename.getByRole("checkbox")).toHaveCount(0);
+});
+
 test("renames a remote and changes its URL", async ({ demo }) => {
   const { page } = demo;
   const origin = page.locator(".sidebar section.remote-sub").filter({ hasText: "origin" });

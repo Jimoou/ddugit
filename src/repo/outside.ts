@@ -36,7 +36,7 @@ export function openItems(repo: Repo, file: string | null, disabled = false): Me
           {
             label: t(file ? "open.editor" : "open.repoEditor", { editor: editorName(editor) }),
             disabled,
-            onSelect: opener(repo, file, { kind: "editor", program: editor }),
+            onSelect: opener(repo, file, { kind: "editor" }),
           },
         ]
       : []),
@@ -61,7 +61,7 @@ export function difftoolItem(repo: Repo, target: DiffTarget, disabled = false): 
 export const versionItem = (repo: Repo, commit: CommitInfo, file: string): MenuItem => ({
   label: t("open.version"),
   onSelect: () =>
-    void api.openVersion(repo.path, commit.id, file, repo.external.editor || null).catch(failed(repo, "open.failed")),
+    void api.openVersion(repo.path, commit.id, file, !!repo.external.editor).catch(failed(repo, "open.failed")),
 });
 
 /**

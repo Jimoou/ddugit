@@ -15,8 +15,8 @@ use std::path::{Component, Path, PathBuf};
 use serde::Deserialize;
 
 mod editor;
-pub use editor::editor;
-use editor::editor_launch;
+pub use editor::{editor, known as known_editor, save as save_editor};
+use editor::{editor_launch, stored};
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -30,8 +30,8 @@ pub enum OpenHow {
     Default,
     /// A terminal in the folder (a file: its folder).
     Terminal,
-    /// The editor from the settings (a name like `code`, or a full path).
-    Editor { program: String },
+    /// The editor from the settings (kept in the config folder, see `editor::save`).
+    Editor,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -98,14 +98,19 @@ const RUNS: &[&str] = &[
     // Windows
     "exe", "com", "bat", "cmd", "scr", "pif", "msi", "msp", "msc", "cpl", "hta", "jar", "js", "jse",
     "vbs", "vbe", "wsf", "wsh", "ps1", "psm1", "lnk", "url", "reg", "inf", "appref-ms",
-    "application", "gadget", "scf", "settingcontent-ms", "library-ms", "diagcab", "jnlp",
+    "application", "gadget", "scf", "settingcontent-ms", "library-ms", "diagcab", "jnlp", "chm",
+    "xll", "wsc", "sct", "msix", "msixbundle", "appx", "appxbundle", "appinstaller", "search-ms",
+    "searchconnector-ms", "xbap", "website", "ws", "psc1", "mde", "accde", "ade", "adp",
+    // (disk images open as a drive whose files skip the downloaded-file warning)
+    "iso", "img", "vhd", "vhdx",
     // (Python installs make its scripts run on a double click)
     "py", "pyw", "pyz", "pyc",
     // macOS
     "app", "command", "tool", "terminal", "workflow", "action", "scpt", "scptd", "applescript",
-    "pkg", "mpkg", "prefpane", "webloc", "inetloc", "fileloc",
+    "pkg", "mpkg", "prefpane", "webloc", "inetloc", "fileloc", "osax", "saver", "plugin", "kext",
+    "mobileconfig", "service", "dmg",
     // Linux
-    "desktop", "sh", "run", "appimage", "bin",
+    "desktop", "sh", "run", "appimage", "bin", "deb", "rpm", "flatpakref", "flatpak", "snap",
 ];
 
 /// Would the system's default app run `real` rather than show it?
@@ -128,8 +133,9 @@ fn executable(_: &Path) -> bool {
     false
 }
 
-/// Open `file` of the repository at `repo` (`None`: the repository's folder).
-pub fn open(repo: &str, file: Option<&str>, how: &OpenHow) -> Result<()> {
+/// Open `file` of the repository at `repo` (`None`: the repository's folder);
+/// `config` is the app's config folder, where the editor is kept.
+pub fn open(config: &Path, repo: &str, file: Option<&str>, how: &OpenHow) -> Result<()> {
     let real = plain(inside(repo, file)?);
     match how {
         OpenHow::Reveal => tauri_plugin_opener::reveal_item_in_dir(&real).map_err(|e| e.to_string()),
@@ -142,7 +148,7 @@ pub fn open(repo: &str, file: Option<&str>, how: &OpenHow) -> Result<()> {
             };
             terminal(&dir)
         }
-        OpenHow::Editor { program } => spawn(&editor_launch(OS, &plain(editor(program)?), &real)),
+        OpenHow::Editor => spawn(&editor_launch(OS, &plain(stored(config)?), &real)),
     }
 }
 
@@ -182,7 +188,13 @@ impl Launch {
 
 /// Start `l` and let it run on its own (the app doesn't wait for editors or terminals).
 fn spawn(l: &Launch) -> Result<()> {
-    let mut cmd = crate::proc::hidden(&l.program);
+    // A console program keeps the console's own input: `proc::hidden` closes stdin,
+    // which a Windows console shell reads as "exit" at once.
+    let mut cmd = if l.console {
+        std::process::Command::new(&l.program)
+    } else {
+        crate::proc::hidden(&l.program)
+    };
     cmd.args(&l.args);
     if let Some(dir) = &l.cwd {
         cmd.current_dir(dir);
@@ -274,8 +286,12 @@ fn on_path(name: &str) -> Option<PathBuf> {
     dirs.iter()
         .filter(|d| d.is_absolute())
         .flat_map(|d| exts.iter().map(move |e| d.join(format!("{name}{e}"))))
-        .find(|p| p.is_file())
-        .and_then(|p| p.canonicalize().ok())
+        .find_map(|p| match p.canonicalize() {
+            Ok(real) if real.is_file() => Some(real),
+            // Windows' app execution aliases (`wt.exe` in WindowsApps) are links nothing can resolve.
+            _ if OS == Os::Windows && p.symlink_metadata().is_ok_and(|m| !m.is_dir()) => Some(p),
+            _ => None,
+        })
 }
 
 /// `src/app.ts` at abc1234… → `app (abc1234).ts`: the copy's name, safe on every
@@ -300,19 +316,17 @@ pub fn version_name(file: &str, id: &str) -> String {
 }
 
 /// Write `file` as commit `rev` has it into `cache` (the app's own cache
-/// folder) as a read-only copy, and open that in `editor` or the default app.
+/// folder) as a read-only copy, and open that in the editor kept in `config`
+/// (`in_editor`) or the default app.
 pub fn open_version(
     cache: &Path,
+    config: &Path,
     repo: &str,
     rev: &str,
     file: &str,
-    editor_program: Option<&str>,
+    in_editor: bool,
 ) -> Result<()> {
-    let editor = editor_program
-        .map(str::trim)
-        .filter(|e| !e.is_empty())
-        .map(editor)
-        .transpose()?;
+    let editor = in_editor.then(|| stored(config)).transpose()?;
     let copy = plain(write_version(cache, repo, rev, file)?);
     match editor {
         Some(e) => spawn(&editor_launch(OS, &plain(e), &copy)),
@@ -322,7 +336,11 @@ pub fn open_version(
 
 fn write_version(cache: &Path, repo: &str, rev: &str, file: &str) -> Result<PathBuf> {
     let (id, content) = crate::git::history::blob_at(repo, rev, file)?;
-    let dir = cache.join("versions");
+    // A folder per path, so `a/x.txt` and `b/x.txt` of one commit don't replace each other.
+    let path_id = git2::Oid::hash_object(git2::ObjectType::Blob, file.as_bytes())
+        .map_err(|e| e.to_string())?
+        .to_string();
+    let dir = cache.join("versions").join(&path_id[..12]);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let copy = dir.join(version_name(file, &id));
     // A copy left from before is replaced (it is read-only, and may not be ours to follow).
@@ -411,6 +429,9 @@ mod tests {
             "a.desktop",
             "s.sh",
             "l.lnk",
+            "help.chm",
+            "disk.iso",
+            "pkg.deb",
         ] {
             assert!(runs_when_opened(&d.path().join(name)), "{name}");
         }
@@ -495,6 +516,12 @@ mod tests {
             copy
         );
         assert!(write_version(cache.path(), s(d.path()), "HEAD", "missing.txt").is_err());
+        // The same name in another folder gets a copy of its own.
+        std::fs::create_dir(d.path().join("b")).unwrap();
+        commit_file(d.path(), "b/a.txt", "other\n", "third");
+        let other = write_version(cache.path(), s(d.path()), "HEAD", "b/a.txt").unwrap();
+        assert_ne!(other.parent(), copy.parent());
+        assert_eq!(std::fs::read_to_string(&copy).unwrap(), "old\n");
         // The working tree is untouched.
         assert_eq!(std::fs::read_to_string(d.path().join("a.txt")).unwrap(), "new\n");
     }

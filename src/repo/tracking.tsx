@@ -101,12 +101,14 @@ export function trackingItems(repo: Repo, r: RefInfo): MenuItem[] {
 }
 
 /**
- * Rename a branch; when it follows a branch on a remote that takes pushes, optionally there too:
+ * Rename a branch; when it follows the branch of the same name on a remote that takes pushes
+ * (never a shared one like `origin/main` it happens to track), optionally there too:
  * push the new name (which it then follows) and delete the old one there. Says which step didn't happen.
  */
 export const renameBranch = (repo: Repo, from: string) => {
   const r = repo.snap.refs.find((x) => x.kind === "local" && x.name === from);
-  const there = r && pushableUpstream(repo, r);
+  const up = r && pushableUpstream(repo, r);
+  const there = up && up.branch === from ? up : null;
   askName(
     repo,
     {

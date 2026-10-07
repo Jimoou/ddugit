@@ -185,10 +185,7 @@ fn track(repo: &Repository, info: &mut HeadInfo) {
     let Ok(up) = local.upstream() else { return };
     info.upstream = up.name().ok().flatten().map(str::to_string);
     if let (Some(a), Some(b)) = (local.get().target(), up.get().target()) {
-        if let Ok((ahead, behind)) = repo.graph_ahead_behind(a, b) {
-            info.ahead = ahead;
-            info.behind = behind;
-        }
+        (info.ahead, info.behind) = distance(repo, a, b);
     }
 }
 
@@ -242,13 +239,40 @@ fn tracking(repo: &Repository, full: &str, tip: git2::Oid) -> Option<Tracking> {
             gone: true,
         });
     };
-    let (ahead, behind) = repo.graph_ahead_behind(tip, there).unwrap_or((0, 0));
+    let (ahead, behind) = distance(repo, tip, there);
     Some(Tracking {
         name,
         ahead,
         behind,
         gone: false,
     })
+}
+
+/// Commits `tip` has that `there` hasn't, and the other way round. Remembered
+/// by the pair (commit ids never change meaning), so a refresh with hundreds of
+/// tracked branches only walks the ones that moved.
+fn distance(repo: &Repository, tip: git2::Oid, there: git2::Oid) -> (usize, usize) {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    type Pairs = HashMap<(git2::Oid, git2::Oid), (usize, usize)>;
+    static SEEN: OnceLock<Mutex<Pairs>> = OnceLock::new();
+    if tip == there {
+        return (0, 0);
+    }
+    let seen = SEEN.get_or_init(Default::default);
+    if let Some(d) = seen.lock().ok().and_then(|m| m.get(&(tip, there)).copied()) {
+        return d;
+    }
+    let Ok(d) = repo.graph_ahead_behind(tip, there) else {
+        return (0, 0);
+    };
+    if let Ok(mut m) = seen.lock() {
+        if m.len() > 4096 {
+            m.clear();
+        }
+        m.insert((tip, there), d);
+    }
+    d
 }
 
 fn read_remotes(repo: &Repository) -> Vec<RemoteInfo> {
