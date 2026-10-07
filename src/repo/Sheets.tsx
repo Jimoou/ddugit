@@ -15,19 +15,18 @@ import { Rich } from "../i18n/Rich";
 import type { CommitInfo, TodoItem } from "../types";
 import { askName, askReset, confirmThen, deleteBranches, richBody, showCommit } from "./actions";
 import { discardHunk, stageFiles } from "./changes";
+import { openCompare } from "./compare";
 import { closeSheet, type Repo, type Sheet } from "./state";
-import type { useSheet } from "./useSheet";
 
 interface Props {
   repo: Repo;
   sheet: Sheet | null;
   conflict: { file?: string } | null;
   rebase: { commits: CommitInfo[]; todo: TodoItem[] | null } | null;
-  loadDiff: ReturnType<typeof useSheet>["loadDiff"];
   askRemote(): void;
 }
 
-export function RepoSheets({ repo, sheet, conflict, rebase, loadDiff, askRemote }: Props) {
+export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) {
   const { path, snap, busy, run, commitById } = repo;
   const backportTargets = useMemo(() => snap.refs.filter((r) => r.kind === "local").map((r) => r.name), [snap]);
   /** Select a commit the sheet points at (when it is loaded) and fly to it. */
@@ -208,7 +207,7 @@ export function RepoSheets({ repo, sheet, conflict, rebase, loadDiff, askRemote 
               ? {
                   scope: source.scope,
                   busy,
-                  onScope: (scope) => loadDiff({ kind: "worktree", scope }, sheet.title, sheet.path),
+                  onScope: (scope) => repo.loadDiff({ kind: "worktree", scope }, sheet.title, sheet.path),
                   onHunk: (file, hunk, lines) =>
                     void run(staged ? t("stage.unstaged") : t("stage.staged"), () =>
                       api.stageHunks(path, file, [hunkKey(file, hunk)], staged, lines),
@@ -216,6 +215,15 @@ export function RepoSheets({ repo, sheet, conflict, rebase, loadDiff, askRemote 
                   onDiscard: (file, hunk, lines) => discardHunk(repo, file, hunkKey(file, hunk), lines),
                   onFile: (file) => void stageFiles(repo, [file], staged),
                   onAll: () => void stageFiles(repo, [], staged),
+                }
+              : undefined
+          }
+          compare={
+            source.kind === "range"
+              ? {
+                  mergeBase: source.mergeBase,
+                  onMergeBase: (mergeBase) => openCompare(repo, source.from, source.to, mergeBase),
+                  onSwap: () => openCompare(repo, source.to, source.from, source.mergeBase),
                 }
               : undefined
           }

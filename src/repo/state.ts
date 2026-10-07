@@ -42,7 +42,17 @@ export type Run = (
   quiet?: boolean,
 ) => Promise<OpResult>;
 
-export type DiffSource = { kind: "commit"; id: string } | { kind: "worktree"; scope: "unstaged" | "staged" };
+/** One side of a comparison: a commit, and the name it is shown by (a branch, `HEAD`, a short id). */
+export interface CompareSide {
+  id: string;
+  name: string;
+}
+
+export type DiffSource =
+  | { kind: "commit"; id: string }
+  | { kind: "worktree"; scope: "unstaged" | "staged" }
+  /** `from` → `to`; with `mergeBase`, from where the two went apart (what `to` adds). Read-only. */
+  | { kind: "range"; from: CompareSide; to: CompareSide; mergeBase: boolean };
 
 /** The sheet under the graph; opening one replaces the last. (The conflict sheet goes over it, see `Repo.setConflict`.) */
 export type Sheet =
@@ -88,6 +98,8 @@ export interface Repo {
   stacks: StackBranch[];
   bisect: BisectState | null;
   bisectDraft: BisectDraft | null;
+  /** A commit picked to compare with the next one picked ("Select for compare"). */
+  compareBase: CompareSide | null;
   /** Local branches checked out in another worktree → that folder. */
   elsewhere: Record<string, string>;
   /** The commit shown in the panel. */
@@ -116,6 +128,9 @@ export interface Repo {
   /** Open the conflict sheet over the current one (at `file`, else the first). */
   setConflict(c: { file?: string } | null): void;
   setBisectDraft(d: BisectDraft | null): void;
+  setCompareBase(c: CompareSide | null): void;
+  /** Open the diff sheet on `source` (at `file`, else its first file). */
+  loadDiff(source: DiffSource, title: string, file?: string): void;
   setTrail(t: { file: string; touches: FileTouch[] } | null): void;
   play(e: Effect): void;
   /** Play an effect once the new snapshot is drawn and the camera has come to rest. */

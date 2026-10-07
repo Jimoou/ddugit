@@ -18,7 +18,16 @@ interface Props {
   initialPath?: string;
   /** Present for working-tree diffs: switch scope and (un)stage single hunks. */
   stage?: Staging;
+  /** Present when comparing two revisions (read-only): which base, and swapping the sides. */
+  compare?: Comparing;
   onClose(): void;
+}
+
+interface Comparing {
+  /** From where the two went apart (what the second side adds), else tip to tip. */
+  mergeBase: boolean;
+  onMergeBase(mergeBase: boolean): void;
+  onSwap(): void;
 }
 
 interface Staging {
@@ -51,7 +60,7 @@ const MIN_H = 160;
 const FILE_H = 24;
 
 /** Bottom sheet under the graph: file list on the left, unified diff on the right. */
-export function DiffSheet({ title, files, error, initialPath, stage, onClose }: Props) {
+export function DiffSheet({ title, files, error, initialPath, stage, compare, onClose }: Props) {
   const [path, setPath] = useState<string | undefined>(initialPath);
   const [height, setHeight] = useState(() => Math.round(window.innerHeight * 0.45));
   const drag = useRef<{ y: number; h: number } | null>(null);
@@ -111,7 +120,7 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
       />
       <header>
         <div className="title">
-          <h2 className="dialog-title">{t("diff.title")}</h2>
+          <h2 className="dialog-title">{compare ? t("compare.title") : t("diff.title")}</h2>
           <b>{title}</b>
           {files && (
             <span className="muted">
@@ -136,6 +145,23 @@ export function DiffSheet({ title, files, error, initialPath, stage, onClose }: 
           <button disabled={stage.busy || !files?.length} onClick={stage.onAll}>
             {t(stage.scope === "unstaged" ? "diff.stageAll" : "diff.unstageAll")}
           </button>
+        )}
+        {compare && (
+          <>
+            <Segmented
+              role="tablist"
+              label={t("compare.title")}
+              value={compare.mergeBase ? "base" : "tips"}
+              onChange={(v) => compare.onMergeBase(v === "base")}
+              options={[
+                { value: "base", label: t("compare.mergeBase") },
+                { value: "tips", label: t("compare.tips") },
+              ]}
+            />
+            <button className="icon" onClick={compare.onSwap} title={t("compare.swap")} aria-label={t("compare.swap")}>
+              <Icon name="pull" />
+            </button>
+          </>
         )}
         <span className="muted keys">
           <Rich k="diff.keys" />

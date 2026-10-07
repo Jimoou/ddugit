@@ -73,6 +73,10 @@ export const demoControls = {
   goneBranches: [] as string[],
   /** Folder the next "choose folder" dialog returns (default: the demo repository). */
   nextFolder: null as string | null,
+  /** Where the next save dialog saves (`null`: cancelled; unset: `/work/<suggested name>`). */
+  nextSave: undefined as string | null | undefined,
+  /** Files saved as a commit had them (`save_file`), oldest first. */
+  saved: [] as { rev: string; file: string; dest: string }[],
   /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */
   conflictNext: false,
   /** The next conflict also stops on a binary file (`assets/logo.png`), resolved by picking a side. */

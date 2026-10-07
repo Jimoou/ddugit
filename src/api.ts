@@ -162,6 +162,7 @@ export interface Commands {
   open_url: [{ path: string; url: string }, null];
   file_log: [{ path: string; rev: string; file: string }, FileTouch[]];
   git_blame: [{ path: string; rev: string; file: string }, Blame];
+  save_file: [{ path: string; rev: string; file: string; dest: string }, OpResult];
   git_discard: [{ path: string; paths: string[] }, OpResult];
   git_stash_push: [{ path: string; message: string; paths: string[]; options: StashOptions }, OpResult];
   git_stash_branch: [{ path: string; id: string; name: string }, OpResult];
@@ -169,6 +170,7 @@ export interface Commands {
   conflict_file: [{ path: string; file: string }, ConflictFile];
   git_resolve: [{ path: string; file: string; how: Resolution }, OpResult];
   commit_diff: [{ path: string; id: string }, FileDiff[]];
+  range_diff: [{ path: string; from: string; to: string; mergeBase: boolean }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
   /** `git --version` of the git in use; rejects when it can't run (not installed, not on PATH). */
@@ -351,6 +353,8 @@ export const api = {
   fileLog: (path: string, rev: string, file: string) => call("file_log", { path, rev, file }),
   /** Who last changed each line of `file` as of `rev`. */
   blame: (path: string, rev: string, file: string) => call("git_blame", { path, rev, file }),
+  /** Write `file` as `rev` has it to `dest` (from `pickSaveFile`). */
+  saveFile: (path: string, rev: string, file: string, dest: string) => call("save_file", { path, rev, file, dest }),
   discard: (path: string, paths: string[]) => call("git_discard", { path, paths }),
   stashPush: (path: string, message: string, paths: string[], options: StashOptions) =>
     call("git_stash_push", { path, message, paths, options }),
@@ -371,6 +375,9 @@ export const api = {
     diffCache.set(key, load);
     return load;
   },
+  /** Changes from `from` to `to` (commit ids); with `mergeBase`, from where the two went apart. */
+  rangeDiff: (path: string, from: string, to: string, mergeBase: boolean) =>
+    call("range_diff", { path, from, to, mergeBase }),
   /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
   gitVersion: () => call("git_version", {}),
@@ -406,6 +413,16 @@ export const api = {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ multiple: false, title, filters: [{ name: "Git bundle", extensions: ["bundle"] }] });
     return typeof r === "string" ? r : null;
+  },
+  /** Where to save a file, starting from `name` (the demo answers `/work/<name>` unless told otherwise). */
+  async pickSaveFile(title: string, name: string): Promise<string | null> {
+    if (!isTauri) {
+      const next = demoControls.nextSave;
+      demoControls.nextSave = undefined;
+      return next === undefined ? `/work/${name}` : next;
+    }
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    return save({ title, defaultPath: name });
   },
   async pickFolder(title = t("app.open")): Promise<string | null> {
     if (!isTauri) {

@@ -1019,6 +1019,18 @@ export const en: Record<Key, string> = {
   "file.restore.here": "Restore file to this commit",
   "file.restore.before": "Restore file to before this commit",
   "file.restored": "Restored {file}; the change is staged",
+  "file.saveAs": "Save this version as…",
+  "file.saveAs.title": "Save this version",
+  "file.saved": "Saved to {dest}",
+  "compare.title": "Compare",
+  "compare.withHead": "Compare with {name}",
+  "compare.hint": "diff",
+  "compare.pick": "Select for compare",
+  "compare.withPicked": "Compare with selected {sha}",
+  "compare.banner": "Comparing from <b>{sha}</b> {summary} · right-click the other commit to compare",
+  "compare.mergeBase": "Since they split",
+  "compare.tips": "Tip to tip",
+  "compare.swap": "Swap sides",
 
   // edit: pushed
   "edit.pushed": "Pushed commits will be rewritten. Pushing again will require a force push.",

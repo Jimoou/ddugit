@@ -1,5 +1,5 @@
-// Banners over the graph: a bisect hunt, a file's trail through history, and an operation
-// in progress (merge, rebase, pick, revert) with its continue / skip / cancel.
+// Banners over the graph: a bisect hunt, a file's trail through history, a commit picked to
+// compare, and an operation in progress (merge, rebase, pick, revert) with its continue / skip / cancel.
 
 import { api } from "../api";
 import { Icon } from "../components/Icon";
@@ -7,7 +7,8 @@ import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { FileTouch } from "../types";
 import { showCommit } from "./actions";
-import type { Repo } from "./state";
+import { headSide, openCompare } from "./compare";
+import type { CompareSide, Repo } from "./state";
 
 export function BisectBanner({ repo }: { repo: Repo }) {
   const { bisect, bisectDraft, busy, commitById } = repo;
@@ -119,6 +120,30 @@ export function TrailBanner({ repo, trail }: { repo: Repo; trail: { file: string
           {t("history.blame.short")}
         </button>
         <button onClick={() => repo.setTrail(null)}>{t("common.close")}</button>
+      </span>
+    </div>
+  );
+}
+
+/** A commit picked to compare with: say how to pick the other one, or compare it with HEAD. */
+export function CompareBanner({ repo, base }: { repo: Repo; base: CompareSide }) {
+  const head = headSide(repo);
+  return (
+    <div className="banner compare-banner">
+      <span>
+        <Rich k="compare.banner" vars={{ sha: base.name, summary: repo.commitById.get(base.id)?.summary ?? "" }} />
+      </span>
+      <span className="row">
+        <button
+          disabled={!head || head.id === base.id}
+          onClick={() => {
+            repo.setCompareBase(null);
+            if (head) openCompare(repo, base, head, false);
+          }}
+        >
+          {t("compare.withHead", { name: "HEAD" })}
+        </button>
+        <button onClick={() => repo.setCompareBase(null)}>{t("common.cancel")}</button>
       </span>
     </div>
   );

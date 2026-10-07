@@ -40,6 +40,7 @@ import {
   showCommit,
   undoLastCommit,
 } from "./actions";
+import { compareNodeItems, compareRefItem, saveVersionItem } from "./compare";
 import type { Repo } from "./state";
 import { splitRemote } from "./useRemote";
 
@@ -155,7 +156,7 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
     disabled: isHead || r.kind === "tag" || !repo.canDropOn(r.target, snap.head.target ?? "", "rebase"),
     onSelect: () => askRebaseOnto(repo, r.name, r.target),
   };
-  const compare: MenuItem = {
+  const backport: MenuItem = {
     label: snap.head.branch ? t("menu.compare", { branch: snap.head.branch }) : t("menu.compareHead"),
     hint: t("menu.compare.hint"),
     disabled: !snap.head.branch || isHead,
@@ -200,7 +201,8 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
       },
       merge,
       rebaseOnto,
-      compare,
+      compareRefItem(repo, r),
+      backport,
       "separator",
       { label: t("menu.branchHere"), onSelect: () => askBranchAt(repo, r.target) },
       "separator",
@@ -223,7 +225,8 @@ export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
     },
     merge,
     rebaseOnto,
-    compare,
+    compareRefItem(repo, r),
+    backport,
     {
       label: t("pr.new", { noun: nounOf(repo.pulls?.forges ?? []) }),
       icon: "pull",
@@ -327,11 +330,13 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
       onSelect: () => repo.setSheet({ kind: "rebase", from: id, init: null }),
     },
     "separator" as const,
+    ...compareNodeItems(repo, id),
+    "separator" as const,
     { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => copyText(id) },
   ];
 }
 
-/** A commit's changed file: put it back as this commit (or its parent) had it, or follow its history. */
+/** A commit's changed file: put it back as this commit (or its parent) had it, follow its history, or save a copy. */
 export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem[] {
   const restore = (rev: string) =>
     void repo.run(t("file.restored", { file }), () => api.restoreFile(repo.path, rev, file));
@@ -348,6 +353,8 @@ export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem
       hint: "blame",
       onSelect: () => repo.setSheet({ kind: "blame", rev: commit.id, file }),
     },
+    "separator",
+    saveVersionItem(repo, commit, file),
   ];
 }
 

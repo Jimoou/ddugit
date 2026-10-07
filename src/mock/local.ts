@@ -254,6 +254,16 @@ export const localCommands = {
     return delay(files.map((f, i) => fakeFile(f, h + i, c.summary, status(i))));
   },
 
+  range_diff({ from, to, mergeBase }) {
+    const unknown = [from, to].find((id) => !repo.commits.has(id));
+    if (unknown) return fail(`Unknown commit ${unknown}`);
+    // The files the commits between the two touched (from the merge base: only `to`'s side).
+    const [a, b] = [repo.ancestors(from), repo.ancestors(to)];
+    const between = [...b].filter((id) => !a.has(id)).concat(mergeBase ? [] : [...a].filter((id) => !b.has(id)));
+    const files = [...new Set(between.flatMap(filesOf))].sort();
+    return delay(files.map((f) => fakeFile(f, hash(f + from + to), `${from.slice(0, 7)} → ${to.slice(0, 7)}`)));
+  },
+
   worktree_diff({ file, scope }) {
     const inScope = (c: FileChange) => scope === "all" || (scope === "staged" ? !!c.staged : !!c.unstaged);
     const list = repo.changes.filter((c) => (!file || c.path === file) && inScope(c));

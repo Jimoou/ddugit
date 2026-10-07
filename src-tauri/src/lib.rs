@@ -248,6 +248,10 @@ command!(conflict_file(path: String, file: String) -> ConflictFile => git::confl
 command!(git_resolve(path: String, file: String, how: Resolution) -> OpResult
     => git::conflict::resolve(&path, &file, &how));
 command!(commit_diff(path: String, id: String) -> Vec<FileDiff> => git::diff::commit_diff(&path, &id));
+command!(range_diff(path: String, from: String, to: String, merge_base: bool) -> Vec<FileDiff>
+    => git::diff::range_diff(&path, &from, &to, merge_base));
+command!(save_file(path: String, rev: String, file: String, dest: String) -> OpResult
+    => git::history::save_file(&path, &rev, &file, &dest));
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref(), scope));
 
@@ -385,6 +389,8 @@ pub fn run() {
             conflict_file,
             git_resolve,
             commit_diff,
+            range_diff,
+            save_file,
             worktree_diff,
         ])
         .run(tauri::generate_context!())

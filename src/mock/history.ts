@@ -327,6 +327,12 @@ export const historyCommands = {
 
   bisect_state: () => delay(repo.bisect ? mockBisect() : null),
   file_log: fileLog,
+  async save_file({ path, rev, file, dest }) {
+    if (!(await fileLog({ path, rev, file })).length) return fail(`'${file}' is not in ${rev.slice(0, 7)}`);
+    if (dest.split(/[\\/]/).includes(".git")) return fail(`Can't save into a .git folder: ${dest}`);
+    demoControls.saved.push({ rev, file, dest });
+    return delay(res("ok", dest));
+  },
   async git_blame({ path, rev, file }) {
     const touches = await fileLog({ path, rev, file });
     if (!touches.length) return fail(`'${file}' is not in ${rev.slice(0, 7)}`);

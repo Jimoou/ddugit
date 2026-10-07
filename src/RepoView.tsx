@@ -55,7 +55,7 @@ import {
   stageFiles,
   stashMenu,
 } from "./repo/changes";
-import { BisectBanner, StateBanner, TrailBanner } from "./repo/Banners";
+import { BisectBanner, CompareBanner, StateBanner, TrailBanner } from "./repo/Banners";
 import { RepoDialogs } from "./repo/Dialogs";
 import {
   branchesMenu,
@@ -71,7 +71,7 @@ import {
   worktreeMenu,
 } from "./repo/menus";
 import { RepoSheets } from "./repo/Sheets";
-import type { Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
+import type { CompareSide, Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
 import { useBisect } from "./repo/useBisect";
 import { useRemote } from "./repo/useRemote";
 import { useRun } from "./repo/useRun";
@@ -147,6 +147,7 @@ export function RepoView({
   const [tokenFor, setTokenFor] = useState<TokenForge | null>(null);
   /** File history: the commits that touched one file, drawn as a constellation. */
   const [trail, setTrail] = useState<{ file: string; touches: FileTouch[] } | null>(null);
+  const [compareBase, setCompareBase] = useState<CompareSide | null>(null);
   const [zoom, setZoom] = useState(1);
   const [search, setSearch] = useState<{ query: string; index: number } | null>(null);
   const animate = settings.animate;
@@ -390,6 +391,7 @@ export function RepoView({
     stacks,
     bisect: bisect.bisect,
     bisectDraft: bisect.draft,
+    compareBase,
     elsewhere,
     selected,
     colorOf,
@@ -405,6 +407,8 @@ export function RepoView({
     setSheet,
     setConflict,
     setBisectDraft: bisect.setDraft,
+    setCompareBase,
+    loadDiff,
     setTrail,
     play,
     playAfterDraw,
@@ -464,6 +468,7 @@ export function RepoView({
 
       <BisectBanner repo={repo} />
       {trail && <TrailBanner repo={repo} trail={trail} />}
+      {compareBase && <CompareBanner repo={repo} base={compareBase} />}
       <StateBanner repo={repo} />
 
       <div className="main">
@@ -689,14 +694,7 @@ export function RepoView({
             </div>
           </div>
 
-          <RepoSheets
-            repo={repo}
-            sheet={sheet}
-            conflict={conflict}
-            rebase={rebase}
-            loadDiff={loadDiff}
-            askRemote={remote.askRemote}
-          />
+          <RepoSheets repo={repo} sheet={sheet} conflict={conflict} rebase={rebase} askRemote={remote.askRemote} />
         </section>
 
         {composer && (

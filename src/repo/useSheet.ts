@@ -28,7 +28,11 @@ export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Ma
       if (!path) return;
       const req = ++diffReq.current;
       const load =
-        source.kind === "commit" ? api.commitDiff(path, source.id) : api.worktreeDiff(path, null, source.scope);
+        source.kind === "commit"
+          ? api.commitDiff(path, source.id)
+          : source.kind === "range"
+            ? api.rangeDiff(path, source.from.id, source.to.id, source.mergeBase)
+            : api.worktreeDiff(path, null, source.scope);
       const land = (files: Awaited<typeof load>, error: string | null) =>
         req === diffReq.current && setSheet((s) => (s?.kind === "diff" ? { ...s, files, error: error ?? s.error } : s));
       load.then(

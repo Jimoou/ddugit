@@ -1002,6 +1002,18 @@ export const ko = {
   "file.restore.here": "이 파일을 이 커밋 상태로 복원",
   "file.restore.before": "이 파일을 이 커밋 이전 상태로 복원",
   "file.restored": "{file:을} 복원했어요. 스테이지에 올라가 있어요",
+  "file.saveAs": "이 버전을 다른 이름으로 저장…",
+  "file.saveAs.title": "이 버전 저장",
+  "file.saved": "{dest}에 저장했어요",
+  "compare.title": "비교",
+  "compare.withHead": "{name:과} 비교",
+  "compare.hint": "diff",
+  "compare.pick": "비교할 커밋으로 고르기",
+  "compare.withPicked": "골라 둔 {sha:과} 비교",
+  "compare.banner": "비교 기준 <b>{sha}</b> {summary} · 비교할 다른 커밋을 오른쪽 클릭하세요",
+  "compare.mergeBase": "갈라진 지점부터",
+  "compare.tips": "두 끝 그대로",
+  "compare.swap": "양쪽 바꾸기",
 
   // edit: pushed
   "edit.pushed": "이미 push한 커밋을 다시 써요. 다시 올리려면 강제 push가 필요해요.",
