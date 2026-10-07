@@ -11,6 +11,7 @@ import { ignoreChoices } from "../ignore";
 import type { CommitOptions, FileChange, StashInfo, StashOptions } from "../types";
 import { askName, confirmThen, richBody } from "./actions";
 import type { Repo } from "./state";
+import { difftoolItem, openItems } from "./outside";
 
 /** Close the diff sheet if it shows the working tree (its files just went away). */
 export const closeWorktreeDiff = (repo: Pick<Repo, "setSheet">) =>
@@ -152,6 +153,10 @@ export function changeMenu(repo: Repo, c: FileChange): MenuItem[] {
     "separator",
     { label: t("untrack.keep"), disabled: !tracked, onSelect: () => ignore(repo, null, c.path) },
     { label: t("untrack.ignore"), disabled: !tracked, onSelect: () => ignore(repo, file, c.path) },
+    "separator",
+    // Staged only: the index against HEAD; otherwise what is still unstaged.
+    difftoolItem(repo, { kind: "worktree", staged: !c.unstaged, file: c.path }, untracked || c.conflicted),
+    ...openItems(repo, c.path, c.unstaged === "deleted" || (!c.unstaged && c.staged === "deleted")),
   ];
 }
 

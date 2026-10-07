@@ -65,6 +65,9 @@ import type {
   SubmoduleOp,
   TodoItem,
   WorktreeOp,
+  OpenHow,
+  DiffTarget,
+  ToolSetup,
 } from "./types";
 import { t } from "./i18n";
 
@@ -176,6 +179,12 @@ export interface Commands {
   range_diff: [{ path: string; from: string; to: string; mergeBase: boolean }, FileDiff[]];
   worktree_diff: [{ path: string; file: string | null; scope: DiffScope }, FileDiff[]];
   set_git_path: [{ gitPath: string | null }, string];
+  open_in: [{ path: string; file: string | null; how: OpenHow }, null];
+  open_version: [{ path: string; rev: string; file: string; editor: string | null }, null];
+  check_editor: [{ program: string }, string];
+  tool_setup: [Record<string, never>, ToolSetup];
+  git_difftool: [{ path: string; target: DiffTarget; tool: string | null }, OpResult];
+  git_mergetool: [{ path: string; file: string; tool: string | null }, OpResult];
   /** `git --version` of the git in use; rejects when it can't run (not installed, not on PATH). */
   git_version: [Record<string, never>, string];
   app_info: [Record<string, never>, AppInfo];
@@ -387,6 +396,18 @@ export const api = {
   /** Use this git executable (blank: PATH). Resolves to its `git --version`, rejects if it isn't git. */
   setGitPath: (gitPath: string) => call("set_git_path", { gitPath: gitPath.trim() || null }),
   gitVersion: () => call("git_version", {}),
+  /** Show `file` (null: the repository's folder) in the file manager, its default app, a terminal or an editor. */
+  openIn: (path: string, file: string | null, how: OpenHow) => call("open_in", { path, file, how }),
+  /** Open `file` as `rev` has it (a read-only copy) in `editor`, else the default app. */
+  openVersion: (path: string, rev: string, file: string, editor: string | null) =>
+    call("open_version", { path, rev, file, editor }),
+  /** The editor `program` names, as the path it runs; rejects one that isn't allowed. */
+  checkEditor: (program: string) => call("check_editor", { program: program.trim() }),
+  toolSetup: () => call("tool_setup", {}),
+  /** Runs until the tool's window closes: not through `run()`, so other git work isn't held up. */
+  difftool: (path: string, target: DiffTarget, tool: string | null) => call("git_difftool", { path, target, tool }),
+  /** Like `difftool`; the conflict is resolved once the tool saved and git staged the file. */
+  mergetool: (path: string, file: string, tool: string | null) => call("git_mergetool", { path, file, tool }),
   /** App version, OS and architecture (problem reports). */
   appInfo: () => call("app_info", {}),
   /** Send a problem report or question to ddugit.com; resolves with its id, rejects with the reason. */

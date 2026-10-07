@@ -16,6 +16,8 @@ import type { CommitInfo, TodoItem } from "../types";
 import { askName, askReset, confirmThen, deleteBranches, richBody, showCommit } from "./actions";
 import { discardHunk, stageFiles } from "./changes";
 import { openCompare } from "./compare";
+import { openMenu } from "./menus";
+import { mergeInTool, openItems } from "./outside";
 import { closeSheet, type Repo, type Sheet } from "./state";
 
 interface Props {
@@ -43,6 +45,8 @@ export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) 
         initialFile={conflict.file}
         busy={busy}
         onResolve={(file, how) => void run(t("conflict.resolved", { file }), () => api.resolve(path, file, how))}
+        onMergeTool={(file) => mergeInTool(repo, file)}
+        onFileMenu={(file, x, y) => openMenu(repo, x, y, file, openItems(repo, file))}
         onClose={() => repo.setConflict(null)}
       />
     );

@@ -672,3 +672,20 @@ export interface NewReport {
   email: string | null;
   diagnostics: string | null;
 }
+
+/** Mirrors `OpenHow` in open.rs: how to open a path of the repository outside the app. */
+export type OpenHow =
+  { kind: "reveal" } | { kind: "default" } | { kind: "terminal" } | { kind: "editor"; program: string };
+
+/** Mirrors `DiffTarget` in git/tools.rs; no `file`: every file at once (`--dir-diff`). */
+export type DiffTarget =
+  { kind: "worktree"; staged: boolean; file: string | null } | { kind: "commit"; id: string; file: string | null };
+
+/** The diff and merge tools git is set up with (git/tools.rs `ToolSetup`). */
+export interface ToolSetup {
+  diff: string | null;
+  merge: string | null;
+  customDiff: string[];
+  customMerge: string[];
+  known: string[];
+}

@@ -1262,6 +1262,38 @@ export const ko = {
   "welcome.drop": "폴더를 이 창에 끌어다 놓아도 열려요.",
   "welcome.forges": "복제할 때 GitHub·GitLab 계정의 저장소 목록에서 고를 수 있어요.",
   "welcome.shortcuts": "단축키",
+  // opening things outside the app
+  "open.reveal.mac": "Finder에서 보기",
+  "open.reveal.win": "탐색기에서 보기",
+  "open.reveal.linux": "파일 관리자에서 보기",
+  "open.default": "기본 앱으로 열기",
+  "open.folder": "폴더 열기",
+  "open.terminal": "여기서 터미널 열기",
+  "open.editor": "{editor}에서 열기",
+  "open.repoEditor": "저장소를 {editor}에서 열기",
+  "open.version": "이 버전 열기",
+  "open.difftool": "비교 도구로 열기",
+  "open.difftool.all": "모든 변경을 비교 도구로 보기",
+  "open.mergetool": "병합 도구로 열기",
+  "open.mergetool.busy": "병합 도구 사용 중…",
+  "open.mergetool.done": "병합 도구로 {file:을} 해결했어요",
+  "open.mergetool.failed": "병합 도구가 충돌을 해결하지 못했어요: {error}",
+  "open.failed": "열지 못했어요: {error}",
+  "open.difftool.failed": "비교 도구를 열지 못했어요: {error}",
+  "open.repoMenu": "폴더·터미널·편집기에서 열기",
+  "settings.external": "외부 프로그램",
+  "settings.editor": "파일 열 프로그램",
+  "settings.editor.default": "시스템 기본 앱",
+  "settings.editor.custom": "직접 지정…",
+  "settings.editor.placeholder": "편집기 실행 파일의 전체 경로",
+  "settings.editor.hint":
+    "이름으로 고른 편집기는 PATH에서 찾아요. 셸·인터프리터나 저장소·임시 폴더 안의 프로그램은 쓸 수 없어요.",
+  "settings.diffTool": "외부 비교 도구",
+  "settings.mergeTool": "외부 병합 도구",
+  "settings.tool.git": "git 설정 따르기 ({tool})",
+  "settings.tool.gitNone": "git 설정 따르기 (설정 없음)",
+  "settings.tool.hint":
+    "<code>git difftool</code>·<code>git mergetool</code>로 열어요. git config에 <code>difftool.이름.cmd</code>로 만든 도구도 목록에 나와요.",
 } as const;
 
 export type Key = keyof typeof ko;

@@ -7,6 +7,7 @@ mod git;
 mod http;
 mod keychain;
 mod license;
+mod open;
 mod pro;
 mod proc;
 mod report;
@@ -254,6 +255,32 @@ command!(range_diff(path: String, from: String, to: String, merge_base: bool) ->
     => git::diff::range_diff(&path, &from, &to, merge_base));
 command!(save_file(path: String, rev: String, file: String, dest: String) -> OpResult
     => git::history::save_file(&path, &rev, &file, &dest));
+// Outside the app: a path inside the repository's work tree only (`open::inside`).
+command!(open_in(path: String, file: Option<String>, how: open::OpenHow) -> ()
+    => open::open(&path, file.as_deref(), &how));
+command!(check_editor(program: String) -> String
+    => open::editor(&program).map(|p| p.to_string_lossy().into_owned()));
+command!(tool_setup() -> git::tools::ToolSetup => Ok(git::tools::setup(None)));
+// These two wait for the tool's window to close: the UI doesn't queue them with other git work.
+command!(git_difftool(path: String, target: git::tools::DiffTarget, tool: Option<String>) -> OpResult
+    => git::tools::difftool(&path, &target, tool.as_deref()));
+command!(git_mergetool(path: String, file: String, tool: Option<String>) -> OpResult
+    => git::tools::mergetool(&path, &file, tool.as_deref()));
+
+/// Open `file` as commit `rev` has it: a read-only copy in the app's cache, in `editor` or the default app.
+#[tauri::command]
+async fn open_version(
+    app: tauri::AppHandle,
+    path: String,
+    rev: String,
+    file: String,
+    editor: Option<String>,
+) -> Result<(), String> {
+    use tauri::Manager;
+    let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    blocking(move || open::open_version(&cache, &path, &rev, &file, editor.as_deref())).await
+}
+
 command!(worktree_diff(path: String, file: Option<String>, scope: DiffScope) -> Vec<FileDiff>
     => git::diff::worktree_diff(&path, file.as_deref(), scope));
 
@@ -395,6 +422,12 @@ pub fn run() {
             range_diff,
             save_file,
             worktree_diff,
+            open_in,
+            open_version,
+            check_editor,
+            tool_setup,
+            git_difftool,
+            git_mergetool,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

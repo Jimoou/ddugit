@@ -96,6 +96,35 @@ export const appCommands = {
     if (gitPath && !/git(\.exe)?$/i.test(gitPath)) return fail(`'${gitPath}' is not a git executable`);
     return delay("git version 2.47.0 (demo)");
   },
+  open_in({ file, how }) {
+    // Nothing leaves the demo: note what would have opened (e2e reads `opened`).
+    if (file?.split("/").includes("..") || file?.split("/").includes(".git"))
+      return fail(`'${file}' is not a path inside the repository`);
+    demoControls.opened.push({ what: how.kind, file, with: how.kind === "editor" ? how.program : undefined });
+    return delay(null);
+  },
+  open_version({ rev, file, editor }) {
+    demoControls.opened.push({ what: "version", file: `${file}@${rev.slice(0, 7)}`, with: editor ?? undefined });
+    return delay(null);
+  },
+  check_editor({ program }) {
+    // Like `open::editor`: a known name, or a full path that isn't a shell.
+    const known = ["code", "cursor", "subl", "idea", "zed"];
+    const name = program.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+    if (/^(sh|bash|zsh|python\d*|node|cmd|powershell)(\.exe)?$/.test(name))
+      return fail(`'${program}' runs files instead of editing them`);
+    if (known.includes(program)) return delay(`/usr/local/bin/${program}`);
+    if (program.startsWith("/") || /^[A-Za-z]:\\/.test(program)) return delay(program);
+    return fail(`'${program}' is not an editor ddugit knows (give its full path)`);
+  },
+  tool_setup: () =>
+    delay({
+      diff: "meld",
+      merge: "meld",
+      customDiff: ["vscode"],
+      customMerge: ["vscode"],
+      known: ["kdiff3", "meld", "opendiff", "p4merge", "tortoisemerge", "winmerge"],
+    }),
   git_version() {
     if (demoControls.gitMissing) return fail("Can't run 'git': No such file or directory (os error 2)");
     return delay("git version 2.47.0 (demo)");

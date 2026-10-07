@@ -16,6 +16,10 @@ interface Props {
   initialFile?: string;
   busy: boolean;
   onResolve(file: string, how: Resolution): void;
+  /** Resolve the file in the external merge tool; settles when the tool is closed. */
+  onMergeTool(file: string): Promise<void>;
+  /** A file's right-click menu (open it outside the app). */
+  onFileMenu(file: string, x: number, y: number): void;
   onClose(): void;
 }
 
@@ -30,7 +34,8 @@ const SIDES: Record<string, [ours: Key, theirs: Key]> = {
 };
 
 /** Bottom sheet for resolving conflicts block by block (or a whole file at once). */
-export function ConflictSheet({ path, files, state, initialFile, busy, onResolve, onClose }: Props) {
+export function ConflictSheet(props: Props) {
+  const { path, files, state, initialFile, busy, onResolve, onClose } = props;
   const [wanted, setFile] = useState(initialFile ?? files[0]);
   // Move on when the current file gets resolved.
   const file = wanted && files.includes(wanted) ? wanted : files[0];
@@ -47,6 +52,13 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
   const chosen = picks.filter(Boolean).length;
   let blockNo = -1;
 
+  // The file open in the merge tool, until it is closed there.
+  const [inTool, setInTool] = useState<string | null>(null);
+  const mergeTool = (f: string) => {
+    setInTool(f);
+    void props.onMergeTool(f).finally(() => setInTool(null));
+  };
+
   const sheet = useDialog(onClose, false);
   return (
     <section className="diff-sheet conflict-sheet" style={{ height: "55vh" }} {...sheet}>
@@ -56,6 +68,11 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
           <b>{file ?? t("cf.allResolved")}</b>
           <span className="muted">{t("cf.left", { n: files.length })}</span>
         </div>
+        {file && (
+          <button disabled={busy || !!inTool} onClick={() => mergeTool(file)}>
+            {inTool ? t("open.mergetool.busy") : t("open.mergetool")}
+          </button>
+        )}
         {data && !data.binary && (
           <div className="row">
             <button disabled={busy} onClick={() => onResolve(file!, { kind: "ours" })}>
@@ -75,7 +92,15 @@ export function ConflictSheet({ path, files, state, initialFile, busy, onResolve
         <ul className="file-list">
           {files.length === 0 && <li className="muted pad">{t("cf.done")}</li>}
           {files.map((f) => (
-            <li key={f} className={f === file ? "on" : ""} onClick={() => setFile(f)}>
+            <li
+              key={f}
+              className={f === file ? "on" : ""}
+              onClick={() => setFile(f)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                props.onFileMenu(f, e.clientX, e.clientY);
+              }}
+            >
               <span className="chip k-conflict">!</span>
               <span className="path">{f}</span>
             </li>

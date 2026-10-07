@@ -3,10 +3,12 @@
 
 import type { Turn } from "./graph/renderer";
 import type { Key, LanguagePref } from "./i18n";
+import { type ExternalApps, parseExternal } from "./external";
 import { parseProfiles } from "./identity";
 import type { Profile } from "./types";
 
-export interface Settings {
+/** With the editor and diff / merge tools to open things in (`external.ts`). */
+export interface Settings extends ExternalApps {
   /** Sparkles flowing along edges and node birth bursts. */
   animate: boolean;
   /** The galaxy (nebulae, stars) behind the graph and the home screen; off is a plain dark backdrop. */
@@ -47,6 +49,9 @@ export function defaults(reducedMotion = false): Settings {
     closedSections: [],
     confirmRemote: { fetch: false, pull: true, push: true },
     profiles: [],
+    editor: "",
+    diffTool: "",
+    mergeTool: "",
   };
 }
 
@@ -85,6 +90,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
         : base.closedSections,
     confirmRemote: parseConfirm(o.confirmRemote, base.confirmRemote),
     profiles: parseProfiles(o.profiles) ?? base.profiles,
+    ...parseExternal(o, base),
   };
 }
 

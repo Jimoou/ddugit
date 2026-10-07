@@ -75,6 +75,12 @@ export const demoControls = {
   nextFolder: null as string | null,
   /** Where the next save dialog saves (`null`: cancelled; unset: `/work/<suggested name>`). */
   nextSave: undefined as string | null | undefined,
+  /** What was opened outside the app (file manager, default app, terminal, editor, diff and merge tools), oldest first. */
+  opened: [] as { what: string; file: string | null; with?: string }[],
+  /** Make the next merge tool give up without resolving (as if closed unsaved). */
+  mergetoolFails: false,
+  /** The merge tool's window stays open (the call doesn't return) until this is cleared. */
+  mergetoolOpen: false,
   /** Files saved as a commit had them (`save_file`), oldest first. */
   saved: [] as { rev: string; file: string; dest: string }[],
   /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */

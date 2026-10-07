@@ -240,6 +240,23 @@ export const localCommands = {
     return delay(res("ok"));
   },
 
+  git_difftool({ target, tool }) {
+    demoControls.opened.push({ what: `difftool:${target.kind}`, file: target.file, with: tool ?? undefined });
+    return delay(res("ok"));
+  },
+  async git_mergetool({ file, tool }) {
+    demoControls.opened.push({ what: "mergetool", file, with: tool ?? undefined });
+    const c = repo.changes.find((x) => x.path === file && x.conflicted);
+    if (!c) return fail(`'${file}' is not in conflict`);
+    while (demoControls.mergetoolOpen) await delay(null, 50);
+    if (demoControls.mergetoolFails) {
+      demoControls.mergetoolFails = false;
+      return delay(res("failed", `'${file}' is still in conflict`));
+    }
+    Object.assign(c, { conflicted: false, staged: "modified", unstaged: null });
+    return delay(res("ok"));
+  },
+
   commit_diff({ id }) {
     const st = repo.stashes.find((x) => x.id === id);
     if (st)

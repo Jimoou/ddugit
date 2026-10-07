@@ -41,6 +41,7 @@ import {
   undoLastCommit,
 } from "./actions";
 import { compareNodeItems, compareRefItem, saveVersionItem } from "./compare";
+import { difftoolItem, openItems, versionItem } from "./outside";
 import type { Repo } from "./state";
 import { splitRemote } from "./useRemote";
 
@@ -331,12 +332,13 @@ export function nodeMenu(repo: Repo, id: string): MenuItem[] {
     },
     "separator" as const,
     ...compareNodeItems(repo, id),
+    difftoolItem(repo, { kind: "commit", id, file: null }),
     "separator" as const,
     { label: t("menu.copySha"), hint: id.slice(0, 7), onSelect: () => copyText(id) },
   ];
 }
 
-/** A commit's changed file: put it back as this commit (or its parent) had it, follow its history, or save a copy. */
+/** A commit's changed file: put it back as this commit (or its parent) had it, follow its history, open or save a copy, or open the file itself. */
 export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem[] {
   const restore = (rev: string) =>
     void repo.run(t("file.restored", { file }), () => api.restoreFile(repo.path, rev, file));
@@ -354,7 +356,11 @@ export function fileMenu(repo: Repo, commit: CommitInfo, file: string): MenuItem
       onSelect: () => repo.setSheet({ kind: "blame", rev: commit.id, file }),
     },
     "separator",
+    versionItem(repo, commit, file),
     saveVersionItem(repo, commit, file),
+    difftoolItem(repo, { kind: "commit", id: commit.id, file }),
+    "separator",
+    ...openItems(repo, file),
   ];
 }
 

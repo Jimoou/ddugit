@@ -8,6 +8,7 @@ import type { EditMode } from "../components/EditCommit";
 import type { Effect } from "../components/Fx";
 import type { NameRequest } from "../components/NameDialog";
 import type { GraphHandle } from "../graph/GraphCanvas";
+import type { ExternalApps } from "../external";
 import type { Drag } from "../graph/renderer";
 import type { Pt } from "../graph/scene";
 import type { MissionId } from "../missions";
@@ -109,6 +110,10 @@ export interface Repo {
   graph(): GraphHandle | null;
   toast: Toast;
   run: Run;
+  /** Read the repository again (after work that doesn't go through `run`). */
+  refresh(): void;
+  /** The editor and diff / merge tools from the settings. */
+  external: ExternalApps;
   stackRun(label: string, op: StackOp): Promise<void>;
   /** The right panel shows one thing: composer, a stash, or a commit. */
   show(what: {

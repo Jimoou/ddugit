@@ -133,23 +133,34 @@ pub fn blame(path: &str, rev: &str, file: &str) -> Result<Blame> {
 /// repository's git directory, where a file would rewrite refs, hooks or config.
 pub fn save_file(path: &str, rev: &str, file: &str, dest: &str) -> Result<OpResult> {
     let repo = open(path)?;
-    let commit = repo
-        .revparse_single(rev)
-        .and_then(|o| o.peel_to_commit())
-        .map_err(err)?;
-    let entry = commit
-        .tree()
-        .and_then(|t| t.get_path(Path::new(file)))
-        .map_err(|_| format!("'{file}' is not in {}", short(&commit.id().to_string())))?;
-    let blob = repo
-        .find_blob(entry.id())
-        .map_err(|_| format!("'{file}' is not a file"))?;
+    let (_, content) = blob_in(&repo, rev, file)?;
     let target = save_target(&repo, Path::new(dest))?;
-    std::fs::write(&target, blob.content()).map_err(|e| format!("Can't write {dest}: {e}"))?;
+    std::fs::write(&target, content).map_err(|e| format!("Can't write {dest}: {e}"))?;
     Ok(OpResult {
         status: OpStatus::Ok,
         output: dest.to_string(),
     })
+}
+
+/// `file` as commit `rev` has it: the commit's full id and the file's bytes.
+pub fn blob_at(path: &str, rev: &str, file: &str) -> Result<(String, Vec<u8>)> {
+    blob_in(&open(path)?, rev, file)
+}
+
+fn blob_in(repo: &git2::Repository, rev: &str, file: &str) -> Result<(String, Vec<u8>)> {
+    let commit = repo
+        .revparse_single(rev)
+        .and_then(|o| o.peel_to_commit())
+        .map_err(err)?;
+    let id = commit.id().to_string();
+    let entry = commit
+        .tree()
+        .and_then(|t| t.get_path(Path::new(file)))
+        .map_err(|_| format!("'{file}' is not in {}", short(&id)))?;
+    let blob = repo
+        .find_blob(entry.id())
+        .map_err(|_| format!("'{file}' is not a file"))?;
+    Ok((id, blob.content().to_vec()))
 }
 
 /// Where `dest` really lands (symlinks followed), refused inside any `.git`.

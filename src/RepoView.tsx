@@ -63,6 +63,7 @@ import {
 } from "./repo/menus";
 import { RepoSheets } from "./repo/Sheets";
 import type { CompareSide, Dialog, Menu, Repo, Sheet, Toast } from "./repo/state";
+import { repoOpenMenu } from "./repo/outside";
 import { useBisect } from "./repo/useBisect";
 import { useRemote } from "./repo/useRemote";
 import { useRun } from "./repo/useRun";
@@ -378,6 +379,8 @@ export function RepoView({
     graph: () => graph.current,
     toast,
     run,
+    refresh: () => void refresh(),
+    external: { editor: settings.editor, diffTool: settings.diffTool, mergeTool: settings.mergeTool },
     stackRun,
     show,
     setMenu,
@@ -442,6 +445,7 @@ export function RepoView({
           onBranches={(x, y) => openMenu(repo, x, y, t("top.branches"), branchesMenu(repo))}
           onCompose={() => show({ composer: true })}
           onUndoHistory={() => toggleSheet({ kind: "reflog" })}
+          onOpenMenu={(x, y) => openMenu(repo, x, y, t("open.repoMenu"), repoOpenMenu(repo))}
           onRemote={remote.onRemote}
         />
       )}

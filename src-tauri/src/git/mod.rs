@@ -27,6 +27,7 @@ pub mod stack;
 pub mod stage;
 pub mod stash;
 pub mod submodule;
+pub mod tools;
 pub mod transfer;
 pub mod undo;
 pub mod watch;
@@ -111,6 +112,18 @@ fn workdir(repo: &Repository) -> Result<PathBuf> {
 
 fn repo_dir(path: &str) -> Result<PathBuf> {
     workdir(&open(path)?)
+}
+
+/// The repository at `path`: its work tree and its git folders (`.git`, and the
+/// common one of a linked worktree), all canonical.
+pub(crate) fn layout(path: &str) -> Result<(PathBuf, Vec<PathBuf>)> {
+    let repo = open(path)?;
+    let root = workdir(&repo)?.canonicalize().map_err(err)?;
+    let git_dirs = [repo.path(), repo.commondir()]
+        .iter()
+        .filter_map(|p| p.canonicalize().ok())
+        .collect();
+    Ok((root, git_dirs))
 }
 
 fn state_name(s: RepositoryState) -> &'static str {
@@ -216,16 +229,25 @@ fn check_git_path(program: &str) -> Result<()> {
         ));
     }
     let real = p.canonicalize().map_err(err)?;
-    if in_temp(&real) {
-        return Err(format!("'{program}' is in a temporary folder"));
+    match planted(&real) {
+        Some(why) => Err(format!("'{program}' {why}")),
+        None => Ok(()),
     }
-    if in_repository(&real) {
-        return Err(format!("'{program}' is inside a git repository"));
+}
+
+/// Why the program at `real` (canonical) could have been put there by a clone
+/// or a download rather than installed: tracked by (or not ignored in) a
+/// repository, in a temp folder, or (Unix) rewritable by other users.
+pub(crate) fn planted(real: &Path) -> Option<&'static str> {
+    if in_temp(real) {
+        Some("is in a temporary folder")
+    } else if in_repository(real) {
+        Some("is inside a git repository")
+    } else if writable_by_others(real) {
+        Some("can be changed by other users")
+    } else {
+        None
     }
-    if writable_by_others(&real) {
-        return Err(format!("'{program}' can be changed by other users"));
-    }
-    Ok(())
 }
 
 /// Under the system temp folder (or `/tmp`, `/var/tmp`).

@@ -20,6 +20,8 @@ interface Props {
   onCompose(): void;
   /** Open the undo history (reflog). */
   onUndoHistory(): void;
+  /** The repository outside the app (file manager, terminal, editor), as a menu at (x, y). */
+  onOpenMenu(x: number, y: number): void;
   onRemote(op: RemoteOp): void;
 }
 
@@ -103,6 +105,18 @@ export function TopBar(p: Props) {
       </button>
       <button className="ghost" onClick={p.onUndoHistory} title={t("undo.log.open")} aria-label={t("undo.log.open")}>
         <Icon name="history" />
+      </button>
+      <button
+        className="ghost"
+        aria-haspopup="menu"
+        title={t("open.repoMenu")}
+        aria-label={t("open.repoMenu")}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          p.onOpenMenu(r.right, r.bottom + 6);
+        }}
+      >
+        <Icon name="folder" />
       </button>
     </header>
   );
