@@ -34,15 +34,7 @@ import type { Pt } from "./graph/scene";
 import { StackSection } from "./components/Stacks";
 import { proOpen, usePro } from "./pro";
 import type { FileDiff, FileTouch, LfsOp, RefInfo, StackBranch, StackOp } from "./types";
-import {
-  askName,
-  askNewBranch,
-  askRebaseOnto,
-  checkoutRef,
-  confirmPick,
-  confirmThen,
-  showCommit,
-} from "./repo/actions";
+import { askName, askNewBranch, askRebaseOnto, checkoutRef, confirmPick, showCommit } from "./repo/actions";
 import {
   applyStash,
   branchFromStash,
