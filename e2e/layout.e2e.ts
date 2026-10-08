@@ -75,3 +75,26 @@ test("a locked map only moves when a commit is dragged: no merge", async ({ demo
   await page.mouse.up();
   await expect(page.locator(".dialog button.primary")).toBeVisible();
 });
+
+test("a long commit message pushes the inspector down instead of running over it", async ({ demo }) => {
+  const { page } = demo;
+  await page.setViewportSize({ width: 1300, height: 480 });
+  await page.locator(".topbar button", { hasText: "커밋" }).click();
+  const body = Array.from({ length: 8 }, (_, i) => `- line ${i + 1}: a body long enough to wrap in the panel`).join(
+    "\n",
+  );
+  await page.locator(".composer textarea").fill(`Long message\n\n${body}`);
+  await page.keyboard.press("Control+Enter");
+  await demo.toast("커밋했어요");
+  const head = (await demo.snapshot()).head.target!;
+  await page.evaluate((id) => window.__ddugit.centerOn(id), head);
+  const at = (await demo.screenOf(head))!;
+  await page.mouse.click(at.x, at.y);
+  const message = page.locator(".inspector .message");
+  await expect(message.locator(".body")).toContainText("line 8");
+  const m = (await message.boundingBox())!;
+  const byline = (await page.locator(".inspector .byline").boundingBox())!;
+  // The panel scrolls; the message keeps its whole height above the author line.
+  expect(m.y + m.height).toBeGreaterThan(480);
+  expect(byline.y).toBeGreaterThanOrEqual(m.y + m.height);
+});

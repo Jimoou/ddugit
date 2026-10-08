@@ -279,28 +279,23 @@
   width: 13px;
   flex: none;
 }
-/* The inspector's message: a card edged in the lane colour, the body under a rule. */
+/* The inspector's message in a plain outlined box. It never shrinks: a long body pushes the rest down. */
 .inspector .message {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
-  border-left: 3px solid var(--accent, var(--ui));
-  background: rgba(255, 255, 255, 0.035);
 }
 .inspector .message h2 {
   margin: 0;
-}
-.inspector .message .body {
-  padding-top: 8px;
-  border-top: 1px dashed var(--line-strong);
 }
 .body {
   margin: 0;
   font: 12px/1.5 var(--mono);
   white-space: pre-wrap;
-  color: #cfc9f2;
+  color: var(--text-2);
   user-select: text;
 }
 .meta {
