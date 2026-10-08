@@ -111,8 +111,8 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - macOS·Windows Rust 빌드는 비싸다(분당 10배·2배). 릴리스 전에 Actions에서 "CI · Rust"를 수동 실행(`all_os`)한다
   - push는 로컬 검사를 모두 통과시킨 뒤 PR당 가능한 한 한 번만 한다. CI가 10분 넘게 멈추면 취소하고 한 번 다시 돌린다
 - 앱 아이콘·워드마크: 원본은 `design/brand/`(README에 사용 규칙: 48px 이하는 small 아이콘, 워드마크 높이 20px 이상, 색 부분 변경 금지). `npx tauri icon design/brand/icon/ddugit-icon-1024.png -o src-tauri/icons`로 만든 뒤(android·ios 폴더는 지운다) 브랜드가 준 `icon.icns`(macOS 그리드)·`icon.ico`·작은 PNG(32·64·128·256)로 덮어쓴다. 파비콘 `public/icon.png`는 32px small 아이콘. 화면의 워드마크는 `components/Wordmark.tsx`(아웃라인 SVG, 색은 `--brand-ink`·`--brand-star`)
-- 릴리스: `main`에 `vX.Y.Z` 태그(SemVer)를 push한다. 0.x 동안은 minor = 마일스톤. 태그를 push하거나, 태그를 push할 수 없으면(예: 세션 브랜치만 push되는 환경) `main`에서 Actions의 Release를 `release` 체크하고 수동 실행한다. `.github/workflows/release.yml`이 macOS universal `.dmg`(서명·공증)와 Windows NSIS `.exe`(서명 없음)를 만들어 Supabase Storage(`releases/v<버전>/`, `downloads.json`)에 올리고 artifact로도 남긴다. **GitHub Release는 만들지 않는다**(배포는 ddugit.com만). 배포 형식은 dmg/exe만 쓴다(`bundle.targets`). 버전은 `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json` 세 곳을 함께 올린다
-- push 전에 반드시 `npm run check`와 `cargo fmt --check && cargo clippy && cargo test`를 통과시킨다. UI 흐름을 바꿨으면 `npm run e2e`도 돌린다.
+- 릴리스: `main`에 `vX.Y.Z` 태그(SemVer)를 push한다. 태그를 push하거나, 태그를 push할 수 없으면(예: 세션 브랜치만 push되는 환경) `main`에서 Actions의 Release를 `release` 체크하고 수동 실행한다. `.github/workflows/release.yml`이 macOS universal `.dmg`(서명·공증)와 Windows NSIS `.exe`(서명 없음)를 만들어 Supabase Storage(`releases/v<버전>/`, `downloads.json`)에 올리고 artifact로도 남긴다. **GitHub Release는 만들지 않는다**(배포는 ddugit.com만). 배포 형식은 dmg/exe만 쓴다(`bundle.targets`). 버전은 `package.json`, `package-lock.json`(맨 위 두 곳), `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`을 함께 올리고 `cargo check`로 `Cargo.lock`을 갱신한다
+- push 전에 반드시 `npm run check`와 `cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`를 통과시킨다(CI와 같은 명령). UI 흐름을 바꿨으면 `npm run e2e`도 돌린다.
 
 ## 주의
 
