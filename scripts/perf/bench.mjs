@@ -82,6 +82,7 @@ if (want("pure")) {
           plusHover: false,
           changeCount: 0,
           selected: null,
+          picked: new Set(),
           hovered: null,
           focus,
           refs: refsBy,
