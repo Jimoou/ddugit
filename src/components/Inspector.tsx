@@ -77,18 +77,19 @@ export function Inspector(props: Props) {
   return (
     <aside className="panel inspector" style={{ ["--accent" as string]: color }}>
       <header>
-        <div>
-          <div className="eyebrow">
-            {t("inspector.eyebrow")} {isHead && <span className="badge head">HEAD</span>}
-          </div>
-          <h2>{commit.summary || t("common.noMessage")}</h2>
+        <div className="eyebrow">
+          {t("inspector.eyebrow")} {isHead && <span className="badge head">HEAD</span>}
         </div>
         <button className="icon" onClick={onClose} title={t("common.closeEsc")} aria-label={t("common.close")}>
           <Icon name="close" />
         </button>
       </header>
 
-      {body && <pre className="body">{body}</pre>}
+      {/* The message in a card of its own, edged in the commit's lane colour. */}
+      <section className="message" aria-label={t("inspector.message")}>
+        <h2>{commit.summary || t("common.noMessage")}</h2>
+        {body && <pre className="body">{body}</pre>}
+      </section>
 
       <div className="byline">
         <span className="avatar" aria-hidden>

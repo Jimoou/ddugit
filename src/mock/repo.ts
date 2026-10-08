@@ -256,17 +256,17 @@ class MockRepo {
 function seed(): MockRepo {
   const r = new MockRepo();
   r.add("main", "Initial commit");
-  r.add("main", "Add project skeleton");
-  r.add("main", "Set up CI pipeline");
+  r.add("main", "feat: add project skeleton");
+  r.add("main", "ci: set up CI pipeline");
   r.tags.set("v0.1.0", r.branches.get("main")!);
 
   r.branch("feature/login", "main");
-  r.add("feature/login", "Login form UI");
-  r.add("main", "Fix typo in README");
-  r.add("feature/login", "Hook up auth API");
+  r.add("feature/login", "feat(auth): login form UI");
+  r.add("main", "docs: fix typo in README");
+  r.add("feature/login", "feat(auth): hook up auth API");
   r.branch("feature/theme", "main");
   r.add("feature/theme", "Neon theme tokens");
-  r.add("feature/login", "Remember-me checkbox");
+  r.add("feature/login", "feat(auth): remember-me checkbox (#7)");
   r.merge("feature/login", "main");
   r.add("feature/theme", "Glow shader for edges");
   r.add("main", "Bump dependencies");
@@ -280,14 +280,14 @@ function seed(): MockRepo {
   r.add("feature/theme", "Tune particle speed");
   r.branch("feature/graph-zoom", "main");
   r.add("feature/graph-zoom", "Semantic zoom levels");
-  r.add("main", "Update changelog");
+  r.add("main", "docs: update changelog");
   r.add("feature/graph-zoom", "Minimap");
   r.remotes.set("origin/main", r.branches.get("main")!);
   r.remotes.set("origin/feature/theme", r.branches.get("feature/theme")!);
   r.remotes.set("origin/feature/graph-zoom", r.branches.get("feature/graph-zoom")!);
   // A teammate's branch that exists only on the remote (no local branch yet).
   r.branch("feature/orbit-sync", "main");
-  r.add("feature/orbit-sync", "Sync orbits across tabs");
+  r.add("feature/orbit-sync", "refactor(sync): share orbit state across tabs");
   r.remotes.set("origin/feature/orbit-sync", r.branches.get("feature/orbit-sync")!);
   r.branches.delete("feature/orbit-sync");
   r.add("feature/graph-zoom", "Zoom to cursor");

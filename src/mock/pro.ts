@@ -6,7 +6,7 @@ import { type Table, delay, fail, fakeId, repo, res } from "./repo";
 
 /** Demo commits read like a Conventional Commits history, so the release notes have sections. */
 function demoConventional(summary: string): string {
-  if (/^Merge /.test(summary)) return summary;
+  if (/^Merge /.test(summary) || /^\w+(\([^)]*\))?!?: /.test(summary)) return summary;
   if (/^Fix /.test(summary)) return `fix: ${summary.slice(4)}`;
   if (/^(Bump|Set up|Update|Initial)/.test(summary)) return `chore: ${summary[0].toLowerCase()}${summary.slice(1)}`;
   return `feat: ${summary[0].toLowerCase()}${summary.slice(1)}`;

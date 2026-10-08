@@ -22,6 +22,7 @@ import {
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
 import { type Box, CAPTION_H, laneReach, placeCaptions } from "./captions";
+import { parseSubject, type Subject, type Tone } from "./subject";
 import type { Layout } from "./layout";
 
 /** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
@@ -167,7 +168,11 @@ export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
 const BADGE_H = 18;
 
 /** Zoom thresholds for semantic zoom. */
-export const ZOOM = { dots: 0.35, fold: 0.5, branches: 0.55, allRefs: 0.8, captions: 0.6, summaries: 1.25 };
+/**
+ * Semantic zoom: what appears from which scale. Zoomed out to `briefs`, branch names and short
+ * summaries still show where there is room, so the map can be read at a glance.
+ */
+export const ZOOM = { dots: 0.35, fold: 0.5, branches: 0.3, allRefs: 0.8, briefs: 0.3, captions: 0.6, summaries: 1.25 };
 
 /**
  * The run drawn as a bar instead of dots for `id`, if any. Nothing folds while
@@ -653,7 +658,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     if (upright(view.r)) {
       for (const L of labelQueue) {
         const text = s.summaries.get(L.id) ?? "";
-        if (text && (k >= ZOOM.captions || L.id === s.selected || L.id === s.hovered))
+        if (text && (k >= ZOOM.briefs || L.id === s.selected || L.id === s.hovered))
           drawUprightCaption(ctx, s, L, text, rowText.get(L.id) ?? 0, side);
       }
     } else {
@@ -856,15 +861,134 @@ function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: 
   ctx.restore();
 }
 
-/** Longest caption on screen, px; the commit in hand may run longer. */
-const CAPTION_MAX = 230;
-const CAPTION_FULL = 360;
+/** Longest caption on screen, px; the commit in hand may run longer. Zoomed out, captions are briefer. */
+const CAPTION_MAX = 240;
+const CAPTION_BRIEF = 150;
+const CAPTION_FULL = 380;
+
+/** Colours for the kinds of change a summary names (see `subject.ts`). */
+const CHIP_COLOR: Record<Tone, string> = {
+  feat: "#4fd1a5",
+  fix: "#ff6b81",
+  docs: "#6cb8ff",
+  perf: "#ffb84d",
+  refactor: "#c08cff",
+  test: "#3ee0d0",
+  chore: "#9aa1b5",
+  merge: "#9aa3ff",
+  revert: "#ff8f5a",
+  wip: "#ffd479",
+};
+const PILL_PAD = 6;
+const PART_GAP = 5;
+const CHIP_FONT = `700 9px ${MONO}`;
+const PR_FONT = `600 10px ${SANS}`;
+const PR_INK = "#c9b8ff";
+
+const subjects = new Map<string, Subject>();
+const subjectOf = (summary: string) => remember(subjects, summary, () => parseSubject(summary));
+const chipText = (sub: Subject) => (sub.chip ? sub.chip.label + (sub.breaking ? "!" : "") : "");
+
+/** The scope (`graph` in `feat(graph): …`) leads the text, dimmer, when there is room for it. */
+const scopeText = (sub: Subject, brief: boolean) => (sub.scope && !brief ? `${sub.scope} ` : "");
+const SCOPE_INK = "rgba(255,255,255,0.5)";
+
+/** Width of a caption pill holding all of `summary` in `font`. */
+function captionWidth(ctx: CanvasRenderingContext2D, summary: string, font: string, brief: boolean): number {
+  const sub = subjectOf(summary);
+  let w = 2 * PILL_PAD;
+  if (sub.chip) {
+    ctx.font = CHIP_FONT;
+    w += textWidth(ctx, chipText(sub)) + 8 + PART_GAP;
+  }
+  ctx.font = font;
+  w += textWidth(ctx, scopeText(sub, brief));
+  if (sub.pr) {
+    ctx.font = PR_FONT;
+    w += textWidth(ctx, sub.pr) + PART_GAP;
+  }
+  ctx.font = font;
+  return w + textWidth(ctx, sub.text);
+}
+
+/**
+ * A commit summary as a pill: outlined in its lane's colour (so it reads as that star's, and
+ * apart from the sky), a chip for the kind of change, the text cut to fit, and a pull request
+ * number when there is room. `x`, `y` is the pill's top left.
+ */
+function drawCaption(
+  ctx: CanvasRenderingContext2D,
+  summary: string,
+  box: { x: number; y: number; w: number },
+  font: string,
+  lane: string,
+  on: boolean,
+  dimmed: boolean,
+  brief: boolean,
+) {
+  const sub = subjectOf(summary);
+  const { x, y, w } = box;
+  const h = CAPTION_H;
+  const mid = y + h / 2 + 0.5;
+  ctx.globalAlpha = dimmed ? 0.35 : 1;
+  roundRect(ctx, x, y, w, h, 5);
+  ctx.fillStyle = on ? "rgba(24,20,44,0.94)" : "rgba(10,8,22,0.8)";
+  ctx.fill();
+  ctx.strokeStyle = alpha(lane, on ? 0.95 : 0.42);
+  ctx.lineWidth = on ? 1.4 : 1;
+  ctx.stroke();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  let cx = x + PILL_PAD;
+  const right = x + w - PILL_PAD;
+  if (sub.chip) {
+    ctx.font = CHIP_FONT;
+    const label = chipText(sub);
+    const cw = textWidth(ctx, label) + 8;
+    if (cx + cw <= right) {
+      const c = sub.breaking ? CHIP_COLOR.fix : CHIP_COLOR[sub.chip.tone];
+      roundRect(ctx, cx, y + 3, cw, h - 6, 3);
+      ctx.fillStyle = alpha(c, 0.2);
+      ctx.fill();
+      ctx.fillStyle = c;
+      ctx.fillText(label, cx + 4, mid);
+      cx += cw + PART_GAP;
+    }
+  }
+  let prW = 0;
+  if (sub.pr) {
+    ctx.font = PR_FONT;
+    prW = textWidth(ctx, sub.pr) + PART_GAP;
+  }
+  ctx.font = font;
+  const scope = scopeText(sub, brief);
+  if (scope && right - cx - prW - textWidth(ctx, scope) >= Math.min(60, textWidth(ctx, sub.text))) {
+    ctx.fillStyle = SCOPE_INK;
+    ctx.fillText(scope, cx, mid);
+    cx += textWidth(ctx, scope);
+  }
+  // Keep the number only if the text keeps a readable start.
+  const roomWithPr = right - cx - prW;
+  const showPr = !!sub.pr && roomWithPr >= Math.min(60, textWidth(ctx, sub.text));
+  const room = showPr ? roomWithPr : right - cx;
+  const line = truncate(ctx, sub.text, Math.max(0, room));
+  ctx.fillStyle = on ? "#ffffff" : "rgba(255,255,255,0.9)";
+  ctx.fillText(line, cx, mid);
+  if (showPr) {
+    const tw = textWidth(ctx, line);
+    ctx.font = PR_FONT;
+    ctx.fillStyle = PR_INK;
+    ctx.fillText(sub.pr!, cx + tw + PART_GAP, mid);
+  }
+  ctx.globalAlpha = 1;
+}
 
 /**
  * Commit summaries as map labels (see `captions.ts`): straight, under or over
  * each star, placed by importance (the commit in hand, HEAD, labelled
  * commits, merges, then newest first) so they never cover a star, a badge or
- * each other. A label set further out hangs from a thin leader line.
+ * each other. A label set further out hangs from a thin leader line. Zoomed
+ * out they are briefer and smaller, and only those with room are shown.
  */
 function drawMapCaptions(
   ctx: CanvasRenderingContext2D,
@@ -878,31 +1002,31 @@ function drawMapCaptions(
   const inHand = (id: string) => id === s.selected || id === s.hovered;
   const rank = (id: string) =>
     inHand(id) ? 0 : id === s.headId ? 1 : badged.has(id) ? 2 : byId.get(id)?.isMerge ? 3 : 4;
-  const all = s.view.k >= ZOOM.captions;
+  const k = s.view.k;
+  const all = k >= ZOOM.briefs;
+  const brief = k < ZOOM.captions;
   const list = queue
     .filter((L) => s.summaries.get(L.id) && (all || inHand(L.id)))
     .sort((a, b) => rank(a.id) - rank(b.id) || (byId.get(a.id)?.row ?? 0) - (byId.get(b.id)?.row ?? 0));
   // Measure in the font each caption is drawn in: a bold caption measured
   // regular gets cut short with room to spare.
-  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} 11.5px ${SANS}`;
-  const items = list.map((L) => {
-    ctx.font = fontOf(L.id);
-    return {
-      id: L.id,
-      x: L.x,
-      y: L.y,
-      w: Math.min(textWidth(ctx, s.summaries.get(L.id)!) + 2, inHand(L.id) ? CAPTION_FULL : CAPTION_MAX),
-      up: !badged.has(L.id),
-    };
-  });
+  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} ${brief && !inHand(id) ? 10.5 : 11.5}px ${SANS}`;
+  const items = list.map((L) => ({
+    id: L.id,
+    x: L.x,
+    y: L.y,
+    w: Math.min(
+      captionWidth(ctx, s.summaries.get(L.id)!, fontOf(L.id), brief && !inHand(L.id)) + 1,
+      inHand(L.id) ? CAPTION_FULL : brief ? CAPTION_BRIEF : CAPTION_MAX,
+      // Cut short at the canvas edge (with an ellipsis) rather than running off it.
+      Math.max(48, s.w - L.x - 4),
+    ),
+    up: !badged.has(L.id),
+  }));
   const stars = queue.map((L) => ({ x: L.x - r - 3, y: L.y - r - 3, w: 2 * r + 6, h: 2 * r + 6 }));
   const byQueue = new Map(list.map((L) => [L.id, L]));
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
   for (const c of placeCaptions(items, [...stars, ...obstacles], r)) {
     const L = byQueue.get(c.id)!;
-    const on = inHand(c.id);
     if (c.level) {
       ctx.strokeStyle = alpha(L.color, L.d ? 0.15 : 0.4);
       ctx.lineWidth = 1;
@@ -911,19 +1035,13 @@ function drawMapCaptions(
       ctx.lineTo(L.x, c.above ? c.y + CAPTION_H : c.y);
       ctx.stroke();
     }
-    ctx.font = fontOf(c.id);
-    const line = truncate(ctx, s.summaries.get(c.id)!, c.w);
-    const y = c.y + CAPTION_H / 2;
-    ctx.lineWidth = 3.5;
-    ctx.strokeStyle = "rgba(5,4,14,0.85)";
-    ctx.strokeText(line, c.x, y);
-    ctx.fillStyle = L.d ? "rgba(255,255,255,0.24)" : on ? "#ffffff" : "rgba(255,255,255,0.88)";
-    ctx.fillText(line, c.x, y);
+    const on = inHand(c.id);
+    drawCaption(ctx, s.summaries.get(c.id)!, c, fontOf(c.id), L.color, on, L.d, brief && !on);
   }
 }
 
 /** Longest upright caption on screen, px. */
-const UPRIGHT_MAX = 440;
+const UPRIGHT_MAX = 460;
 const reachOf = new WeakMap<Layout, number[]>();
 
 /** Where an upright row's badges and summary begin: past the lanes in use on that row. */
@@ -943,24 +1061,18 @@ function uprightStart(s: DrawState, id: string, r: number, side: 1 | -1): number
 function drawUprightCaption(
   ctx: CanvasRenderingContext2D,
   s: DrawState,
-  L: { y: number; id: string; d: boolean },
+  L: { y: number; id: string; d: boolean; color: string },
   text: string,
   x: number,
   side: 1 | -1,
 ) {
   const space = Math.min(UPRIGHT_MAX, side > 0 ? s.w - x - 8 : x - 8);
-  if (space < 24) return;
+  if (space < 40) return;
   const on = L.id === s.selected || L.id === s.hovered;
-  ctx.font = `${on ? 600 : 400} 12px ${SANS}`;
-  ctx.textAlign = side > 0 ? "left" : "right";
-  ctx.textBaseline = "middle";
-  const line = truncate(ctx, text, space);
-  ctx.lineJoin = "round";
-  ctx.lineWidth = 3.5;
-  ctx.strokeStyle = "rgba(5,4,14,0.85)";
-  ctx.strokeText(line, x, L.y);
-  ctx.fillStyle = L.d ? "rgba(255,255,255,0.24)" : on ? "#ffffff" : "rgba(255,255,255,0.86)";
-  ctx.fillText(line, x, L.y);
+  const brief = s.view.k < ZOOM.captions && !on;
+  const font = `${on ? 600 : 400} ${brief ? 11 : 12}px ${SANS}`;
+  const w = Math.min(space, captionWidth(ctx, text, font, brief) + 1);
+  drawCaption(ctx, text, { x: side > 0 ? x : x - w, y: L.y - CAPTION_H / 2, w }, font, L.color, on, L.d, brief);
 }
 
 const TRAIL = "#ffd479";

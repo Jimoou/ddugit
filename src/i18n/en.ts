@@ -110,6 +110,8 @@ export const en: Record<Key, string> = {
     "Commit graph. Arrow keys move between commits and Enter opens the menu. + and - zoom, 0 fits, H goes to HEAD",
   "graph.hint":
     "Drag to pan · ⌘/Ctrl+wheel to zoom · ⌘/Ctrl+F to search · drag a commit onto a branch tip to merge · Shift+drag to reorder",
+  "graph.hint.locked":
+    "Map locked: dragging only moves it (merge, cherry-pick and rebase by drag are off) · L to unlock",
   "graph.hint.truncated": " · showing the latest {n}",
   "drag.merge:idle": "Drop on a branch tip to merge into it · ⌥/Alt: cherry-pick · Shift: reorder · ⌘/Ctrl: rebase",
   "drag.merge:ok": "Release to merge",
@@ -132,6 +134,9 @@ export const en: Record<Key, string> = {
   "settings.language.system": "Follow system",
   "settings.sparkle": "Sparkle effects",
   "settings.space": "Space background",
+  "settings.map": "Branch map",
+  "settings.minimap": "Show the minimap (M)",
+  "settings.mapLocked": "Lock the map: no merge, cherry-pick or rebase by dragging (L)",
   "settings.glow": "Glow",
   "settings.confirmRemote": "Confirm before",
   "pro.title": "ddugit Pro",
@@ -283,6 +288,8 @@ export const en: Record<Key, string> = {
   "keys.fit.what": "Fit to view",
   "keys.head.what": "Go to HEAD",
   "keys.rotate.what": "Rotate the graph 90°",
+  "keys.lock.what": "Lock or unlock the map (locked: no merge, cherry-pick or rebase by dragging)",
+  "keys.minimap.what": "Show or hide the minimap",
   "keys.sidebar.what": "Collapse or expand the sidebar",
   "keys.refresh.what": "Reload the repository",
   "keys.dragMerge": "Drag a commit onto a branch tip",
@@ -371,6 +378,14 @@ export const en: Record<Key, string> = {
   "hud.fit": "Fit to view (0)",
   "hud.head": "Go to HEAD (H)",
   "hud.rotate": "Rotate 90° (R) · currently {deg}°",
+  "hud.minimap": "Minimap",
+  "layout.sidebarWidth": "Sidebar width (drag · double-click to reset)",
+  "layout.panelWidth": "Right panel width (drag · double-click to reset)",
+  "hud.minimap.show": "Show the minimap (M)",
+  "hud.minimap.hide": "Hide the minimap (M)",
+  "hud.lockLabel": "Lock the map",
+  "hud.lock": "Lock the map (L) · prevents accidental merges and rebases by dragging",
+  "hud.unlock": "Unlock the map (L)",
   "pick.copy": "Cherry-pick",
   "pick.body":
     "Copies the changes from <b>“{summary}”</b> onto <b>{target}</b> as a new commit. The original SHA is recorded in the message.",
@@ -574,6 +589,7 @@ export const en: Record<Key, string> = {
   "merge.done": "Merged {source} into {target}",
 
   // commit / stash panels
+  "inspector.message": "Commit message",
   "inspector.eyebrow": "Commit",
   "inspector.copy": "Click to copy",
   "inspector.parents": "Parents",
