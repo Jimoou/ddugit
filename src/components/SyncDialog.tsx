@@ -1,11 +1,14 @@
 import { NEON } from "../graph/scene";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
+import { GitOutput } from "./GitOutput";
 import { Modal } from "./Modal";
 
 interface Props {
   /** `diverged`: pull couldn't fast-forward. `rejected`: push refused. */
   kind: "diverged" | "rejected";
+  /** git's own words, for the details. */
+  output: string;
   branch: string;
   upstream: string;
   ahead: number;
@@ -64,6 +67,7 @@ export function SyncDialog(p: Props) {
         <span style={{ color: p.color }}>{t("sync.mine", { n: p.ahead })}</span>
         <span style={{ color: NEON[0] }}>{t("sync.theirs", { n: p.behind })}</span>
       </div>
+      {p.output.trim() && <GitOutput text={p.output} />}
       <div className="choices">
         <button disabled={p.busy} onClick={p.onMerge}>
           <b>{andPush ? t("sync.mergePush") : t("sync.merge")}</b>

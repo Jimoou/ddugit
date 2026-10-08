@@ -36,8 +36,8 @@ interface PlacedCaption extends Box {
   above: boolean;
 }
 
-/** Caption line height, px. */
-export const CAPTION_H = 15;
+/** Caption height (a pill with its text centred), px. */
+export const CAPTION_H = 18;
 /** A label starts this far left of its star's centre, so it reads as starting at the star. */
 const LEAD = 6;
 /** A long label tries this much of itself before stepping further out. */
@@ -46,12 +46,41 @@ const SHORT_W = 120;
 const hit = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /**
+ * Boxes bucketed by screen cell, so testing a slot looks at its neighbours only: zoomed out a
+ * screen holds hundreds of stars, and testing each against every placed box was quadratic.
+ */
+class Taken {
+  private cells = new Map<number, Box[]>();
+  private static CELL = 64;
+  private keys(b: Box, each: (key: number) => void) {
+    const C = Taken.CELL;
+    for (let cx = Math.floor(b.x / C); cx <= Math.floor((b.x + b.w) / C); cx++)
+      for (let cy = Math.floor(b.y / C); cy <= Math.floor((b.y + b.h) / C); cy++) each(cx * 100_003 + cy);
+  }
+  add(b: Box) {
+    this.keys(b, (key) => {
+      const list = this.cells.get(key);
+      if (list) list.push(b);
+      else this.cells.set(key, [b]);
+    });
+  }
+  hits(b: Box): boolean {
+    let found = false;
+    this.keys(b, (key) => {
+      if (!found && this.cells.get(key)?.some((o) => hit(o, b))) found = true;
+    });
+    return found;
+  }
+}
+
+/**
  * Place `items` (most important first) around their stars of radius `r`,
  * avoiding `obstacles` (stars, badges) and each other. Items that find no
  * free slot are left out.
  */
 export function placeCaptions(items: CaptionItem[], obstacles: Box[], r: number): PlacedCaption[] {
-  const taken: Box[] = [...obstacles];
+  const taken = new Taken();
+  for (const b of obstacles) taken.add(b);
   const out: PlacedCaption[] = [];
   for (const it of items) {
     const below = (level: number) => it.y + r + 5 + level * CAPTION_H;
@@ -72,14 +101,14 @@ export function placeCaptions(items: CaptionItem[], obstacles: Box[], r: number)
         const top = slot.above ? slot.y + CAPTION_H : it.y + r + 3;
         const bottom = slot.above ? it.y - r - 3 : slot.y;
         const stem = slot.level ? { x: it.x - 1, y: top, w: 2, h: bottom - top } : null;
-        if (taken.some((b) => hit(b, box) || (stem !== null && hit(b, stem)))) continue;
+        if (taken.hits(box) || (stem !== null && taken.hits(stem))) continue;
         placed = { id: it.id, ...box, level: slot.level, above: slot.above };
         break;
       }
       if (placed) break;
     }
     if (placed) {
-      taken.push(placed);
+      taken.add(placed);
       out.push(placed);
     }
   }

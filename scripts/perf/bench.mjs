@@ -82,6 +82,7 @@ if (want("pure")) {
           plusHover: false,
           changeCount: 0,
           selected: null,
+          picked: new Set(),
           hovered: null,
           focus,
           refs: refsBy,
@@ -105,12 +106,18 @@ if (want("pure")) {
       };
       const draw1 = drawAt(1, null);
       const drawMin = drawAt(0.08, null);
-      const drawMinSearch = drawAt(0.08, new Set(commits.filter((_, i) => i % 3 === 0).map((c) => c.id)));
+      const third = new Set(commits.filter((_, i) => i % 3 === 0).map((c) => c.id));
+      const drawMinSearch = drawAt(0.08, third);
+      // Zoomed out to where branch names and brief summaries still show (`ZOOM.briefs`).
+      const drawBrief = drawAt(0.3, null);
+      const drawBriefSearch = drawAt(0.3, third);
       rows.push({
         n,
         draw1,
         drawMin,
         drawMinSearch,
+        drawBrief,
+        drawBriefSearch,
         lanes: layout.laneCount,
         edges: layout.edges.length,
         layoutMs,

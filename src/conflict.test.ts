@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conflictCount, parseConflicts, resolveText } from "./conflict";
+import { conflictCount, newerSide, parseConflicts, resolveText } from "./conflict";
 
 const file = [
   "keep 1\n",
@@ -68,5 +68,14 @@ describe("resolveText", () => {
   it("handles CRLF files", () => {
     const crlf = "x\r\n<<<<<<< HEAD\r\no\r\n=======\r\nt\r\n>>>>>>> f\r\ny\r\n";
     expect(resolveText(parseConflicts(crlf), ["theirs"])).toBe("x\r\nt\r\ny\r\n");
+  });
+});
+
+describe("newerSide", () => {
+  it("names the side changed later, and neither on a tie or with a side unknown", () => {
+    expect(newerSide({ time: 20 }, { time: 10 })).toBe("ours");
+    expect(newerSide({ time: 10 }, { time: 20 })).toBe("theirs");
+    expect(newerSide({ time: 10 }, { time: 10 })).toBeNull();
+    expect(newerSide({ time: 10 }, null)).toBeNull();
   });
 });

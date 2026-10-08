@@ -99,10 +99,15 @@ function remoteOp(op: RemoteOp): OpResult | string {
 }
 
 export const remoteCommands = {
-  async git_push_to({ remote: name, branch, onProgress }) {
+  async git_push_to({ remote: name, branch, force, onProgress }) {
     if (repo.fetchOnly.has(name)) return fail(`${name} is fetch-only`);
     const b = branch ?? repo.head;
     if (!repo.branches.has(b)) return fail(`Unknown branch '${b}'`);
+    const refused = demoControls.rejectNextPush;
+    if (refused && !force) {
+      demoControls.rejectNextPush = null;
+      return delay(res("rejected", refused));
+    }
     for (let pct = 0; pct <= 100; pct += 25) {
       onProgress.onmessage({ phase: "Writing objects", percent: pct });
       await delay(null, 40);
@@ -167,6 +172,11 @@ export const remoteCommands = {
         onProgress.onmessage({ phase, percent: pct });
         await delay(null, 60);
       }
+    }
+    const refused = demoControls.rejectNextPush;
+    if (refused && op === "push") {
+      demoControls.rejectNextPush = null;
+      return res("rejected", refused);
     }
     const r = remoteOp(op);
     return typeof r === "string" ? fail(r) : r;

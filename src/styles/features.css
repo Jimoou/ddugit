@@ -318,6 +318,16 @@ button.demo-pill {
 }
 
 /* ------------------------------------------------ remote work, before it runs */
+.git-output {
+  margin: 8px 0;
+}
+.git-output .raw {
+  max-height: 160px;
+  overflow: auto;
+}
+.git-output button {
+  margin-top: 6px;
+}
 .sync-commits {
   list-style: none;
   margin: 0;

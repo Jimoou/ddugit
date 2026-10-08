@@ -13,7 +13,7 @@ import { UpdateNotice } from "./components/Update";
 import { ProOffer } from "./components/ProOffer";
 import { GitMissing, ReportDialog } from "./components/Report";
 import { isUnexpected } from "./report";
-import { onShareFailure } from "./share";
+import { copyText, onShareFailure } from "./share";
 import { refreshPro } from "./pro";
 import { useLicenseCheck } from "./components/License";
 import { Wordmark } from "./components/Wordmark";
@@ -80,6 +80,8 @@ export default function App() {
   /** git can't be run: why (the startup check). */
   const [gitMissing, setGitMissing] = useState<string | null>(null);
   const toastId = useRef(0);
+  /** The toast under the pointer: it isn't taken away while being read or copied. */
+  const hoveredToast = useRef<number | null>(null);
   const page = PAGE_OVERRIDE ?? settings.historyPage;
   const current = activeTab(tabs);
   const welcome = home || !current.path;
@@ -101,8 +103,13 @@ export default function App() {
     if (kind === "err" && !action && isUnexpected(text))
       action = { label: t("report.action"), onClick: () => setReport({ error: text }) };
     setToasts((l) => [...l.slice(-3), { id, kind, text, action }]);
-    // One with a button stays long enough to reach it.
-    setTimeout(() => setToasts((l) => l.filter((x) => x.id !== id)), kind === "err" || action ? 7000 : 3200);
+    // One with a button stays long enough to reach it; one under the pointer stays until it leaves.
+    const later = (ms: number) =>
+      setTimeout(
+        () => (hoveredToast.current === id ? later(1500) : setToasts((l) => l.filter((x) => x.id !== id))),
+        ms,
+      );
+    later(kind === "err" || action ? 7000 : 3200);
   }, []);
 
   useEffect(() => {
@@ -437,21 +444,39 @@ export default function App() {
       )}
       <ProOffer onLicense={() => setSettingsAt("license")} />
       <div className={`toasts floating ${welcome ? "welcome-toasts" : ""}`}>
-        {toasts.map((item) => (
-          <div key={item.id} className={`toast ${item.kind}`}>
-            {item.text}
-            {item.action && (
-              <button
-                onClick={() => {
-                  item.action!.onClick();
-                  setToasts((l) => l.filter((x) => x.id !== item.id));
-                }}
-              >
-                {item.action.label}
-              </button>
-            )}
-          </div>
-        ))}
+        {toasts.map((item) => {
+          const close = () => setToasts((l) => l.filter((x) => x.id !== item.id));
+          return (
+            <div
+              key={item.id}
+              className={`toast ${item.kind}`}
+              onMouseEnter={() => (hoveredToast.current = item.id)}
+              onMouseLeave={() => (hoveredToast.current = null)}
+            >
+              <span className="toast-text">{item.text}</span>
+              <span className="toast-actions">
+                {item.action && (
+                  <button
+                    onClick={() => {
+                      item.action!.onClick();
+                      close();
+                    }}
+                  >
+                    {item.action.label}
+                  </button>
+                )}
+                {item.kind === "err" && (
+                  <button title={t("common.copy")} aria-label={t("common.copy")} onClick={() => copyText(item.text)}>
+                    <Icon name="copy" size={12} />
+                  </button>
+                )}
+                <button title={t("common.close")} aria-label={t("common.close")} onClick={close}>
+                  <Icon name="close" size={12} />
+                </button>
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

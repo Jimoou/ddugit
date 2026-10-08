@@ -224,8 +224,12 @@ test("release notes group the commits since the previous tag by kind, and copy a
   await expect(dialog.locator("select")).toHaveValue("v0.1.0");
   await expect(md).toHaveValue(/^## v0\.2\.0 \(/);
   // Plain branch merges give the commits they brought in, oldest first.
-  await expect(md).toHaveValue(/### 새 기능\n\n- login form UI .*\n- hook up auth API .*\n- remember-me checkbox/);
-  await expect(md).toHaveValue(/### 버그 수정\n\n- typo in README .*\n- crash on empty repo/);
+  // Typed summaries keep their scope; a trailing (#7) links the pull request.
+  await expect(md).toHaveValue(
+    /### 새 기능\n\n- \*\*auth:\*\* login form UI .*\n- \*\*auth:\*\* hook up auth API .*\n- \*\*auth:\*\* remember-me checkbox \(\[#7\]/,
+  );
+  await expect(md).toHaveValue(/### 버그 수정\n\n- crash on empty repo/);
+  await expect(md).toHaveValue(/### 문서\n\n- fix typo in README/);
 
   // Leave out the chores; then start from the first commit.
   await expect(md).toHaveValue(/### 기타/);

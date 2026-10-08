@@ -1,5 +1,5 @@
 import { Icon } from "./components/Icon";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, DEMO_PATH } from "./api";
 import { demoControls } from "./mock";
 import { Composer } from "./components/Composer";
@@ -12,6 +12,7 @@ import { ContextMenu } from "./components/ContextMenu";
 import { Inspector } from "./components/Inspector";
 import { SearchBar } from "./components/SearchBar";
 import { Sidebar } from "./components/Sidebar";
+import { Splitter } from "./components/Splitter";
 import { WorktreeSection } from "./components/Worktrees";
 import { SubmoduleSection } from "./components/Submodules";
 import { LfsSection } from "./components/Lfs";
@@ -24,7 +25,7 @@ import { NEON } from "./graph/scene";
 import { stashTitle } from "./format";
 import { planMove } from "./rebasePlan";
 import { useLoaded } from "./components/useLoaded";
-import type { Settings } from "./settings";
+import { PANEL_WIDTH, type Settings, SIDEBAR_WIDTH } from "./settings";
 import { t } from "./i18n";
 import { openLink } from "./share";
 import { Rich } from "./i18n/Rich";
@@ -137,6 +138,8 @@ export function RepoView({
   const [zoom, setZoom] = useState(1);
   const animate = settings.animate;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
+  const toggleLock = () => onChangeSettings({ mapLocked: !settings.mapLocked });
+  const toggleMinimap = () => onChangeSettings({ minimap: !settings.minimap });
   // First-run tutorial, played on the demo repository only.
   const tour = useVoyage(path === DEMO_PATH);
   const { mission } = tour;
@@ -243,14 +246,19 @@ export function RepoView({
 
   const trailIds = useMemo(() => trail?.touches.map((x) => x.id), [trail]);
   const trailFocus = useMemo(() => (trailIds ? new Set(trailIds) : null), [trailIds]);
+  // The picked refs as they are now: a deleted one drops out, a moved one is followed to its new tip.
+  const liveFocus = useMemo(
+    () => focusRefs.flatMap((f) => snap?.refs.filter((r) => r.kind === f.kind && r.name === f.name).slice(0, 1) ?? []),
+    [focusRefs, snap],
+  );
   // Search highlights its matches; otherwise a focused branch highlights its ancestry.
   const focus = useMemo(() => {
     if (searchLit) return searchLit;
-    if (!snap || !focusRefs.length) return null;
+    if (!snap || !liveFocus.length) return null;
     const lit = new Set<string>();
-    for (const r of focusRefs) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
+    for (const r of liveFocus) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
     return lit;
-  }, [snap, focusRefs, searchLit]);
+  }, [snap, liveFocus, searchLit]);
 
   const openSearch = search.open;
   useEffect(() => {
@@ -465,7 +473,15 @@ export function RepoView({
       {compareBase && <CompareBanner repo={repo} base={compareBase} />}
       <StateBanner repo={repo} />
 
-      <div className="main">
+      <div
+        className="main"
+        style={
+          {
+            "--sidebar-w": `${settings.sidebarWidth}px`,
+            "--panel-w": `${settings.panelWidth}px`,
+          } as CSSProperties
+        }
+      >
         <Sidebar
           collapsed={settings.sidebarCollapsed}
           closed={settings.closedSections}
@@ -474,12 +490,12 @@ export function RepoView({
           refs={snap.refs}
           headBranch={snap.head.branch}
           colorOf={colorOf}
-          focused={focusRefs.map((r) => `${r.kind}:${r.name}`)}
+          focused={liveFocus.map((r) => `${r.kind}:${r.name}`)}
           onFocus={(r) => {
             const key = (x: RefInfo) => `${x.kind}:${x.name}`;
-            const on = focusRefs.some((x) => key(x) === key(r));
+            const on = liveFocus.some((x) => key(x) === key(r));
             // Each click toggles one ref in or out of the picked set.
-            const next = on ? focusRefs.filter((x) => key(x) !== key(r)) : [...focusRefs, r];
+            const next = on ? liveFocus.filter((x) => key(x) !== key(r)) : [...liveFocus, r];
             setFocusRefs(next);
             if (next.some((x) => key(x) === key(r))) graph.current?.centerOn(r.target);
           }}
@@ -564,6 +580,16 @@ export function RepoView({
             </>
           }
         />
+        {!settings.sidebarCollapsed && (
+          <Splitter
+            variable="--sidebar-w"
+            width={settings.sidebarWidth}
+            range={SIDEBAR_WIDTH}
+            pane="left"
+            label={t("layout.sidebarWidth")}
+            onResize={(sidebarWidth) => onChangeSettings({ sidebarWidth })}
+          />
+        )}
 
         <section className="stage">
           <div className="stage-graph" ref={stageGraph}>
@@ -634,6 +660,10 @@ export function RepoView({
               onZoomChange={setZoom}
               rotation={settings.rotation}
               onRotate={rotate}
+              minimap={settings.minimap}
+              locked={settings.mapLocked}
+              onToggleLock={toggleLock}
+              onToggleMinimap={toggleMinimap}
               onHover={(id) => {
                 clearTimeout(peekTimer.current);
                 setPeek(null);
@@ -674,9 +704,28 @@ export function RepoView({
                 <Icon name="rotate" />
                 <span className="deg">{settings.rotation * 90}°</span>
               </button>
+              <span className="hud-sep" aria-hidden />
+              <button
+                className={settings.minimap ? "on" : ""}
+                onClick={toggleMinimap}
+                aria-pressed={settings.minimap}
+                title={t(settings.minimap ? "hud.minimap.hide" : "hud.minimap.show")}
+                aria-label={t("hud.minimap")}
+              >
+                <Icon name="map" />
+              </button>
+              <button
+                className={settings.mapLocked ? "on lock" : ""}
+                onClick={toggleLock}
+                aria-pressed={settings.mapLocked}
+                title={t(settings.mapLocked ? "hud.unlock" : "hud.lock")}
+                aria-label={t("hud.lockLabel")}
+              >
+                <Icon name={settings.mapLocked ? "lock" : "unlock"} />
+              </button>
             </div>
             <div className="hint">
-              {t("graph.hint")}
+              {t(settings.mapLocked ? "graph.hint.locked" : "graph.hint")}
               {snap.truncated && t("graph.hint.truncated", { n: snap.commits.length })}
             </div>
           </div>
@@ -684,6 +733,16 @@ export function RepoView({
           <RepoSheets repo={repo} sheet={sheet} conflict={conflict} rebase={rebase} askRemote={remote.askRemote} />
         </section>
 
+        {(composer || selectedCommit || stashSel) && (
+          <Splitter
+            variable="--panel-w"
+            width={settings.panelWidth}
+            range={PANEL_WIDTH}
+            pane="right"
+            label={t("layout.panelWidth")}
+            onResize={(panelWidth) => onChangeSettings({ panelWidth })}
+          />
+        )}
         {composer && (
           <Composer
             // A prefilled message (after a squash merge) starts a fresh panel.
@@ -702,6 +761,7 @@ export function RepoView({
             startAmend={composer.amend}
             headPushed={!!snap.head.upstream && snap.head.ahead === 0}
             onClose={() => setComposer(false)}
+            viewing={sheet?.kind === "diff" && sheet.source.kind === "worktree" ? (sheet.path ?? null) : null}
             onOpenFile={(file) => {
               const c = snap.changes.find((x) => x.path === file);
               if (c?.conflicted) return setConflict({ file });

@@ -8,6 +8,8 @@ export const en: Record<Key, string> = {
   "common.close": "Close",
   "common.closeEsc": "Close (Esc)",
   "common.none": "None",
+  "common.copy": "Copy",
+  "common.copied": "Copied",
   "common.noMessage": "(no message)",
 
   // top bar
@@ -108,6 +110,8 @@ export const en: Record<Key, string> = {
     "Commit graph. Arrow keys move between commits and Enter opens the menu. + and - zoom, 0 fits, H goes to HEAD",
   "graph.hint":
     "Drag to pan · ⌘/Ctrl+wheel to zoom · ⌘/Ctrl+F to search · drag a commit onto a branch tip to merge · Shift+drag to reorder",
+  "graph.hint.locked":
+    "Map locked: dragging only moves it (merge, cherry-pick and rebase by drag are off) · L to unlock",
   "graph.hint.truncated": " · showing the latest {n}",
   "drag.merge:idle": "Drop on a branch tip to merge into it · ⌥/Alt: cherry-pick · Shift: reorder · ⌘/Ctrl: rebase",
   "drag.merge:ok": "Release to merge",
@@ -130,6 +134,9 @@ export const en: Record<Key, string> = {
   "settings.language.system": "Follow system",
   "settings.sparkle": "Sparkle effects",
   "settings.space": "Space background",
+  "settings.map": "Branch map",
+  "settings.minimap": "Show the minimap (M)",
+  "settings.mapLocked": "Lock the map: no merge, cherry-pick or rebase by dragging (L)",
   "settings.glow": "Glow",
   "settings.confirmRemote": "Confirm before",
   "pro.title": "ddugit Pro",
@@ -281,6 +288,8 @@ export const en: Record<Key, string> = {
   "keys.fit.what": "Fit to view",
   "keys.head.what": "Go to HEAD",
   "keys.rotate.what": "Rotate the graph 90°",
+  "keys.lock.what": "Lock or unlock the map (locked: no merge, cherry-pick or rebase by dragging)",
+  "keys.minimap.what": "Show or hide the minimap",
   "keys.sidebar.what": "Collapse or expand the sidebar",
   "keys.refresh.what": "Reload the repository",
   "keys.dragMerge": "Drag a commit onto a branch tip",
@@ -369,6 +378,14 @@ export const en: Record<Key, string> = {
   "hud.fit": "Fit to view (0)",
   "hud.head": "Go to HEAD (H)",
   "hud.rotate": "Rotate 90° (R) · currently {deg}°",
+  "hud.minimap": "Minimap",
+  "layout.sidebarWidth": "Sidebar width (drag · double-click to reset)",
+  "layout.panelWidth": "Right panel width (drag · double-click to reset)",
+  "hud.minimap.show": "Show the minimap (M)",
+  "hud.minimap.hide": "Hide the minimap (M)",
+  "hud.lockLabel": "Lock the map",
+  "hud.lock": "Lock the map (L) · prevents accidental merges and rebases by dragging",
+  "hud.unlock": "Unlock the map (L)",
   "pick.copy": "Cherry-pick",
   "pick.body":
     "Copies the changes from <b>“{summary}”</b> onto <b>{target}</b> as a new commit. The original SHA is recorded in the message.",
@@ -572,6 +589,7 @@ export const en: Record<Key, string> = {
   "merge.done": "Merged {source} into {target}",
 
   // commit / stash panels
+  "inspector.message": "Commit message",
   "inspector.eyebrow": "Commit",
   "inspector.copy": "Click to copy",
   "inspector.parents": "Parents",
@@ -645,6 +663,8 @@ export const en: Record<Key, string> = {
   "bp.pickedFrom": "Cherry-picked from {sha} with -x",
   "bp.showInGraph": "Show in graph",
   "bp.ignore": "Ignore",
+  "bp.refresh": "Refresh (fetch every remote)",
+  "bp.refreshed": "Fetched the remotes and compared again",
   "bp.unignore": "Unignore",
   "bp.remoteHint":
     "To compare with another repository, add it as a remote, then choose a branch such as <code>upstream/main</code> as From.",
@@ -730,6 +750,16 @@ export const en: Record<Key, string> = {
   "cf.empty": "(empty)",
   "cf.chosen": "{n} of {total} conflicts resolved",
   "cf.resolve": "Mark as resolved",
+  "cf.why.content": "Both sides changed the same lines in different ways.",
+  "cf.why.binary": "Both sides changed this binary file in different ways.",
+  "cf.why.deleted":
+    "One side deleted this file and the other changed it. Picking the side that deleted it deletes the file.",
+  "cf.why.added": "Both sides created a file with this name.",
+  "cf.lastChange": "Last change",
+  "cf.deletedHere": "Deleted",
+  "cf.newer": "Newer",
+  "cf.newer.title": "This side's last change is the more recent one (by commit time)",
+  "cf.noCommit": "No commit to show for this side",
 
   // diff sheet
   "diff.resize": "Drag to resize",
@@ -779,6 +809,20 @@ export const en: Record<Key, string> = {
   "sync.fork": "{ahead:local commit|local commits}, {behind:remote commit|remote commits}",
   "sync.rejected": "Push rejected",
   "sync.diverged": "Branches diverged",
+  "push.force.menu": "Force push (overwrite)…",
+  "push.force.title": "Force push",
+  "push.force.body":
+    "Overwrites <b>{there}</b> with your <b>{branch}</b>. Commits only the remote has drop off the remote branch.",
+  "push.force.bodyNew":
+    "Pushes <b>{branch}</b> as <b>{there}</b>. The remote doesn't have it yet, so nothing is overwritten.",
+  "push.force.lost": "As of your last fetch, {n:commit|commits} only on {there} will be dropped.",
+  "push.force.lease":
+    "Refused if someone pushed after your last fetch (--force-with-lease). Fetch first to see what changed.",
+  "push.force.go": "Overwrite",
+  "push.force.done": "Overwrote {there}",
+  "push.force.stale":
+    "Nothing was overwritten: the remote changed after your last fetch. Fetch to see what changed, then try again.\n\n{output}",
+  "sync.rejected.unknown": "The remote refused the push without saying why.",
   "sync.rejected.body":
     "<b>{upstream}</b> has commits you haven't pulled, so the push was rejected. How do you want to proceed?",
   "sync.diverged.body": "<b>{branch}</b> and <b>{upstream}</b> have diverged. How do you want to combine them?",
@@ -1178,7 +1222,6 @@ export const en: Record<Key, string> = {
   "pr.new.unreadable": "Couldn't read the repository: {error}",
   "pr.new.connect": "Connect {forge} to create {noun}s.",
   "pr.new.commits": "Commits ({n})",
-  "pr.new.more": "and {n} more",
   "pr.new.noCommits": "No commits that {base} doesn't already have",
   "pr.new.missing": "<b>{branch}</b> isn't on {remote} yet. It will be pushed first.",
   "pr.new.ahead": "<b>{branch}</b> is {n:commit|commits} ahead of {remote}. It will be pushed first.",

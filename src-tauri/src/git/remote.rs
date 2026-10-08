@@ -216,11 +216,14 @@ fn upstream_remote(repo: &Repository, upstream: &str) -> Option<String> {
 
 /// Push `branch` (default: the current one) to `remote` and make it the
 /// branch's upstream (e.g. `origin`, when it followed the original project's
-/// branch, or before opening a pull request from it).
+/// branch, or before opening a pull request from it). `force` overwrites the
+/// branch there, but only if it still is what we last fetched
+/// (`--force-with-lease`: someone else's new commits are never thrown away).
 pub fn push_to(
     path: &str,
     remote: &str,
     branch: Option<&str>,
+    force: bool,
     on_progress: impl FnMut(Progress),
 ) -> Result<OpResult> {
     let repo = open(path)?;
@@ -235,7 +238,11 @@ pub fn push_to(
         return Err(format!("{remote} is fetch-only"));
     }
     let spec = heads_refspec(valid(&branch, "heads")?);
-    let args = ["push", "--progress", "-u", remote, &spec];
+    let mut args = vec!["push", "--progress", "-u"];
+    if force {
+        args.push("--force-with-lease");
+    }
+    args.extend([remote, &spec]);
     let o = stream_remote(&dir, &args, on_progress)?;
     Ok(OpResult::with(remote_status(&o, true), o))
 }
@@ -338,6 +345,30 @@ mod tests {
 
     fn head(p: &tempfile::TempDir) -> super::super::read::HeadInfo {
         snapshot(s(p.path()), 100).unwrap().head
+    }
+
+    #[test]
+    fn force_push_to_overwrites_only_what_was_last_fetched() {
+        let (origin, a, b) = setup();
+        commit_file(b.path(), "theirs.txt", "t", "theirs");
+        git_ok(b.path(), &["push", "-q", "origin", "main"]).unwrap();
+        commit_file(a.path(), "mine.txt", "m", "mine");
+        let pa = s(a.path());
+        let tip = || git_ok(origin.path(), &["rev-parse", "main"]).unwrap();
+        let theirs = tip();
+        assert_eq!(
+            push_to(pa, "origin", None, false, |_| {}).unwrap().status,
+            OpStatus::Rejected
+        );
+        // Not fetched yet: the lease is stale, so their commit is not thrown away.
+        let r = push_to(pa, "origin", None, true, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Rejected, "{}", r.output);
+        assert_eq!(tip(), theirs);
+        // Seen (fetched): now it overwrites.
+        remote(pa, RemoteOp::Fetch, |_| {}).unwrap();
+        let r = push_to(pa, "origin", None, true, |_| {}).unwrap();
+        assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
+        assert_eq!(tip(), git_ok(a.path(), &["rev-parse", "main"]).unwrap());
     }
 
     #[test]
@@ -486,7 +517,7 @@ mod tests {
         let pa = s(a.path());
         git_ok(a.path(), &["checkout", "-q", "-b", "old-name"]).unwrap();
         commit_file(a.path(), "w.txt", "w", "work");
-        push_to(pa, "origin", None, |_| {}).unwrap();
+        push_to(pa, "origin", None, false, |_| {}).unwrap();
         git_ok(a.path(), &["checkout", "-q", "main"]).unwrap();
 
         let rename = RefOp::RenameBranch {
@@ -498,7 +529,7 @@ mod tests {
         let upstream = || git_ok(a.path(), &["rev-parse", "--abbrev-ref", "new-name@{upstream}"]).unwrap();
         assert_eq!(upstream().trim(), "origin/old-name");
 
-        let r = push_to(pa, "origin", Some("new-name"), |_| {}).unwrap();
+        let r = push_to(pa, "origin", Some("new-name"), false, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(upstream().trim(), "origin/new-name");
         let op = RemoteRefOp::DeleteBranch {
@@ -521,7 +552,7 @@ mod tests {
         // Patterns would push or match many refs at once.
         let glob = RemoteRefOp::PushTag { name: "*".into() };
         assert!(remote_ref(s(a.path()), "origin", &glob, |_| {}).is_err());
-        assert!(push_to(s(a.path()), "origin", Some("*"), |_| {}).is_err());
+        assert!(push_to(s(a.path()), "origin", Some("*"), false, |_| {}).is_err());
         git_ok(
             a.path(),
             &["remote", "set-url", "--push", "origin", super::super::NO_PUSH],
@@ -676,14 +707,14 @@ mod tests {
         let r = remote(pb, RemoteOp::Push, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Failed);
         assert!(r.output.contains("fetch-only"), "{}", r.output);
-        assert!(push_to(pb, "upstream", None, |_| {}).is_err());
+        assert!(push_to(pb, "upstream", None, false, |_| {}).is_err());
         // The original project never got the commit.
         assert_ne!(
             git_ok(a.path(), &["rev-parse", "main"]).unwrap(),
             git_ok(b.path(), &["rev-parse", "HEAD"]).unwrap()
         );
 
-        let r = push_to(pb, "origin", None, |_| {}).unwrap();
+        let r = push_to(pb, "origin", None, false, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
         assert_eq!(
@@ -693,7 +724,7 @@ mod tests {
 
         // A branch that isn't checked out goes up too, and follows its new remote copy.
         git_ok(b.path(), &["branch", "-q", "topic"]).unwrap();
-        let r = push_to(pb, "origin", Some("topic"), |_| {}).unwrap();
+        let r = push_to(pb, "origin", Some("topic"), false, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(
             git_ok(b.path(), &["rev-parse", "--abbrev-ref", "topic@{upstream}"])
@@ -702,12 +733,12 @@ mod tests {
             "origin/topic"
         );
         assert_eq!(head(&b).upstream.as_deref(), Some("origin/main"));
-        assert!(push_to(pb, "origin", Some("--all"), |_| {}).is_err());
+        assert!(push_to(pb, "origin", Some("--all"), false, |_| {}).is_err());
 
         // A branch named `+main` is pushed as itself, never as a forced push of main.
         let main_before = git_ok(origin.path(), &["rev-parse", "main"]).unwrap();
         git_ok(b.path(), &["branch", "-q", "+main", "HEAD~1"]).unwrap();
-        let r = push_to(pb, "origin", Some("+main"), |_| {}).unwrap();
+        let r = push_to(pb, "origin", Some("+main"), false, |_| {}).unwrap();
         assert_eq!(r.status, OpStatus::Ok, "{}", r.output);
         assert_eq!(
             git_ok(origin.path(), &["rev-parse", "main"]).unwrap(),

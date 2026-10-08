@@ -25,6 +25,13 @@ export interface Settings extends ExternalApps {
   rotation: Turn;
   /** Left sidebar folded to a thin rail. */
   sidebarCollapsed: boolean;
+  /** Widths of the left sidebar and the right panel (inspector, composer), px; dragged by their edges. */
+  sidebarWidth: number;
+  panelWidth: number;
+  /** The overview strip under (or beside) the graph. */
+  minimap: boolean;
+  /** The map is locked: commits can't be dragged onto each other (merge, cherry-pick, rebase, reorder). */
+  mapLocked: boolean;
   /** Sidebar sections folded shut, by id ("local", "remote", "tag", "pulls", "stash"). */
   closedSections: string[];
   /** Ask before each kind of remote work (fetch only reads, so it isn't asked by default). */
@@ -34,6 +41,11 @@ export interface Settings extends ExternalApps {
 }
 
 export const HISTORY_PAGES = [1000, 3000, 10000] as const;
+/** Resizable side widths, px. */
+export const SIDEBAR_WIDTH = { min: 180, initial: 220, max: 440 } as const;
+export const PANEL_WIDTH = { min: 280, initial: 340, max: 720 } as const;
+export const clampWidth = (w: number, range: { min: number; max: number }) =>
+  Math.round(Math.min(range.max, Math.max(range.min, w)));
 export const LANGUAGES: readonly LanguagePref[] = ["system", "ko", "en"];
 
 export function defaults(reducedMotion = false): Settings {
@@ -46,6 +58,10 @@ export function defaults(reducedMotion = false): Settings {
     language: "system",
     rotation: 0,
     sidebarCollapsed: false,
+    sidebarWidth: SIDEBAR_WIDTH.initial,
+    panelWidth: PANEL_WIDTH.initial,
+    minimap: true,
+    mapLocked: false,
     closedSections: [],
     confirmRemote: { fetch: false, pull: true, push: true },
     profiles: [],
@@ -84,6 +100,16 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
     language: LANGUAGES.find((l) => l === o.language) ?? base.language,
     rotation: ([0, 1, 2, 3] as const).find((r) => r === o.rotation) ?? base.rotation,
     sidebarCollapsed: typeof o.sidebarCollapsed === "boolean" ? o.sidebarCollapsed : base.sidebarCollapsed,
+    sidebarWidth:
+      typeof o.sidebarWidth === "number" && Number.isFinite(o.sidebarWidth)
+        ? clampWidth(o.sidebarWidth, SIDEBAR_WIDTH)
+        : base.sidebarWidth,
+    panelWidth:
+      typeof o.panelWidth === "number" && Number.isFinite(o.panelWidth)
+        ? clampWidth(o.panelWidth, PANEL_WIDTH)
+        : base.panelWidth,
+    minimap: typeof o.minimap === "boolean" ? o.minimap : base.minimap,
+    mapLocked: typeof o.mapLocked === "boolean" ? o.mapLocked : base.mapLocked,
     closedSections:
       Array.isArray(o.closedSections) && o.closedSections.every((x) => typeof x === "string")
         ? o.closedSections
@@ -140,6 +166,8 @@ export const SHORTCUTS: { group: Key; items: Shortcut[] }[] = [
       { keys: "0", what: "keys.fit.what" },
       { keys: "H", what: "keys.head.what" },
       { keys: "R", what: "keys.rotate.what" },
+      { keys: "L", what: "keys.lock.what" },
+      { keys: "M", what: "keys.minimap.what" },
       { keys: "⌘/Ctrl + B", what: "keys.sidebar.what" },
       { keys: "⌘/Ctrl + R", what: "keys.refresh.what" },
       { keys: "keys.dragMerge", what: "keys.dragMerge.what" },

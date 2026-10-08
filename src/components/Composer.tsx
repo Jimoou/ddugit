@@ -16,6 +16,8 @@ interface Props {
   busy: boolean;
   onClose(): void;
   onOpenFile(path: string): void;
+  /** The file whose changes are open in the diff sheet, marked in the list. */
+  viewing?: string | null;
   /** Full message of HEAD, prefilled when switching to amend; `null` without commits. */
   headMessage: string | null;
   /** Message to start with (a squash merge's summary). */
@@ -212,6 +214,8 @@ export function Composer(props: Props) {
           return (
             <li
               key={c.path}
+              className={props.viewing === c.path ? "viewing" : undefined}
+              aria-current={props.viewing === c.path ? "true" : undefined}
               onContextMenu={(e) => {
                 e.preventDefault();
                 props.onFileMenu(c, e.clientX, e.clientY);

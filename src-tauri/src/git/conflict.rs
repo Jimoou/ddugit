@@ -1,4 +1,8 @@
-//! Merge conflict inspection and resolution for a single file.
+//! Merge conflict inspection and resolution for a single file, and why it
+//! conflicts: what each side did to it (index stages) and the commit that last
+//! changed it (`sides`).
+
+mod sides;
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -6,6 +10,7 @@ use std::path::{Component, Path, PathBuf};
 use git2::Repository;
 use serde::{Deserialize, Serialize};
 
+use super::search::SearchHit;
 use super::{err, git_ok, literal, open, workdir, OpResult, OpStatus, Result, LITERAL};
 
 #[derive(Debug, Serialize, Clone)]
@@ -21,6 +26,27 @@ pub struct ConflictFile {
     /// Working-tree file with conflict markers.
     pub merged: String,
     pub binary: bool,
+    pub kind: ConflictKind,
+    /// The last commit on HEAD's side that changed the file since the sides parted.
+    pub ours_change: Option<SearchHit>,
+    /// The same on the incoming side; for a pick, revert or rebase step, the commit
+    /// being applied. `None` when no ref names the incoming commit (a squash merge,
+    /// a stash pop, a plain patch).
+    pub theirs_change: Option<SearchHit>,
+}
+
+/// What the index stages say the two sides did to the file.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ConflictKind {
+    /// Both sides changed it (the same lines, or a binary file).
+    Content,
+    /// HEAD's side deleted it, the incoming side changed it.
+    DeletedByUs,
+    /// The incoming side deleted it, HEAD's side changed it.
+    DeletedByThem,
+    /// Both sides added a file at this path.
+    AddedByBoth,
 }
 
 /// How to resolve one conflicted file; the frontend sends `{ kind, ... }`.
@@ -59,8 +85,16 @@ fn inside(dir: &Path, file: &str) -> Result<PathBuf> {
     Ok(full)
 }
 
+/// The conflicted `file` with each side's last change (see [`sides::last_changes`]).
 pub fn conflict_file(path: &str, file: &str) -> Result<ConflictFile> {
     let repo = open(path)?;
+    let mut c = read(&repo, file)?;
+    (c.ours_change, c.theirs_change) = sides::last_changes(&repo, file);
+    Ok(c)
+}
+
+/// The conflicted `file`'s stages and work-tree text, without looking through history.
+fn read(repo: &Repository, file: &str) -> Result<ConflictFile> {
     let index = repo.index().map_err(err)?;
     let conflict = index
         .conflicts()
@@ -72,11 +106,17 @@ pub fn conflict_file(path: &str, file: &str) -> Result<ConflictFile> {
                 .any(|e| e.as_ref().is_some_and(|e| e.path == file.as_bytes()))
         })
         .ok_or_else(|| format!("'{file}' is not in conflict"))?;
-    let (base, b1) = blob_text(&repo, conflict.ancestor.as_ref());
-    let (ours, b2) = blob_text(&repo, conflict.our.as_ref());
-    let (theirs, b3) = blob_text(&repo, conflict.their.as_ref());
+    let kind = match (&conflict.ancestor, &conflict.our, &conflict.their) {
+        (Some(_), None, Some(_)) => ConflictKind::DeletedByUs,
+        (Some(_), Some(_), None) => ConflictKind::DeletedByThem,
+        (None, Some(_), Some(_)) => ConflictKind::AddedByBoth,
+        _ => ConflictKind::Content,
+    };
+    let (base, b1) = blob_text(repo, conflict.ancestor.as_ref());
+    let (ours, b2) = blob_text(repo, conflict.our.as_ref());
+    let (theirs, b3) = blob_text(repo, conflict.their.as_ref());
     // A symlink in the work tree is not followed: its target may be anywhere.
-    let merged = inside(&workdir(&repo)?, file)
+    let merged = inside(&workdir(repo)?, file)
         .ok()
         .and_then(|p| fs::read(p).ok())
         .map(|b| String::from_utf8_lossy(&b).into_owned())
@@ -88,6 +128,9 @@ pub fn conflict_file(path: &str, file: &str) -> Result<ConflictFile> {
         theirs,
         merged,
         binary: b1 || b2 || b3,
+        kind,
+        ours_change: None,
+        theirs_change: None,
     })
 }
 
@@ -97,8 +140,8 @@ pub fn resolve(path: &str, file: &str, how: &Resolution) -> Result<OpResult> {
     let repo = open(path)?;
     let dir = workdir(&repo)?;
     let side = match how {
-        Resolution::Ours => Some(("--ours", conflict_file(path, file)?.ours.is_some())),
-        Resolution::Theirs => Some(("--theirs", conflict_file(path, file)?.theirs.is_some())),
+        Resolution::Ours => Some(("--ours", read(&repo, file)?.ours.is_some())),
+        Resolution::Theirs => Some(("--theirs", read(&repo, file)?.theirs.is_some())),
         Resolution::Content { .. } => None,
     };
     let out = match (how, side) {
@@ -109,7 +152,7 @@ pub fn resolve(path: &str, file: &str, how: &Resolution) -> Result<OpResult> {
         }
         (Resolution::Content { text }, None) => {
             // Only a file that is in conflict, and only inside the work tree.
-            conflict_file(path, file)?;
+            read(&repo, file)?;
             fs::write(inside(&dir, file)?, text).map_err(err)?;
             git_ok(&dir, &[LITERAL, "add", "--", file])?
         }

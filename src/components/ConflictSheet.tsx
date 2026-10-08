@@ -1,8 +1,9 @@
 import { Icon } from "./Icon";
 import { useMemo, useState } from "react";
 import { api } from "../api";
-import { blockText, conflictCount, parseConflicts, type Pick, resolveText } from "../conflict";
-import type { Resolution } from "../types";
+import { blockText, conflictCount, newerSide, parseConflicts, type Pick, resolveText } from "../conflict";
+import { fmtAgo, fmtTime } from "../format";
+import type { ConflictFile, ConflictKind, Resolution, SearchHit } from "../types";
 import { type Key, t } from "../i18n";
 import { useDialog } from "./useDialog";
 import { useLoaded } from "./useLoaded";
@@ -20,6 +21,8 @@ interface Props {
   onMergeTool(file: string): Promise<void>;
   /** A file's right-click menu (open it outside the app). */
   onFileMenu(file: string, x: number, y: number): void;
+  /** Select a side's last commit in the graph. */
+  onShowCommit(id: string): void;
   onClose(): void;
 }
 
@@ -34,6 +37,67 @@ const SIDES: Record<string, [ours: Key, theirs: Key]> = {
   revert: ["cf.side.current", "cf.side.reverting"],
   am: ["cf.side.current", "cf.side.patch"],
 };
+
+/** Why the file conflicts, from what the index stages say the sides did. */
+const WHY: Record<ConflictKind, Key> = {
+  content: "cf.why.content",
+  deletedByUs: "cf.why.deleted",
+  deletedByThem: "cf.why.deleted",
+  addedByBoth: "cf.why.added",
+};
+
+/**
+ * Why the file conflicts, and per side the commit that last changed it (the newer one marked),
+ * so it is clear what each side is before picking one.
+ */
+function ConflictWhy({
+  data,
+  names,
+  onShow,
+}: {
+  data: ConflictFile;
+  names: [string, string];
+  onShow(id: string): void;
+}) {
+  const newer = newerSide(data.oursChange, data.theirsChange);
+  const why = data.kind === "content" && data.binary ? "cf.why.binary" : WHY[data.kind];
+  const side = (which: "ours" | "theirs", name: string, change: SearchHit | null, deleted: boolean) => (
+    <div className={`why-side ${which}`}>
+      <em>
+        {name}
+        {deleted && <span className="tag">{t("cf.deletedHere")}</span>}
+        {newer === which && (
+          <span className="tag newer" title={t("cf.newer.title")}>
+            {t("cf.newer")}
+          </span>
+        )}
+      </em>
+      {change ? (
+        <span className="change">
+          <span className="muted">{t("cf.lastChange")}</span>
+          <button className="id" onClick={() => onShow(change.id)} title={t("bp.showInGraph")}>
+            {change.id.slice(0, 7)}
+          </button>
+          <span className="summary">{change.summary}</span>
+          <span className="muted" title={fmtTime(change.time)}>
+            {change.author} · {fmtAgo(change.time)}
+          </span>
+        </span>
+      ) : (
+        <span className="change muted">{t("cf.noCommit")}</span>
+      )}
+    </div>
+  );
+  return (
+    <div className="conflict-why">
+      <p>{t(why)}</p>
+      <div className="why-sides">
+        {side("ours", names[0], data.oursChange, data.kind === "deletedByUs")}
+        {side("theirs", names[1], data.theirsChange, data.kind === "deletedByThem")}
+      </div>
+    </div>
+  );
+}
 
 /** Bottom sheet for resolving conflicts block by block (or a whole file at once). */
 export function ConflictSheet(props: Props) {
@@ -111,6 +175,7 @@ export function ConflictSheet(props: Props) {
 
         <div className="diff-body conflict-body">
           {error && <p className="note warn">{error}</p>}
+          {data && <ConflictWhy data={data} names={[ours, theirs]} onShow={props.onShowCommit} />}
           {data?.binary && (
             <div className="pad row">
               <p className="muted">{t("cf.binary")}</p>

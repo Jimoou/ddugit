@@ -162,8 +162,8 @@ command!(git_remote(path: String, op: RemoteOp, on_progress: Channel<Progress>) 
     => git::remote::remote(&path, op, |p| { let _ = on_progress.send(p); }));
 command!(git_fetch_remote(path: String, name: String, on_progress: Channel<Progress>) -> OpResult
     => git::remote::fetch_one(&path, &name, |p| { let _ = on_progress.send(p); }));
-command!(git_push_to(path: String, remote: String, branch: Option<String>, on_progress: Channel<Progress>) -> OpResult
-    => git::remote::push_to(&path, &remote, branch.as_deref(), |p| { let _ = on_progress.send(p); }));
+command!(git_push_to(path: String, remote: String, branch: Option<String>, force: Option<bool>, on_progress: Channel<Progress>) -> OpResult
+    => git::remote::push_to(&path, &remote, branch.as_deref(), force.unwrap_or(false), |p| { let _ = on_progress.send(p); }));
 command!(git_remote_ref(path: String, remote: String, op: RemoteRefOp, on_progress: Channel<Progress>) -> OpResult
     => git::remote::remote_ref(&path, &remote, &op, |p| { let _ = on_progress.send(p); }));
 command!(git_skip(path: String) -> OpResult => git::write::skip(&path));

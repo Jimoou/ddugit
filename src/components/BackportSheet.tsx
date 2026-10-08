@@ -22,6 +22,8 @@ interface Props {
   /** With fewer than two remotes, explain how to add the other repository. */
   remoteCount: number;
   onAddRemote(): void;
+  /** Fetch every remote: the other repository's branches as they are now. */
+  onRefresh(): Promise<unknown>;
   /** Changes whenever the repository does, so the list reloads. */
   version: unknown;
   busy: boolean;
@@ -82,20 +84,28 @@ export function BackportSheet(p: Props) {
   const [reload, setReload] = useState(0);
   // Overview rows belong to one source (and repo state); others are stale.
   const tallyKey = `${source}\n${p.targets.join("\n")}`;
-  const [tallies, setTallies] = useState<{ key: string; version: unknown; rows: BackportTally[] } | null>(null);
-  const rows = tallies && tallies.key === tallyKey && tallies.version === version ? tallies.rows : null;
+  const [tallies, setTallies] = useState<{
+    key: string;
+    version: unknown;
+    reload: number;
+    rows: BackportTally[];
+  } | null>(null);
+  const rows =
+    tallies && tallies.key === tallyKey && tallies.version === version && tallies.reload === reload
+      ? tallies.rows
+      : null;
 
   useEffect(() => {
     if (view !== "targets") return;
     let live = true;
     api.backportSummary(path, source, p.targets).then(
-      (r) => live && setTallies({ key: tallyKey, version, rows: r }),
+      (r) => live && setTallies({ key: tallyKey, version, reload, rows: r }),
       (e) => live && setError(String(e)),
     );
     return () => {
       live = false;
     };
-  }, [view, path, source, p.targets, tallyKey, version]);
+  }, [view, path, source, p.targets, tallyKey, version, reload]);
 
   useEffect(() => {
     let live = true;
@@ -181,6 +191,15 @@ export function BackportSheet(p: Props) {
             { value: "targets", label: t("bp.tab.targets") },
           ]}
         />
+        <button
+          className="icon"
+          disabled={p.busy}
+          onClick={() => void p.onRefresh().then(() => setReload((r) => r + 1))}
+          title={t("bp.refresh")}
+          aria-label={t("bp.refresh")}
+        >
+          <Icon name="refresh" />
+        </button>
         <button className="icon" onClick={p.onClose} title={t("common.close")}>
           <Icon name="close" />
         </button>

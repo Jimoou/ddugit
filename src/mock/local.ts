@@ -237,10 +237,22 @@ export const localCommands = {
   conflict_file({ file }) {
     const merged = repo.pending?.files.get(file);
     if (merged === undefined) return fail(`'${file}' is not in conflict`);
+    // Each side's last change: HEAD's tip, and the incoming commit when a ref would name it (not for a
+    // squash merge, a stash pop or a plain patch).
+    const hit = (id: string | undefined) => {
+      const c = id === undefined ? undefined : repo.commits.get(id);
+      return c ? { id: c.id, summary: c.summary, author: c.author, time: c.time } : null;
+    };
+    const named = ["merge", "cherry-pick", "revert", "rebase"].includes(repo.state);
+    const sides = {
+      kind: "content" as const,
+      oursChange: hit(repo.branches.get(repo.head)),
+      theirsChange: named ? hit(repo.pending?.source) : null,
+    };
     if (merged === DEMO_BINARY)
-      return delay({ path: file, base: null, ours: null, theirs: null, merged: "", binary: true });
+      return delay({ path: file, base: null, ours: null, theirs: null, merged: "", binary: true, ...sides });
     const side = (pick: 1 | 2) => merged.replace(/<<<<<<< .*\n([\s\S]*?)=======\n([\s\S]*?)>>>>>>> .*\n/g, `$${pick}`);
-    return delay({ path: file, base: null, ours: side(1), theirs: side(2), merged, binary: false });
+    return delay({ path: file, base: null, ours: side(1), theirs: side(2), merged, binary: false, ...sides });
   },
 
   git_resolve({ file, how }) {

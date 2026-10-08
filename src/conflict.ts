@@ -85,3 +85,9 @@ function edited(s: Conflict, text: string): string {
 }
 
 export const conflictCount = (segments: Segment[]) => segments.filter((s) => s.kind === "conflict").length;
+
+/** The side whose last change to the file is newer by commit time; null on a tie or when a side is unknown. */
+export function newerSide(ours: { time: number } | null, theirs: { time: number } | null): "ours" | "theirs" | null {
+  if (!ours || !theirs || ours.time === theirs.time) return null;
+  return ours.time > theirs.time ? "ours" : "theirs";
+}

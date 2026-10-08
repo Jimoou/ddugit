@@ -8,6 +8,8 @@ export const ko = {
   "common.closeEsc": "닫기 (Esc)",
   "common.none": "없음",
   "common.noMessage": "(메시지 없음)",
+  "common.copy": "복사",
+  "common.copied": "복사했어요",
 
   // top bar
   "top.emptyRepo": "빈 저장소",
@@ -106,6 +108,7 @@ export const ko = {
   "graph.aria": "커밋 그래프. 화살표로 커밋 이동, Enter로 메뉴, + - 0 H로 확대·전체·HEAD",
   "graph.hint":
     "끌어서 이동 · ⌘/Ctrl+휠 확대 · ⌘/Ctrl+F 검색 · 점을 다른 브랜치 끝에 놓으면 병합 · Shift+끌기로 순서 바꾸기",
+  "graph.hint.locked": "맵 잠김: 끌면 이동만 해요 (병합·cherry-pick·rebase 끌기 꺼짐) · L로 풀기",
   "graph.hint.truncated": " · 최근 {n}개 표시 중",
   "drag.merge:idle": "병합할 브랜치 끝으로 끌어다 놓으세요 · ⌥/Alt: cherry-pick · Shift: 순서 바꾸기 · ⌘/Ctrl: rebase",
   "drag.merge:ok": "놓으면 병합해요",
@@ -129,6 +132,9 @@ export const ko = {
   "settings.sparkle": "반짝임 효과",
   "settings.space": "우주 배경",
   "settings.glow": "빛 번짐",
+  "settings.map": "브랜치 맵",
+  "settings.minimap": "미니맵 보이기 (M)",
+  "settings.mapLocked": "맵 잠금: 끌어서 병합·cherry-pick·rebase 하지 않기 (L)",
   "settings.confirmRemote": "실행 전에 확인",
   "pro.title": "ddugit Pro",
   "pro.feature.pulls": "비공개 저장소와 회사 서버의 PR·MR 연동은 Pro 기능이에요.",
@@ -277,6 +283,8 @@ export const ko = {
   "keys.fit.what": "전체 보기",
   "keys.head.what": "HEAD로",
   "keys.rotate.what": "그래프를 90°씩 돌리기",
+  "keys.lock.what": "맵 잠그기·풀기 (잠기면 끌어서 병합·cherry-pick·rebase 안 됨)",
+  "keys.minimap.what": "미니맵 보이기·숨기기",
   "keys.sidebar.what": "사이드바 접기·펼치기",
   "keys.refresh.what": "저장소 다시 읽기",
   "keys.dragMerge": "점 끌어 브랜치 끝에 놓기",
@@ -363,6 +371,14 @@ export const ko = {
   "hud.fit": "전체 보기 (0)",
   "hud.head": "HEAD로 (H)",
   "hud.rotate": "그래프 90° 돌리기 (R) · 지금 {deg}°",
+  "hud.minimap": "미니맵",
+  "layout.sidebarWidth": "사이드바 너비 (끌기 · 두 번 눌러 기본값)",
+  "layout.panelWidth": "오른쪽 패널 너비 (끌기 · 두 번 눌러 기본값)",
+  "hud.minimap.show": "미니맵 보이기 (M)",
+  "hud.minimap.hide": "미니맵 숨기기 (M)",
+  "hud.lockLabel": "맵 잠금",
+  "hud.lock": "맵 잠그기 (L) · 끌어서 병합·rebase하는 실수를 막아요",
+  "hud.unlock": "맵 잠금 풀기 (L)",
   "pick.copy": "복사",
   "pick.body":
     "<b>“{summary}”</b> 커밋의 변경을 <b>{target}</b>에 새 커밋으로 복사해요. 원래 커밋의 SHA가 메시지에 기록돼요.",
@@ -561,6 +577,7 @@ export const ko = {
   "merge.done": "{source:을} {target}에 병합했어요",
 
   // commit / stash panels
+  "inspector.message": "커밋 메시지",
   "inspector.eyebrow": "커밋",
   "inspector.copy": "클릭해서 복사",
   "inspector.parents": "병합한 부모",
@@ -635,6 +652,8 @@ export const ko = {
   "bp.showInGraph": "그래프에서 보기",
   "bp.ignore": "제외",
   "bp.unignore": "제외 취소",
+  "bp.refresh": "새로고침 (모든 원격 Fetch)",
+  "bp.refreshed": "원격을 가져와 다시 비교했어요",
   "bp.remoteHint":
     "다른 저장소와 비교하려면 원격으로 추가한 뒤 <code>upstream/main</code> 같은 브랜치를 가져올 쪽으로 고르세요.",
   "bp.addRemote": "원격 추가…",
@@ -719,6 +738,15 @@ export const ko = {
   "cf.empty": "(비어 있음)",
   "cf.chosen": "충돌 {total}개 중 {n}개 선택",
   "cf.resolve": "이 파일 해결 완료",
+  "cf.why.content": "두 쪽이 같은 부분을 서로 다르게 고쳤어요.",
+  "cf.why.binary": "두 쪽이 이 바이너리 파일을 서로 다르게 고쳤어요.",
+  "cf.why.deleted": "한쪽은 이 파일을 지우고 다른 쪽은 고쳤어요. 지운 쪽을 고르면 파일이 지워져요.",
+  "cf.why.added": "두 쪽이 같은 이름의 파일을 각각 만들었어요.",
+  "cf.lastChange": "마지막 변경",
+  "cf.deletedHere": "지움",
+  "cf.newer": "더 최근",
+  "cf.newer.title": "이쪽의 마지막 변경이 더 최근이에요 (커밋 시각 기준)",
+  "cf.noCommit": "이쪽 커밋은 알 수 없어요",
 
   // diff sheet
   "diff.resize": "끌어서 높이 조절",
@@ -768,6 +796,20 @@ export const ko = {
   "sync.fork": "내 커밋 {ahead}개, 원격 커밋 {behind}개",
   "sync.rejected": "Push 거부됨",
   "sync.diverged": "갈라진 이력",
+  "push.force.menu": "강제 push (덮어쓰기)…",
+  "push.force.title": "강제 push",
+  "push.force.body":
+    "<b>{there}</b>{:를} 내 <b>{branch}</b>{:로} 덮어써요. 원격에만 있는 커밋은 원격 브랜치에서 사라져요.",
+  "push.force.bodyNew":
+    "<b>{branch}</b>{:를} <b>{there}</b>{:로} 올려요. 원격에 아직 없는 브랜치라 덮어쓸 것은 없어요.",
+  "push.force.lost": "마지막으로 가져온 기준으로 {there}에만 있는 커밋 {n}개가 사라져요.",
+  "push.force.lease":
+    "마지막으로 가져온(fetch) 뒤에 누가 push했다면 거부돼요(--force-with-lease). 그럴 때는 먼저 Fetch해서 확인하세요.",
+  "push.force.go": "덮어쓰기",
+  "push.force.done": "{there}{:를} 덮어썼어요",
+  "push.force.stale":
+    "덮어쓰지 않았어요. 마지막으로 가져온 뒤에 원격이 바뀌었어요. Fetch해서 무엇이 바뀌었는지 보고 다시 하세요.\n\n{output}",
+  "sync.rejected.unknown": "원격이 push를 거부했어요. git이 이유를 남기지 않았어요.",
   "sync.rejected.body": "<b>{upstream}</b>에 내가 아직 받지 않은 커밋이 있어서 push가 거부됐어요. 어떻게 올릴까요?",
   "sync.diverged.body": "<b>{branch}</b>{:와} <b>{upstream}</b>의 이력이 갈라졌어요. 어떻게 합칠까요?",
   "sync.ask.title.fetch": "Fetch",
@@ -1161,7 +1203,6 @@ export const ko = {
   "pr.new.unreadable": "저장소 정보를 읽지 못했어요: {error}",
   "pr.new.connect": "{forge}에 연결해야 {noun:을} 만들 수 있어요.",
   "pr.new.commits": "커밋 {n}개",
-  "pr.new.more": "외 {n}개",
   "pr.new.noCommits": "{base}에 없는 커밋이 없어요",
   "pr.new.missing": "<b>{branch}</b>{:이} 아직 {remote}에 없어요. 먼저 올려요.",
   "pr.new.ahead": "<b>{branch}</b>에 {remote}에 안 올린 커밋이 {n}개 있어요. 먼저 올려요.",

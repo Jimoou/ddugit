@@ -79,6 +79,18 @@ the first commit. Refs, HEAD, status and stashes take under 10 ms together.
 On the same input the new `computeLayout` returns exactly the old layout (checked node by node at 3k and 100k), and
 `straightRuns` the old runs.
 
+### Web: drawing zoomed out with labels (v1.1.2)
+
+Branch names and brief commit summaries now show from 30 % zoom (`ZOOM.briefs`), placed on a cell grid
+(`captions.ts`). One `draw()` centred mid-history (`drawBrief`, and with a search lighting every third commit so
+nothing folds, `drawBriefSearch`), median of 15, ms:
+
+| commits | draw at 100 % | draw at 30 % | draw at 30 %, searching |
+| ------- | ------------- | ------------ | ----------------------- |
+| 3k      | 1.2           | 2.3          | 1.6                     |
+| 10k     | 1.0           | 3.0          | 2.2                     |
+| 100k    | 1.5           | 2.9          | 1.9                     |
+
 ### Web: in the demo
 
 | step                                         | before                     | after                |

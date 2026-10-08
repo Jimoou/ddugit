@@ -84,6 +84,13 @@ interface Props {
   rotation: Turn;
   /** The rotate key was pressed. */
   onRotate?(): void;
+  /** Show the overview strip. */
+  minimap: boolean;
+  /** Locked: dragging a commit moves the map instead of starting a merge, cherry-pick or rebase. */
+  locked: boolean;
+  /** The lock key (L) or the minimap key (M) was pressed. */
+  onToggleLock?(): void;
+  onToggleMinimap?(): void;
   /** The commit under the pointer changed (null: none, or the view moved). For the preview card. */
   onHover?(id: string | null): void;
 }
@@ -597,6 +604,13 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       return;
     }
     if (s.press && !s.drag && Math.hypot(p.x - s.press.x, p.y - s.press.y) > 6) {
+      if (propsRef.current.locked) {
+        // A locked map only moves: the press becomes a pan from where it started.
+        s.pan = { x: s.press.x, y: s.press.y, tx: s.view.tx, ty: s.view.ty, moved: true };
+        s.press = null;
+        setCursor("grabbing");
+        return onPointerMove(e);
+      }
       s.drag = { from: s.press.id, to: p, target: null, valid: false, mode: "merge" };
     }
     if (s.drag) {
@@ -677,11 +691,15 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       if ((e.target as Element).closest?.("[aria-modal]")) return;
       // Every tab keeps its graph mounted; only the one on screen takes keys.
       if (!isOnScreen(canvasRef.current)) return;
+      const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
       if (e.key === "=" || e.key === "+") api.zoomBy(1.25);
       else if (e.key === "-") api.zoomBy(0.8);
       else if (e.key === "0") api.fit();
       else if (e.key === "h" || e.key === "H") api.centerOnHead();
-      else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) propsRef.current.onRotate?.();
+      else if (plain && (e.key === "r" || e.key === "R")) propsRef.current.onRotate?.();
+      // By key position too, so they work with a Korean input mode on.
+      else if (plain && e.code === "KeyL") propsRef.current.onToggleLock?.();
+      else if (plain && e.code === "KeyM") propsRef.current.onToggleMinimap?.();
       else if (e.key === "Escape") {
         // Esc that closes a menu, sheet or dialog leaves the selection alone.
         if (hasOpenLayer()) return;
@@ -714,7 +732,10 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
   });
 
   return (
-    <div className={`graph ${upright(props.rotation) ? "upright" : ""}`}>
+    <div
+      className={`graph ${upright(props.rotation) ? "upright" : ""} ${props.minimap ? "" : "no-minimap"}`}
+      data-locked={props.locked || undefined}
+    >
       <div className="graph-area" ref={wrapRef}>
         <canvas
           ref={canvasRef}
@@ -751,18 +772,20 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       {dragHint && (
         <div className={`drag-hint ${dragHint.split(":")[1]} ${dragHint.split(":")[0]}`}>{t(`drag.${dragHint}`)}</div>
       )}
-      <Minimap
-        ref={minimap}
-        scene={scene}
-        rotation={props.rotation}
-        getView={() => st.current.view}
-        getSize={() => st.current.size}
-        onJump={(world) => {
-          st.current.target = null;
-          st.current.view = viewFor(world, st.current.view.k);
-          wake.current();
-        }}
-      />
+      {props.minimap && (
+        <Minimap
+          ref={minimap}
+          scene={scene}
+          rotation={props.rotation}
+          getView={() => st.current.view}
+          getSize={() => st.current.size}
+          onJump={(world) => {
+            st.current.target = null;
+            st.current.view = viewFor(world, st.current.view.k);
+            wake.current();
+          }}
+        />
+      )}
     </div>
   );
 });

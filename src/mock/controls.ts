@@ -95,6 +95,8 @@ export const demoControls = {
   lastPick: null as { op: PickOp; ids: string[]; mainline: number | null } | null,
   /** Make the next merge, cherry-pick, revert, rebase or stash pop stop on a conflict in two files. */
   conflictNext: false,
+  /** The next push to a named remote is refused with this git output (a forced one goes through). */
+  rejectNextPush: null as string | null,
   /** The next conflict also stops on a binary file (`assets/logo.png`), resolved by picking a side. */
   binaryConflict: false,
   /** Make the next commit fail while signing, the way gpg or ssh-keygen report it. */

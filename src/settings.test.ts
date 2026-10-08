@@ -22,6 +22,10 @@ describe("parseSettings", () => {
       language: "system",
       rotation: 0,
       sidebarCollapsed: false,
+      sidebarWidth: 220,
+      panelWidth: 340,
+      minimap: true,
+      mapLocked: false,
       closedSections: [],
       confirmRemote: { fetch: false, pull: true, push: true },
       profiles: [],
@@ -51,6 +55,20 @@ describe("parseSettings", () => {
     expect(parseSettings(JSON.stringify({ rotation: 4 }), base).rotation).toBe(0);
     expect(parseSettings(JSON.stringify({ language: "en" }), base).language).toBe("en");
     expect(parseSettings(JSON.stringify({ historyPage: 10000 }), base).historyPage).toBe(10000);
+  });
+  it("keeps side widths within their ranges, and the minimap and lock switches", () => {
+    expect(parseSettings(JSON.stringify({ sidebarWidth: 301.6, panelWidth: 5000 }), base)).toMatchObject({
+      sidebarWidth: 302,
+      panelWidth: 720,
+    });
+    expect(parseSettings(JSON.stringify({ sidebarWidth: "wide", panelWidth: null }), base)).toMatchObject({
+      sidebarWidth: 220,
+      panelWidth: 340,
+    });
+    expect(parseSettings(JSON.stringify({ minimap: false, mapLocked: true }), base)).toMatchObject({
+      minimap: false,
+      mapLocked: true,
+    });
   });
   it("respects reduced motion by default", () => {
     expect(defaults(true).animate).toBe(false);

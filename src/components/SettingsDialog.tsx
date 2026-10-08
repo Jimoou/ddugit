@@ -85,7 +85,7 @@ export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Pr
 type SectionProps = Pick<Props, "settings" | "onChange">;
 
 function ScreenSection({ settings, onChange }: SectionProps) {
-  const check = (key: "animate" | "space" | "glow", text: string) => (
+  const check = (key: "animate" | "space" | "glow" | "minimap" | "mapLocked", text: string) => (
     <label className="check">
       <input type="checkbox" checked={settings[key]} onChange={(e) => onChange({ [key]: e.target.checked })} />
       {text}
@@ -112,6 +112,11 @@ function ScreenSection({ settings, onChange }: SectionProps) {
           {check("animate", t("settings.sparkle"))}
           {check("space", t("settings.space"))}
           {check("glow", t("settings.glow"))}
+        </div>
+        <span>{t("settings.map")}</span>
+        <div className="checks">
+          {check("minimap", t("settings.minimap"))}
+          {check("mapLocked", t("settings.mapLocked"))}
         </div>
         <span>{t("settings.confirmRemote")}</span>
         <div className="checks">

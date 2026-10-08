@@ -10,13 +10,11 @@ import { commitsBetween, defaultBody, defaultTitle, pickBase, pushNeed, remoteBr
 import { FORGE_NAME, prNoun } from "./Pulls";
 import { ProBadge } from "./ProOffer";
 import type { ForgeKind, ForgeStatus, PrTarget, RepoSnapshot } from "../types";
+import { CommitList } from "./CommitList";
 import { Modal } from "./Modal";
 
 /** `#12` / `!12`. */
 export const prTag = (kind: ForgeKind, n: number) => `${kind === "gitlab" ? "!" : "#"}${n}`;
-
-/** Shown in the commit list before "and n more". */
-const LISTED = 8;
 
 interface Props {
   path: string;
@@ -209,18 +207,7 @@ export function CreatePr(p: Props) {
             <div className="muted small">
               {empty ? t("pr.new.noCommits", { base: chosenBase ?? "" }) : t("pr.new.commits", { n: commits.length })}
             </div>
-            {!empty && (
-              <ul>
-                {commits.slice(0, LISTED).map((c) => (
-                  <li key={c.id}>
-                    <code>{c.id.slice(0, 7)}</code> {c.summary}
-                  </li>
-                ))}
-                {commits.length > LISTED && (
-                  <li className="muted">{t("pr.new.more", { n: commits.length - LISTED })}</li>
-                )}
-              </ul>
-            )}
+            {!empty && <CommitList commits={commits} />}
           </div>
         )}
       </fieldset>

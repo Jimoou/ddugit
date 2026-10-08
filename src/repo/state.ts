@@ -162,7 +162,8 @@ export interface Repo {
    * Push `branch` (default: the current one) to `remote` and follow it there; `done` is the toast.
    * True when it went up (a refusal or missing sign-in has been explained already).
    */
-  pushTo(remote: string, branch?: string | null, done?: string): Promise<boolean>;
+  /** `force`: overwrite the branch there (`--force-with-lease`). */
+  pushTo(remote: string, branch?: string | null, done?: string, force?: boolean): Promise<boolean>;
   /** Push a tag to a remote, or delete a branch or tag there (after any confirmation in `actions.tsx`); true when done. */
   remoteRef(remote: string, op: RemoteRefOp, done: string): Promise<boolean>;
   canDropOn(target: string, source: string, mode: Drag["mode"]): boolean;
