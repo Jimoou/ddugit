@@ -45,7 +45,7 @@ Linux에서 Rust 빌드 시 webkit2gtk-4.1 등이 필요하다. `tauri::generate
   - `remote.rs`: fetch/pull/push (`RemoteOp` 테이블), 다른 원격으로 push(`push_to`), 이름 있는 원격의 참조 작업 `remote_ref`(`RemoteRefOp`: deleteBranch / pushTag / deleteTag / pushTags, 전체 참조 이름, 가져오기 전용 원격은 거부). 화면은 `useRemote.remoteRef`, 태그 메뉴(원격마다 push·삭제, 분리된 HEAD로 체크아웃), 원격 메뉴 '모든 태그 올리기', 태그 창의 push 체크박스(`NameRequest.check`)
   - `watch.rs`: 파일 감시 (관련 경로만 걸러 `repo-changed` 이벤트, `lib.rs`의 `Watching` 상태가 하나만 유지)
   - `diff.rs`: 커밋 diff, 두 리비전 비교(`range_diff`, `merge_base`면 갈라진 지점부터 `from...to`, 이름 바뀜 포함), 작업 트리 diff (`DiffScope`: all / unstaged / staged, `local_diff`는 스테이징과 hunk 순서를 공유)
-  - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content)
+  - `conflict.rs`: 충돌 파일 읽기(base / ours / theirs / 마커), 해결(Ours / Theirs / Content). 왜 충돌했는지: index 단계로 `ConflictKind`(내용·한쪽 삭제·양쪽 추가), `conflict/sides.rs`가 쪽마다 merge base 이후 그 파일을 마지막으로 바꾼 커밋(libgit2, 시각 순 최대 2000개, 들어오는 쪽은 MERGE_HEAD 이력 또는 CHERRY_PICK/REVERT/REBASE_HEAD 그 커밋, squash·stash pop은 없음). 화면은 `ConflictSheet`의 `ConflictWhy`(이유 한 줄, 쪽별 커밋, `newerSide`로 '더 최근')
   - `stage.rs`: hunk·줄 단위 스테이지·내리기 (패치에서 hunk/줄만 골라 `git apply --cached`), 파일 단위(`stage_files`: `add -A` / `restore --staged`, 첫 커밋 전엔 `rm --cached`), hunk·줄 버리기(`discard_hunks`: 같은 패치를 작업 트리에 `apply --reverse`)
   - `ignore.rs`: `.gitignore`(최상위, 중복 건너뜀, CRLF 유지, 바이트 그대로 뒤에만 덧붙임, 심볼릭 링크면 거부)에 패턴 추가와 추적 중지(`rm --cached`)를 한 번에(`ignore`). 패턴은 `src/ignore.ts`(`ignoreChoices`: `/file`, `*.ext`, `/dir/`, 이스케이프)
   - `bisect.rs`: `git bisect` 시작·좋음·나쁨·건너뛰기와 상태 읽기(refs/bisect/*에서 후보·지금 확인할 커밋·범인). 끝내기는 `write::abort`(bisect reset)

@@ -53,6 +53,7 @@ export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) 
         onResolve={(file, how) => void run(t("conflict.resolved", { file }), () => api.resolve(path, file, how))}
         onMergeTool={(file) => mergeInTool(repo, file)}
         onFileMenu={(file, x, y) => openMenu(repo, x, y, file, openItems(repo, file))}
+        onShowCommit={select}
         onClose={() => repo.setConflict(null)}
       />
     );

@@ -734,6 +734,16 @@ export const en: Record<Key, string> = {
   "cf.empty": "(empty)",
   "cf.chosen": "{n} of {total} conflicts resolved",
   "cf.resolve": "Mark as resolved",
+  "cf.why.content": "Both sides changed the same lines in different ways.",
+  "cf.why.binary": "Both sides changed this binary file in different ways.",
+  "cf.why.deleted":
+    "One side deleted this file and the other changed it. Picking the side that deleted it deletes the file.",
+  "cf.why.added": "Both sides created a file with this name.",
+  "cf.lastChange": "Last change",
+  "cf.deletedHere": "Deleted",
+  "cf.newer": "Newer",
+  "cf.newer.title": "This side's last change is the more recent one (by commit time)",
+  "cf.noCommit": "No commit to show for this side",
 
   // diff sheet
   "diff.resize": "Drag to resize",

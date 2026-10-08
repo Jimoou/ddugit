@@ -602,6 +602,79 @@ table.diff tr.picked .no {
   color: var(--muted);
   opacity: 0.7;
 }
+/* Why the file conflicts, and each side's last commit (tinted like the block columns below). */
+.conflict-why {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.conflict-why p {
+  margin: 0;
+  color: var(--text-2);
+}
+.why-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+}
+.why-side {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px 10px;
+}
+.why-side.ours {
+  background: rgba(34, 232, 255, 0.06);
+  border-right: 1px solid var(--line);
+}
+.why-side.theirs {
+  background: rgba(255, 61, 242, 0.06);
+}
+.why-side em {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 10px var(--sans);
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+.why-side.ours em {
+  color: #9be8ff;
+}
+.why-side.theirs em {
+  color: #f7aef3;
+}
+.why-side .tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  letter-spacing: 0;
+  color: var(--text);
+  background: var(--glass-strong);
+}
+.why-side .tag.newer {
+  color: #fff;
+  background: var(--ui);
+}
+.why-side .change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  min-width: 0;
+}
+.why-side .change .summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.why-side .id {
+  padding: 0 4px;
+  font: 11px var(--mono);
+}
 /* The body scrolls; a block keeps its height instead of being squeezed to its header. */
 .block {
   flex-shrink: 0;

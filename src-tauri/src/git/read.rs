@@ -344,14 +344,14 @@ fn read_commits(repo: &Repository, limit: usize) -> Result<(Vec<CommitInfo>, boo
 
 /// Commits newest first by commit time, each once; ties in the order found.
 #[derive(Default)]
-struct TimeWalk<'r> {
+pub(super) struct TimeWalk<'r> {
     seen: std::collections::HashSet<git2::Oid>,
     found: Vec<Option<git2::Commit<'r>>>,
     queue: std::collections::BinaryHeap<(i64, std::cmp::Reverse<usize>)>,
 }
 
 impl<'r> TimeWalk<'r> {
-    fn push(&mut self, c: git2::Commit<'r>) {
+    pub(super) fn push(&mut self, c: git2::Commit<'r>) {
         if self.seen.insert(c.id()) {
             self.queue
                 .push((c.time().seconds(), std::cmp::Reverse(self.found.len())));
@@ -359,7 +359,7 @@ impl<'r> TimeWalk<'r> {
         }
     }
 
-    fn pop(&mut self) -> Option<git2::Commit<'r>> {
+    pub(super) fn pop(&mut self) -> Option<git2::Commit<'r>> {
         let (_, std::cmp::Reverse(i)) = self.queue.pop()?;
         self.found[i].take()
     }

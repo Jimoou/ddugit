@@ -723,6 +723,15 @@ export const ko = {
   "cf.empty": "(비어 있음)",
   "cf.chosen": "충돌 {total}개 중 {n}개 선택",
   "cf.resolve": "이 파일 해결 완료",
+  "cf.why.content": "두 쪽이 같은 부분을 서로 다르게 고쳤어요.",
+  "cf.why.binary": "두 쪽이 이 바이너리 파일을 서로 다르게 고쳤어요.",
+  "cf.why.deleted": "한쪽은 이 파일을 지우고 다른 쪽은 고쳤어요. 지운 쪽을 고르면 파일이 지워져요.",
+  "cf.why.added": "두 쪽이 같은 이름의 파일을 각각 만들었어요.",
+  "cf.lastChange": "마지막 변경",
+  "cf.deletedHere": "지움",
+  "cf.newer": "더 최근",
+  "cf.newer.title": "이쪽의 마지막 변경이 더 최근이에요 (커밋 시각 기준)",
+  "cf.noCommit": "이쪽 커밋은 알 수 없어요",
 
   // diff sheet
   "diff.resize": "끌어서 높이 조절",

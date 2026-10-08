@@ -464,7 +464,15 @@ export interface ConflictFile {
   /** Working-tree file with conflict markers. */
   merged: string;
   binary: boolean;
+  kind: ConflictKind;
+  /** The last commit on HEAD's side that changed the file since the sides parted. */
+  oursChange: SearchHit | null;
+  /** The same on the incoming side (for a pick, revert or rebase step: the commit applied); null when no ref names it. */
+  theirsChange: SearchHit | null;
 }
+
+/** Mirrors `ConflictKind` in git/conflict.rs: what the index stages say the sides did. */
+export type ConflictKind = "content" | "deletedByUs" | "deletedByThem" | "addedByBoth";
 
 /** Mirrors `Resolution` in git/conflict.rs. */
 export type Resolution = { kind: "ours" } | { kind: "theirs" } | { kind: "content"; text: string };

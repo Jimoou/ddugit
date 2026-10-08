@@ -48,6 +48,35 @@ test("resolves a conflict block by editing it by hand", async ({ demo }) => {
   await expect(nebula).not.toHaveClass(/\bon\b/);
 });
 
+test("the conflict sheet says why a file conflicts and which side changed it last", async ({ demo }) => {
+  const { page } = demo;
+  const before = await demo.snapshot();
+  const byId = new Map(before.commits.map((c) => [c.id, c]));
+  const head = byId.get(before.head.target!)!;
+  const theme = byId.get(before.refs.find((r) => r.kind === "local" && r.name === "feature/theme")!.target)!;
+  await demo.mutate((d) => (d.conflictNext = true));
+  await page.click(".sidebar li >> text=feature/theme", { button: "right" });
+  await page.click(".context-menu >> text=에 병합");
+  await page.click(".dialog button.primary");
+
+  const why = page.locator(".conflict-sheet .conflict-why");
+  await expect(why).toContainText("두 쪽이 같은 부분을 서로 다르게 고쳤어요.");
+  const [ours, theirs] = [why.locator(".why-side.ours"), why.locator(".why-side.theirs")];
+  await expect(ours).toContainText("현재 브랜치");
+  await expect(ours).toContainText(head.id.slice(0, 7));
+  await expect(ours).toContainText(head.summary);
+  await expect(theirs).toContainText("들어오는 변경");
+  await expect(theirs).toContainText(theme.id.slice(0, 7));
+  await expect(theirs).toContainText(theme.author);
+  // The side changed later says so, and only that one.
+  await expect(why.locator(".newer")).toHaveCount(1);
+  await expect(head.time > theme.time ? ours : theirs).toContainText("더 최근");
+
+  // The short id selects that commit in the graph.
+  await theirs.locator("button.id").click();
+  await expect(page.locator(".inspector h2")).toHaveText(theme.summary);
+});
+
 test("keeps the diff and the conflict sheet usable in a small window", async ({ demo }) => {
   const { page } = demo;
   await page.setViewportSize({ width: 1024, height: 680 });
@@ -700,6 +729,10 @@ test("a squash merge stopped on conflicts keeps its message, and cancelling goes
   await expect(page.locator(".conflict-sheet")).toBeVisible();
   // The message waits in the composer, which commits the index (what the squash staged).
   await expect(page.locator(".composer textarea.message")).toHaveValue(/^feature\/theme\n/);
+  // A squash leaves no ref to the incoming commit: that side is unknown, and nothing is called newer.
+  const why = page.locator(".conflict-why");
+  await expect(why.locator(".why-side.theirs")).toContainText("이쪽 커밋은 알 수 없어요");
+  await expect(why.locator(".newer")).toHaveCount(0);
   const banner = page.locator(".banner", { hasText: "진행 중" });
   await expect(banner).toContainText("squash 병합 진행 중");
   await banner.getByRole("button", { name: "취소" }).click();
