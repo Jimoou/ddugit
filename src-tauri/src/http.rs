@@ -74,15 +74,36 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
 
-    /// A server that answers one request with `reply`.
+    /// A server that answers one request with `reply`. It reads the whole request (headers, then
+    /// `Content-Length` bytes of body) first: replying and closing while the client is still
+    /// sending makes Windows reset the connection (os error 10053).
     fn serve(reply: &'static str) -> String {
         let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = l.local_addr().unwrap().port();
         std::thread::spawn(move || {
             let (mut s, _) = l.accept().unwrap();
+            let mut req = Vec::new();
             let mut buf = [0u8; 4096];
-            let _ = s.read(&mut buf);
+            let complete = |req: &[u8]| {
+                let Some(end) = req.windows(4).position(|w| w == b"\r\n\r\n") else {
+                    return false;
+                };
+                let head = String::from_utf8_lossy(&req[..end]).to_ascii_lowercase();
+                let len = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length:"))
+                    .and_then(|v| v.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                req.len() >= end + 4 + len
+            };
+            while !complete(&req) {
+                match s.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => req.extend_from_slice(&buf[..n]),
+                }
+            }
             let _ = s.write_all(reply.as_bytes());
+            let _ = s.flush();
         });
         format!("http://127.0.0.1:{port}/x")
     }
