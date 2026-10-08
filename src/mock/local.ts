@@ -125,6 +125,9 @@ export const localCommands = {
       if (id.sign?.value && id.key) demoSigned.add(repo.branches.get(repo.head)!);
       const trailer = `Signed-off-by: ${id.name?.value} <${id.email?.value}>`;
       demoControls.lastMessage = args.options.signoff ? `${args.message}\n\n${trailer}` : args.message;
+      // Keep the whole message (body and trailers) on the new commit, as git does.
+      const made = repo.commits.get(repo.branches.get(repo.head) ?? "");
+      if (made) made.message = demoControls.lastMessage.trimEnd() + "\n";
     }
     return r;
   },
