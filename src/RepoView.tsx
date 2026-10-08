@@ -243,14 +243,19 @@ export function RepoView({
 
   const trailIds = useMemo(() => trail?.touches.map((x) => x.id), [trail]);
   const trailFocus = useMemo(() => (trailIds ? new Set(trailIds) : null), [trailIds]);
+  // The picked refs as they are now: a deleted one drops out, a moved one is followed to its new tip.
+  const liveFocus = useMemo(
+    () => focusRefs.flatMap((f) => snap?.refs.filter((r) => r.kind === f.kind && r.name === f.name).slice(0, 1) ?? []),
+    [focusRefs, snap],
+  );
   // Search highlights its matches; otherwise a focused branch highlights its ancestry.
   const focus = useMemo(() => {
     if (searchLit) return searchLit;
-    if (!snap || !focusRefs.length) return null;
+    if (!snap || !liveFocus.length) return null;
     const lit = new Set<string>();
-    for (const r of focusRefs) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
+    for (const r of liveFocus) for (const id of ancestors(snap.commits, r.target)) lit.add(id);
     return lit;
-  }, [snap, focusRefs, searchLit]);
+  }, [snap, liveFocus, searchLit]);
 
   const openSearch = search.open;
   useEffect(() => {
@@ -474,12 +479,12 @@ export function RepoView({
           refs={snap.refs}
           headBranch={snap.head.branch}
           colorOf={colorOf}
-          focused={focusRefs.map((r) => `${r.kind}:${r.name}`)}
+          focused={liveFocus.map((r) => `${r.kind}:${r.name}`)}
           onFocus={(r) => {
             const key = (x: RefInfo) => `${x.kind}:${x.name}`;
-            const on = focusRefs.some((x) => key(x) === key(r));
+            const on = liveFocus.some((x) => key(x) === key(r));
             // Each click toggles one ref in or out of the picked set.
-            const next = on ? focusRefs.filter((x) => key(x) !== key(r)) : [...focusRefs, r];
+            const next = on ? liveFocus.filter((x) => key(x) !== key(r)) : [...liveFocus, r];
             setFocusRefs(next);
             if (next.some((x) => key(x) === key(r))) graph.current?.centerOn(r.target);
           }}
@@ -702,6 +707,7 @@ export function RepoView({
             startAmend={composer.amend}
             headPushed={!!snap.head.upstream && snap.head.ahead === 0}
             onClose={() => setComposer(false)}
+            viewing={sheet?.kind === "diff" && sheet.source.kind === "worktree" ? (sheet.path ?? null) : null}
             onOpenFile={(file) => {
               const c = snap.changes.find((x) => x.path === file);
               if (c?.conflicted) return setConflict({ file });

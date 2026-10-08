@@ -20,6 +20,8 @@ interface Props {
   stage?: Staging;
   /** Present when comparing two revisions (read-only): which base, and swapping the sides. */
   compare?: Comparing;
+  /** The file shown changed (picked here, or the first one): the composer marks it. */
+  onCurrent?(path: string): void;
   onClose(): void;
 }
 
@@ -60,7 +62,7 @@ const MIN_H = 160;
 const FILE_H = 24;
 
 /** Bottom sheet under the graph: file list on the left, unified diff on the right. */
-export function DiffSheet({ title, files, error, initialPath, stage, compare, onClose }: Props) {
+export function DiffSheet({ title, files, error, initialPath, stage, compare, onCurrent, onClose }: Props) {
   const [path, setPath] = useState<string | undefined>(initialPath);
   const [height, setHeight] = useState(() => Math.round(window.innerHeight * 0.45));
   const drag = useRef<{ y: number; h: number } | null>(null);
@@ -77,6 +79,10 @@ export function DiffSheet({ title, files, error, initialPath, stage, compare, on
   }
 
   const current = useMemo(() => files?.find((f) => f.path === path) ?? files?.[0], [files, path]);
+  const currentPath = current?.path;
+  useEffect(() => {
+    if (currentPath) onCurrent?.(currentPath);
+  }, [currentPath, onCurrent]);
   const totals = useMemo(
     () => (files ?? []).reduce((t, f) => ({ add: t.add + f.additions, del: t.del + f.deletions }), { add: 0, del: 0 }),
     [files],

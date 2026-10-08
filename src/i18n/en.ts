@@ -8,6 +8,8 @@ export const en: Record<Key, string> = {
   "common.close": "Close",
   "common.closeEsc": "Close (Esc)",
   "common.none": "None",
+  "common.copy": "Copy",
+  "common.copied": "Copied",
   "common.noMessage": "(no message)",
 
   // top bar
@@ -645,6 +647,8 @@ export const en: Record<Key, string> = {
   "bp.pickedFrom": "Cherry-picked from {sha} with -x",
   "bp.showInGraph": "Show in graph",
   "bp.ignore": "Ignore",
+  "bp.refresh": "Refresh (fetch every remote)",
+  "bp.refreshed": "Fetched the remotes and compared again",
   "bp.unignore": "Unignore",
   "bp.remoteHint":
     "To compare with another repository, add it as a remote, then choose a branch such as <code>upstream/main</code> as From.",
@@ -779,6 +783,20 @@ export const en: Record<Key, string> = {
   "sync.fork": "{ahead:local commit|local commits}, {behind:remote commit|remote commits}",
   "sync.rejected": "Push rejected",
   "sync.diverged": "Branches diverged",
+  "push.force.menu": "Force push (overwrite)…",
+  "push.force.title": "Force push",
+  "push.force.body":
+    "Overwrites <b>{there}</b> with your <b>{branch}</b>. Commits only the remote has drop off the remote branch.",
+  "push.force.bodyNew":
+    "Pushes <b>{branch}</b> as <b>{there}</b>. The remote doesn't have it yet, so nothing is overwritten.",
+  "push.force.lost": "As of your last fetch, {n:commit|commits} only on {there} will be dropped.",
+  "push.force.lease":
+    "Refused if someone pushed after your last fetch (--force-with-lease). Fetch first to see what changed.",
+  "push.force.go": "Overwrite",
+  "push.force.done": "Overwrote {there}",
+  "push.force.stale":
+    "Nothing was overwritten: the remote changed after your last fetch. Fetch to see what changed, then try again.\n\n{output}",
+  "sync.rejected.unknown": "The remote refused the push without saying why.",
   "sync.rejected.body":
     "<b>{upstream}</b> has commits you haven't pulled, so the push was rejected. How do you want to proceed?",
   "sync.diverged.body": "<b>{branch}</b> and <b>{upstream}</b> have diverged. How do you want to combine them?",
@@ -1178,7 +1196,6 @@ export const en: Record<Key, string> = {
   "pr.new.unreadable": "Couldn't read the repository: {error}",
   "pr.new.connect": "Connect {forge} to create {noun}s.",
   "pr.new.commits": "Commits ({n})",
-  "pr.new.more": "and {n} more",
   "pr.new.noCommits": "No commits that {base} doesn't already have",
   "pr.new.missing": "<b>{branch}</b> isn't on {remote} yet. It will be pushed first.",
   "pr.new.ahead": "<b>{branch}</b> is {n:commit|commits} ahead of {remote}. It will be pushed first.",

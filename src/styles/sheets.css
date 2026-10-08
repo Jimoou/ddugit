@@ -180,8 +180,12 @@
   height: 24px;
 }
 .file-list li.on {
-  background: var(--ui-soft);
-  box-shadow: inset 2px 0 0 var(--ui-text);
+  background: rgba(var(--signal), 0.16);
+  box-shadow: inset 3px 0 0 rgb(var(--signal));
+}
+.file-list li.on .path {
+  color: #fff;
+  font-weight: 600;
 }
 .diff-body {
   flex: 1;

@@ -4,7 +4,7 @@
 import type { MenuItem } from "../components/ContextMenu";
 import { t } from "../i18n";
 import type { RefInfo } from "../types";
-import { askName, refRun } from "./actions";
+import { askName, confirmThen, refRun, richBody } from "./actions";
 import type { Repo } from "./state";
 import { defaultPushRemote, splitRemote } from "./useRemote";
 
@@ -61,6 +61,13 @@ export function trackingItems(repo: Repo, r: RefInfo): MenuItem[] {
       hint: remote ? `→ ${remote}/${r.name}` : undefined,
       disabled: !remote,
       onSelect: () => void repo.pushTo(remote!, r.name, t("branch.pushed", { branch: r.name, remote: remote! })),
+    },
+    {
+      label: t("push.force.menu"),
+      hint: remote ? `→ ${remote}/${r.name}` : undefined,
+      danger: true,
+      disabled: !remote,
+      onSelect: () => askForcePush(repo, r, remote!),
     },
     ...(up
       ? [
@@ -170,4 +177,30 @@ export function remoteEditItems(repo: Repo, name: string): MenuItem[] {
         ),
     },
   ];
+}
+
+/**
+ * Overwrite `r` on `remote` with the local branch, after saying what goes: the commits only the
+ * remote has (as far as we last fetched). `--force-with-lease` refuses if someone pushed since.
+ */
+function askForcePush(repo: Repo, r: RefInfo, remote: string) {
+  const there = `${remote}/${r.name}`;
+  const known = repo.snap.refs.some((x) => x.kind === "remote" && x.name === there);
+  const lost = r.upstream?.name === there ? r.upstream.behind : 0;
+  confirmThen(
+    repo,
+    {
+      title: t("push.force.title"),
+      danger: true,
+      confirmLabel: t("push.force.go"),
+      body: (
+        <>
+          {richBody(known ? "push.force.body" : "push.force.bodyNew", { branch: r.name, there })}
+          {lost > 0 && <p className="note warn">{t("push.force.lost", { n: lost, there })}</p>}
+          <p className="muted small">{t("push.force.lease")}</p>
+        </>
+      ),
+    },
+    () => void repo.pushTo(remote, r.name, t("push.force.done", { there }), true),
+  );
 }

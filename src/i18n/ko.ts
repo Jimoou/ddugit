@@ -8,6 +8,8 @@ export const ko = {
   "common.closeEsc": "닫기 (Esc)",
   "common.none": "없음",
   "common.noMessage": "(메시지 없음)",
+  "common.copy": "복사",
+  "common.copied": "복사했어요",
 
   // top bar
   "top.emptyRepo": "빈 저장소",
@@ -635,6 +637,8 @@ export const ko = {
   "bp.showInGraph": "그래프에서 보기",
   "bp.ignore": "제외",
   "bp.unignore": "제외 취소",
+  "bp.refresh": "새로고침 (모든 원격 Fetch)",
+  "bp.refreshed": "원격을 가져와 다시 비교했어요",
   "bp.remoteHint":
     "다른 저장소와 비교하려면 원격으로 추가한 뒤 <code>upstream/main</code> 같은 브랜치를 가져올 쪽으로 고르세요.",
   "bp.addRemote": "원격 추가…",
@@ -768,6 +772,20 @@ export const ko = {
   "sync.fork": "내 커밋 {ahead}개, 원격 커밋 {behind}개",
   "sync.rejected": "Push 거부됨",
   "sync.diverged": "갈라진 이력",
+  "push.force.menu": "강제 push (덮어쓰기)…",
+  "push.force.title": "강제 push",
+  "push.force.body":
+    "<b>{there}</b>{:를} 내 <b>{branch}</b>{:로} 덮어써요. 원격에만 있는 커밋은 원격 브랜치에서 사라져요.",
+  "push.force.bodyNew":
+    "<b>{branch}</b>{:를} <b>{there}</b>{:로} 올려요. 원격에 아직 없는 브랜치라 덮어쓸 것은 없어요.",
+  "push.force.lost": "마지막으로 가져온 기준으로 {there}에만 있는 커밋 {n}개가 사라져요.",
+  "push.force.lease":
+    "마지막으로 가져온(fetch) 뒤에 누가 push했다면 거부돼요(--force-with-lease). 그럴 때는 먼저 Fetch해서 확인하세요.",
+  "push.force.go": "덮어쓰기",
+  "push.force.done": "{there}{:를} 덮어썼어요",
+  "push.force.stale":
+    "덮어쓰지 않았어요. 마지막으로 가져온 뒤에 원격이 바뀌었어요. Fetch해서 무엇이 바뀌었는지 보고 다시 하세요.\n\n{output}",
+  "sync.rejected.unknown": "원격이 push를 거부했어요. git이 이유를 남기지 않았어요.",
   "sync.rejected.body": "<b>{upstream}</b>에 내가 아직 받지 않은 커밋이 있어서 push가 거부됐어요. 어떻게 올릴까요?",
   "sync.diverged.body": "<b>{branch}</b>{:와} <b>{upstream}</b>의 이력이 갈라졌어요. 어떻게 합칠까요?",
   "sync.ask.title.fetch": "Fetch",
@@ -1161,7 +1179,6 @@ export const ko = {
   "pr.new.unreadable": "저장소 정보를 읽지 못했어요: {error}",
   "pr.new.connect": "{forge}에 연결해야 {noun:을} 만들 수 있어요.",
   "pr.new.commits": "커밋 {n}개",
-  "pr.new.more": "외 {n}개",
   "pr.new.noCommits": "{base}에 없는 커밋이 없어요",
   "pr.new.missing": "<b>{branch}</b>{:이} 아직 {remote}에 없어요. 먼저 올려요.",
   "pr.new.ahead": "<b>{branch}</b>에 {remote}에 안 올린 커밋이 {n}개 있어요. 먼저 올려요.",

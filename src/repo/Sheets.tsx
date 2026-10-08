@@ -1,7 +1,7 @@
 // The sheet under the graph (diff, rebase plan, backport, cleanup, undo history, blame)
 // and the conflict sheet over it, with what each one's buttons do.
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { api } from "../api";
 import { BackportSheet } from "../components/BackportSheet";
 import { CleanupSheet } from "../components/Cleanup";
@@ -31,6 +31,12 @@ interface Props {
 export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) {
   const { path, snap, busy, run, commitById } = repo;
   const backportTargets = useMemo(() => snap.refs.filter((r) => r.kind === "local").map((r) => r.name), [snap]);
+  const { setSheet } = repo;
+  /** The diff sheet's file, kept on the sheet so the composer can mark it. */
+  const followFile = useCallback(
+    (file: string) => setSheet((s) => (s?.kind === "diff" && s.path !== file ? { ...s, path: file } : s)),
+    [setSheet],
+  );
   /** Select a commit the sheet points at (when it is loaded) and fly to it. */
   const select = (id: string) => {
     if (commitById.has(id)) showCommit(repo, id);
@@ -91,6 +97,7 @@ export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) 
           targets={backportTargets}
           remoteCount={snap.remotes.length}
           onAddRemote={askRemote}
+          onRefresh={() => run(t("bp.refreshed"), () => api.remote(path, "fetch"))}
           source={source}
           target={target}
           version={snap}
@@ -207,6 +214,7 @@ export function RepoSheets({ repo, sheet, conflict, rebase, askRemote }: Props) 
           files={sheet.files}
           error={sheet.error}
           initialPath={sheet.path}
+          onCurrent={followFile}
           stage={
             source.kind === "worktree"
               ? {

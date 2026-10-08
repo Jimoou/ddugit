@@ -123,7 +123,10 @@ export interface Commands {
   git_lfs: [{ path: string; op: LfsOp }, OpResult];
   git_remote: [{ path: string; op: RemoteOp; onProgress: Sink<Progress> }, OpResult];
   git_fetch_remote: [{ path: string; name: string; onProgress: Sink<Progress> }, OpResult];
-  git_push_to: [{ path: string; remote: string; branch: string | null; onProgress: Sink<Progress> }, OpResult];
+  git_push_to: [
+    { path: string; remote: string; branch: string | null; force?: boolean; onProgress: Sink<Progress> },
+    OpResult,
+  ];
   git_remote_ref: [{ path: string; remote: string; op: RemoteRefOp; onProgress: Sink<Progress> }, OpResult];
   git_skip: [{ path: string }, OpResult];
   git_reset: [{ path: string; target: string; mode: ResetMode }, OpResult];
@@ -295,8 +298,15 @@ export const api = {
     return call("git_fetch_remote", { path, name, onProgress: progressSink(onProgress, path) });
   },
   /** Push `branch` (default: the current one) to `remote` and track it there from now on. */
-  pushTo(path: string, remote: string, onProgress: (p: Progress) => void = () => {}, branch: string | null = null) {
-    return call("git_push_to", { path, remote, branch, onProgress: progressSink(onProgress, path) });
+  /** `force`: `--force-with-lease`, overwriting the branch there only if it is what we last fetched. */
+  pushTo(
+    path: string,
+    remote: string,
+    onProgress: (p: Progress) => void = () => {},
+    branch: string | null = null,
+    force = false,
+  ) {
+    return call("git_push_to", { path, remote, branch, force, onProgress: progressSink(onProgress, path) });
   },
   /** Push a tag (or all of them) to `remote`, or delete a branch or tag there; local refs stay. */
   remoteRef(path: string, remote: string, op: RemoteRefOp, onProgress: (p: Progress) => void = () => {}) {

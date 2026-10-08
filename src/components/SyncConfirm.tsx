@@ -2,11 +2,9 @@ import { useState } from "react";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import type { SyncPlan } from "../sync";
+import { CommitList } from "./CommitList";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
-
-/** Commits listed by name before the rest are counted. */
-const LISTED = 8;
 
 /**
  * Before a fetch, pull or push: what will move and where, so nothing leaves
@@ -77,16 +75,7 @@ export function SyncConfirm(p: {
         <Rich k={body} vars={{ n, upstream: plan.upstream ?? "", branch: p.branch ?? "HEAD" }} />
       </p>
       {plan.op !== "fetch" && n === 0 && <p className="muted">{t(`sync.ask.none.${plan.op}`)}</p>}
-      {n > 0 && (
-        <ul className="sync-commits">
-          {plan.commits.slice(0, LISTED).map((c) => (
-            <li key={c.id}>
-              <code>{c.id.slice(0, 7)}</code> {c.summary}
-            </li>
-          ))}
-          {n > LISTED && <li className="muted">{t("sync.ask.more", { n: n - LISTED })}</li>}
-        </ul>
-      )}
+      {n > 0 && <CommitList className="sync-commits" commits={plan.commits} />}
       {plan.op === "pull" && plan.dirty && <p className="note warn">{t("sync.ask.dirty")}</p>}
       {p.target && (
         <p className="sync-target muted small">

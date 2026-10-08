@@ -74,6 +74,15 @@
 .files li:hover {
   background: rgba(255, 255, 255, 0.04);
 }
+/* The file open in the diff sheet. */
+.files li.viewing {
+  background: rgba(var(--signal), 0.16);
+  box-shadow: inset 3px 0 0 rgb(var(--signal));
+}
+.files li.viewing .path {
+  color: #fff;
+  font-weight: 600;
+}
 .files .empty {
   color: var(--muted);
   padding: 14px;
@@ -499,8 +508,14 @@
   pointer-events: none;
 }
 .toast {
-  max-width: 380px;
-  padding: 9px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 420px;
+  padding: 9px 8px 9px 14px;
+  /* Readable and copyable: it stays while the pointer is over it. */
+  pointer-events: auto;
+  user-select: text;
   background: var(--brackets), var(--scanlines), var(--surface);
   border: 1px solid rgba(var(--signal), 0.22);
   box-shadow:
@@ -508,6 +523,21 @@
     0 10px 30px rgba(0, 0, 0, 0.45);
   white-space: pre-wrap;
   animation: slide-in 0.18s ease-out;
+}
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  user-select: none;
+}
+.toast-actions button {
+  padding: 2px 6px;
+  font-size: 12px;
 }
 .toast.err {
   box-shadow:

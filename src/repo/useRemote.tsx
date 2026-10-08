@@ -66,7 +66,7 @@ function pushTargetOf(snap: RepoSnapshot | null) {
 type RemoteDialog =
   /** Remote work waiting for the user's go-ahead (see `SyncConfirm`). */
   | { kind: "ask"; op: SyncOp }
-  | { kind: "sync"; sync: "diverged" | "rejected" }
+  | { kind: "sync"; sync: "diverged" | "rejected"; output: string }
   | { kind: "auth"; op: RemoteOp; output: string }
   | { kind: "add" };
 
@@ -97,21 +97,36 @@ export function useRemote(o: Options) {
   const pushTarget = pushTargetOf(snap);
 
   /**
+   * A refused push or a pull that can't fast-forward: the merge / rebase / overwrite dialog when the
+   * branch follows a remote one, else git's own words (a first push the remote turned down).
+   */
+  const refused = (sync: "diverged" | "rejected", output: string) => {
+    const head = latest.current?.head;
+    if (head?.branch && head.upstream) setOpen({ kind: "sync", sync, output });
+    else toast("err", output || t("sync.rejected.unknown"));
+  };
+
+  /**
    * Push to `name` (e.g. origin) instead of a fetch-only upstream, and follow it there from now on.
    * `branch` defaults to the current one (another goes up before a pull request is opened from it).
    */
-  const pushTo = async (name: string, branch: string | null = null, done = t("remote.pushedTo", { name })) => {
+  const pushTo = async (
+    name: string,
+    branch: string | null = null,
+    done = t("remote.pushedTo", { name }),
+    force = false,
+  ) => {
     // Before the progress card changes: it belongs to the operation still running.
     if (refuseBusy()) return false;
     setRemoteBusy("push");
     setProgress(null);
     try {
-      const r = await run(done, () => api.pushTo(path, name, setProgress, branch));
+      const r = await run(done, () => api.pushTo(path, name, setProgress, branch, force));
       if (r.status === "auth") setOpen({ kind: "auth", op: "push", output: r.output });
-      // Another branch than HEAD: the pull-then-push dialog doesn't apply, so just say why.
+      // Another branch than HEAD, or a forced push someone got ahead of (the lease): just say why.
       if (r.status === "rejected") {
-        if (branch) toast("err", r.output);
-        else setOpen({ kind: "sync", sync: "rejected" });
+        if (branch || force) toast("err", force ? t("push.force.stale", { output: r.output }) : r.output);
+        else refused("rejected", r.output);
       }
       return r.status === "ok";
     } finally {
@@ -148,7 +163,7 @@ export function useRemote(o: Options) {
         });
       }
       if (r.status === "auth") setOpen({ kind: "auth", op, output: r.output });
-      if (r.status === "diverged" || r.status === "rejected") setOpen({ kind: "sync", sync: r.status });
+      if (r.status === "diverged" || r.status === "rejected") refused(r.status, r.output);
       return r.status;
     } finally {
       setRemoteBusy(null);
@@ -272,6 +287,7 @@ export function useRemote(o: Options) {
         {open?.kind === "sync" && snap.head.branch && snap.head.upstream && (
           <SyncDialog
             kind={open.sync}
+            output={open.output}
             branch={snap.head.branch}
             upstream={snap.head.upstream}
             ahead={snap.head.ahead}
