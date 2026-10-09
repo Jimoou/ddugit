@@ -98,3 +98,19 @@ test("a long commit message pushes the inspector down instead of running over it
   expect(m.y + m.height).toBeGreaterThan(480);
   expect(byline.y).toBeGreaterThanOrEqual(m.y + m.height);
 });
+
+test("the list button turns the map into one row per commit and back", async ({ demo }) => {
+  const { page } = demo;
+  const list = page.getByRole("button", { name: "목록 보기" });
+  const graph = page.locator(".app:not([hidden]) .graph");
+  await expect(list).toHaveAttribute("aria-pressed", "false");
+  await list.click();
+  await expect(list).toHaveAttribute("aria-pressed", "true");
+  await expect(graph).toHaveClass(/upright/);
+  // Kept across a reload, like the rotation it sets.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "목록 보기" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "목록 보기" }).click();
+  await expect(graph).not.toHaveClass(/upright/);
+  await expect(page.locator(".hud .turn .deg").first()).toHaveText("0°");
+});

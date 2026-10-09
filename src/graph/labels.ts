@@ -1,6 +1,16 @@
 // Collision-free placement of ref badges above graph nodes. Pure (screen
 // coordinates in, rectangles out) so it can be unit-tested.
 
+import type { RefInfo } from "../types";
+
+/**
+ * Whether a ref gets a badge. Zoomed out (`all` false) the map keeps what orients it: local
+ * branches, pull requests, tags (releases) and the branch HEAD tracks; remote branches wait
+ * until there is room for every ref.
+ */
+export const refShown = (rf: Pick<RefInfo, "kind" | "name">, all: boolean, headBranch: string | null) =>
+  all || rf.kind !== "remote" || rf.name === headBranch;
+
 interface BadgeGroup {
   /** Node centre x. */
   x: number;

@@ -55,6 +55,8 @@ export const ICONS = {
   link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
   lock: "M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3",
   unlock: "M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 6.9-.8",
+  /** Rows of text: the graph turned upright, read like a list. */
+  list: "M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01",
   /** A folded map: the overview strip (minimap). */
   map: "M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5zM9 4v13.5M15 6.5V20",
   /** Brand marks, unaltered (filled, no stroke): GitHub's Invertocat and GitLab's tanuki. */

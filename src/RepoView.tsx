@@ -29,7 +29,7 @@ import { PANEL_WIDTH, type Settings, SIDEBAR_WIDTH } from "./settings";
 import { t } from "./i18n";
 import { openLink } from "./share";
 import { Rich } from "./i18n/Rich";
-import type { Drag, Turn } from "./graph/renderer";
+import { type Drag, type Turn, upright } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
 import { StackSection } from "./components/Stacks";
 import { proOpen, usePro } from "./pro";
@@ -138,6 +138,9 @@ export function RepoView({
   const [zoom, setZoom] = useState(1);
   const animate = settings.animate;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
+  /** List view: time runs down the screen, one row per commit with its whole summary. */
+  const listView = upright(settings.rotation);
+  const toggleList = () => onChangeSettings({ rotation: ((settings.rotation + (listView ? 3 : 1)) % 4) as Turn });
   const toggleLock = () => onChangeSettings({ mapLocked: !settings.mapLocked });
   const toggleMinimap = () => onChangeSettings({ minimap: !settings.minimap });
   // First-run tutorial, played on the demo repository only.
@@ -703,6 +706,16 @@ export function RepoView({
               >
                 <Icon name="rotate" />
                 <span className="deg">{settings.rotation * 90}°</span>
+              </button>
+              <button
+                className={`list ${listView ? "on" : ""}`}
+                onClick={toggleList}
+                aria-pressed={listView}
+                aria-label={t("hud.list.label")}
+                title={t(listView ? "hud.list.off" : "hud.list.on")}
+              >
+                <Icon name="list" />
+                <span className="deg">{t("hud.list")}</span>
               </button>
               <span className="hud-sep" aria-hidden />
               <button

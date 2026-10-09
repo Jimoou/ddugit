@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inlineBadges, placeBadges } from "./labels";
+import { inlineBadges, placeBadges, refShown } from "./labels";
 
 const H = 18;
 
@@ -60,5 +60,17 @@ describe("inlineBadges", () => {
     expect(left.badges[0].x).toBe(60);
     expect(left.end).toBe(54);
     expect(inlineBadges(100, 1, 50, []).end).toBe(100);
+  });
+});
+
+describe("refShown", () => {
+  it("keeps branches, pull requests and tags when zoomed out, and remote branches only for HEAD's branch", () => {
+    const at = (kind: "local" | "remote" | "tag" | "pr", name: string) => refShown({ kind, name }, false, "main");
+    expect(at("local", "feature/x")).toBe(true);
+    expect(at("pr", "#12")).toBe(true);
+    expect(at("tag", "v1.2.0")).toBe(true);
+    expect(at("remote", "origin/feature/x")).toBe(false);
+    expect(at("remote", "main")).toBe(true);
+    expect(refShown({ kind: "remote", name: "origin/feature/x" }, true, "main")).toBe(true);
   });
 });
