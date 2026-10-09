@@ -94,7 +94,8 @@
   color: var(--text);
   background: rgba(255, 255, 255, 0.1);
 }
-.hud button.turn {
+.hud button.turn,
+.hud button.list {
   width: auto;
   display: inline-flex;
   align-items: center;
@@ -103,6 +104,9 @@
 }
 .hud button.on {
   color: var(--text);
+}
+.hud button.list.on {
+  background: var(--ui-soft);
 }
 .hud button.on.lock {
   color: var(--amber);

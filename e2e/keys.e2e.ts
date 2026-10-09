@@ -16,6 +16,8 @@ test("command keys: new branch, stash, fetch, commit panel; listed with the shor
   await page.keyboard.press("Control+Shift+S");
   await demo.toast("스태시에 보관했어요");
   expect((await demo.snapshot()).changes).toEqual([]);
+  // Wait for the app to read the clean work tree (the commit button's count goes), as a user would.
+  await expect(page.locator(".topbar button", { hasText: "커밋" }).locator(".count")).toHaveCount(0);
   await page.keyboard.press("Control+Shift+S");
   await demo.toast("보관할 변경이 없어요");
 

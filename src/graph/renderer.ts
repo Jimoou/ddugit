@@ -1,5 +1,5 @@
 import { stashTitle } from "../format";
-import { inlineBadges, placeBadges, type PlacedGroup } from "./labels";
+import { inlineBadges, placeBadges, type PlacedGroup, refShown } from "./labels";
 import { drawSpace, PLAIN_SKY } from "./space";
 import { type Run, runsInRows } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
@@ -617,9 +617,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     // don't overlap (stacks get lifted, or folded into "+N").
     ctx.font = `600 11px ${SANS}`;
     const groups = labelQueue.map((L) => {
-      const shown = (s.refs.get(L.id) ?? []).filter(
-        (rf) => k >= ZOOM.allRefs || rf.kind === "local" || rf.kind === "pr" || rf.name === s.headBranch,
-      );
+      const shown = (s.refs.get(L.id) ?? []).filter((rf) => refShown(rf, k >= ZOOM.allRefs, s.headBranch));
       const labels = shown.map((rf) => {
         const isHead = rf.kind === "local" && rf.name === s.headBranch && L.id === s.headId;
         const icon: IconName | null = isHead ? "head" : (REF_ICON[rf.kind] ?? null);
