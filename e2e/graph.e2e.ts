@@ -111,7 +111,7 @@ test("several branches can be picked in the sidebar, lighting their histories to
   await branch("hotfix/crash").click();
   await branch("feature/theme").click();
   await expect(side.locator("li.focused")).toHaveCount(3);
-  await expect(side.locator(".side-picked")).toContainText("브랜치 3개의 이력 강조 중");
+  await expect(side.getByRole("button", { name: "선택 해제" })).toBeVisible();
   await branch("hotfix/crash").click();
   await expect(side.locator("li.focused")).toHaveCount(2);
   await expect(branch("feature/login")).toHaveClass(/focused/);

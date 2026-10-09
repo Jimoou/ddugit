@@ -41,7 +41,6 @@ export const ko = {
   "side.more.backport": "백포트…",
   "side.more.transfer": "폐쇄망 반출입…",
   "side.more.cleanup": "브랜치 정리…",
-  "side.picked": "브랜치 {n}개의 이력 강조 중",
   "side.unpick": "선택 해제",
   "side.local": "브랜치",
   "side.remote": "원격",

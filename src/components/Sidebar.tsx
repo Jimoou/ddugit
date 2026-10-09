@@ -265,8 +265,7 @@ export function Sidebar(props: Props) {
           </div>
         )}
         {focused.length > 1 && !collapsed && (
-          <div className="side-picked" role="status">
-            <span>{t("side.picked", { n: focused.length })}</span>
+          <div className="side-picked">
             <button className="ghost" onClick={props.onClearFocus}>
               {t("side.unpick")}
             </button>

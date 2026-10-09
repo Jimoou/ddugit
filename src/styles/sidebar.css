@@ -1,19 +1,10 @@
 /* The sidebar: refs, remotes, stashes, worktrees, submodules, LFS (components/Sidebar.tsx). */
 
-/* Several branches picked at once. */
+/* Several branches picked at once: just the way to clear them. */
 .sidebar .side-picked {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 8px;
-  padding: 4px 6px 4px 8px;
-  font-size: 11.5px;
-  color: var(--text-2);
-  border: 1px solid rgba(var(--signal), 0.35);
-}
-.sidebar .side-picked > span {
-  flex: 1;
-  min-width: 0;
+  justify-content: flex-end;
+  margin: -4px 0 4px;
 }
 .sidebar .side-picked button {
   flex-shrink: 0;

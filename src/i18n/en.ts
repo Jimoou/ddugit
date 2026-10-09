@@ -42,7 +42,6 @@ export const en: Record<Key, string> = {
   "side.more.backport": "Backport…",
   "side.more.transfer": "Air-gapped transfer…",
   "side.more.cleanup": "Clean up branches…",
-  "side.picked": "Highlighting {n:branch|branches}",
   "side.unpick": "Clear",
   "side.local": "Branches",
   "side.remote": "Remotes",
