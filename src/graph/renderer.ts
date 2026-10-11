@@ -1,15 +1,14 @@
 import { stashTitle } from "../format";
 import { inlineBadges, placeBadges, type PlacedGroup, refShown } from "./labels";
-import { drawSpace, PLAIN_SKY } from "./space";
+import { drawSpace } from "./space";
+import type { Ink } from "./ink";
 import { type Run, runsInRows } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
 import {
-  ALERT,
   COL,
   edgesInRows,
   fractionAtX,
   LANE,
-  NEON,
   nodeAtCell,
   pointAt,
   type Pt,
@@ -22,7 +21,7 @@ import {
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
 import { type Box, CAPTION_H, laneReach, placeCaptions } from "./captions";
-import { parseSubject, type Subject, type Tone } from "./subject";
+import { parseSubject, type Subject } from "./subject";
 import type { Layout } from "./layout";
 
 /** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
@@ -85,6 +84,8 @@ export interface DrawState {
   space: boolean;
   /** Glow around edges, commits and the [+] node (off: the lines alone). */
   glow: boolean;
+  /** The theme's colours (lanes, fills, text). */
+  ink: Ink;
   headId: string | null;
   headBranch: string | null;
   plus: Pt;
@@ -301,16 +302,19 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): str
 }
 
 export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
-  const { scene, view, w, h, dpr, time } = s;
+  const { scene, view, w, h, dpr, time, ink } = s;
   const { k } = view;
+  const lanes = ink.lanes;
+  // Glow adds light: it belongs to the night sky, not to paper.
+  const glow = s.glow && !ink.paper;
   const n = scene.layout.rowCount;
   s.labelHits.length = 0;
 
   // --- background: galaxy ---------------------------------------------------
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (s.space) drawSpace(ctx, w, h, view, time, s.animate);
+  if (s.space) drawSpace(ctx, w, h, view, time, s.animate, ink.paper);
   else {
-    ctx.fillStyle = PLAIN_SKY;
+    ctx.fillStyle = ink.sky;
     ctx.fillRect(0, 0, w, h);
   }
 
@@ -340,8 +344,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const visible = edgesInRows(scene, firstCol, lastCol).filter((e) => e.maxY >= vy0 && e.minY <= vy1);
 
   ctx.globalCompositeOperation = "lighter";
-  for (const e of s.glow ? visible : []) {
-    const c = NEON[e.edge.color];
+  for (const e of glow ? visible : []) {
+    const c = lanes[e.edge.color];
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = alpha(c, d ? 0.03 : 0.16);
     ctx.lineWidth = 9 / k;
@@ -353,7 +357,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   }
   ctx.globalCompositeOperation = "source-over";
   for (const e of visible) {
-    const c = NEON[e.edge.color];
+    const c = lanes[e.edge.color];
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = d ? alpha(c, 0.2) : c;
     ctx.lineWidth = (e.edge.isMergeEdge ? 1.6 : 2.2) / Math.max(k, 0.5);
@@ -363,13 +367,13 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   // --- sparkles flowing along edges (parent → child, i.e. forward in time) --
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (s.animate && k > 0.2) {
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = ink.blend;
     const speed = 70; // world px / s
     for (const e of visible) {
       if (dim(e.edge.child)) continue;
       const shape = shapeOf(scene, e);
       const count = Math.max(1, Math.round(shape.length / (COL * 2.2)));
-      const c = NEON[e.edge.color];
+      const c = lanes[e.edge.color];
       const from = fractionAtX(shape, vx0),
         to = fractionAtX(shape, vx1);
       for (const t of sparklesIn(count, (time * speed) / shape.length + shape.seed, from, to)) {
@@ -378,7 +382,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         const fade = Math.sin(t * Math.PI); // fade in/out at the ends
         const r = Math.max(2, 4.5 * Math.min(k, 1.4));
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3);
-        g.addColorStop(0, alpha("#ffffff", 0.9 * fade));
+        g.addColorStop(0, alpha(ink.paper ? c : "#ffffff", 0.9 * fade));
         g.addColorStop(0.25, alpha(c, 0.7 * fade));
         g.addColorStop(1, alpha(c, 0));
         ctx.fillStyle = g;
@@ -397,8 +401,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const a = toScreen(view, { x: xOf(oldest.row, n), y: yOf(oldest.lane) });
     const b = toScreen(view, { x: xOf(oldest.row, n) - COL * 1.6, y: yOf(oldest.lane) });
     const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-    g.addColorStop(0, alpha(NEON[oldest.color], 0.9));
-    g.addColorStop(1, alpha(NEON[oldest.color], 0));
+    g.addColorStop(0, alpha(lanes[oldest.color], 0.9));
+    g.addColorStop(1, alpha(lanes[oldest.color], 0));
     ctx.save();
     ctx.setLineDash([3, 5]);
     ctx.strokeStyle = g;
@@ -414,12 +418,12 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       bh = 22;
     const rect = { x: b.x - bw / 2, y: b.y - bh / 2, w: bw, h: bh };
     roundRect(ctx, rect.x, rect.y, bw, bh, 11);
-    ctx.fillStyle = "rgba(10,8,20,0.9)";
+    ctx.fillStyle = ink.badge;
     ctx.fill();
-    ctx.strokeStyle = alpha(NEON[oldest.color], 0.8);
+    ctx.strokeStyle = alpha(lanes[oldest.color], 0.8);
     ctx.lineWidth = 1;
     ctx.stroke();
-    ctx.fillStyle = NEON[oldest.color];
+    ctx.fillStyle = lanes[oldest.color];
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label, b.x, b.y + 0.5);
@@ -433,7 +437,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const headNode = s.headId ? scene.layout.byId.get(s.headId) : undefined;
   if (headNode) {
     const hs = toScreen(view, { x: xOf(headNode.row, n), y: yOf(headNode.lane) });
-    const c = NEON[headNode.color];
+    const c = lanes[headNode.color];
     ctx.save();
     ctx.setLineDash([4, 6]);
     ctx.lineDashOffset = s.animate ? -time * 24 : 0;
@@ -455,7 +459,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     if (!node || foldedRun(s, node.id)) continue;
     const p = toScreen(view, { x: xOf(node.row, n), y: yOf(node.lane) });
     if (offscreen(p, 30)) continue;
-    const c = NEON[node.color];
+    const c = lanes[node.color];
     const d = dim(node.id);
     const born = s.births.get(node.id);
     let scale = 1;
@@ -473,7 +477,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     }
     const rr = r * scale;
 
-    if (s.glow && !d && k > ZOOM.dots) {
+    if (glow && !d && k > ZOOM.dots) {
       ctx.globalCompositeOperation = "lighter";
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rr * 3.2);
       g.addColorStop(0, alpha(c, 0.45));
@@ -491,7 +495,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.fillStyle = d ? alpha(c, 0.25) : c;
       ctx.fill();
     } else {
-      ctx.fillStyle = "#0a0814";
+      ctx.fillStyle = ink.hole;
       ctx.fill();
       ctx.lineWidth = Math.max(1.5, 2.2 * Math.min(k, 1));
       ctx.strokeStyle = d ? alpha(c, 0.25) : c;
@@ -500,14 +504,14 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
     if (node.id === s.headId) {
       const pulse = s.animate ? (Math.sin(time * 3) + 1) / 2 : 0.5;
-      ctx.strokeStyle = alpha("#ffffff", 0.5 + 0.4 * pulse);
+      ctx.strokeStyle = alpha(ink.ring, 0.5 + 0.4 * pulse);
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(p.x, p.y, rr + 4 + pulse * 2, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (node.id === s.selected || node.id === s.hovered || node.id === s.drag?.target) {
-      ctx.strokeStyle = node.id === s.drag?.target ? "#ffffff" : alpha("#ffffff", node.id === s.selected ? 0.95 : 0.5);
+      ctx.strokeStyle = node.id === s.drag?.target ? ink.ring : alpha(ink.ring, node.id === s.selected ? 0.95 : 0.5);
       ctx.lineWidth = node.id === s.drag?.target ? 2.5 : 1.5;
       ctx.beginPath();
       ctx.arc(p.x, p.y, rr + (node.id === s.drag?.target ? 9 : 7), 0, Math.PI * 2);
@@ -515,7 +519,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     }
     if (s.picked.has(node.id)) {
       // A dashed ring apart from the selection's, so both read at once.
-      ctx.strokeStyle = alpha("#ffffff", 0.9);
+      ctx.strokeStyle = alpha(ink.ring, 0.9);
       ctx.lineWidth = 2;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -524,7 +528,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.setLineDash([]);
     }
     const badge = s.badges.get(node.id);
-    if (badge) drawBadge(ctx, badge, p, rr, s.animate ? time : 0);
+    if (badge) drawBadge(ctx, ink.bisect[badge], badge, p, rr, s.animate ? time : 0);
     labelQueue.push({ x: p.x, y: p.y, id: node.id, color: c, d });
   }
 
@@ -543,10 +547,10 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const bw = Math.abs(b.x - a.x) + rr * 2,
         bh = Math.abs(b.y - a.y) + rr * 2;
       if (x > w + 30 || y > h + 30 || x + bw < -30 || y + bh < -30) continue;
-      const c = NEON[run.color];
+      const c = lanes[run.color];
       const on = run === s.runHover;
       roundRect(ctx, x, y, bw, bh, rr);
-      ctx.fillStyle = on ? alpha(c, 0.3) : "#0a0814";
+      ctx.fillStyle = on ? alpha(c, 0.3) : ink.hole;
       ctx.fill();
       ctx.lineWidth = on ? 2 : 1.5;
       ctx.strokeStyle = c;
@@ -555,7 +559,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const cx = x + bw / 2,
         cy = y + bh / 2;
       if (textWidth(ctx, label) + 10 < Math.max(bw, bh * 2.5)) {
-        ctx.fillStyle = on ? "#ffffff" : c;
+        ctx.fillStyle = on ? ink.textOn : c;
         ctx.fillText(label, cx, cy + 0.5);
       }
       if (on) {
@@ -570,7 +574,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const b = toScreen(view, m.base);
     const p = toScreen(view, m.pos);
     if (offscreen(p, 40)) continue;
-    const c = NEON[3];
+    const c = lanes[3];
     const on = m.index === s.stashHover || m.index === s.stashSelected;
     const sr = stashRadius(k) * (on ? 1.2 : 1);
     ctx.save();
@@ -582,7 +586,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.quadraticCurveTo(p.x, b.y, p.x, p.y);
     ctx.stroke();
     ctx.restore();
-    if (s.glow) {
+    if (glow) {
       ctx.globalCompositeOperation = "lighter";
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sr * 3);
       g.addColorStop(0, alpha(c, on ? 0.6 : 0.35));
@@ -597,7 +601,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.lineTo(p.x, p.y + sr);
     ctx.lineTo(p.x - sr, p.y);
     ctx.closePath();
-    ctx.fillStyle = on ? c : "#0a0814";
+    ctx.fillStyle = on ? c : ink.hole;
     ctx.fill();
     ctx.strokeStyle = c;
     ctx.lineWidth = 1.8;
@@ -687,15 +691,15 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       for (const b of pg.badges) {
         const item = b.index >= 0 ? labels[b.index] : null;
         const col =
-          item?.rf.kind === "tag" ? NEON[3] : item?.rf.kind === "pr" ? PR_COLOR[item.rf.checks ?? "none"] : L.color;
+          item?.rf.kind === "tag" ? lanes[3] : item?.rf.kind === "pr" ? ink.pr[item.rf.checks ?? "none"] : L.color;
         ctx.globalAlpha = L.d ? 0.3 : item?.rf.kind === "remote" || !item ? 0.75 : 1;
         roundRect(ctx, b.x, b.y, b.w, BADGE_H, 9);
-        ctx.fillStyle = item?.isHead ? col : "rgba(10,8,20,0.85)";
+        ctx.fillStyle = item?.isHead ? col : ink.badge;
         ctx.fill();
         ctx.strokeStyle = col;
         ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = item?.isHead ? "#07060d" : col;
+        ctx.fillStyle = item?.isHead ? ink.onFill : col;
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
         ctx.font = `600 11px ${SANS}`;
@@ -721,16 +725,16 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     if (src) {
       const a = toScreen(view, { x: xOf(src.row, n), y: yOf(src.lane) });
       const b = s.drag.to;
-      const c = s.drag.valid ? "#ffffff" : NEON[src.color];
+      const c = s.drag.valid ? ink.ring : lanes[src.color];
       const tint =
         s.drag.mode === "pick"
-          ? NEON[3]
+          ? lanes[3]
           : s.drag.mode === "move" || s.drag.mode === "rebase"
-            ? NEON[4]
+            ? lanes[4]
             : s.drag.valid
-              ? NEON[6]
-              : NEON[src.color];
-      ctx.globalCompositeOperation = "lighter";
+              ? lanes[6]
+              : lanes[src.color];
+      ctx.globalCompositeOperation = ink.blend;
       for (const [lw, al] of [
         [10, 0.12],
         [5, 0.3],
@@ -749,7 +753,13 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.fill();
       const dst = s.drag.valid && s.drag.target ? scene.layout.byId.get(s.drag.target) : undefined;
       if (dst)
-        drawGravityWell(ctx, toScreen(view, { x: xOf(dst.row, n), y: yOf(dst.lane) }), tint, s.animate ? time : 0);
+        drawGravityWell(
+          ctx,
+          toScreen(view, { x: xOf(dst.row, n), y: yOf(dst.lane) }),
+          tint,
+          s.animate ? time : 0,
+          ink.blend,
+        );
     }
   }
 
@@ -757,9 +767,9 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const inNode = s.incoming ? scene.layout.byId.get(s.incoming) : undefined;
   if (inNode) {
     const a = toScreen(view, { x: xOf(inNode.row, n), y: yOf(inNode.lane) });
-    const c = ALERT;
+    const c = ink.alert;
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = ink.blend;
     ctx.setLineDash([6, 6]);
     ctx.lineDashOffset = s.animate ? -time * 30 : 0;
     for (const [lw, al] of [
@@ -783,9 +793,9 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   // --- [+] node ---------------------------------------------------------------
   {
     const pr = Math.max(9, Math.min(15, 12 * k));
-    const c = inNode ? ALERT : headNode ? NEON[headNode.color] : NEON[0];
+    const c = inNode ? ink.alert : headNode ? lanes[headNode.color] : lanes[0];
     const pulse = s.animate && s.changeCount ? (Math.sin(time * 4) + 1) / 2 : 0;
-    if (s.glow) {
+    if (glow) {
       ctx.globalCompositeOperation = "lighter";
       const g = ctx.createRadialGradient(plusS.x, plusS.y, 0, plusS.x, plusS.y, pr * (2.4 + pulse));
       g.addColorStop(0, alpha(c, s.plusHover ? 0.55 : 0.3));
@@ -799,14 +809,14 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 
     ctx.beginPath();
     ctx.arc(plusS.x, plusS.y, pr, 0, Math.PI * 2);
-    ctx.fillStyle = s.plusHover ? c : "#0a0814";
+    ctx.fillStyle = s.plusHover ? c : ink.hole;
     ctx.fill();
     ctx.setLineDash(s.changeCount ? [] : [3, 3]);
     ctx.strokeStyle = c;
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.strokeStyle = s.plusHover ? "#07060d" : c;
+    ctx.strokeStyle = s.plusHover ? ink.onFill : c;
     ctx.lineWidth = 2.2;
     ctx.beginPath();
     ctx.moveTo(plusS.x - pr * 0.45, plusS.y);
@@ -822,9 +832,9 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       const bx = plusS.x + pr * 0.6,
         by = plusS.y - pr - 6;
       roundRect(ctx, bx, by, bw, 15, 7.5);
-      ctx.fillStyle = NEON[1];
+      ctx.fillStyle = lanes[1];
       ctx.fill();
-      ctx.fillStyle = "#07060d";
+      ctx.fillStyle = ink.onFill;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, bx + bw / 2, by + 8);
@@ -833,9 +843,15 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
 }
 
 /** A valid drop target pulls the dragged star in: dashed rings that turn and shrink into it. */
-function drawGravityWell(ctx: CanvasRenderingContext2D, p: Pt, c: string, time: number) {
+function drawGravityWell(
+  ctx: CanvasRenderingContext2D,
+  p: Pt,
+  c: string,
+  time: number,
+  blend: GlobalCompositeOperation,
+) {
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = blend;
   const R = 46;
   for (let i = 0; i < 3; i++) {
     const f = (time * 0.7 + i / 3) % 1; // 0 = outer edge, 1 = swallowed
@@ -864,24 +880,10 @@ const CAPTION_MAX = 240;
 const CAPTION_BRIEF = 150;
 const CAPTION_FULL = 380;
 
-/** Colours for the kinds of change a summary names (see `subject.ts`). */
-const CHIP_COLOR: Record<Tone, string> = {
-  feat: "#4fd1a5",
-  fix: "#ff6b81",
-  docs: "#6cb8ff",
-  perf: "#ffb84d",
-  refactor: "#c08cff",
-  test: "#3ee0d0",
-  chore: "#9aa1b5",
-  merge: "#9aa3ff",
-  revert: "#ff8f5a",
-  wip: "#ffd479",
-};
 const PILL_PAD = 6;
 const PART_GAP = 5;
 const CHIP_FONT = `700 9px ${MONO}`;
 const PR_FONT = `600 10px ${SANS}`;
-const PR_INK = "#c9b8ff";
 
 const subjects = new Map<string, Subject>();
 const subjectOf = (summary: string) => remember(subjects, summary, () => parseSubject(summary));
@@ -889,7 +891,6 @@ const chipText = (sub: Subject) => (sub.chip ? sub.chip.label + (sub.breaking ? 
 
 /** The scope (`graph` in `feat(graph): …`) leads the text, dimmer, when there is room for it. */
 const scopeText = (sub: Subject, brief: boolean) => (sub.scope && !brief ? `${sub.scope} ` : "");
-const SCOPE_INK = "rgba(255,255,255,0.5)";
 
 /** Width of a caption pill holding all of `summary` in `font`. */
 function captionWidth(ctx: CanvasRenderingContext2D, summary: string, font: string, brief: boolean): number {
@@ -916,6 +917,7 @@ function captionWidth(ctx: CanvasRenderingContext2D, summary: string, font: stri
  */
 function drawCaption(
   ctx: CanvasRenderingContext2D,
+  ink: Ink,
   summary: string,
   box: { x: number; y: number; w: number },
   font: string,
@@ -930,7 +932,7 @@ function drawCaption(
   const mid = y + h / 2 + 0.5;
   ctx.globalAlpha = dimmed ? 0.35 : 1;
   roundRect(ctx, x, y, w, h, 5);
-  ctx.fillStyle = on ? "rgba(24,20,44,0.94)" : "rgba(10,8,22,0.8)";
+  ctx.fillStyle = on ? ink.pillOn : ink.pill;
   ctx.fill();
   ctx.strokeStyle = alpha(lane, on ? 0.95 : 0.42);
   ctx.lineWidth = on ? 1.4 : 1;
@@ -944,7 +946,7 @@ function drawCaption(
     const label = chipText(sub);
     const cw = textWidth(ctx, label) + 8;
     if (cx + cw <= right) {
-      const c = sub.breaking ? CHIP_COLOR.fix : CHIP_COLOR[sub.chip.tone];
+      const c = sub.breaking ? ink.chip.fix : ink.chip[sub.chip.tone];
       roundRect(ctx, cx, y + 3, cw, h - 6, 3);
       ctx.fillStyle = alpha(c, 0.2);
       ctx.fill();
@@ -961,7 +963,7 @@ function drawCaption(
   ctx.font = font;
   const scope = scopeText(sub, brief);
   if (scope && right - cx - prW - textWidth(ctx, scope) >= Math.min(60, textWidth(ctx, sub.text))) {
-    ctx.fillStyle = SCOPE_INK;
+    ctx.fillStyle = ink.scope;
     ctx.fillText(scope, cx, mid);
     cx += textWidth(ctx, scope);
   }
@@ -970,12 +972,12 @@ function drawCaption(
   const showPr = !!sub.pr && roomWithPr >= Math.min(60, textWidth(ctx, sub.text));
   const room = showPr ? roomWithPr : right - cx;
   const line = truncate(ctx, sub.text, Math.max(0, room));
-  ctx.fillStyle = on ? "#ffffff" : "rgba(255,255,255,0.9)";
+  ctx.fillStyle = on ? ink.textOn : ink.text;
   ctx.fillText(line, cx, mid);
   if (showPr) {
     const tw = textWidth(ctx, line);
     ctx.font = PR_FONT;
-    ctx.fillStyle = PR_INK;
+    ctx.fillStyle = ink.prInk;
     ctx.fillText(sub.pr!, cx + tw + PART_GAP, mid);
   }
   ctx.globalAlpha = 1;
@@ -1034,7 +1036,7 @@ function drawMapCaptions(
       ctx.stroke();
     }
     const on = inHand(c.id);
-    drawCaption(ctx, s.summaries.get(c.id)!, c, fontOf(c.id), L.color, on, L.d, brief && !on);
+    drawCaption(ctx, s.ink, s.summaries.get(c.id)!, c, fontOf(c.id), L.color, on, L.d, brief && !on);
   }
 }
 
@@ -1070,12 +1072,8 @@ function drawUprightCaption(
   const brief = s.view.k < ZOOM.captions && !on;
   const font = `${on ? 600 : 400} ${brief ? 11 : 12}px ${SANS}`;
   const w = Math.min(space, captionWidth(ctx, text, font, brief) + 1);
-  drawCaption(ctx, text, { x: side > 0 ? x : x - w, y: L.y - CAPTION_H / 2, w }, font, L.color, on, L.d, brief);
+  drawCaption(ctx, s.ink, text, { x: side > 0 ? x : x - w, y: L.y - CAPTION_H / 2, w }, font, L.color, on, L.d, brief);
 }
-
-const TRAIL = "#ffd479";
-/** Pull request labels by CI state: green, red, amber; pale violet when nothing runs. */
-const PR_COLOR = { success: "#4fd1a5", failure: "#ff4d6d", pending: "#ffb84d", none: "#c9b8ff" } as const;
 
 /**
  * A star chart through the commits that touched a file, oldest to newest,
@@ -1083,6 +1081,7 @@ const PR_COLOR = { success: "#4fd1a5", failure: "#ff4d6d", pending: "#ffb84d", n
  */
 function drawTrail(ctx: CanvasRenderingContext2D, s: DrawState) {
   const { scene, view, time } = s;
+  const TRAIL = s.ink.trail;
   const n = scene.layout.rowCount;
   const pts = s.trail
     .flatMap((id) => {
@@ -1100,7 +1099,7 @@ function drawTrail(ctx: CanvasRenderingContext2D, s: DrawState) {
   pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = s.ink.blend;
   ctx.strokeStyle = alpha(TRAIL, 0.85);
   for (const [i, p] of pts.entries()) {
     const twinkle = s.animate ? 0.75 + 0.25 * Math.sin(time * 2 + i * 1.7) : 1;
@@ -1132,7 +1131,7 @@ function drawTrail(ctx: CanvasRenderingContext2D, s: DrawState) {
       const p = at(Math.max(0, head - j * 7));
       const rad = 5 - j * 0.5;
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad * 2.5);
-      g.addColorStop(0, alpha("#ffffff", 0.9 * (1 - j / 8)));
+      g.addColorStop(0, alpha(s.ink.paper ? TRAIL : "#ffffff", 0.9 * (1 - j / 8)));
       g.addColorStop(0.4, alpha(TRAIL, 0.6 * (1 - j / 8)));
       g.addColorStop(1, alpha(TRAIL, 0));
       ctx.fillStyle = g;
@@ -1144,11 +1143,8 @@ function drawTrail(ctx: CanvasRenderingContext2D, s: DrawState) {
   ctx.restore();
 }
 
-const BADGE_COLOR = { good: "#4fd1a5", bad: "#ff4d6d", probe: "#cfc6ff", culprit: "#ff4d6d" } as const;
-
 /** Bisect marks: a ring for good / bad, a turning scanner on the commit under test, a pulsing culprit. */
-function drawBadge(ctx: CanvasRenderingContext2D, badge: NodeBadge, p: Pt, r: number, time: number) {
-  const c = BADGE_COLOR[badge];
+function drawBadge(ctx: CanvasRenderingContext2D, c: string, badge: NodeBadge, p: Pt, r: number, time: number) {
   ctx.save();
   ctx.strokeStyle = c;
   ctx.lineWidth = 2;

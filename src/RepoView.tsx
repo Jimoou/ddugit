@@ -21,7 +21,8 @@ import { StashPanel } from "./components/StashPanel";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
 import { ancestors, ancestorsOf, computeLayout, descendantsOf } from "./graph/layout";
-import { NEON } from "./graph/scene";
+import { INK } from "./graph/ink";
+import type { Theme } from "./theme";
 import { stashTitle } from "./format";
 import { planMove } from "./rebasePlan";
 import { useLoaded } from "./components/useLoaded";
@@ -77,6 +78,8 @@ interface RepoViewProps {
   /** The visible tab: only it listens to keys, watches files and draws. */
   active: boolean;
   settings: Settings;
+  /** The colour scheme in effect (settings resolved against the OS). */
+  theme: Theme;
   /** Commits per page (settings, or `?page=` in demos). */
   page: number;
   toast: Toast;
@@ -97,6 +100,7 @@ export function RepoView({
   path,
   active,
   settings,
+  theme,
   page,
   toast,
   onLoaded,
@@ -281,7 +285,8 @@ export function RepoView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, refresh, openSearch]);
-  const colorOf = useCallback((id: string) => NEON[layout?.byId.get(id)?.color ?? 0], [layout]);
+  const lanes = INK[theme].lanes;
+  const colorOf = useCallback((id: string) => lanes[layout?.byId.get(id)?.color ?? 0], [layout, lanes]);
 
   /** Local branch a merge can land on at commit `id`. */
   const branchAt = useCallback(
@@ -634,6 +639,7 @@ export function RepoView({
               animate={animate}
               space={settings.space}
               glow={settings.glow}
+              theme={theme}
               onSelect={(id) => {
                 setPicked([]);
                 if (id || !composer) show({ commit: id });

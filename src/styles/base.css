@@ -17,7 +17,11 @@
   /* Floating over the map (zoom controls, cards, menus): opaque so the stars don't show through. */
   --panel: #181b1f;
   --scrim: rgba(0, 0, 0, 0.55);
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shade: rgba(0, 0, 0, 0.45);
+  --shadow: 0 12px 32px var(--shade);
+  /* Over the branch map: the overview strip and the help line's veil. */
+  --map-strip: rgba(8, 7, 22, 0.88);
+  --map-veil: rgba(5, 4, 14, 0.6);
   --hover: rgba(255, 255, 255, 0.05);
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.15);
@@ -41,9 +45,51 @@
   --lime: #a6ff4d;
   --amber: #ffb84d;
   --red: #ff4d6d;
+  --violet: #b9a3ff;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", sans-serif;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   color-scheme: dark;
+}
+
+/* Light (frame B's colours): warm paper, white panels, black ink. The data colours are deeper
+   inks of the same hues (graph/ink.ts holds the canvas's), dark enough to read as text on paper. */
+:root[data-theme="light"] {
+  --space: #f4f2ec;
+  --brand-ink: #1c1c1a;
+  --brand-star: #c98400;
+  --chrome: #e9e6df;
+  --bg: #f6f4ef;
+  --surface: #fcfbf8;
+  --raised: #ffffff;
+  --raised-hover: #f1eee7;
+  --panel: #ffffff;
+  --scrim: rgba(28, 28, 26, 0.28);
+  --shade: rgba(28, 28, 26, 0.14);
+  --shadow: 0 10px 28px var(--shade);
+  --map-strip: rgba(244, 242, 236, 0.92);
+  --map-veil: rgba(246, 244, 239, 0.85);
+  --hover: rgba(28, 28, 26, 0.05);
+  --line: rgba(28, 28, 26, 0.1);
+  --line-strong: rgba(28, 28, 26, 0.2);
+  --text: #1c1c1a;
+  --text-2: #2b2a27;
+  --muted: #4f4c46;
+  --faint: #6f6b63;
+  --ui: #1c1c1a;
+  --ui-hover: #000000;
+  --ui-ink: #ffffff;
+  --ui-soft: rgba(28, 28, 26, 0.07);
+  --ui-text: #1c1c1a;
+  --focus: #2a64d0;
+  --ok: #1f8754;
+  --danger: #c8364f;
+  --cyan: #08728f;
+  --magenta: #b4359e;
+  --lime: #387a0e;
+  --amber: #9a6200;
+  --red: #c23558;
+  --violet: #6c52cc;
+  color-scheme: light;
 }
 
 /* Thin scrollbars that sit on the surfaces instead of the OS's grey gutter. */

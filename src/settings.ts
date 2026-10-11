@@ -5,6 +5,7 @@ import type { Turn } from "./graph/renderer";
 import type { Key, LanguagePref } from "./i18n";
 import { type ExternalApps, parseExternal } from "./external";
 import { parseProfiles } from "./identity";
+import { THEMES, type ThemePref } from "./theme";
 import type { Profile } from "./types";
 
 /** With the editor and diff / merge tools to open things in (`external.ts`). */
@@ -19,6 +20,8 @@ export interface Settings extends ExternalApps {
   historyPage: number;
   /** git executable; empty means `git` on PATH. */
   gitPath: string;
+  /** Colour scheme; "system" follows the OS. */
+  theme: ThemePref;
   /** UI language; "system" follows the OS (Korean if it is Korean, else English). */
   language: LanguagePref;
   /** The graph turned in quarter turns clockwise (0: time runs left → right). */
@@ -55,6 +58,7 @@ export function defaults(reducedMotion = false): Settings {
     glow: true,
     historyPage: 3000,
     gitPath: "",
+    theme: "system",
     language: "system",
     rotation: 0,
     sidebarCollapsed: false,
@@ -97,6 +101,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
         ? o.historyPage
         : base.historyPage,
     gitPath: typeof o.gitPath === "string" ? o.gitPath : base.gitPath,
+    theme: THEMES.find((x) => x === o.theme) ?? base.theme,
     language: LANGUAGES.find((l) => l === o.language) ?? base.language,
     rotation: ([0, 1, 2, 3] as const).find((r) => r === o.rotation) ?? base.rotation,
     sidebarCollapsed: typeof o.sidebarCollapsed === "boolean" ? o.sidebarCollapsed : base.sidebarCollapsed,

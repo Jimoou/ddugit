@@ -3,6 +3,7 @@ import { api } from "../api";
 import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
+import { THEMES } from "../theme";
 import { Icon } from "./Icon";
 import { ExternalSection } from "./ExternalSettings";
 import { ProfilesSection } from "./Identity";
@@ -107,6 +108,13 @@ function ScreenSection({ settings, onChange }: SectionProps) {
             </option>
           ))}
         </select>
+        <span>{t("settings.theme")}</span>
+        <Segmented
+          label={t("settings.theme")}
+          value={settings.theme}
+          onChange={(theme) => onChange({ theme })}
+          options={THEMES.map((x) => ({ value: x, label: t(`settings.theme.${x}`) }))}
+        />
         <span>{t("settings.effects")}</span>
         <div className="checks">
           {check("animate", t("settings.sparkle"))}

@@ -1,12 +1,14 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { type Bounds, turnBounds } from "./camera";
 import { toWorld, turn, type Turn, upright, type View } from "./renderer";
-import { COL, LANE, NEON, type Pt, type Scene, xOf, yOf } from "./scene";
+import { COL, LANE, type Pt, type Scene, xOf, yOf } from "./scene";
+import type { Ink } from "./ink";
 
 interface Props {
   scene: Scene;
   /** Turned like the graph: a strip along the bottom, or down the right side when time runs down. */
   rotation: Turn;
+  ink: Ink;
   getView(): View;
   getSize(): { w: number; h: number };
   onJump(world: Pt): void;
@@ -23,7 +25,7 @@ const PAD = 8;
 
 /** Whole-history overview strip with the current viewport; click or drag to jump. */
 export const Minimap = forwardRef<MinimapHandle, Props>(function Minimap(
-  { scene, rotation, getView, getSize, onJump },
+  { scene, rotation, ink, getView, getSize, onJump },
   handle,
 ) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -70,7 +72,8 @@ export const Minimap = forwardRef<MinimapHandle, Props>(function Minimap(
     const n = scene.layout.rowCount;
     ctx.lineWidth = 1;
     // One path per colour instead of a stroke call per edge (100k on a big history).
-    const lines = NEON.map(() => new Path2D());
+    const lanes = ink.lanes;
+    const lines = lanes.map(() => new Path2D());
     for (const e of scene.edges) {
       const a = e.edge;
       const p = to({ x: xOf(a.parentRow, n), y: yOf(a.parentLane) });
@@ -79,16 +82,16 @@ export const Minimap = forwardRef<MinimapHandle, Props>(function Minimap(
       lines[a.color].lineTo(q.x, q.y);
     }
     lines.forEach((path, c) => {
-      ctx.strokeStyle = NEON[c] + "99";
+      ctx.strokeStyle = lanes[c] + "99";
       ctx.stroke(path);
     });
-    const dots = NEON.map(() => new Path2D());
+    const dots = lanes.map(() => new Path2D());
     for (const node of scene.layout.nodes) {
       const p = to({ x: xOf(node.row, n), y: yOf(node.lane) });
       dots[node.color].rect(p.x - 1, p.y - 1, 2, 2);
     }
     dots.forEach((path, c) => {
-      ctx.fillStyle = NEON[c];
+      ctx.fillStyle = lanes[c];
       ctx.fill(path);
     });
     cache.current = off;
@@ -108,7 +111,7 @@ export const Minimap = forwardRef<MinimapHandle, Props>(function Minimap(
     ro.observe(c);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene, rotation]);
+  }, [scene, rotation, ink]);
 
   /** Draw the cached strip and the viewport box over it, unless the box is where it was (`force` after a new cache). */
   const draw = (force = false) => {
@@ -134,8 +137,8 @@ export const Minimap = forwardRef<MinimapHandle, Props>(function Minimap(
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.drawImage(cache.current, 0, 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = "rgba(34,232,255,0.08)";
-    ctx.strokeStyle = "rgba(34,232,255,0.8)";
+    ctx.fillStyle = ink.view.fill;
+    ctx.strokeStyle = ink.view.stroke;
     ctx.lineWidth = 1;
     ctx.fillRect(rx, ry, rw, rh);
     ctx.strokeRect(rx + 0.5, ry + 0.5, rw, rh);

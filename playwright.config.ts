@@ -15,6 +15,8 @@ export default defineConfig({
     trace: "retain-on-failure",
     // The default language follows the system; tests read Korean unless they switch.
     locale: "ko-KR",
+    // The theme follows the system too; tests see the dark theme unless they switch.
+    colorScheme: "dark",
   },
   projects: [
     {
