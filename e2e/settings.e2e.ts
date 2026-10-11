@@ -145,17 +145,21 @@ test("settings: the light theme repaints the window and the map, and is remember
       const [r, g, b] = c.getContext("2d")!.getImageData(4, 4, 1, 1).data;
       return (r + g + b) / 3;
     });
-  // "System" follows the OS while it changes.
-  expect(await theme()).toBe("dark");
+  // Dark by default, whatever the OS uses.
   await page.emulateMedia({ colorScheme: "light" });
-  await expect.poll(theme).toBe("light");
-  await page.emulateMedia({ colorScheme: "dark" });
-  await expect.poll(theme).toBe("dark");
+  expect(await theme()).toBe("dark");
   expect(await paper()).toBeLessThan(60);
 
   await page.locator(".tabrow-settings").click();
   const dialog = page.getByRole("dialog", { name: "설정" });
-  await dialog.getByRole("radiogroup", { name: "테마" }).getByRole("radio", { name: "밝게" }).click();
+  const themes = dialog.getByRole("radiogroup", { name: "테마" });
+  // "System" follows the OS while it changes.
+  await themes.getByRole("radio", { name: "시스템" }).click();
+  await expect.poll(theme).toBe("light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect.poll(theme).toBe("dark");
+
+  await themes.getByRole("radio", { name: "밝게" }).click();
   await expect.poll(theme).toBe("light");
   await page.keyboard.press("Escape");
   await expect.poll(paper).toBeGreaterThan(200);

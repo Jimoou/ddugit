@@ -20,7 +20,7 @@ export interface Settings extends ExternalApps {
   historyPage: number;
   /** git executable; empty means `git` on PATH. */
   gitPath: string;
-  /** Colour scheme; "system" follows the OS. */
+  /** Colour scheme; "system" follows the OS. Dark until chosen otherwise: the app's own look. */
   theme: ThemePref;
   /** UI language; "system" follows the OS (Korean if it is Korean, else English). */
   language: LanguagePref;
@@ -58,7 +58,7 @@ export function defaults(reducedMotion = false): Settings {
     glow: true,
     historyPage: 3000,
     gitPath: "",
-    theme: "system",
+    theme: "dark",
     language: "system",
     rotation: 0,
     sidebarCollapsed: false,
