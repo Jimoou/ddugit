@@ -67,6 +67,8 @@ interface Props {
   glow: boolean;
   /** Night sky or printed chart: the map's colours. */
   theme: Theme;
+  /** Lane colours: the theme's, then the branch colours the user chose. */
+  lanes: readonly string[];
   onSelect(id: string | null): void;
   /** A commit ⌘/Ctrl-clicked (`range`: Shift-clicked), to pick it along with others. */
   onPick?(id: string, range: boolean): void;
@@ -118,6 +120,7 @@ const MAX_K = 3;
 const clampK = (k: number) => Math.min(MAX_K, Math.max(MIN_K, k));
 
 export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(props, ref) {
+  const ink = useMemo(() => ({ ...INK[props.theme], lanes: props.lanes }), [props.theme, props.lanes]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const scene = useMemo(() => buildScene(props.layout), [props.layout]);
@@ -437,7 +440,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         animate: p.animate,
         space: p.space,
         glow: p.glow,
-        ink: INK[p.theme],
+        ink: { ...INK[p.theme], lanes: p.lanes },
         headId: p.headId,
         headBranch: p.headBranch,
         plus: plusPosition(sceneRef.current, p.headId),
@@ -782,7 +785,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           ref={minimap}
           scene={scene}
           rotation={props.rotation}
-          ink={INK[props.theme]}
+          ink={ink}
           getView={() => st.current.view}
           getSize={() => st.current.size}
           onJump={(world) => {

@@ -43,7 +43,8 @@ export interface Layout {
   rowCount: number;
 }
 
-const PALETTE_SIZE = 8;
+/** Lane colours to choose from (`graph/ink.ts`: one ink per theme for each). */
+export const PALETTE_SIZE = 8;
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -54,7 +55,8 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-const baseName = (name: string) => name.replace(/^origin\//, "");
+/** A branch's name without `origin/`: a local branch and its upstream share a colour. */
+export const baseName = (name: string) => name.replace(/^origin\//, "");
 
 /** Preferred colour per branch name: the same branch keeps its colour across reloads. */
 export function colorForBranch(name: string): number {
@@ -64,15 +66,21 @@ export function colorForBranch(name: string): number {
 }
 
 /**
- * Colour for every branch name. Starts from the hashed preference and moves
- * to the next free colour on collision, so live branches look distinct while
- * staying stable as long as the branch set doesn't change much.
+ * Colour for every branch name: the user's choice (`chosen`, by base name), else
+ * the hashed preference moved to the next free colour on collision, so live
+ * branches look distinct while staying stable as long as the branch set
+ * doesn't change much. A choice never moves another branch's colour.
  */
-function branchColors(refs: RefInfo[]): Map<string, number> {
+function branchColors(refs: RefInfo[], chosen: ReadonlyMap<string, number>): Map<string, number> {
   const bases = [...new Set(refs.filter((r) => r.kind !== "tag").map((r) => baseName(r.name)))].sort();
   const out = new Map<string, number>();
   const used = new Set<number>();
   for (const b of bases) {
+    const mine = chosen.get(b);
+    if (mine !== undefined) {
+      out.set(b, mine);
+      continue;
+    }
     let c = colorForBranch(b);
     if (c !== 0) {
       for (let i = 0; i < PALETTE_SIZE - 1 && used.has(c); i++) c = (c % (PALETTE_SIZE - 1)) + 1;
@@ -93,6 +101,8 @@ export function computeLayout(
   commits: CommitInfo[],
   refs: RefInfo[],
   head: Pick<HeadInfo, "branch" | "target">,
+  /** Colours the user chose, by base branch name (`baseName`). */
+  chosen: ReadonlyMap<string, number> = new Map(),
 ): Layout {
   // Commits are worked on by row: one string-keyed map (`byId`), then plain
   // numbers. 100k commits lay out in tens of milliseconds.
@@ -142,7 +152,7 @@ export function computeLayout(
     laneCount = Math.max(laneCount, i + 1);
     return i;
   };
-  const colors = branchColors(refs);
+  const colors = branchColors(refs, chosen);
   const freshColor = (row: number): number => {
     const name = tipName.get(nodes[row].id);
     if (name) return colors.get(baseName(name)) ?? colorForBranch(name);
@@ -152,7 +162,7 @@ export function computeLayout(
   };
   if (reserve) {
     lanes[0] = -1;
-    laneColor[0] = 0;
+    laneColor[0] = chosen.get(baseName(tn ?? "")) ?? 0;
   }
 
   // Edge "via" lanes are known when the child is placed; the parent's lane once it is.
@@ -209,6 +219,29 @@ export function computeLayout(
   for (const e of edges) e.parentLane = nodes[e.parentRow].lane;
 
   return { nodes, byId, edges, laneCount: Math.max(laneCount, 1), rowCount: n };
+}
+
+/**
+ * Commits only hidden branches reach: what the map leaves out while they are
+ * hidden. A commit any shown tip also reaches (merged in, or under a shown
+ * branch) stays.
+ */
+export function hiddenOnly(commits: CommitInfo[], tips: { shown: string[]; hidden: string[] }): Set<string> {
+  const byId = new Map(commits.map((c) => [c.id, c]));
+  const walk = (from: string[], stop?: Set<string>) => {
+    const seen = new Set<string>();
+    const stack = [...from];
+    while (stack.length) {
+      const id = stack.pop()!;
+      if (seen.has(id) || stop?.has(id)) continue;
+      const c = byId.get(id);
+      if (!c) continue;
+      seen.add(id);
+      stack.push(...c.parents);
+    }
+    return seen;
+  };
+  return walk(tips.hidden, walk(tips.shown));
 }
 
 /** All ancestors of `id` (inclusive) within the loaded commits. */
