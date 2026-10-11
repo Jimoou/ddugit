@@ -78,21 +78,23 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px;
+  padding: 3px;
   background: var(--panel);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
 }
 .hud button {
   width: 30px;
   height: 28px;
   padding: 0;
   border: none;
+  border-radius: 5px;
   background: none;
+  color: var(--text-2);
 }
 .hud button:hover:not(:disabled) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--hover);
 }
 .hud button.turn,
 .hud button.list {
@@ -104,6 +106,7 @@
 }
 .hud button.on {
   color: var(--text);
+  background: var(--ui-soft);
 }
 .hud button.list.on {
   background: var(--ui-soft);
@@ -132,8 +135,8 @@
   position: absolute;
   left: 14px;
   bottom: 70px;
-  /* Stops short of the zoom controls at the bottom right. */
-  max-width: calc(100% - 290px);
+  /* Stops short of the zoom controls at the bottom right (about 380px with every key shown). */
+  max-width: calc(100% - 420px);
   font-size: 11px;
   color: var(--text-2);
   pointer-events: none;
@@ -144,7 +147,7 @@
   text-overflow: ellipsis;
 }
 /* A narrow or short graph (panel or sheet open, small window) keeps the room for commits, not the help line. */
-@container (max-width: 640px) or (max-height: 420px) {
+@container (max-width: 760px) or (max-height: 420px) {
   .hint {
     display: none;
   }
@@ -166,6 +169,7 @@
   padding: 6px 14px;
   background: var(--panel);
   border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   pointer-events: none;
 }
 .drag-hint.ok {

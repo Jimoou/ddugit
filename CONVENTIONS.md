@@ -76,7 +76,10 @@ ddugit의 모든 코드(사람과 AI 모두)가 따르는 규칙입니다. 포�
 ## 5. CSS
 
 - 색, 폰트, 테두리는 `:root` 토큰(`--cyan`, `--line` …)만 씁니다. 하드코딩한 색은 토큰 정의부와 동적 값(`--c`, `--accent` 주입)에만 허용합니다.
-- **은하계 UI 규칙**: 네온(`--cyan` `--magenta` `--lime`, 발광 `box-shadow`/`text-shadow`)은 그래프와 데이터(브랜치 색, diff 부호, 파일 상태)에만 씁니다. 버튼·탭·메뉴·패널 같은 조작 요소는 유리 표면(`--glass`, `--glass-strong`), 밝은 글자(`--text`, `--text-2`), 차분한 강조(`--ui`, `--ui-soft`, `--ui-text`, `--focus`)만 씁니다. 선택·켜짐 상태는 발광 대신 채운 배경으로 보여 줍니다.
+- **틀 A 규칙**: 브랜치 맵(캔버스)과 은하 대시보드만 우주·네온입니다. 네온(`--cyan` `--magenta` `--lime` …)은 그래프와 데이터(브랜치 색, diff 부호, 파일 상태)에만 씁니다. 버튼·탭·메뉴·패널 같은 조작 요소는 흑연색 표면(`--chrome` `--bg` `--surface` `--raised` `--panel`), 선(`--line` `--line-strong`), 글자(`--text` `--text-2` `--muted` `--faint`), 차분한 강조(`--ui` `--ui-ink` `--ui-soft` `--hover` `--focus`)만 씁니다.
+  - 조작 요소에 발광(`box-shadow`/`text-shadow` 빛 번짐), 모서리 꺾쇠·잘린 모서리, 주사선, 색 막대(`inset 3px 0 0`)를 쓰지 않습니다. 선택·켜짐은 `--ui-soft` 배경, 종류(성공·오류)는 작은 점이나 글자색으로 보여 줍니다.
+  - 모서리는 `--radius`(6px, 버튼·입력), `--radius-lg`(8px, 카드·메뉴·떠 있는 판), 떠 있는 것의 그림자는 `--shadow` 하나입니다.
+  - 채운 버튼은 `button.primary`(커밋·확인) 하나와 위험한 작업(`button.danger`)뿐입니다.
 - 클래스 이름은 컴포넌트의 루트 클래스 아래에 둡니다 (`.composer .files`). 전역 유틸 클래스는 `.muted`, `.note`처럼 이미 있는 것만 씁니다.
 - 애니메이션은 `prefers-reduced-motion`과 앱의 ✦ 토글을 존중합니다.
 

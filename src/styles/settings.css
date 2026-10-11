@@ -238,9 +238,10 @@ kbd {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  background: var(--brackets), var(--scanlines), var(--surface);
-  border: 1px solid rgba(var(--signal), 0.22);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
   animation: slide-in 0.1s ease-out;
 }
 .dialog .field.col {
@@ -433,9 +434,8 @@ kbd {
   align-items: center;
   gap: 10px;
   padding: 4px 14px;
-  background: var(--brackets), var(--scanlines), var(--surface);
-  border-bottom: 1px solid rgba(var(--signal), 0.3);
-  box-shadow: inset 3px 0 0 var(--cyan);
+  background: color-mix(in srgb, var(--focus) 10%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
 }
 .update-notice > span {
   flex: 1;

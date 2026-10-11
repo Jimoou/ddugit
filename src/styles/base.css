@@ -1,45 +1,39 @@
 /* Tokens, page base, buttons and the wordmark. */
 
 :root {
-  /* Galaxy UI: deep space behind glass surfaces. Controls use the --ui-* and
-     surface tokens only; the neon colours below are for the graph and data
-     (branches, diff signs, file status), never for buttons or chrome. */
+  /* Frame A: a quiet graphite frame around the branch map. The neon colours below are
+     the graph's and the data's (branches, diff signs, file status), never the chrome's;
+     controls use the surface, line, text and --ui tokens only. */
   --space: #05040e;
   /* Brand colours (design/brand/README.md): wordmark letters and its star. */
   --brand-ink: #f3f1ff;
   --brand-star: #ffc56b;
-  --bg: #07061a;
-  --bg-2: #0c0b20;
-  --glass: rgba(18, 16, 42, 0.66);
-  /* Top bar and sidebar: plain black so the galaxy reads as the work area. */
-  --chrome: #000;
-  --glass-strong: rgba(20, 18, 46, 0.92);
-  --panel: var(--glass-strong);
-  /* Side panels and dialogs: black like the chrome, so only the galaxy has colour. */
-  --surface: #000;
-  /* Control console: square edges, a signal colour for what is live, corner brackets on panels. */
-  --signal: 34, 232, 255;
-  --bracket: rgba(var(--signal), 0.7);
-  --brackets:
-    linear-gradient(var(--bracket), var(--bracket)) top left / 10px 1px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) top left / 1px 10px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) top right / 10px 1px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) top right / 1px 10px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) bottom left / 10px 1px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) bottom left / 1px 10px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) bottom right / 10px 1px no-repeat,
-    linear-gradient(var(--bracket), var(--bracket)) bottom right / 1px 10px no-repeat;
-  --scanlines: repeating-linear-gradient(0deg, rgba(var(--signal), 0.03) 0 1px, transparent 1px 3px);
-  --line: rgba(255, 255, 255, 0.09);
-  --line-strong: rgba(255, 255, 255, 0.18);
-  --text: #ffffff;
-  --text-2: #e8e8ee;
-  --muted: #c2c2cc;
-  --ui: #6d5ae6;
-  --ui-hover: #7c6af0;
-  --ui-soft: rgba(143, 124, 255, 0.18);
-  --ui-text: #ffffff;
-  --focus: #b3a6ff;
+  /* Surfaces, darkest first: the tab row, the window, side panes and dialogs, controls. */
+  --chrome: #0e1012;
+  --bg: #121417;
+  --surface: #15181b;
+  --raised: #1a1d21;
+  --raised-hover: #22262b;
+  /* Floating over the map (zoom controls, cards, menus): opaque so the stars don't show through. */
+  --panel: #181b1f;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --hover: rgba(255, 255, 255, 0.05);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.15);
+  --text: #e6e8eb;
+  --text-2: #c9cdd3;
+  --muted: #a3a9b1;
+  --faint: #7d848d;
+  /* The one filled key (commit, confirm) is light on the dark frame; selection is a plain tint. */
+  --ui: #e6e8eb;
+  --ui-hover: #ffffff;
+  --ui-ink: #121417;
+  --ui-soft: rgba(255, 255, 255, 0.08);
+  --ui-text: #e6e8eb;
+  --focus: #7aa2e3;
+  --radius: 6px;
+  --radius-lg: 8px;
   --ok: #4fd1a5;
   --danger: #e5485f;
   --cyan: #22e8ff;
@@ -52,7 +46,7 @@
   color-scheme: dark;
 }
 
-/* Thin scrollbars that sit on the dark surfaces instead of the OS's grey gutter. */
+/* Thin scrollbars that sit on the surfaces instead of the OS's grey gutter. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -63,10 +57,11 @@
 }
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
-  background: rgba(207, 198, 255, 0.16) padding-box;
+  border-radius: 6px;
+  background: var(--line-strong) padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(207, 198, 255, 0.32) padding-box;
+  background: var(--faint) padding-box;
 }
 
 * {
@@ -81,10 +76,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(ellipse 60% 45% at 18% 12%, rgba(98, 70, 220, 0.22), transparent 70%),
-    radial-gradient(ellipse 50% 40% at 85% 80%, rgba(30, 120, 190, 0.16), transparent 70%),
-    radial-gradient(ellipse 40% 30% at 60% 35%, rgba(190, 70, 170, 0.1), transparent 70%), var(--space);
+  background: var(--bg);
   color: var(--text);
   font: 13px/1.45 var(--sans);
   /* Korean wraps between words, not inside them; long tokens (paths, hashes) still break. */
@@ -97,39 +89,22 @@ body {
   user-select: none;
 }
 
-/* Buttons are console keys: square, with corner ticks that light up in the signal colour. */
+/* Keys: a flat raised surface with a hairline edge; nothing glows. */
 button {
-  --tick: rgba(207, 198, 255, 0.35);
   font: inherit;
   color: var(--text);
-  background-color: rgba(255, 255, 255, 0.045);
-  background-image:
-    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
-  background-size:
-    5px 1px,
-    1px 5px,
-    5px 1px,
-    1px 5px;
-  background-position:
-    top left,
-    top left,
-    bottom right,
-    bottom right;
-  background-repeat: no-repeat;
-  border: 1px solid var(--line);
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   padding: 6px 12px;
   cursor: pointer;
   transition:
-    border-color 0.15s,
-    background-color 0.15s,
-    box-shadow 0.15s;
+    border-color 0.12s,
+    background-color 0.12s,
+    color 0.12s;
 }
 button:hover:not(:disabled) {
-  --tick: rgba(var(--signal), 0.9);
-  border-color: rgba(var(--signal), 0.38);
-  background-color: rgba(var(--signal), 0.06);
-  box-shadow: inset 0 0 14px rgba(var(--signal), 0.08);
+  background-color: var(--raised-hover);
 }
 button:focus-visible,
 select:focus-visible,
@@ -168,34 +143,38 @@ button:disabled {
   opacity: 0.45;
   cursor: default;
 }
+/* The one key that commits to something: filled, the frame's lightest colour. */
 button.primary {
   background: var(--ui);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #fff;
+  border-color: transparent;
+  color: var(--ui-ink);
   font-weight: 650;
-  /* Clipped corners: the one key that commits to something. */
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
 button.primary:hover:not(:disabled) {
   background: var(--ui-hover);
-  border-color: rgba(255, 255, 255, 0.24);
-  box-shadow: inset 0 0 14px rgba(255, 255, 255, 0.12);
 }
 button.ghost {
   background-color: transparent;
+  border-color: var(--line);
+}
+button.ghost:hover:not(:disabled) {
+  background-color: var(--hover);
 }
 button.danger {
-  border-color: rgba(229, 72, 95, 0.55);
-  color: #ffc2cc;
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  color: color-mix(in srgb, var(--danger) 45%, var(--text));
 }
 button.danger:not(.ghost) {
   background: var(--danger);
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  border-color: transparent;
   color: #fff;
   font-weight: 650;
 }
 button.danger:hover:not(:disabled) {
-  border-color: #ff8a9c;
+  border-color: var(--danger);
+}
+button.danger:not(.ghost):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 85%, #fff);
 }
 .dialog-title.danger {
   color: var(--red);
@@ -209,6 +188,10 @@ button.icon {
   border: none;
   color: var(--muted);
   padding: 4px 6px;
+}
+button.icon:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
 }
 kbd {
   font: 10px var(--mono);
@@ -225,22 +208,30 @@ input.text,
 textarea {
   font: inherit;
   color: var(--text);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--line);
+  background: var(--raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   padding: 7px 10px;
   outline: none;
   width: 100%;
   user-select: text;
 }
+input.text::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
 select,
 select option {
-  background-color: #0c0b20;
+  background-color: var(--raised);
   color: var(--text);
+}
+select {
+  border-radius: var(--radius);
 }
 input.text:focus,
 textarea:focus {
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px rgba(143, 124, 255, 0.22);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 25%, transparent);
 }
 
 /* ---------------------------------------------------------------- wordmark */

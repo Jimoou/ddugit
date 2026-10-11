@@ -179,11 +179,11 @@
 }
 /* A card picked for grouping, and a band a card is dragged over. */
 .world.picked {
-  border-color: rgba(var(--signal), 0.9);
-  background: rgba(var(--signal), 0.06);
+  border-color: color-mix(in srgb, var(--focus) 90%, transparent);
+  background: color-mix(in srgb, var(--focus) 6%, transparent);
 }
 .band.drop {
-  outline: 1px dashed rgba(var(--signal), 0.8);
+  outline: 1px dashed color-mix(in srgb, var(--focus) 80%, transparent);
   outline-offset: 4px;
 }
 .group-hint,
@@ -195,11 +195,12 @@
   padding: 6px 10px;
   font-size: 12.5px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 .group-hint {
   color: var(--text-2);
-  border-color: rgba(var(--signal), 0.35);
+  border-color: color-mix(in srgb, var(--focus) 35%, transparent);
 }
 .group-hint > span {
   flex: 1;
@@ -216,10 +217,11 @@
   position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
 }
 .world:hover,
 .world:focus-within {
-  border-color: rgba(var(--signal), 0.45);
+  border-color: color-mix(in srgb, var(--focus) 45%, transparent);
 }
 .world.missing {
   opacity: 0.6;
@@ -273,6 +275,7 @@
   --sig: var(--text-2);
   padding: 0 7px;
   font: 600 10.5px/18px var(--sans);
+  border-radius: 4px;
   color: var(--sig);
   background: color-mix(in srgb, var(--sig) 12%, transparent);
   white-space: nowrap;
@@ -348,7 +351,7 @@
   opacity: 1;
 }
 .world-tools button:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover);
   border-color: var(--line-strong);
 }
 .world-tools .star.on {
