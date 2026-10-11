@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CommitInfo, RefInfo } from "../types";
-import { ancestors, colorForBranch, computeLayout, descendantsOf } from "./layout";
+import { ancestors, colorForBranch, computeLayout, descendantsOf, hiddenOnly } from "./layout";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
   id,
@@ -75,6 +75,46 @@ describe("computeLayout", () => {
     expect(l.byId.get("s1")!.lane).toBe(1);
     expect(l.byId.get("s2")!.lane).toBe(1);
     expect(l.laneCount).toBe(2);
+  });
+});
+
+describe("chosen colours and hidden branches", () => {
+  const commits = [c("m", "x", "f2"), c("g1", "x"), c("f2", "f1"), c("x", "a"), c("f1", "a"), c("a")];
+  const refs = [local("main", "m"), local("feature", "f2"), local("ghost", "g1")];
+  const head = { branch: "main", target: "m" };
+
+  it("paints a branch in the colour chosen for it, the trunk too, and leaves the others' colours alone", () => {
+    const auto = computeLayout(commits, refs, head);
+    const ghostAuto = auto.byId.get("g1")!.color;
+    const l = computeLayout(
+      commits,
+      refs,
+      head,
+      new Map([
+        ["feature", ghostAuto],
+        ["main", 5],
+      ]),
+    );
+    expect(l.byId.get("f2")!.color).toBe(ghostAuto);
+    expect(l.byId.get("m")!.color).toBe(5);
+    expect(l.byId.get("g1")!.color).toBe(ghostAuto);
+    // A remote branch shares its local branch's choice.
+    const r = computeLayout(
+      commits,
+      [local("main", "m"), { name: "origin/feature", kind: "remote", target: "f2" }],
+      head,
+      new Map([["feature", 3]]),
+    );
+    expect(r.byId.get("f2")!.color).toBe(3);
+  });
+
+  it("leaves out only what hidden branches alone reach", () => {
+    // ghost's own commit goes; feature's commits stay, since main merged them.
+    expect([...hiddenOnly(commits, { shown: ["m"], hidden: ["g1", "f2"] })]).toEqual(["g1"]);
+    expect(hiddenOnly(commits, { shown: ["m", "g1"], hidden: [] }).size).toBe(0);
+    // Unmerged: a branch off `a` hidden while main is shown loses everything above `a`.
+    const side = [c("s2", "s1"), c("m", "a"), c("s1", "a"), c("a")];
+    expect([...hiddenOnly(side, { shown: ["m"], hidden: ["s2"] })].sort()).toEqual(["s1", "s2"]);
   });
 });
 

@@ -356,3 +356,49 @@ test("checks out a tag and a commit without a branch, then goes back to a branch
   await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("main");
   await expect(branchNow).toContainText("main");
 });
+
+test("a branch's colour comes from a palette on its dot, and its eye hides it on the map until shown again", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  const snap = await demo.snapshot();
+  const sync = snap.refs.find((r) => r.name === "origin/feature/orbit-sync")!;
+  // Undefined until the graph is up again after a reload, so a poll waits for it.
+  const onMap = (id: string) =>
+    page.evaluate((id) => (window.__ddugit ? window.__ddugit.screenOf(id) !== null : undefined), id);
+  expect(await onMap(sync.target)).toBe(true);
+
+  // The eye hides the branch and the commit only it has; the setting is kept for the repository.
+  const row = page.locator(".sidebar li", { hasText: "feature/orbit-sync" }).first();
+  await row.hover();
+  await row.getByRole("button", { name: /브랜치 맵에서 숨기기/ }).click();
+  await expect(row).toHaveClass(/off-map/);
+  await expect.poll(() => onMap(sync.target)).toBe(false);
+  // The trunk, which merged nothing of it, stays.
+  expect(await onMap(snap.refs.find((r) => r.name === "main")!.target)).toBe(true);
+  await page.reload();
+  await expect.poll(() => onMap(sync.target)).toBe(false);
+  await page.getByRole("button", { name: "숨긴 브랜치 1개 모두 보이기" }).click();
+  await expect.poll(() => onMap(sync.target)).toBe(true);
+
+  // The checked-out branch can't be hidden.
+  await expect(page.locator(".sidebar li.head").getByRole("button", { name: /숨기기/ })).toBeDisabled();
+
+  // The dot opens the palette; a colour code (or a drag) repaints the branch's dot and its lane.
+  const theme = page.locator(".sidebar li", { hasText: "feature/theme" }).first();
+  const dot = theme.getByRole("button", { name: /브랜치 색/ });
+  const color = () => dot.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const before = await color();
+  await dot.click();
+  const palette = page.getByRole("dialog", { name: /브랜치 색/ });
+  await palette.getByRole("textbox", { name: "색 코드" }).fill("#ff8800");
+  await page.keyboard.press("Enter");
+  await expect.poll(color).toBe("rgb(255, 136, 0)");
+  await page.keyboard.press("Escape");
+  await expect(palette).toHaveCount(0);
+  // From the branch's menu too; "Auto" puts the automatic colour back.
+  await theme.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "브랜치 색 바꾸기…" }).click();
+  await palette.getByRole("button", { name: "자동" }).click();
+  await expect.poll(color).toBe(before);
+});

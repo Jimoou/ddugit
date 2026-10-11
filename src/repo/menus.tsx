@@ -129,8 +129,26 @@ export function showPr(repo: Repo, pr: PullRequest) {
   if (repo.commitById.has(pr.sha)) showCommit(repo, pr.sha);
 }
 
-/** Menu for a ref badge (graph) or a sidebar row. */
+/** Menu for a ref badge (graph) or a sidebar row: what to do with it, then how a branch is drawn. */
 export function refMenu(repo: Repo, r: RefInfo): MenuItem[] {
+  const items = refActions(repo, r);
+  if (r.kind !== "local" && r.kind !== "remote") return items;
+  const hidden = repo.isHidden(r);
+  const isHead = r.kind === "local" && r.name === repo.snap.head.branch;
+  return [
+    ...items,
+    "separator",
+    { label: t("branch.color.menu"), onSelect: () => repo.pickColor(r, repo.menuAt()) },
+    {
+      label: t(hidden ? "branch.show" : "branch.hide"),
+      hint: isHead && !hidden ? t("branch.headHide") : undefined,
+      disabled: isHead && !hidden,
+      onSelect: () => repo.setRefHidden(r, !hidden),
+    },
+  ];
+}
+
+function refActions(repo: Repo, r: RefInfo): MenuItem[] {
   const { snap } = repo;
   if (r.kind === "pr") {
     const pr = prOf(repo.pulls, r);

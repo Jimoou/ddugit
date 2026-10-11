@@ -20,6 +20,7 @@ import type {
   OpResult,
   PrReport,
   RebaseStep,
+  RefInfo,
   RemoteRefOp,
   RepoSnapshot,
   ResetMode,
@@ -118,6 +119,11 @@ export interface Repo {
   picked: string[];
   setPicked(ids: string[]): void;
   colorOf(id: string): string;
+  /** Open the colour palette for a branch at a point on screen. */
+  pickColor(r: RefInfo, at: { x: number; y: number }): void;
+  /** Hidden from the branch map (with the commits only it reaches). */
+  isHidden(r: RefInfo): boolean;
+  setRefHidden(r: RefInfo, hide: boolean): void;
   /** The graph's camera and screen positions (not during render). */
   graph(): GraphHandle | null;
   toast: Toast;

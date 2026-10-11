@@ -27,7 +27,16 @@ interface Props {
   active: boolean;
   refs: RefInfo[];
   headBranch: string | null;
-  colorOf(target: string): string;
+  /** A ref's colour on the map (the chosen one for its branch, else its lane's). */
+  refColor(r: RefInfo): string;
+  /** Refs hidden from the branch map, as `kind:name`. */
+  hidden: string[];
+  onToggleHidden(r: RefInfo): void;
+  /** How many refs are off the map now, and bring them all back. */
+  hiddenCount: number;
+  onShowAll(): void;
+  /** Click on a branch's dot: choose its colour. */
+  onRefColor(r: RefInfo, x: number, y: number): void;
   /** Picked refs, as `kind:name`. */
   focused: string[];
   /** Click on a ref: adds it to the picked set, or takes it out if already picked. */
@@ -114,6 +123,8 @@ interface RowHandlers {
   onFocus(ref: RefInfo): void;
   onCheckout(ref: RefInfo): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
+  onToggleHidden(ref: RefInfo): void;
+  onRefColor(ref: RefInfo, x: number, y: number): void;
 }
 
 const RefRow = memo(function RefRow(p: {
@@ -123,6 +134,8 @@ const RefRow = memo(function RefRow(p: {
   isFocused: boolean;
   isHead: boolean;
   remoteOnly: boolean;
+  /** Off the branch map. */
+  isHidden: boolean;
   /** Checked out in another worktree at this folder. */
   elsewhere?: string;
   /** Latest handlers, read on events (they change on every render of the view). */
@@ -131,7 +144,7 @@ const RefRow = memo(function RefRow(p: {
   const { r, color, on } = p;
   return (
     <li
-      className={`${p.isFocused ? "focused" : ""} ${p.isHead ? "head" : ""}`}
+      className={`${p.isFocused ? "focused" : ""} ${p.isHead ? "head" : ""} ${p.isHidden ? "off-map" : ""}`}
       aria-selected={p.isFocused}
       style={{ ["--c" as string]: color }}
       title={`${r.name}\n${r.kind === "tag" ? t("side.hint.tag") : t("side.hint.branch")}`}
@@ -142,7 +155,21 @@ const RefRow = memo(function RefRow(p: {
         on.current.onRefMenu(r, e.clientX, e.clientY);
       }}
     >
-      <span className="dot" style={{ background: color, color }} />
+      {r.kind === "tag" ? (
+        <span className="dot" style={{ background: color, color }} />
+      ) : (
+        <button
+          className="dot"
+          style={{ background: color, color }}
+          title={t("branch.color")}
+          aria-label={`${t("branch.color")}: ${r.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            on.current.onRefColor(r, e.clientX, e.clientY);
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        />
+      )}
       <span className="name">{p.label}</span>
       {p.isHead && <span className="badge head">HEAD</span>}
       {p.remoteOnly && (
@@ -163,12 +190,30 @@ const RefRow = memo(function RefRow(p: {
           <Icon name="folder" size={11} />
         </span>
       )}
+      {r.kind !== "tag" && (
+        <button
+          className={`icon eye ${p.isHidden ? "on" : ""}`}
+          aria-pressed={p.isHidden}
+          disabled={p.isHead && !p.isHidden}
+          title={p.isHead && !p.isHidden ? t("branch.headHide") : t(p.isHidden ? "branch.show" : "branch.hide")}
+          aria-label={`${t(p.isHidden ? "branch.show" : "branch.hide")}: ${r.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            on.current.onToggleHidden(r);
+          }}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Icon name={p.isHidden ? "eyeOff" : "eye"} size={13} />
+        </button>
+      )}
     </li>
   );
 });
 
 export function Sidebar(props: Props) {
-  const { refs, headBranch, colorOf, focused, onFocus, onCheckout, onRefMenu, stashes, selectedStash, onStash } = props;
+  const { refs, headBranch, refColor, focused, onFocus, onCheckout, onRefMenu, stashes, selectedStash, onStash } =
+    props;
+  const { onToggleHidden, onRefColor } = props;
   const { collapsed, closed, onLayout, active } = props;
   const [q, setQ] = useState("");
   // The rail has no search box: it counts everything.
@@ -190,9 +235,9 @@ export function Sidebar(props: Props) {
 
   // Rows only re-render when their own ref changes: a big repository lists
   // hundreds of refs, and the view re-renders on every selection.
-  const latest = useRef({ onFocus, onCheckout, onRefMenu });
+  const latest = useRef({ onFocus, onCheckout, onRefMenu, onToggleHidden, onRefColor });
   useEffect(() => {
-    latest.current = { onFocus, onCheckout, onRefMenu };
+    latest.current = { onFocus, onCheckout, onRefMenu, onToggleHidden, onRefColor };
   });
   const row = (r: RefInfo, label: string) => {
     const key = `${r.kind}:${r.name}`;
@@ -201,7 +246,8 @@ export function Sidebar(props: Props) {
         key={key}
         r={r}
         label={label}
-        color={colorOf(r.target)}
+        color={refColor(r)}
+        isHidden={props.hidden.includes(key)}
         isFocused={focused.includes(key)}
         isHead={r.kind === "local" && r.name === headBranch}
         // A remote branch with no local branch of its name yet.
@@ -261,6 +307,13 @@ export function Sidebar(props: Props) {
             />
             <button className="icon fold-side" onClick={fold} title={t("side.fold")} aria-label={t("side.fold")}>
               <Icon name="sidebar" />
+            </button>
+          </div>
+        )}
+        {props.hiddenCount > 0 && !collapsed && (
+          <div className="side-picked">
+            <button className="ghost" onClick={props.onShowAll}>
+              <Icon name="eyeOff" size={12} /> {t("branch.hidden", { n: props.hiddenCount })}
             </button>
           </div>
         )}

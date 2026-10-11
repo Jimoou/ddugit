@@ -20,8 +20,21 @@ import { joinPath } from "./recent";
 import { StashPanel } from "./components/StashPanel";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
-import { ancestors, ancestorsOf, computeLayout, descendantsOf } from "./graph/layout";
+import {
+  ancestors,
+  ancestorsOf,
+  baseName,
+  colorForBranch,
+  computeLayout,
+  PALETTE_SIZE,
+  descendantsOf,
+  hiddenOnly,
+} from "./graph/layout";
+import { refKey } from "./branchLook";
+import { useBranchLook } from "./repo/useBranchLook";
 import { INK } from "./graph/ink";
+import { inkFor } from "./color";
+import { ColorPicker } from "./components/ColorPicker";
 import type { Theme } from "./theme";
 import { stashTitle } from "./format";
 import { planMove } from "./rebasePlan";
@@ -117,6 +130,8 @@ export function RepoView({
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   /** Branches picked in the sidebar: their history stays lit in the graph, the rest fades. */
   const [focusRefs, setFocusRefs] = useState<RefInfo[]>([]);
+  /** The colour palette open for a branch, and where. */
+  const [colorPick, setColorPick] = useState<{ ref: RefInfo; x: number; y: number } | null>(null);
   const [composer, setComposer] = useState<false | { amend: boolean; message?: string; stagedOnly?: boolean }>(false);
   const [menu, setMenu] = useState<Menu | null>(null);
   // Where the last menu opened, for a follow-up menu in the same spot (picking a stack parent).
@@ -179,7 +194,28 @@ export function RepoView({
     setTimeout(tick, 100);
   };
 
-  const layout = useMemo(() => (snap ? computeLayout(snap.commits, snap.refs, snap.head) : null), [snap]);
+  // Branches the user hid stay off the map with the commits only they reach; HEAD's branch always shows.
+  const branchLook = useBranchLook(path);
+  const { look } = branchLook;
+  const shown = useMemo(() => {
+    if (!snap) return null;
+    const hidden = new Set(look.hidden);
+    const off = (r: RefInfo) =>
+      r.kind !== "tag" && hidden.has(refKey(r)) && !(r.kind === "local" && r.name === snap.head.branch);
+    const refs = snap.refs.filter((r) => !off(r));
+    if (refs.length === snap.refs.length) return { commits: snap.commits, refs: snap.refs, hidden: 0 };
+    const tips = [...refs.map((r) => r.target), ...snap.stashes.map((st) => st.base)];
+    if (snap.head.target) tips.push(snap.head.target);
+    const gone = hiddenOnly(snap.commits, { shown: tips, hidden: snap.refs.filter(off).map((r) => r.target) });
+    return { commits: snap.commits.filter((c) => !gone.has(c.id)), refs, hidden: snap.refs.length - refs.length };
+  }, [snap, look.hidden]);
+  // A chosen colour is one more lane colour after the theme's own; the layout knows it by index.
+  const chosenList = useMemo(() => Object.entries(look.colors), [look.colors]);
+  const chosenColors = useMemo(() => new Map(chosenList.map(([base], i) => [base, PALETTE_SIZE + i])), [chosenList]);
+  const layout = useMemo(
+    () => (snap && shown ? computeLayout(shown.commits, shown.refs, snap.head, chosenColors) : null),
+    [snap, shown, chosenColors],
+  );
   const summaries = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c.summary]) ?? []), [snap]);
   const commitById = useMemo(() => new Map(snap?.commits.map((c) => [c.id, c]) ?? []), [snap]);
   // Picks of commits no longer loaded (history rewritten) drop out.
@@ -245,8 +281,8 @@ export function RepoView({
     return () => clearInterval(timer);
   }, [active, prTick]);
   const graphRefs = useMemo(
-    () => [...(snap?.refs ?? []), ...prRefs(pulls, (id) => commitById.has(id))],
-    [snap, pulls, commitById],
+    () => [...(shown?.refs ?? []), ...prRefs(pulls, (id) => !!layout?.byId.has(id))],
+    [shown, pulls, layout],
   );
   const search = useSearch({ path, snap, latest, loadTo, show, graph, toast });
   const searchLit = search.highlight;
@@ -285,8 +321,25 @@ export function RepoView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, refresh, openSearch]);
-  const lanes = INK[theme].lanes;
+  const lanes = useMemo(
+    () => [...INK[theme].lanes, ...chosenList.map(([, hex]) => inkFor(hex, INK[theme]))],
+    [theme, chosenList],
+  );
   const colorOf = useCallback((id: string) => lanes[layout?.byId.get(id)?.color ?? 0], [layout, lanes]);
+  /** A ref's colour: the one chosen for its branch, else its lane's (a hidden one keeps its automatic colour). */
+  const refColor = useCallback(
+    (r: RefInfo) => {
+      const chosen = r.kind === "tag" ? undefined : chosenColors.get(baseName(r.name));
+      if (chosen !== undefined) return lanes[chosen];
+      return layout?.byId.has(r.target) || r.kind === "tag" ? colorOf(r.target) : lanes[colorForBranch(r.name)];
+    },
+    [chosenColors, lanes, layout, colorOf],
+  );
+  /** A local branch hides and shows together with its upstream. */
+  const hideKeys = (r: RefInfo) => [
+    refKey(r),
+    ...(r.kind === "local" && r.upstream && !r.upstream.gone ? [`remote:${r.upstream.name}`] : []),
+  ];
 
   /** Local branch a merge can land on at commit `id`. */
   const branchAt = useCallback(
@@ -400,6 +453,9 @@ export function RepoView({
     picked,
     setPicked,
     colorOf,
+    pickColor: (r, at) => setColorPick({ ref: r, ...at }),
+    isHidden: (r) => look.hidden.includes(refKey(r)),
+    setRefHidden: (r, hide) => branchLook.setHidden(hideKeys(r), hide),
     graph: () => graph.current,
     toast,
     run,
@@ -497,7 +553,12 @@ export function RepoView({
           active={active}
           refs={snap.refs}
           headBranch={snap.head.branch}
-          colorOf={colorOf}
+          refColor={refColor}
+          hidden={look.hidden}
+          onToggleHidden={(r) => branchLook.setHidden(hideKeys(r), !look.hidden.includes(refKey(r)))}
+          onShowAll={() => branchLook.setHidden(look.hidden, false)}
+          hiddenCount={shown?.hidden ?? 0}
+          onRefColor={(r, x, y) => setColorPick({ ref: r, x, y })}
           focused={liveFocus.map((r) => `${r.kind}:${r.name}`)}
           onFocus={(r) => {
             const key = (x: RefInfo) => `${x.kind}:${x.name}`;
@@ -640,6 +701,7 @@ export function RepoView({
               space={settings.space}
               glow={settings.glow}
               theme={theme}
+              lanes={lanes}
               onSelect={(id) => {
                 setPicked([]);
                 if (id || !composer) show({ commit: id });
@@ -841,6 +903,16 @@ export function RepoView({
         )}
       </div>
 
+      {colorPick && (
+        <ColorPicker
+          {...colorPick}
+          title={colorPick.ref.name}
+          value={look.colors[baseName(colorPick.ref.name)] ?? refColor(colorPick.ref)}
+          chosen={baseName(colorPick.ref.name) in look.colors}
+          onPick={(hex) => branchLook.setColor(baseName(colorPick.ref.name), hex)}
+          onClose={() => setColorPick(null)}
+        />
+      )}
       {menu && (
         <ContextMenu x={menu.x} y={menu.y} title={menu.title} items={menu.items} onClose={() => setMenu(null)} />
       )}
