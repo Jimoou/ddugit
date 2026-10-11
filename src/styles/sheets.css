@@ -56,7 +56,7 @@
   height: 5px;
   flex-shrink: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 .changed .bar .add {
   background: var(--lime);
@@ -81,7 +81,7 @@
 }
 .changed li:hover,
 .file-list li:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
 }
 .changed .path,
 .file-list .path {
@@ -104,7 +104,7 @@
   flex-direction: column;
   border-top: 1px solid var(--line-strong);
   background: var(--surface);
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 -12px 40px var(--shade);
   animation: rise 0.18s ease-out;
 }
 @keyframes rise {
@@ -250,28 +250,28 @@ table.diff tr.hunk {
 table.diff tr.hunk td {
   padding: 0 12px;
   vertical-align: middle;
-  color: #9b7bff;
-  background: rgba(155, 123, 255, 0.07);
+  color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 7%, transparent);
   /* Lines drawn inside the row, so no row height is shared with its neighbours. */
   box-shadow:
     inset 0 1px var(--line),
     inset 0 -1px var(--line);
 }
 table.diff tr.ins {
-  background: rgba(166, 255, 77, 0.08);
+  background: color-mix(in srgb, var(--lime) 8%, transparent);
 }
 table.diff tr.ins .sign,
 table.diff tr.ins .code {
-  color: #d6ffb0;
+  color: color-mix(in srgb, var(--lime) 35%, var(--text));
 }
 table.diff tr.ins .sign {
   color: var(--lime);
 }
 table.diff tr.rem {
-  background: rgba(255, 77, 109, 0.09);
+  background: color-mix(in srgb, var(--red) 9%, transparent);
 }
 table.diff tr.rem .code {
-  color: #ffc2cf;
+  color: color-mix(in srgb, var(--red) 35%, var(--text));
 }
 table.diff tr.rem .sign {
   color: var(--red);
@@ -341,7 +341,7 @@ table.diff tr.rem .sign {
   margin-top: 4px;
   padding: 4px 4px 4px 10px;
   border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--bg);
 }
 .cmd code {
   flex: 1;
@@ -424,7 +424,7 @@ table.diff tr.rem .sign {
 }
 .drag-hint.pick.ok {
   border-color: var(--amber);
-  color: #ffe2b8;
+  color: color-mix(in srgb, var(--amber) 35%, var(--text));
 }
 
 /* -------------------------------------------------------------- search bar */
@@ -587,7 +587,7 @@ table.diff tr.picked .no {
 
 /* ---------------------------------------------------------- conflict sheet */
 .conflict-sheet {
-  border-top-color: rgba(229, 72, 95, 0.55);
+  border-top-color: color-mix(in srgb, var(--danger) 55%, transparent);
 }
 .conflict-body {
   padding: 10px 14px;
@@ -629,11 +629,11 @@ table.diff tr.picked .no {
   padding: 6px 10px;
 }
 .why-side.ours {
-  background: rgba(34, 232, 255, 0.06);
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
   border-right: 1px solid var(--line);
 }
 .why-side.theirs {
-  background: rgba(255, 61, 242, 0.06);
+  background: color-mix(in srgb, var(--magenta) 6%, transparent);
 }
 .why-side em {
   display: flex;
@@ -644,10 +644,10 @@ table.diff tr.picked .no {
   letter-spacing: 0.06em;
 }
 .why-side.ours em {
-  color: #9be8ff;
+  color: color-mix(in srgb, var(--cyan) 40%, var(--text));
 }
 .why-side.theirs em {
-  color: #f7aef3;
+  color: color-mix(in srgb, var(--magenta) 40%, var(--text));
 }
 .why-side .tag {
   padding: 0 6px;
@@ -680,11 +680,11 @@ table.diff tr.picked .no {
 /* The body scrolls; a block keeps its height instead of being squeezed to its header. */
 .block {
   flex-shrink: 0;
-  border: 1px solid rgba(255, 77, 109, 0.45);
+  border: 1px solid color-mix(in srgb, var(--red) 45%, transparent);
   overflow: hidden;
 }
 .block.picked {
-  border-color: rgba(79, 209, 165, 0.5);
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
 }
 .block-head {
   display: flex;
@@ -692,10 +692,10 @@ table.diff tr.picked .no {
   align-items: center;
   padding: 5px 10px;
   font-size: 12px;
-  background: rgba(255, 77, 109, 0.08);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
 }
 .block.picked .block-head {
-  background: rgba(79, 209, 165, 0.08);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
 }
 .block-head button {
   padding: 2px 10px;
@@ -722,20 +722,20 @@ table.diff tr.picked .no {
   margin-bottom: 4px;
 }
 .side.ours {
-  background: rgba(34, 232, 255, 0.06);
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
   border-right: 1px solid var(--line);
 }
 .side.ours em {
-  color: #9be8ff;
+  color: color-mix(in srgb, var(--cyan) 40%, var(--text));
 }
 .side.theirs {
-  background: rgba(255, 61, 242, 0.06);
+  background: color-mix(in srgb, var(--magenta) 6%, transparent);
 }
 .side.theirs em {
-  color: #f7aef3;
+  color: color-mix(in srgb, var(--magenta) 40%, var(--text));
 }
 .side.keep {
-  box-shadow: inset 0 0 0 1px rgba(79, 209, 165, 0.55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 55%, transparent);
 }
 .side.drop {
   opacity: 0.35;
@@ -781,7 +781,7 @@ table.diff tr.picked .no {
 .backport-sheet select {
   font: 600 12px var(--mono);
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--line);
   padding: 3px 6px;
   max-width: 220px;
@@ -809,7 +809,7 @@ table.diff tr.picked .no {
 }
 .bp-list td {
   padding: 5px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 4%, transparent);
   white-space: nowrap;
 }
 .bp-list th:first-child,
@@ -851,16 +851,16 @@ table.diff tr.picked .no {
 }
 .chip.bp-missing {
   color: var(--amber);
-  background: rgba(255, 184, 77, 0.14);
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
 }
 .chip.bp-applied,
 .chip.bp-picked {
   color: var(--lime);
-  background: rgba(166, 255, 77, 0.12);
+  background: color-mix(in srgb, var(--lime) 12%, transparent);
 }
 .chip.bp-ignored {
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 .bp-hint {
   margin: 12px 14px;
@@ -909,7 +909,7 @@ b.bp-missing {
   padding: 5px 8px;
   margin-bottom: 4px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--text) 2%, transparent);
   font-size: 12px;
   white-space: nowrap;
   cursor: grab;
@@ -940,7 +940,7 @@ b.bp-missing {
 .rb-list li select {
   font-size: 11px;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--line);
   padding: 2px 4px;
 }
@@ -980,7 +980,7 @@ b.bp-missing {
   color: var(--muted);
 }
 .rb-list li.rb-line.side {
-  color: #a371f7;
+  color: var(--violet);
 }
 .warn-text {
   color: var(--amber);

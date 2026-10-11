@@ -39,7 +39,8 @@
   gap: 14px 24px;
   font-size: 13px;
 }
-.settings-form select {
+.settings-form select,
+.settings-form .segmented {
   justify-self: start;
 }
 .settings-form .checks {
@@ -71,7 +72,7 @@
 }
 .dialog.settings select {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 1px solid var(--line);
   padding: 3px 6px;
 }
@@ -117,7 +118,7 @@ kbd {
   border-bottom-width: 2px;
   font: 11px var(--mono);
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
   white-space: nowrap;
 }
 
@@ -131,7 +132,7 @@ kbd {
   white-space: nowrap;
 }
 .graph-area canvas:focus-visible {
-  outline: 2px solid rgba(179, 166, 255, 0.55);
+  outline: 2px solid color-mix(in srgb, var(--focus) 55%, transparent);
   outline-offset: -1px;
 }
 
@@ -262,7 +263,7 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 7px 10px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg);
   border: 1px solid var(--line);
 }
 /* Clone / add remote: where the repository comes from (components/ForgeRepoPicker.tsx). */
@@ -320,7 +321,7 @@ kbd {
   gap: 6px;
   padding-left: 10px;
   border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--bg);
   color: var(--muted);
 }
 .forge-search .search-box:focus-within {
@@ -350,7 +351,7 @@ kbd {
   cursor: pointer;
 }
 .forge-repos li:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 .forge-repos li.on {
   background: var(--ui-soft);
@@ -451,7 +452,7 @@ kbd {
   display: grid;
   place-items: center;
   border: 2px dashed var(--focus);
-  background: rgba(10, 8, 30, 0.72);
+  background: var(--scrim);
   color: var(--text);
   font-size: 18px;
   pointer-events: none;

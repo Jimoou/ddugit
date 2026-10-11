@@ -135,6 +135,38 @@ test("settings: switching to English relabels the app and is remembered", async 
   expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
 });
 
+test("settings: the light theme repaints the window and the map, and is remembered", async ({ demo }) => {
+  const { page } = demo;
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  const paper = () =>
+    page.evaluate(() => {
+      // The map's backdrop at a corner, away from lanes and labels.
+      const c = document.querySelector<HTMLCanvasElement>(".app:not([hidden]) .graph-area canvas")!;
+      const [r, g, b] = c.getContext("2d")!.getImageData(4, 4, 1, 1).data;
+      return (r + g + b) / 3;
+    });
+  // "System" follows the OS while it changes.
+  expect(await theme()).toBe("dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect.poll(theme).toBe("light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect.poll(theme).toBe("dark");
+  expect(await paper()).toBeLessThan(60);
+
+  await page.locator(".tabrow-settings").click();
+  const dialog = page.getByRole("dialog", { name: "설정" });
+  await dialog.getByRole("radiogroup", { name: "테마" }).getByRole("radio", { name: "밝게" }).click();
+  await expect.poll(theme).toBe("light");
+  await page.keyboard.press("Escape");
+  await expect.poll(paper).toBeGreaterThan(200);
+  // The window around the map turns too.
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector(".topbar")!).backgroundColor);
+  expect(bg).toBe("rgb(246, 244, 239)");
+
+  await page.reload();
+  await expect.poll(theme).toBe("light");
+});
+
 test("the tutorial voyage ticks off missions as they are done, and can be closed and reopened", async ({ demo }) => {
   const { page } = demo;
   await page.evaluate(() => localStorage.setItem("ddugit.voyage", JSON.stringify({ done: [], dismissed: false })));

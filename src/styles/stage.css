@@ -41,7 +41,7 @@
   display: block;
   width: 100%;
   border-top: 1px solid var(--line);
-  background: rgba(8, 7, 22, 0.88);
+  background: var(--map-strip);
   cursor: pointer;
 }
 /* Time runs down the screen: the overview stands along the right side. */
@@ -113,7 +113,7 @@
 }
 .hud button.on.lock {
   color: var(--amber);
-  background: rgba(255, 184, 77, 0.12);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
 }
 .hud .hud-sep {
   width: 1px;
@@ -141,7 +141,7 @@
   color: var(--text-2);
   pointer-events: none;
   padding: 2px 8px;
-  background: rgba(5, 4, 14, 0.6);
+  background: var(--map-veil);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,11 +174,11 @@
 }
 .drag-hint.ok {
   border-color: var(--ok);
-  color: #c9f5e6;
+  color: color-mix(in srgb, var(--ok) 35%, var(--text));
 }
 .drag-hint.bad {
   border-color: var(--red);
-  color: #ffb3c1;
+  color: color-mix(in srgb, var(--red) 40%, var(--text));
 }
 .empty-hint {
   position: absolute;

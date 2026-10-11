@@ -31,6 +31,8 @@ import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap, type MinimapHandle } from "./Minimap";
+import { INK } from "./ink";
+import type { Theme } from "../theme";
 import { t } from "../i18n";
 import { isOnScreen, isTypingTarget } from "../keys";
 import { hasOpenLayer } from "../components/useDialog";
@@ -63,6 +65,8 @@ interface Props {
   /** Galaxy behind the graph, and glow around lines and commits (settings). */
   space: boolean;
   glow: boolean;
+  /** Night sky or printed chart: the map's colours. */
+  theme: Theme;
   onSelect(id: string | null): void;
   /** A commit ⌘/Ctrl-clicked (`range`: Shift-clicked), to pick it along with others. */
   onPick?(id: string, range: boolean): void;
@@ -433,6 +437,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         animate: p.animate,
         space: p.space,
         glow: p.glow,
+        ink: INK[p.theme],
         headId: p.headId,
         headBranch: p.headBranch,
         plus: plusPosition(sceneRef.current, p.headId),
@@ -777,6 +782,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
           ref={minimap}
           scene={scene}
           rotation={props.rotation}
+          ink={INK[props.theme]}
           getView={() => st.current.view}
           getSize={() => st.current.size}
           onJump={(world) => {

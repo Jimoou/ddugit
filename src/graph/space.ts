@@ -27,15 +27,17 @@ function mulberry32(seed: number) {
 }
 
 const TINTS = ["#ffffff", "#d6ddff", "#ffeedd", "#e0d4ff"];
+/** Printed stars: the same sky in warm greys of ink. */
+const INKS = ["#6f695e", "#857f72", "#9a9487"];
 
-function starTile(seed: number, count: number, maxR: number, maxA: number): HTMLCanvasElement {
+function starTile(seed: number, count: number, maxR: number, maxA: number, tints = TINTS): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = c.height = TILE;
   const g = c.getContext("2d")!;
   const rand = mulberry32(seed);
   for (let i = 0; i < count; i++) {
     g.globalAlpha = 0.25 + rand() * (maxA - 0.25);
-    g.fillStyle = TINTS[Math.floor(rand() * TINTS.length)];
+    g.fillStyle = tints[Math.floor(rand() * tints.length)];
     g.beginPath();
     g.arc(rand() * TILE, rand() * TILE, 0.4 + rand() * maxR, 0, Math.PI * 2);
     g.fill();
@@ -49,6 +51,14 @@ const starLayers = () =>
     { tile: starTile(11, 140, 0.55, 0.45), parallax: 0.04 },
     { tile: starTile(23, 55, 0.85, 0.65), parallax: 0.1 },
     { tile: starTile(37, 16, 1.2, 0.85), parallax: 0.2 },
+  ]);
+
+let paperLayers: StarLayer[] | null = null;
+const paperStarLayers = () =>
+  (paperLayers ??= [
+    { tile: starTile(11, 140, 0.5, 0.5, INKS), parallax: 0.04 },
+    { tile: starTile(23, 55, 0.8, 0.7, INKS), parallax: 0.1 },
+    { tile: starTile(37, 16, 1.2, 0.85, INKS), parallax: 0.2 },
   ]);
 
 /** Soft colour clouds: [x, y] as a fraction of the view, radius as a fraction of its larger side. */
@@ -170,10 +180,44 @@ export function skyAngle(time: number, animate: boolean): number {
   return sky.angle;
 }
 
-/** Paint the sky in CSS pixels (the caller has set the device-pixel transform). */
-/** The backdrop with the galaxy turned off: the space gradient's dark end, flat. */
-export const PLAIN_SKY = "#05040e";
+/** Rings and spokes of the printed chart: a ring every this many px, a spoke every 30°. */
+const RING = 170;
+const SPOKES = 12;
 
+/**
+ * The light theme's sky: a star atlas printed on paper. Ink stars drift with the camera like the
+ * night sky's, over the chart's rings and spokes, which turn as slowly as the sky does.
+ */
+function drawAtlas(ctx: CanvasRenderingContext2D, w: number, h: number, view: View, time: number, animate: boolean) {
+  ctx.fillStyle = "#f4f2ec";
+  ctx.fillRect(0, 0, w, h);
+  const cx = w * 0.55,
+    cy = h * 0.5;
+  const reach = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy));
+  ctx.save();
+  ctx.strokeStyle = "rgba(120, 108, 84, 0.16)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let r = RING; r < reach + RING; r += RING) {
+    ctx.moveTo(cx + r, cy);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  }
+  const angle = skyAngle(time, animate);
+  for (let i = 0; i < SPOKES; i++) {
+    const a = angle + (i * Math.PI * 2) / SPOKES;
+    ctx.moveTo(cx + Math.cos(a) * RING * 0.5, cy + Math.sin(a) * RING * 0.5);
+    ctx.lineTo(cx + Math.cos(a) * reach, cy + Math.sin(a) * reach);
+  }
+  ctx.stroke();
+  ctx.restore();
+  for (const { tile, parallax } of paperStarLayers()) {
+    const ox = mod(view.tx * parallax, TILE) - TILE;
+    const oy = mod(view.ty * parallax, TILE) - TILE;
+    for (let x = ox; x < w; x += TILE) for (let y = oy; y < h; y += TILE) ctx.drawImage(tile, x, y);
+  }
+}
+
+/** Paint the sky in CSS pixels (the caller has set the device-pixel transform); `paper` for the light theme. */
 export function drawSpace(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -181,7 +225,12 @@ export function drawSpace(
   view: View,
   time: number,
   animate: boolean,
+  paper = false,
 ) {
+  if (paper) {
+    drawAtlas(ctx, w, h, view, time, animate);
+    return;
+  }
   const base = ctx.createLinearGradient(0, 0, 0, h);
   base.addColorStop(0, "#0a0822");
   base.addColorStop(1, "#03020b");

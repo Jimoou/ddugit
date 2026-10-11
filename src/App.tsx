@@ -1,5 +1,5 @@
 import { Icon } from "./components/Icon";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, DEMO_PATH, isTauri, keepsTabs } from "./api";
 import { AuthDialog } from "./components/AuthDialog";
 import { type CloneInit, CloneDialog, ConnectActions, RecentList, RepoMenu, useRecent } from "./components/Connect";
@@ -27,6 +27,7 @@ import { defaults, parseSettings, type Settings } from "./settings";
 import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
 import "./App.css";
 import { readStored, writeStored } from "./storage";
+import { useTheme } from "./theme";
 
 type Toast = { id: number; kind: "ok" | "err"; text: string; action?: ToastAction };
 
@@ -60,6 +61,16 @@ const loadTabs = (): Tabs =>
  */
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
+  const theme = useTheme(settings.theme);
+  // The whole window's tokens switch with one attribute (styles/base.css); before paint, so nothing flashes.
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    // The OS's own parts of the window (macOS traffic lights, menus) follow it too.
+    if (isTauri)
+      void import("@tauri-apps/api/window")
+        .then(({ getCurrentWindow }) => getCurrentWindow().setTheme(theme))
+        .catch(() => {});
+  }, [theme]);
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
   const [tabs, setTabsState] = useState(loadTabs);
   /** The galaxy dashboard is showing (the home tab), over whichever tab is active. */
@@ -330,6 +341,7 @@ export default function App() {
               path={tab.path}
               active={!home && tab.id === tabs.active}
               settings={settings}
+              theme={theme}
               page={page}
               toast={toast}
               onLoaded={onLoaded}
@@ -342,7 +354,7 @@ export default function App() {
       )}
       {welcome && (
         <div className="welcome">
-          <SpaceBackdrop animate={settings.animate} space={settings.space} />
+          <SpaceBackdrop animate={settings.animate} space={settings.space} theme={theme} />
           <h1 className="brand">
             <Wordmark />
           </h1>

@@ -1,4 +1,3 @@
-import { NEON } from "../graph/scene";
 import { t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { GitOutput } from "./GitOutput";
@@ -22,19 +21,29 @@ interface Props {
   onCancel(): void;
 }
 
+/** The upstream's commits: the trunk's colour, as the theme draws it. */
+const THEIRS = "var(--cyan)";
+
 /** Tiny fork diagram: shared base, my commits above, theirs below. */
 function Fork({ ahead, behind, color }: { ahead: number; behind: number; color: string }) {
   const dots = (n: number, y: number, c: string) =>
     Array.from({ length: Math.min(n, 5) }, (_, i) => (
-      <circle key={`${y}-${i}`} cx={70 + i * 34} cy={y} r={5} fill="#0a0814" stroke={c} strokeWidth={2} />
+      <circle
+        key={`${y}-${i}`}
+        cx={70 + i * 34}
+        cy={y}
+        r={5}
+        style={{ fill: "var(--bg)", stroke: c }}
+        strokeWidth={2}
+      />
     ));
   return (
     <svg className="fork" viewBox="0 0 260 80" role="img" aria-label={t("sync.fork", { ahead, behind })}>
-      <path d="M14 40 C 40 40, 40 18, 66 18 L 240 18" stroke={color} />
-      <path d="M14 40 C 40 40, 40 62, 66 62 L 240 62" stroke={NEON[0]} />
-      <circle cx={14} cy={40} r={5} fill="#0a0814" stroke="#aaa" strokeWidth={2} />
+      <path d="M14 40 C 40 40, 40 18, 66 18 L 240 18" style={{ stroke: color }} />
+      <path d="M14 40 C 40 40, 40 62, 66 62 L 240 62" style={{ stroke: THEIRS }} />
+      <circle cx={14} cy={40} r={5} style={{ fill: "var(--bg)", stroke: "var(--muted)" }} strokeWidth={2} />
       {dots(ahead, 18, color)}
-      {dots(behind, 62, NEON[0])}
+      {dots(behind, 62, THEIRS)}
     </svg>
   );
 }
@@ -65,7 +74,7 @@ export function SyncDialog(p: Props) {
       <Fork ahead={p.ahead} behind={p.behind} color={p.color} />
       <div className="legend">
         <span style={{ color: p.color }}>{t("sync.mine", { n: p.ahead })}</span>
-        <span style={{ color: NEON[0] }}>{t("sync.theirs", { n: p.behind })}</span>
+        <span style={{ color: THEIRS }}>{t("sync.theirs", { n: p.behind })}</span>
       </div>
       {p.output.trim() && <GitOutput text={p.output} />}
       <div className="choices">

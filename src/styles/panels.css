@@ -118,26 +118,26 @@
 }
 .k-modified {
   color: var(--amber);
-  background: rgba(255, 184, 77, 0.12);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
 }
 .k-untracked,
 .k-added {
   color: var(--lime);
-  background: rgba(166, 255, 77, 0.12);
+  background: color-mix(in srgb, var(--lime) 12%, transparent);
 }
 .k-deleted {
   color: var(--red);
-  background: rgba(255, 77, 109, 0.12);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 .k-renamed,
 .k-copied,
 .k-typechange {
-  color: #9b7bff;
-  background: rgba(155, 123, 255, 0.14);
+  color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 14%, transparent);
 }
 .k-conflict,
 .k-conflicted {
-  color: #07060d;
+  color: var(--bg);
   background: var(--red);
 }
 
@@ -227,8 +227,8 @@
   gap: 6px;
 }
 .inspector .ref-pr {
-  border-color: #c9b8ff;
-  color: #c9b8ff;
+  border-color: var(--violet);
+  color: var(--violet);
 }
 .inspector .contained {
   flex-basis: 100%;

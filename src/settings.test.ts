@@ -19,6 +19,7 @@ describe("parseSettings", () => {
       glow: true,
       historyPage: 3000,
       gitPath: "/opt/git",
+      theme: "system",
       language: "system",
       rotation: 0,
       sidebarCollapsed: false,
@@ -54,6 +55,8 @@ describe("parseSettings", () => {
     });
     expect(parseSettings(JSON.stringify({ rotation: 4 }), base).rotation).toBe(0);
     expect(parseSettings(JSON.stringify({ language: "en" }), base).language).toBe("en");
+    expect(parseSettings(JSON.stringify({ theme: "light" }), base).theme).toBe("light");
+    expect(parseSettings(JSON.stringify({ theme: "sepia" }), base).theme).toBe("system");
     expect(parseSettings(JSON.stringify({ historyPage: 10000 }), base).historyPage).toBe(10000);
   });
   it("keeps side widths within their ranges, and the minimap and lock switches", () => {
