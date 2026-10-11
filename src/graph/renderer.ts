@@ -535,7 +535,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   // --- folded runs ------------------------------------------------------------
   if (k < ZOOM.fold && !s.focus) {
     const rr = runRadius(k);
-    ctx.font = `600 10px ${SANS}`;
+    ctx.font = `600 11px ${SANS}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const run of runsInRows(s.runs, firstCol, lastCol)) {
@@ -607,7 +607,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.lineWidth = 1.8;
     ctx.stroke();
     if (on || k >= ZOOM.summaries) {
-      ctx.font = `600 11px ${SANS}`;
+      ctx.font = `600 12px ${SANS}`;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillStyle = c;
@@ -619,7 +619,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   if (k >= ZOOM.branches) {
     // Measure every node's badges, then place them all at once so neighbours
     // don't overlap (stacks get lifted, or folded into "+N").
-    ctx.font = `600 11px ${SANS}`;
+    ctx.font = `600 12px ${SANS}`;
     const groups = labelQueue.map((L) => {
       const shown = (s.refs.get(L.id) ?? []).filter((rf) => refShown(rf, k >= ZOOM.allRefs, s.headBranch));
       const labels = shown.map((rf) => {
@@ -702,7 +702,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         ctx.fillStyle = item?.isHead ? ink.onFill : col;
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
-        ctx.font = `600 11px ${SANS}`;
+        ctx.font = `600 12px ${SANS}`;
         const iw = item?.icon ? ICON_W : 0;
         const mw = item?.mark ? ICON_W : 0;
         const iy = b.y + (BADGE_H - 10) / 2;
@@ -783,7 +783,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.stroke();
     }
     ctx.restore();
-    ctx.font = `700 11px ${SANS}`;
+    ctx.font = `700 12px ${SANS}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillStyle = c;
@@ -882,8 +882,8 @@ const CAPTION_FULL = 380;
 
 const PILL_PAD = 6;
 const PART_GAP = 5;
-const CHIP_FONT = `700 9px ${MONO}`;
-const PR_FONT = `600 10px ${SANS}`;
+const CHIP_FONT = `700 10px ${MONO}`;
+const PR_FONT = `600 11px ${SANS}`;
 
 const subjects = new Map<string, Subject>();
 const subjectOf = (summary: string) => remember(subjects, summary, () => parseSubject(summary));
@@ -1010,7 +1010,7 @@ function drawMapCaptions(
     .sort((a, b) => rank(a.id) - rank(b.id) || (byId.get(a.id)?.row ?? 0) - (byId.get(b.id)?.row ?? 0));
   // Measure in the font each caption is drawn in: a bold caption measured
   // regular gets cut short with room to spare.
-  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} ${brief && !inHand(id) ? 10.5 : 11.5}px ${SANS}`;
+  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} ${brief && !inHand(id) ? 11.5 : 12.5}px ${SANS}`;
   const items = list.map((L) => ({
     id: L.id,
     x: L.x,
@@ -1070,7 +1070,7 @@ function drawUprightCaption(
   if (space < 40) return;
   const on = L.id === s.selected || L.id === s.hovered;
   const brief = s.view.k < ZOOM.captions && !on;
-  const font = `${on ? 600 : 400} ${brief ? 11 : 12}px ${SANS}`;
+  const font = `${on ? 600 : 400} ${brief ? 12 : 13}px ${SANS}`;
   const w = Math.min(space, captionWidth(ctx, text, font, brief) + 1);
   drawCaption(ctx, s.ink, text, { x: side > 0 ? x : x - w, y: L.y - CAPTION_H / 2, w }, font, L.color, on, L.d, brief);
 }
