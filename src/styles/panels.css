@@ -45,14 +45,15 @@
 .note {
   margin: 0;
   padding: 8px 10px;
-  background: rgba(143, 124, 255, 0.1);
-  border: 1px solid rgba(143, 124, 255, 0.3);
+  background: var(--hover);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   font-size: 12px;
 }
 .note.warn {
-  background: rgba(255, 184, 77, 0.08);
-  border-color: rgba(255, 184, 77, 0.35);
-  color: #ffe0b0;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 35%, transparent);
+  color: var(--text);
 }
 
 .files-head {
@@ -67,21 +68,22 @@
   max-height: 38vh;
   overflow-y: auto;
   border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius);
+  background: var(--bg);
 }
 .files li {
   padding: 3px 4px;
+  border-radius: 4px;
 }
 .files li:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--hover);
 }
 /* The file open in the diff sheet. */
 .files li.viewing {
-  background: rgba(var(--signal), 0.16);
-  box-shadow: inset 3px 0 0 rgb(var(--signal));
+  background: var(--ui-soft);
 }
 .files li.viewing .path {
-  color: #fff;
+  color: var(--text);
   font-weight: 600;
 }
 .files .empty {
@@ -110,6 +112,7 @@
 .chip {
   font: 700 10px/16px var(--mono);
   width: 18px;
+  border-radius: 3px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -163,7 +166,8 @@
 .ref {
   font: 600 11px var(--mono);
   padding: 2px 8px;
-  border: 1px solid var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 4px;
   color: var(--accent);
 }
 .badge.ref {
@@ -240,6 +244,7 @@
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
 }
 .inspector .toolbar .spacer {
   flex: 1;
@@ -256,7 +261,7 @@
 }
 .inspector .tool:hover:not(:disabled) {
   color: var(--text);
-  background: var(--ui-soft);
+  background: var(--hover);
 }
 .context-menu .menu-label {
   display: inline-flex;
@@ -287,6 +292,7 @@
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
 }
 .inspector .message h2 {
   margin: 0;
@@ -343,6 +349,7 @@
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 .segmented button {
   display: inline-flex;
@@ -350,6 +357,7 @@
   gap: 8px;
   border: none;
   padding: 3px 10px;
+  border-radius: 4px;
   font-size: 12px;
   background: none;
   color: var(--text-2);
@@ -379,8 +387,8 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(3, 2, 8, 0.6);
-  backdrop-filter: blur(4px);
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
   z-index: 10;
   animation: scrim-in 0.16s ease-out;
 }
@@ -444,9 +452,10 @@
   flex-direction: column;
   gap: 14px;
   padding: 22px;
-  background: var(--brackets), var(--scanlines), var(--surface);
-  border: 1px solid rgba(var(--signal), 0.22);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
 }
 .dialog p {
   margin: 0;
@@ -475,8 +484,8 @@
   font: 700 13px var(--mono);
   padding: 6px 12px;
   border: 1.5px solid var(--c);
+  border-radius: var(--radius);
   color: var(--c);
-  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent);
   max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -494,10 +503,8 @@
   top: -2px;
   width: 24px;
   height: 6px;
-  background: #fff;
-  box-shadow:
-    0 0 10px #fff,
-    0 0 18px var(--cyan);
+  border-radius: 3px;
+  background: var(--text);
   animation: flow 1.2s linear infinite;
 }
 @keyframes flow {
@@ -529,13 +536,22 @@
   /* Readable and copyable: it stays while the pointer is over it. */
   pointer-events: auto;
   user-select: text;
-  background: var(--brackets), var(--scanlines), var(--surface);
-  border: 1px solid rgba(var(--signal), 0.22);
-  box-shadow:
-    inset 3px 0 0 var(--ok),
-    0 10px 30px rgba(0, 0, 0, 0.45);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   white-space: pre-wrap;
   animation: slide-in 0.18s ease-out;
+}
+/* What kind of message: a small dot before the text, not a coloured edge. */
+.toast::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--ok);
 }
 .toast-text {
   flex: 1;
@@ -553,9 +569,10 @@
   font-size: 12px;
 }
 .toast.err {
-  box-shadow:
-    inset 3px 0 0 var(--danger),
-    0 10px 30px rgba(0, 0, 0, 0.45);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.toast.err::before {
+  background: var(--danger);
 }
 
 @media (prefers-reduced-motion: reduce) {
