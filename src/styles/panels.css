@@ -166,9 +166,19 @@
 .ref {
   font: 600 11px var(--mono);
   padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border: 1px solid var(--accent);
   border-radius: 4px;
   color: var(--accent);
+}
+/* A long branch name wraps inside the panel instead of running off its edge. */
+.inspector .where .ref {
+  height: auto;
+  min-height: 18px;
+  padding: 2px 6px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 .badge.ref {
   padding: 0 6px;
@@ -486,6 +496,7 @@
   border: 1.5px solid var(--c);
   border-radius: var(--radius);
   color: var(--c);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent);
   max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;

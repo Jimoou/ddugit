@@ -28,7 +28,7 @@ function mulberry32(seed: number) {
 
 const TINTS = ["#ffffff", "#d6ddff", "#ffeedd", "#e0d4ff"];
 /** Printed stars: the same sky in warm greys of ink. */
-const INKS = ["#6f695e", "#857f72", "#9a9487"];
+const INKS = ["#5c5244", "#6f6454", "#857a68"];
 
 function starTile(seed: number, count: number, maxR: number, maxA: number, tints = TINTS): HTMLCanvasElement {
   const c = document.createElement("canvas");
@@ -189,13 +189,13 @@ const SPOKES = 12;
  * night sky's, over the chart's rings and spokes, which turn as slowly as the sky does.
  */
 function drawAtlas(ctx: CanvasRenderingContext2D, w: number, h: number, view: View, time: number, animate: boolean) {
-  ctx.fillStyle = "#f4f2ec";
+  ctx.fillStyle = "#efe9de";
   ctx.fillRect(0, 0, w, h);
   const cx = w * 0.55,
     cy = h * 0.5;
   const reach = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy));
   ctx.save();
-  ctx.strokeStyle = "rgba(120, 108, 84, 0.16)";
+  ctx.strokeStyle = "rgba(110, 88, 56, 0.22)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let r = RING; r < reach + RING; r += RING) {

@@ -165,7 +165,7 @@ test("settings: the light theme repaints the window and the map, and is remember
   await expect.poll(paper).toBeGreaterThan(200);
   // The window around the map turns too.
   const bg = await page.evaluate(() => getComputedStyle(document.querySelector(".topbar")!).backgroundColor);
-  expect(bg).toBe("rgb(246, 244, 239)");
+  expect(bg).toBe("rgb(240, 235, 225)");
 
   await page.reload();
   await expect.poll(theme).toBe("light");

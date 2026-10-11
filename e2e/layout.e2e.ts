@@ -107,6 +107,13 @@ test("the list button turns the map into one row per commit and back", async ({ 
   await list.click();
   await expect(list).toHaveAttribute("aria-pressed", "true");
   await expect(graph).toHaveClass(/upright/);
+  // The newest commit on top: HEAD sits above its parent.
+  await expect(page.locator(".hud .turn .deg").first()).toHaveText("270°");
+  const snap = await demo.snapshot();
+  const head = snap.commits.find((c) => c.id === snap.head.target)!;
+  const h = (await demo.screenOf(head.id))!;
+  const p = (await demo.screenOf(head.parents[0]))!;
+  expect(p.y).toBeGreaterThan(h.y + 20);
   // Kept across a reload, like the rotation it sets.
   await page.reload();
   await expect(page.getByRole("button", { name: "목록 보기" })).toHaveAttribute("aria-pressed", "true");

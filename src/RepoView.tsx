@@ -142,9 +142,9 @@ export function RepoView({
   const [zoom, setZoom] = useState(1);
   const animate = settings.animate;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
-  /** List view: time runs down the screen, one row per commit with its whole summary. */
+  /** List view: one row per commit with its whole summary, the newest on top (a quarter turn back). */
   const listView = upright(settings.rotation);
-  const toggleList = () => onChangeSettings({ rotation: ((settings.rotation + (listView ? 3 : 1)) % 4) as Turn });
+  const toggleList = () => onChangeSettings({ rotation: listView ? 0 : 3 });
   const toggleLock = () => onChangeSettings({ mapLocked: !settings.mapLocked });
   const toggleMinimap = () => onChangeSettings({ minimap: !settings.minimap });
   // First-run tutorial, played on the demo repository only.
