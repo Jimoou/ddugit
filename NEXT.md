@@ -5,32 +5,30 @@
 
 _마지막 갱신: 2026-10-11_
 
-## 지금: ddugit.com을 앱 모습에 맞추기
+## 지금: v1.3.1 릴리스
 
-- 사이트(`Jimoou/ddugit-site`)를 frame A 그래파이트 톤으로: 토큰은 앱 `base.css`에서, 둥근 모서리, 밝게 채운 주 버튼, 괄호·스캔라인·보라 버튼·빛 번짐 제거. 앱 화면 11장을 v1.3 데모로 다시 찍음
-- v1.3.0 릴리스 완료(Release 실행 3개 작업 성공)
-- 남은 결정: 브랜치맵 글자 크기를 키울지(지금 배지 11px·메시지 11.5px, 바뀐 적 없음)
+- 담긴 것: 브랜치맵 글자 1px 키움(#155)
+- 순서: 버전 PR → CI · Rust `all_os` 수동 실행 → 병합 → main에서 Release(`release` 체크) → dmg·exe·downloads.json 확인
+- 직전: ddugit.com을 앱 frame A 모습으로(ddugit-site#41), v1.3.0 릴리스
 
-## 지난 단계 (UI 개편 2단계: 라이트 모드)
+## 남은 일
 
-- 설정 → 화면 → 테마(시스템·어둡게·밝게, 기본 어둡게). `src/theme.ts`, `<html data-theme>`, Tauri 창 테마(`core:window:allow-set-theme`)
-- 캔버스: `graph/ink.ts`의 `INK.dark`·`INK.light`. 밝은 하늘은 인쇄된 성도(`drawAtlas`), 우주 배경 끄면 무지 종이
-- e2e는 `colorScheme: dark`로 고정(Playwright 기본이 light라서)
-- 남은 것: 결과 순간 효과(`fx.css`의 별·폭발)는 흰 빛이라 종이 위에선 옅다
+앱 기능 마일스톤은 모두 끝났다. 전체 목록은 [ROADMAP.md](ROADMAP.md)의 '남은 마일스톤'.
 
-## 진행 중
-
-- 실기에서만 확인할 수 있는 것: 외부 열기·편집기 확인 창·저장 창·diff·merge 도구(macOS·Windows)
-- PR 알림 구독은 새 저장소 이름 `Jimoou/ddugit`으로 한다(옛 이름 `jimoou/otgit`으로는 이벤트가 오지 않음)
-
-## 다음 단계 (사용자)
+### 사용자
 
 1. Paddle 판매자 검증 통과 대기
 2. 통과 후 한 번에 전환: Supabase Secrets(`PADDLE_ENV` 삭제, `PADDLE_PRODUCT_ID`·`PADDLE_WEBHOOK_SECRET`·`PADDLE_API_KEY` 라이브 값, `ALLOW_TEST_LICENSES` 비움), Netlify(`NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`·`_PRICE_ID` 라이브 값, `_ENV=production`, `ALLOW_TEST_LICENSES` 비움) → 재배포 → 샌드박스 웹훅 목적지 끄기 → 실결제·환불 1회 확인
 3. 상품 생성에 쓴 라이브 API 키는 권한을 customer 읽기·adjustment 쓰기로 줄인 키로 바꾼다
-4. Supabase Auth → Sessions: 최대 기간·미사용 제한(선택), Providers에서 Email·Phone·Anonymous 꺼짐 확인
-5. git-scm.com GUI 목록 PR(파일은 세션에서 전달: `data/guis/ddugit.yml`, 이미지 588×332/294×166, order 61)
-6. Search Console: sitemap 재제출, `/guides`·가이드 4편 색인 요청
+4. Windows 실기 점검(창 버튼·크기 조절·SmartScreen), 외부 열기·편집기·저장 창·diff/merge 도구(macOS·Windows)
+5. Supabase Auth → Sessions: 최대 기간·미사용 제한(선택), Providers에서 Email·Phone·Anonymous 꺼짐 확인
+6. git-scm.com GUI 목록 PR(파일은 세션에서 전달: `data/guis/ddugit.yml`, 이미지 588×332/294×166, order 61)
+7. Search Console: sitemap 재제출, `/guides`·가이드 4편 색인 요청
+
+### 나중에
+
+- Windows 코드 서명, 레이아웃 Worker·WebGL(측정상 불필요), 라이트 모드의 결과 효과가 옅은 것
+- PR 알림 구독은 새 저장소 이름 `Jimoou/ddugit`으로 한다
 
 ## 결정
 
