@@ -282,6 +282,8 @@ export default function App() {
     };
   }, []);
 
+  /** With repositories to show, the home tab is the dashboard; before that, the welcome. */
+  const dashboard = recent.list.some((r) => r.path !== DEMO_PATH);
   const connect = {
     onOpen: () => void openRepo(),
     onClone: () => setClone({}),
@@ -352,7 +354,22 @@ export default function App() {
           </Boundary>
         ) : null,
       )}
-      {welcome && (
+      {welcome && dashboard && (
+        <div className="welcome dash">
+          {/* The chart draws its own rings, so on paper the printed atlas would double them. */}
+          <SpaceBackdrop animate={settings.animate} space={settings.space && theme === "dark"} theme={theme} />
+          <Galaxy
+            recent={recent}
+            confirmFetch={settings.confirmRemote.fetch}
+            onOpen={openPath}
+            onOpenMany={openMany}
+            toast={toast}
+            connect={connect}
+            onDemo={() => openPath(DEMO_PATH)}
+          />
+        </div>
+      )}
+      {welcome && !dashboard && (
         <div className="welcome">
           <SpaceBackdrop animate={settings.animate} space={settings.space} theme={theme} />
           <h1 className="brand">
@@ -369,20 +386,10 @@ export default function App() {
               </button>
             </li>
           </ul>
-          {recent.list.some((r) => r.path !== DEMO_PATH) ? (
-            <Galaxy
-              recent={recent}
-              confirmFetch={settings.confirmRemote.fetch}
-              onOpen={openPath}
-              onOpenMany={openMany}
-              toast={toast}
-            />
-          ) : (
-            <section className="welcome-recent">
-              <div className="eyebrow">{t("connect.recent")}</div>
-              <RecentList recent={recent} onOpen={openPath} />
-            </section>
-          )}
+          <section className="welcome-recent">
+            <div className="eyebrow">{t("connect.recent")}</div>
+            <RecentList recent={recent} onOpen={openPath} />
+          </section>
           <button className="ghost" onClick={() => openPath(DEMO_PATH)}>
             <Icon name="sparkle" /> {t("app.demo")}
           </button>

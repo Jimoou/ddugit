@@ -1,6 +1,10 @@
 // Getting repositories in: clone, SSH, init, tabs, and the galaxy dashboard with its groups and batch work.
 
+import type { Page } from "@playwright/test";
 import { demoFlags, expect, test } from "./fixtures";
+
+/** Show the dashboard as cards (the chart is the default view). */
+const cardsView = (page: Page) => page.evaluate(() => localStorage.setItem("ddugit.galaxyView", "list"));
 
 test("clones from a URL, remembers it in the repository menu and stars it", async ({ demo }) => {
   const { page } = demo;
@@ -167,10 +171,11 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
   });
   await page.reload();
   // The home tab shows the galaxy over the open repository, without a new tab.
+  await cardsView(page);
   await page.locator(".tab-home").click();
   await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(1);
   const galaxy = page.locator(".welcome .galaxy");
-  await expect(galaxy).toContainText("내 저장소 · 3개");
+  await expect(galaxy.getByRole("group", { name: "그룹으로 거르기" })).toContainText("전체 3");
   const worlds = galaxy.locator(".world");
   await expect(worlds).toHaveCount(3);
   await expect(worlds.filter({ hasText: "gone-project" })).toContainText("찾을 수 없음");
@@ -189,6 +194,65 @@ test("the galaxy dashboard reads every recent repository and fetches them all", 
   await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(2);
 });
 
+test("the dashboard's star chart: a constellation per group, the list beside it, filters and the view kept", async ({
+  demo,
+}) => {
+  const { page } = demo;
+  await page.evaluate(() => {
+    localStorage.setItem("ddugit.groups", JSON.stringify([{ id: "w", name: "회사", hue: 300, collapsed: false }]));
+    const recent = [
+      { path: "/work/nova", starred: false, at: 3, group: "w" },
+      { path: "/work/comet", starred: false, at: 2, group: "w" },
+      { path: "/home/me/dotfiles", starred: true, at: 1 },
+    ];
+    localStorage.setItem("ddugit.recent", JSON.stringify(recent));
+  });
+  await page.reload();
+  await page.locator(".tab-home").click();
+  const galaxy = page.locator(".welcome .galaxy");
+  const list = galaxy.getByRole("complementary", { name: "저장소" });
+  await expect(galaxy.locator(".chart-star")).toHaveCount(3);
+  await expect(galaxy.locator(".constellation-name")).toHaveText("회사");
+  await expect(list.locator(".orbit-row")).toHaveCount(3);
+  await expect(list.locator(".orbit").filter({ hasText: "회사" }).locator(".orbit-row")).toHaveCount(2);
+
+  // Pointing at a row lights its star.
+  await list.locator(".orbit-row").filter({ hasText: "dotfiles" }).hover();
+  await expect(galaxy.locator(".chart-star.hot")).toHaveCount(1);
+
+  // Filtering by a group keeps only its stars and rows; "all" brings the rest back.
+  const filter = galaxy.getByRole("group", { name: "그룹으로 거르기" });
+  await filter.getByRole("button", { name: /회사/ }).click();
+  await expect(galaxy.locator(".chart-star")).toHaveCount(2);
+  await expect(list.locator(".orbit-row")).toHaveCount(2);
+  await filter.getByRole("button", { name: /전체/ }).click();
+  await expect(galaxy.locator(".chart-star")).toHaveCount(3);
+
+  // A group's menu holds its batch work; a row's menu stars, moves and forgets.
+  await list.getByRole("button", { name: "회사 메뉴" }).click();
+  for (const item of ["Fetch", "Pull", "모두 열기", "이름 바꾸기"])
+    await expect(page.getByRole("menuitem", { name: new RegExp(`^${item}`) })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await list.locator(".orbit-row").filter({ hasText: "nova" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "그룹에서 빼기" }).click();
+  await expect(list.locator(".orbit").filter({ hasText: "회사" }).locator(".orbit-row")).toHaveCount(1);
+
+  // The add menu gets more repositories in.
+  await galaxy.getByRole("button", { name: "저장소 추가" }).click();
+  await expect(page.getByRole("menuitem", { name: /복제/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // The cards view is kept across a reload; a click on a row opens the repository.
+  await galaxy.getByRole("group", { name: "보기" }).getByRole("button", { name: "목록" }).click();
+  await expect(galaxy.locator(".world")).toHaveCount(3);
+  await page.reload();
+  await page.locator(".tab-home").click();
+  await expect(galaxy.locator(".world")).toHaveCount(3);
+  await galaxy.getByRole("group", { name: "보기" }).getByRole("button", { name: "성도" }).click();
+  await list.locator(".orbit-row").filter({ hasText: "comet" }).locator(".orbit-open").click();
+  await expect(page.locator(".tabbar .tab:not(.tab-home)").filter({ hasText: "comet" })).toHaveCount(1);
+});
+
 test("groups repositories on the dashboard: create, move in, open all, ungroup", async ({ demo }) => {
   const { page } = demo;
   await page.evaluate(() => {
@@ -199,6 +263,7 @@ test("groups repositories on the dashboard: create, move in, open all, ungroup",
     );
   });
   await page.reload();
+  await cardsView(page);
   await page.locator(".tab-new").click();
   const galaxy = page.locator(".welcome .galaxy");
   await expect(galaxy.locator(".band")).toHaveCount(0);
@@ -247,6 +312,7 @@ test("groups: a suggestion by owner, picking several cards, and dragging between
     );
   });
   await page.reload();
+  await cardsView(page);
   await page.locator(".tab-new").click();
   const galaxy = page.locator(".welcome .galaxy");
 
@@ -309,6 +375,7 @@ test("the dashboard pulls picked repositories and puts them all on the same bran
     localStorage.setItem("ddugit.recent", JSON.stringify(recent));
   }, names);
   await page.reload();
+  await cardsView(page);
   await page.locator(".tab-home").click();
   const galaxy = page.locator(".welcome .galaxy");
   const world = (name: string) => galaxy.locator(".world").filter({ hasText: `/work/${name}` });
@@ -341,6 +408,7 @@ test("on Free, batch pull and branch switching offer Pro", async ({ demo }) => {
     localStorage.setItem("ddugit.recent", JSON.stringify([{ path: "/work/nova", starred: false, at: 0 }]));
   });
   await page.reload();
+  await cardsView(page);
   await page.locator(".tab-home").click();
   await page.locator(".welcome .galaxy .world .world-open").click({ modifiers: ["ControlOrMeta"] });
   await page
@@ -399,6 +467,7 @@ test("on Free, the dashboard reads three repositories, starred first, and offers
     localStorage.setItem("ddugit.recent", JSON.stringify(recent));
   });
   await page.reload();
+  await cardsView(page);
   await page.locator(".tab-home").click();
   const galaxy = page.locator(".welcome .galaxy");
   const world = (name: string) => galaxy.locator(".world").filter({ hasText: `/work/${name}` });
@@ -437,11 +506,14 @@ test("tabs follow the keyboard: new, by number, cycle, home and close, and come 
   await expect(tabs).toHaveCount(1);
   for (const name of ["second", "third"]) {
     await page.keyboard.press("Control+t");
-    // The new tab's welcome screen: the recent list, or the dashboard once a repository is known.
-    const open = page.locator(".welcome:not([hidden])").getByRole("button", { name: /폴더 열기/ });
-    await expect(open).toBeVisible();
     await page.evaluate((name) => (window.__ddugitDemo.nextFolder = `/work/${name}`), name);
-    await open.click();
+    // The new tab's welcome screen offers it at once; once a repository is known, the dashboard's add menu does.
+    const welcome = page.locator(".welcome:not([hidden])");
+    if (name === "second") await welcome.getByRole("button", { name: /폴더 열기/ }).click();
+    else {
+      await welcome.getByRole("button", { name: "저장소 추가" }).click();
+      await page.getByRole("menuitem", { name: /폴더 열기/ }).click();
+    }
     await expect(active).toHaveAttribute("title", `/work/${name}`);
   }
   await expect(tabs).toHaveCount(3);

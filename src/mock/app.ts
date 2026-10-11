@@ -63,7 +63,8 @@ function demoGlanceBase(path: string): RepoGlance {
     last: {
       summary: GLANCE_SUMMARIES[pick(16, 4)],
       author: AUTHORS[pick(18, 4)],
-      time: Math.floor(Date.now() / 1000) - 600 - pick(22, 200) * 1800,
+      // From minutes to weeks old, so the dashboard's chart spreads out.
+      time: Math.floor(Date.now() / 1000) - 600 - pick(22, 200) ** 2 * 60,
     },
   };
 }

@@ -43,6 +43,7 @@ test("a malformed stored list of dismissed hints doesn't break the dashboard", a
   const { page } = demo;
   await page.evaluate(() => {
     localStorage.setItem("ddugit.groupHints", "{}");
+    localStorage.setItem("ddugit.galaxyView", "list");
     const paths = ["/work/rocket", "/srv/api-server"];
     localStorage.setItem("ddugit.recent", JSON.stringify(paths.map((path, i) => ({ path, starred: false, at: i }))));
   });
@@ -205,6 +206,12 @@ test("the smallest window (900×560) keeps every screen inside it, controls uncl
   await page.reload();
   await page.locator(".tab-home").click();
   const galaxy = page.locator(".welcome .galaxy");
+  // The chart beside its list, then the cards.
+  await expect(galaxy.locator(".chart-star")).toHaveCount(3);
+  await noPageScroll("dashboard chart");
+  await inside("dashboard list", galaxy.locator(".galaxy-list"));
+  await controlsApart("dashboard toolbar", galaxy.locator(".galaxy-head").first());
+  await galaxy.getByRole("group", { name: "보기" }).getByRole("button", { name: "목록" }).click();
   await expect(galaxy.locator(".world")).toHaveCount(3);
   await expect(galaxy.locator(".world-branch")).toHaveCount(3);
   await noPageScroll("dashboard");

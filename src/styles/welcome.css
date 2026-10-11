@@ -61,23 +61,104 @@
   height: 7px;
 }
 
-/* The galaxy dashboard: every recent repository as a world card. */
+/* The galaxy dashboard fills the home tab: a toolbar, then the star chart beside its list
+   (or the cards, one band per group). Its colours per state: the chart's dots, the list's
+   dots and the words beside them read the same. */
+.welcome.dash {
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 0;
+}
 .galaxy {
-  width: min(1120px, calc(100vw - 32px));
+  --t-clean: var(--text-2);
+  --t-changes: color-mix(in srgb, var(--amber) 85%, var(--text));
+  --t-behind: var(--focus);
+  --t-stopped: color-mix(in srgb, var(--red) 75%, var(--text));
+  --t-missing: var(--faint);
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  min-height: 0;
+}
+.tone-clean {
+  --tone: var(--t-clean);
+}
+.tone-changes {
+  --tone: var(--t-changes);
+}
+.tone-behind {
+  --tone: var(--t-behind);
+}
+.tone-stopped {
+  --tone: var(--t-stopped);
+}
+.tone-missing,
+.tone-unread {
+  --tone: var(--t-missing);
 }
 .galaxy-head {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
 }
-.galaxy-head .eyebrow {
-  margin: 0;
+.galaxy-head-gap {
+  flex: 1;
+}
+.galaxy-head > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+}
+.galaxy-head .n {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+.galaxy-head .primary .n {
+  color: inherit;
+  opacity: 0.6;
+}
+/* Segmented choices: the group filter and the view. */
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.seg button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.seg button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+.seg button.on {
+  background: var(--raised-hover);
+  color: var(--text);
+  font-weight: 500;
+}
+.seg .seg-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--faint);
+}
+.galaxy > .group-hint,
+.galaxy > .pick-bar {
+  margin: 10px 16px 0;
 }
 .galaxy-tally {
   flex: 1;
@@ -93,43 +174,315 @@
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 8px;
 }
-/* Groups and the cards scroll together under the header. */
+/* The cards view: groups and the cards scroll together under the toolbar. */
 .galaxy-body {
+  flex: 1;
   min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 14px 16px;
 }
-/* With repositories to show, the hero steps back: a smaller wordmark, no
-   tagline. The dashboard takes the height that is
-   left and the demo button stays in flow under it, never over a card. */
-.welcome:has(> .galaxy) {
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 18px 0 14px;
+
+/* The chart view. */
+.galaxy-sky {
+  flex: 1;
+  min-height: 0;
+  display: flex;
 }
-/* Auto margins centre it while it fits and keep the top in view once it does not. */
-.welcome:has(> .galaxy) > .brand {
-  margin-top: auto;
+.star-chart {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 16px;
 }
-.welcome:has(> .galaxy) > :last-child {
-  margin-bottom: auto;
+.star-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
-.welcome:has(> .galaxy) .brand .wordmark {
-  height: 40px;
+.chart-grid circle,
+.chart-grid line {
+  fill: none;
+  stroke: var(--line);
 }
-.welcome:has(> .galaxy) > p {
-  display: none;
+.chart-rings text {
+  fill: var(--faint);
+  font: 10px var(--mono);
 }
-.welcome:has(> .galaxy) .connect-actions {
-  margin-top: 0;
+.constellation {
+  fill: none;
+  stroke: var(--line-strong);
 }
-.welcome > .galaxy {
-  flex: 0 1 auto;
+.constellation-name {
+  fill: var(--muted);
+  font: 600 11px var(--sans);
+  letter-spacing: 0.08em;
 }
-.welcome > :not(.galaxy, .space-backdrop) {
+.chart-star {
+  cursor: pointer;
+}
+.chart-star .hit {
+  fill: transparent;
+}
+.chart-star .ring {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.2;
+  opacity: 0;
+}
+.chart-star.hot .ring,
+.chart-star.picked .ring {
+  opacity: 1;
+}
+.chart-star .dot {
+  fill: var(--tone);
+}
+.chart-star.tone-missing .dot,
+.chart-star.tone-unread .dot {
+  fill: none;
+  stroke: var(--tone);
+  stroke-dasharray: 2 2;
+}
+/* Names keep a rim of the sky's colour so lines and neighbours behind them don't cut through. */
+.star-name,
+.star-sub,
+.constellation-name {
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.star-name {
+  fill: var(--text);
+  font: 500 13px var(--sans);
+}
+.chart-star.tone-missing .star-name,
+.chart-star.tone-unread .star-name {
+  fill: var(--muted);
+}
+.star-sub {
+  fill: var(--faint);
+  font: 11.5px var(--sans);
+}
+.star-sub tspan {
+  fill: var(--sig);
+}
+.chart-legend {
+  position: absolute;
+  left: 24px;
+  bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+/* Beside the chart: the same repositories as a list, by group, most recent work first. */
+.galaxy-list {
+  flex: 0 0 380px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+}
+.galaxy-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.galaxy-list-head b {
+  font-weight: 600;
+}
+.galaxy-list-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+.orbit.drop {
+  background: var(--ui-soft);
+}
+.orbit-head {
+  display: flex;
+  align-items: center;
+  padding: 10px 10px 2px 18px;
+}
+.orbit-head .fold {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+.orbit-head .fold:hover:not(:disabled) {
+  background: none;
+  color: var(--text-2);
+}
+.orbit-head .fold:disabled {
+  opacity: 1;
+}
+.orbit-head .chev {
+  transition: transform 0.12s;
+}
+.orbit-head .fold[aria-expanded="true"] .chev {
+  transform: rotate(90deg);
+}
+.orbit ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.orbit .band-empty {
+  padding: 4px 18px 8px;
+  margin: 0;
+}
+.orbit-row {
+  display: flex;
+  align-items: center;
+}
+.orbit-row.hot,
+.orbit-row:focus-within {
+  background: var(--hover);
+}
+.orbit-row.picked {
+  background: var(--ui-soft);
+}
+.orbit-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 6px 9px 18px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+.orbit-open:hover:not(:disabled) {
+  background: none;
+}
+.tone-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tone, var(--faint));
+}
+.orbit-row.tone-missing .tone-dot,
+.orbit-row.tone-unread .tone-dot,
+.orbit-row.locked .tone-dot {
+  background: none;
+  border: 1px dashed var(--faint);
+}
+.orbit-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.orbit-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.orbit-row.locked .orbit-name {
+  color: var(--muted);
+}
+.orbit-star {
   flex-shrink: 0;
+  color: var(--brand-star);
+}
+.orbit-sub {
+  color: var(--faint);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.orbit-sigs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.orbit-sigs span,
+.orbit-row .world-fetch {
+  position: static;
+  color: var(--sig, var(--muted));
+  white-space: nowrap;
+}
+.orbit-row .more {
+  margin-right: 10px;
+  opacity: 0;
+}
+.orbit-row:hover .more,
+.orbit-row:focus-within .more {
+  opacity: 1;
+}
+.orbit-pro {
+  margin-right: 14px;
+  padding: 2px;
+  border: 0;
+  background: none;
+}
+/* In the chart view the state colours: what the dots show, the words say. */
+.galaxy-sky .sig-changes {
+  --sig: var(--t-changes);
+}
+.galaxy-sky .sig-behind {
+  --sig: var(--t-behind);
+}
+.galaxy-sky .sig-stopped,
+.galaxy-sky .sig-missing {
+  --sig: var(--t-stopped);
+}
+.galaxy-sky .sig-ahead {
+  --sig: var(--text-2);
+}
+.galaxy-sky .sig-stash {
+  --sig: var(--faint);
+}
+/* Too narrow for both: the list alone. */
+@media (max-width: 860px) {
+  .star-chart {
+    display: none;
+  }
+  .galaxy-list {
+    flex: 1;
+    border-left: 0;
+  }
 }
 .band {
   display: flex;
