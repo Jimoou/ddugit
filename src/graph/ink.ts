@@ -41,12 +41,12 @@ export interface Ink {
 /** Lane inks for paper: the neon hues, deep enough to read as text (≥ 4.5:1 on the light map). */
 export const PAPER_LANES = [
   "#08728f", // trunk
-  "#b4359e",
-  "#387a0e",
-  "#9a6200",
+  "#a82d93",
+  "#33720c",
+  "#8c5900",
   "#6c52cc",
-  "#c23558",
-  "#0e7e5c",
+  "#b52f51",
+  "#0c7454",
   "#2a64d0",
 ];
 
@@ -88,12 +88,12 @@ export const INK: Record<Theme, Ink> = {
     paper: true,
     lanes: PAPER_LANES,
     alert: "#c23558",
-    sky: "#f6f4ef",
-    hole: "#ffffff",
-    ring: "#1c1c1a",
+    sky: "#efe9de",
+    hole: "#fffcf6",
+    ring: "#1b1814",
     onFill: "#ffffff",
-    badge: "rgba(255,255,255,0.94)",
-    pill: "rgba(255,255,255,0.9)",
+    badge: "rgba(255,252,246,0.95)",
+    pill: "rgba(255,252,246,0.92)",
     pillOn: "#ffffff",
     text: "#2b2a27",
     textOn: "#1c1c1a",

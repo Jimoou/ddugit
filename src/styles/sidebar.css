@@ -376,19 +376,20 @@ button.link {
 .sidebar li:hover {
   background: var(--hover);
 }
-/* The chosen ref: a plain selected row, its dot ringed in its own branch colour. */
+/* The chosen ref in its own branch colour: a tint fading right, a brighter star. */
 .sidebar li.focused {
-  background: var(--ui-soft);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--ui-text)) 24%, transparent), transparent 90%);
 }
 .sidebar li.focused .name {
   color: var(--text);
-  font-weight: 600;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--c, var(--ui-text)) 70%, transparent);
 }
 /* The ring stays inside the row's padding (8px): 4px dot + 1.5px gap + 1.5px ring. */
 .sidebar li.focused .dot {
   box-shadow:
     0 0 0 1.5px var(--surface),
-    0 0 0 3px var(--c, currentColor);
+    0 0 0 3px var(--c, currentColor),
+    0 0 8px var(--c, currentColor);
 }
 /* Folding and unfolding slide the width; the content fades in after it (Sidebar `slide`). */
 .sidebar.slide {
@@ -465,10 +466,12 @@ button.link {
   flex-shrink: 0;
   transform: rotate(45deg);
   border: 1.5px solid var(--amber);
+  box-shadow: 0 0 6px var(--amber);
 }
 .sidebar .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
 }

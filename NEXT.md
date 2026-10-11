@@ -5,19 +5,19 @@
 
 _마지막 갱신: 2026-10-11_
 
-## 지금: v1.2.0 릴리스
+## 지금: v1.2.0 피드백 수정 PR → 다음은 은하 대시보드 개편
 
-- 담긴 것: 목록 보기 버튼·줌아웃 태그(#142), 사이드바 강조 문구 삭제(#143), 틀 A(#144), 라이트 모드(#145), 기본 테마 어둡게(사용자 결정: 업데이트해도 화면이 바뀌지 않게, 밝게·시스템은 설정에서)
-- 순서: 버전 PR(이 PR) → CI · Rust `all_os` 수동 실행 → 병합 → main에서 Release(`release` 체크) 수동 실행 → 3개 작업(dmg·exe·downloads.json) 확인
+- 이 PR: 인스펙터의 긴 브랜치 이름 줄바꿈(`.inspector .where .ref`), 틀 A에서 빠졌던 브랜치 스타일 복원(사이드바 점·다이아 빛, 선택 줄 색 그라데이션·글자 빛, 탑바 `.branch-now` 색 칩, 병합 창 `.chip-lg` 빛), 라이트 모드를 따뜻한 종이(`#EFE9DE` 하늘, `#FFFCF6` 패널, 레인 잉크 다시 4.5:1), 목록 보기는 270°(최신 커밋이 위), 설정 아이콘 해 → 톱니바퀴
+- 다크 캔버스(레인·커밋 점)는 v1.1과 코드가 같다(확인함)
+- 다음 PR: 은하 대시보드를 목업대로(성도 + 저장소 목록, 그룹 필터, 성도/목록 전환, 모두 Fetch·Pull N·저장소 추가). 그룹·띠, 즐겨찾기, 메뉴, 일괄 Pull·전환(Pro), 열기·지우기, 그룹 안내, 고르기 막대는 그대로 유지
+- 릴리스(1.2.1)는 사용자가 정하면
 
-## 방금 끝낸 것 (UI 개편 2단계: 라이트 모드)
+## 지난 단계 (UI 개편 2단계: 라이트 모드)
 
-- 설정 → 화면 → 테마(시스템·어둡게·밝게, 기본 시스템). `src/theme.ts`, `<html data-theme>`, Tauri 창 테마(`core:window:allow-set-theme`)
-- CSS: `base.css`의 `:root[data-theme="light"]`(B 색). 나머지 파일의 하드코딩 색은 토큰·`color-mix`로 바꿈(`--violet` `--shade` `--map-strip` `--map-veil` 추가)
-- 캔버스: `graph/ink.ts`의 `INK.dark`·`INK.light`. 종이 위 레인은 네온과 같은 색상의 진한 잉크(대비 4.5:1 이상, `ink.test.ts`). 밝은 테마는 빛 번짐 없음, 반짝임·끌기 선은 `source-over`
-- 밝은 하늘: 우주 배경 켜면 인쇄된 성도(`space.ts` `drawAtlas`: 잉크 별 + 동심원·방사선, 하늘처럼 천천히 돎), 끄면 무지 종이 `#F6F4EF`. 시작 화면·대시보드도 같은 하늘
-- e2e는 `colorScheme: dark`로 고정(Playwright 기본이 light라서), 테마 e2e 하나 추가
-- 남은 것: 결과 순간 효과(`fx.css`의 별·폭발)는 흰 빛이라 종이 위에선 옅다. 필요하면 다음에
+- 설정 → 화면 → 테마(시스템·어둡게·밝게, 기본 어둡게). `src/theme.ts`, `<html data-theme>`, Tauri 창 테마(`core:window:allow-set-theme`)
+- 캔버스: `graph/ink.ts`의 `INK.dark`·`INK.light`. 밝은 하늘은 인쇄된 성도(`drawAtlas`), 우주 배경 끄면 무지 종이
+- e2e는 `colorScheme: dark`로 고정(Playwright 기본이 light라서)
+- 남은 것: 결과 순간 효과(`fx.css`의 별·폭발)는 흰 빛이라 종이 위에선 옅다
 
 ## 진행 중
 

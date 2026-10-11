@@ -251,19 +251,21 @@
   background: color-mix(in srgb, var(--ok) 18%, transparent);
   color: var(--text);
 }
-/* The branch switcher: a plain key; only the branch mark carries HEAD's lane colour. */
+/* The branch switcher: HEAD's branch in its own lane colour, like its badge on the map. */
 .branch-now {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   max-width: 320px;
-  padding: 5px 9px 5px 10px;
-  font-weight: 600;
-  color: var(--text);
-}
-.branch-now > svg:first-child {
-  flex-shrink: 0;
+  padding: 4px 8px 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+  font: 600 12px var(--mono);
   color: var(--c);
+}
+.branch-now:hover:not(:disabled) {
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 18%, transparent);
 }
 .branch-now .branch-name {
   overflow: hidden;

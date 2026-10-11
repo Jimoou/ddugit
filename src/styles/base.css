@@ -54,40 +54,41 @@
 /* Light (frame B's colours): warm paper, white panels, black ink. The data colours are deeper
    inks of the same hues (graph/ink.ts holds the canvas's), dark enough to read as text on paper. */
 :root[data-theme="light"] {
-  --space: #f4f2ec;
-  --brand-ink: #1c1c1a;
+  --space: #efe9de;
+  --brand-ink: #1b1814;
   --brand-star: #c98400;
-  --chrome: #e9e6df;
-  --bg: #f6f4ef;
-  --surface: #fcfbf8;
-  --raised: #ffffff;
-  --raised-hover: #f1eee7;
-  --panel: #ffffff;
-  --scrim: rgba(28, 28, 26, 0.28);
-  --shade: rgba(28, 28, 26, 0.14);
+  /* Warm paper in a few weights, darkest at the window's edge: not bare white. */
+  --chrome: #e4ddcf;
+  --bg: #f0ebe1;
+  --surface: #f6f2ea;
+  --raised: #fffcf6;
+  --raised-hover: #f2ece1;
+  --panel: #fffcf6;
+  --scrim: rgba(40, 30, 16, 0.3);
+  --shade: rgba(60, 44, 20, 0.16);
   --shadow: 0 10px 28px var(--shade);
-  --map-strip: rgba(244, 242, 236, 0.92);
-  --map-veil: rgba(246, 244, 239, 0.85);
-  --hover: rgba(28, 28, 26, 0.05);
-  --line: rgba(28, 28, 26, 0.1);
-  --line-strong: rgba(28, 28, 26, 0.2);
-  --text: #1c1c1a;
-  --text-2: #2b2a27;
-  --muted: #4f4c46;
-  --faint: #6f6b63;
-  --ui: #1c1c1a;
+  --map-strip: rgba(236, 229, 216, 0.94);
+  --map-veil: rgba(240, 235, 225, 0.88);
+  --hover: rgba(60, 44, 20, 0.06);
+  --line: rgba(60, 44, 20, 0.14);
+  --line-strong: rgba(60, 44, 20, 0.26);
+  --text: #1b1814;
+  --text-2: #2c2822;
+  --muted: #4a443b;
+  --faint: #6b645a;
+  --ui: #1b1814;
   --ui-hover: #000000;
-  --ui-ink: #ffffff;
-  --ui-soft: rgba(28, 28, 26, 0.07);
-  --ui-text: #1c1c1a;
+  --ui-ink: #fffcf6;
+  --ui-soft: rgba(60, 44, 20, 0.09);
+  --ui-text: #1b1814;
   --focus: #2a64d0;
   --ok: #1f8754;
   --danger: #c8364f;
   --cyan: #08728f;
-  --magenta: #b4359e;
-  --lime: #387a0e;
-  --amber: #9a6200;
-  --red: #c23558;
+  --magenta: #a82d93;
+  --lime: #33720c;
+  --amber: #8c5900;
+  --red: #b52f51;
   --violet: #6c52cc;
   color-scheme: light;
 }
