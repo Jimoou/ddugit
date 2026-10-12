@@ -586,6 +586,8 @@ test("rebases the current branch onto another from the branch menu, saying what 
   // feature/theme has a merge from main among its own commits, and it is pushed.
   await local(/^feature\/theme$/).dblclick();
   await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
+  // The screen too: a menu opened before it refreshes still names the old branch.
+  await expect(page.locator(".app:not([hidden]) .topbar .branch-now")).toContainText("feature/theme");
   await local(/^main$/).click({ button: "right" });
   await page.getByRole("menuitem", { name: /^main 위로 feature\/theme 다시 쌓기/ }).click();
   await expect(ask).toContainText("병합 커밋 1개");
