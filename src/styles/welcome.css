@@ -174,9 +174,6 @@
   background: hsl(var(--h) 90% 65%);
   box-shadow: 0 0 8px hsl(var(--h) 90% 65% / 0.7);
 }
-.band:not(.ungrouped) .world {
-  border-left: 2px solid hsl(var(--h) 80% 60% / 0.8);
-}
 /* A card picked for grouping, and a band a card is dragged over. */
 .world.picked {
   border-color: color-mix(in srgb, var(--focus) 90%, transparent);
