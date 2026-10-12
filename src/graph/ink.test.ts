@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INK } from "./ink";
+import { INK, inkOf, MAP_STYLES } from "./ink";
 
 /** WCAG relative luminance of `#rrggbb`. */
 function luminance(hex: string): number {
@@ -27,5 +27,29 @@ describe("INK", () => {
     }
     for (const c of [...Object.values(INK.light.chip), ...Object.values(INK.light.pr), INK.light.alert])
       expect(contrast(c, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("inkOf", () => {
+  it("gives every style a look per theme, with as many lanes as the others", () => {
+    for (const style of MAP_STYLES)
+      for (const theme of ["dark", "light"] as const) {
+        const ink = inkOf(style, theme);
+        expect(ink.style).toBe(style);
+        expect(ink.paper).toBe(theme === "light");
+        expect(ink.lanes).toHaveLength(INK.dark.lanes.length);
+      }
+  });
+
+  it("keeps lane names readable on the gauge and route map, and route badge text on its fill", () => {
+    for (const style of ["gauge", "metro"] as const)
+      for (const theme of ["dark", "light"] as const) {
+        const ink = inkOf(style, theme);
+        for (const lane of ink.lanes) {
+          // Gauge names are lane-coloured text on the map; route badges are lane fills under `onFill`.
+          if (style === "gauge") expect(contrast(lane, ink.sky)).toBeGreaterThanOrEqual(4.5);
+          expect(contrast(lane, ink.onFill)).toBeGreaterThanOrEqual(4.5);
+        }
+      }
   });
 });

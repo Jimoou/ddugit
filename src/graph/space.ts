@@ -29,6 +29,8 @@ function mulberry32(seed: number) {
 const TINTS = ["#ffffff", "#d6ddff", "#ffeedd", "#e0d4ff"];
 /** Printed stars: the same sky in warm greys of ink. */
 const INKS = ["#5c5244", "#6f6454", "#857a68"];
+/** The same chart on graphite: cool greys. */
+const CHALKS = ["#8b9199", "#6e757d", "#a3a9b1"];
 
 function starTile(seed: number, count: number, maxR: number, maxA: number, tints = TINTS): HTMLCanvasElement {
   const c = document.createElement("canvas");
@@ -53,13 +55,30 @@ const starLayers = () =>
     { tile: starTile(37, 16, 1.2, 0.85), parallax: 0.2 },
   ]);
 
+const chartLayers = (inks: string[]): StarLayer[] => [
+  { tile: starTile(11, 140, 0.5, 0.5, inks), parallax: 0.04 },
+  { tile: starTile(23, 55, 0.8, 0.7, inks), parallax: 0.1 },
+  { tile: starTile(37, 16, 1.2, 0.85, inks), parallax: 0.2 },
+];
 let paperLayers: StarLayer[] | null = null;
-const paperStarLayers = () =>
-  (paperLayers ??= [
-    { tile: starTile(11, 140, 0.5, 0.5, INKS), parallax: 0.04 },
-    { tile: starTile(23, 55, 0.8, 0.7, INKS), parallax: 0.1 },
-    { tile: starTile(37, 16, 1.2, 0.85, INKS), parallax: 0.2 },
-  ]);
+let graphiteLayers: StarLayer[] | null = null;
+
+/** A printed star chart: its paper, the rings and spokes, the stars. */
+interface Chart {
+  paper: string;
+  rule: string;
+  layers: () => StarLayer[];
+}
+const PAPER_CHART: Chart = {
+  paper: "#efe9de",
+  rule: "rgba(110, 88, 56, 0.22)",
+  layers: () => (paperLayers ??= chartLayers(INKS)),
+};
+const GRAPHITE_CHART: Chart = {
+  paper: "#121417",
+  rule: "rgba(230, 232, 235, 0.07)",
+  layers: () => (graphiteLayers ??= chartLayers(CHALKS)),
+};
 
 /** Soft colour clouds: [x, y] as a fraction of the view, radius as a fraction of its larger side. */
 const NEBULAE: [number, number, number, string][] = [
@@ -185,17 +204,27 @@ const RING = 170;
 const SPOKES = 12;
 
 /**
- * The light theme's sky: a star atlas printed on paper. Ink stars drift with the camera like the
- * night sky's, over the chart's rings and spokes, which turn as slowly as the sky does.
+ * A star atlas printed on paper (or on graphite, for the dark theme's gauge and route map). Its
+ * stars drift with the camera like the night sky's, over the chart's rings and spokes, which turn
+ * as slowly as the sky does.
  */
-function drawAtlas(ctx: CanvasRenderingContext2D, w: number, h: number, view: View, time: number, animate: boolean) {
-  ctx.fillStyle = "#efe9de";
+export function drawChart(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  view: View,
+  time: number,
+  animate: boolean,
+  dark: boolean,
+) {
+  const chart = dark ? GRAPHITE_CHART : PAPER_CHART;
+  ctx.fillStyle = chart.paper;
   ctx.fillRect(0, 0, w, h);
   const cx = w * 0.55,
     cy = h * 0.5;
   const reach = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy));
   ctx.save();
-  ctx.strokeStyle = "rgba(110, 88, 56, 0.22)";
+  ctx.strokeStyle = chart.rule;
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (let r = RING; r < reach + RING; r += RING) {
@@ -210,7 +239,7 @@ function drawAtlas(ctx: CanvasRenderingContext2D, w: number, h: number, view: Vi
   }
   ctx.stroke();
   ctx.restore();
-  for (const { tile, parallax } of paperStarLayers()) {
+  for (const { tile, parallax } of chart.layers()) {
     const ox = mod(view.tx * parallax, TILE) - TILE;
     const oy = mod(view.ty * parallax, TILE) - TILE;
     for (let x = ox; x < w; x += TILE) for (let y = oy; y < h; y += TILE) ctx.drawImage(tile, x, y);
@@ -228,7 +257,7 @@ export function drawSpace(
   paper = false,
 ) {
   if (paper) {
-    drawAtlas(ctx, w, h, view, time, animate);
+    drawChart(ctx, w, h, view, time, animate, false);
     return;
   }
   const base = ctx.createLinearGradient(0, 0, 0, h);

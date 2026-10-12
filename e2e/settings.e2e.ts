@@ -18,10 +18,17 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
   await dialog.getByRole("tab", { name: "화면" }).click();
   await dialog.getByLabel(/반짝임 효과/).uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!).animate)).toBe(false);
-  // The space backdrop and the glow switch off on their own (the graph keeps drawing).
-  await dialog.getByLabel(/우주 배경/).uncheck();
+  // The map is a gauge by default; its glow switch belongs to the space style only.
+  const styles = dialog.getByRole("radiogroup", { name: "브랜치맵 모양" });
+  await expect(styles.getByRole("radio", { name: "계기판" })).toBeChecked();
+  await expect(dialog.getByLabel(/빛 번짐/)).toBeDisabled();
+  await styles.getByRole("radio", { name: "노선도" }).click();
+  await styles.getByRole("radio", { name: "우주" }).click();
+  // The backdrop and the glow switch off on their own (the graph keeps drawing).
+  await dialog.getByLabel(/지도 배경/).uncheck();
   await dialog.getByLabel(/빛 번짐/).uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!))).toMatchObject({
+    mapStyle: "space",
     space: false,
     glow: false,
   });
