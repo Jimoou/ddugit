@@ -78,6 +78,15 @@ export class Demo {
     return this.page.evaluate((id) => window.__ddugit.screenOf(id), id);
   }
 
+  /**
+   * HEAD is on `branch`, in the demo and on screen: menus read the screen's snapshot,
+   * which refreshes a little after the demo changes.
+   */
+  async onBranch(branch: string) {
+    await expect.poll(async () => (await this.snapshot()).head.branch).toBe(branch);
+    await expect(this.page.locator(".app:not([hidden]) .topbar .branch-now")).toContainText(branch);
+  }
+
   /** Pan (keeping the zoom) to a commit that is off screen, as selecting it with the keyboard would. */
   reveal(id: string) {
     return this.page.evaluate((id) => window.__ddugit.reveal(id), id);

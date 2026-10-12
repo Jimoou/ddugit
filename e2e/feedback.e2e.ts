@@ -24,7 +24,7 @@ test("a refused push always says why: git's words in the dialog, or a toast with
     .filter({ has: page.locator(".name").getByText("feature/login", { exact: true }) })
     .first()
     .dblclick();
-  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/login");
+  await demo.onBranch("feature/login");
   await demo.mutateQuietly(
     (d) => (d.rejectNextPush = " ! [remote rejected] main -> main (protected branch hook declined)"),
   );

@@ -29,6 +29,8 @@ export interface Settings extends ExternalApps {
   language: LanguagePref;
   /** The graph turned in quarter turns clockwise (0: time runs left → right). */
   rotation: Turn;
+  /** History as a list of rows (`graph/CommitList.tsx`) instead of the map. */
+  listView: boolean;
   /** Left sidebar folded to a thin rail. */
   sidebarCollapsed: boolean;
   /** Widths of the left sidebar and the right panel (inspector, composer), px; dragged by their edges. */
@@ -65,6 +67,7 @@ export function defaults(reducedMotion = false): Settings {
     theme: "dark",
     language: "system",
     rotation: 0,
+    listView: false,
     sidebarCollapsed: false,
     sidebarWidth: SIDEBAR_WIDTH.initial,
     panelWidth: PANEL_WIDTH.initial,
@@ -96,6 +99,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
   }
   if (!v || typeof v !== "object") return base;
   const o = v as Record<string, unknown>;
+  const legacyList = o.listView === undefined && o.rotation === 3;
   return {
     animate: typeof o.animate === "boolean" ? o.animate : base.animate,
     mapStyle: MAP_STYLES.find((x) => x === o.mapStyle) ?? base.mapStyle,
@@ -108,7 +112,9 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
     gitPath: typeof o.gitPath === "string" ? o.gitPath : base.gitPath,
     theme: THEMES.find((x) => x === o.theme) ?? base.theme,
     language: LANGUAGES.find((l) => l === o.language) ?? base.language,
-    rotation: ([0, 1, 2, 3] as const).find((r) => r === o.rotation) ?? base.rotation,
+    // The list button used to turn the map a quarter back (270°): that becomes the list.
+    rotation: legacyList ? 0 : (([0, 1, 2, 3] as const).find((r) => r === o.rotation) ?? base.rotation),
+    listView: typeof o.listView === "boolean" ? o.listView : legacyList,
     sidebarCollapsed: typeof o.sidebarCollapsed === "boolean" ? o.sidebarCollapsed : base.sidebarCollapsed,
     sidebarWidth:
       typeof o.sidebarWidth === "number" && Number.isFinite(o.sidebarWidth)

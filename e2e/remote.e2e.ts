@@ -129,7 +129,7 @@ test("lists open pull requests, checks one out, and connects or forgets a forge 
 
   await open.nth(0).click({ button: "right" });
   await page.click(".context-menu >> text=feature/theme 브랜치 체크아웃");
-  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
+  await demo.onBranch("feature/theme");
 
   // Without a login the section offers to connect; a pasted token is saved and can be forgotten.
   await demo.mutate((d) => (d.forgeToken = "none"));
