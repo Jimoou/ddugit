@@ -11,10 +11,22 @@ const localRow = (page: Page, name: string) =>
     .locator("li")
     .filter({ has: page.locator(".name").getByText(name, { exact: true }) });
 
-/** Pick `item` in local branch `name`'s menu. */
+/**
+ * Pick `item` in local branch `name`'s menu. The menu reads the screen's snapshot, which
+ * refreshes a little after the demo changes: open it again until the item is enabled.
+ */
 async function branchMenu(page: Page, name: string, item: string | RegExp) {
-  await localRow(page, name).click({ button: "right" });
-  await page.locator(".context-menu").getByRole("menuitem", { name: item }).click();
+  const menu = page.locator(".context-menu");
+  await expect(async () => {
+    if (await menu.count()) {
+      await page.keyboard.press("Escape");
+      await expect(menu).toHaveCount(0);
+    }
+    await localRow(page, name).click({ button: "right" });
+    const it = menu.getByRole("menuitem", { name: item });
+    await expect(it).toBeEnabled({ timeout: 2000 });
+    await it.click();
+  }).toPass({ timeout: 20_000 });
 }
 
 test("stops tracking a remote branch, then picks one again (the same name first)", async ({ demo }) => {
