@@ -124,6 +124,20 @@ export class Demo {
     return menu;
   }
 
+  /** Click a commit until the inspector shows it (a click can miss while the camera still moves). */
+  async selectCommit(id: string) {
+    const summary = (await this.snapshot()).commits.find((c) => c.id === id)!.summary;
+    const heading = this.page.locator(".inspector h2");
+    await expect(async () => {
+      if ((await heading.count()) && (await heading.textContent()) === summary) return;
+      await this.reveal(id);
+      const at = await this.screenOf(id);
+      if (!at) throw new Error(`commit ${id.slice(0, 7)} is not drawn`);
+      await this.page.mouse.click(at.x, at.y);
+      await expect(heading).toHaveText(summary, { timeout: 3000 });
+    }).toPass({ timeout: 30_000 });
+  }
+
   /** A toast with `text` is up (the newest one, when an earlier step left a similar one showing). */
   toast(text: string | RegExp) {
     return expect(this.page.locator(".toast").filter({ hasText: text }).last()).toBeVisible();

@@ -60,9 +60,7 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
 
   // Restore one of HEAD's files as it was before HEAD.
   const now = await demo.snapshot();
-  await demo.reveal(now.head.target!);
-  const tip = (await demo.screenOf(now.head.target!))!;
-  await page.mouse.click(tip.x, tip.y);
+  await demo.selectCommit(now.head.target!);
   const file = page.locator(".inspector .changed li:not(.dir)").first();
   await file.click({ button: "right" });
   await page.click(".context-menu >> text=이 커밋 이전 상태로");
