@@ -92,7 +92,18 @@ export function ResetDialog(p: {
 function action(message: string): string {
   const verb = message.split(":")[0].trim().split(" ")[0];
   const key = `undo.log.${verb}` as Key;
-  const known: string[] = ["commit", "reset", "checkout", "merge", "rebase", "cherry-pick", "revert", "pull"];
+  const known: string[] = [
+    "commit",
+    "reset",
+    "checkout",
+    "merge",
+    "rebase",
+    "cherry-pick",
+    "revert",
+    "pull",
+    "clone",
+    "branch",
+  ];
   return known.includes(verb) ? t(key) : message;
 }
 
@@ -143,7 +154,9 @@ export function ReflogSheet(p: {
           {list.map((e, i) => (
             <li key={`${i}-${e.id}`} className={`${e.lost ? "lost" : ""} ${e.id === p.head && i === 0 ? "here" : ""}`}>
               <span className="when muted">{fmtTime(e.time, false)}</span>
-              <span className="what">{action(e.message)}</span>
+              <span className="what" title={e.message}>
+                {action(e.message)}
+              </span>
               <code className="link" onClick={() => p.onSelect(e.id)} title={t("bp.showInGraph")}>
                 {e.id.slice(0, 7)}
               </code>

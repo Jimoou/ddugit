@@ -1092,6 +1092,8 @@ export const en: Record<Key, string> = {
   "undo.log.cherry-pick": "Cherry-pick",
   "undo.log.revert": "Revert",
   "undo.log.pull": "Pull",
+  "undo.log.clone": "Clone",
+  "undo.log.branch": "Branch",
 
   // undo: move
   "undo.moveTo": "Moves <b>{branch}</b> to <b>“{summary}”</b>.",

@@ -1073,6 +1073,8 @@ export const ko = {
   "undo.log.cherry-pick": "cherry-pick",
   "undo.log.revert": "revert",
   "undo.log.pull": "pull",
+  "undo.log.clone": "clone",
+  "undo.log.branch": "브랜치",
 
   // undo: move
   "undo.moveTo": "<b>{branch}</b>{:을} <b>“{summary}”</b>{:으로} 옮겨요.",

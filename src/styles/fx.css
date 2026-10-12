@@ -43,6 +43,8 @@
 }
 .reflog-list .what {
   width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text-2);
 }
 .reflog-list li.lost {
