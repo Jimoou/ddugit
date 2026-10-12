@@ -32,16 +32,12 @@ interface Props {
   /** Refs hidden from the branch map, as `kind:name`. */
   hidden: string[];
   onToggleHidden(r: RefInfo): void;
-  /** How many refs are off the map now, and bring them all back. */
-  hiddenCount: number;
-  onShowAll(): void;
   /** Click on a branch's dot: choose its colour. */
   onRefColor(r: RefInfo, x: number, y: number): void;
   /** Picked refs, as `kind:name`. */
   focused: string[];
   /** Click on a ref: adds it to the picked set, or takes it out if already picked. */
   onFocus(ref: RefInfo): void;
-  onClearFocus(): void;
   onCheckout(ref: RefInfo): void;
   onRefMenu(ref: RefInfo, x: number, y: number): void;
   stashes: StashInfo[];
@@ -307,20 +303,6 @@ export function Sidebar(props: Props) {
             />
             <button className="icon fold-side" onClick={fold} title={t("side.fold")} aria-label={t("side.fold")}>
               <Icon name="sidebar" />
-            </button>
-          </div>
-        )}
-        {props.hiddenCount > 0 && !collapsed && (
-          <div className="side-picked">
-            <button className="ghost" onClick={props.onShowAll}>
-              <Icon name="eyeOff" size={12} /> {t("branch.hidden", { n: props.hiddenCount })}
-            </button>
-          </div>
-        )}
-        {focused.length > 1 && !collapsed && (
-          <div className="side-picked">
-            <button className="ghost" onClick={props.onClearFocus}>
-              {t("side.unpick")}
             </button>
           </div>
         )}

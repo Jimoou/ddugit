@@ -880,8 +880,8 @@ const CAPTION_MAX = 240;
 const CAPTION_BRIEF = 150;
 const CAPTION_FULL = 380;
 
-const PILL_PAD = 6;
-const PART_GAP = 5;
+const PILL_PAD = 9;
+const PART_GAP = 6;
 const CHIP_FONT = `700 10px ${MONO}`;
 const PR_FONT = `600 11px ${SANS}`;
 
@@ -947,7 +947,7 @@ function drawCaption(
     const cw = textWidth(ctx, label) + 8;
     if (cx + cw <= right) {
       const c = sub.breaking ? ink.chip.fix : ink.chip[sub.chip.tone];
-      roundRect(ctx, cx, y + 3, cw, h - 6, 3);
+      roundRect(ctx, cx, y + 4, cw, h - 8, 3);
       ctx.fillStyle = alpha(c, 0.2);
       ctx.fill();
       ctx.fillStyle = c;
@@ -987,7 +987,7 @@ function drawCaption(
  * Commit summaries as map labels (see `captions.ts`): straight, under or over
  * each star, placed by importance (the commit in hand, HEAD, labelled
  * commits, merges, then newest first) so they never cover a star, a badge or
- * each other. A label set further out hangs from a thin leader line. Zoomed
+ * each other. Each hangs a little away from its star on a thin leader line. Zoomed
  * out they are briefer and smaller, and only those with room are shown.
  */
 function drawMapCaptions(
@@ -1027,14 +1027,12 @@ function drawMapCaptions(
   const byQueue = new Map(list.map((L) => [L.id, L]));
   for (const c of placeCaptions(items, [...stars, ...obstacles], r)) {
     const L = byQueue.get(c.id)!;
-    if (c.level) {
-      ctx.strokeStyle = alpha(L.color, L.d ? 0.15 : 0.4);
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(L.x, c.above ? L.y - r - 3 : L.y + r + 3);
-      ctx.lineTo(L.x, c.above ? c.y + CAPTION_H : c.y);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = alpha(L.color, L.d ? 0.15 : 0.45);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(L.x, c.above ? L.y - r - 3 : L.y + r + 3);
+    ctx.lineTo(L.x, c.above ? c.y + CAPTION_H : c.y);
+    ctx.stroke();
     const on = inHand(c.id);
     drawCaption(ctx, s.ink, s.summaries.get(c.id)!, c, fontOf(c.id), L.color, on, L.d, brief && !on);
   }

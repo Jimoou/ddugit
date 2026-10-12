@@ -113,13 +113,11 @@ test("a picked branch that is deleted stops counting", async ({ demo }) => {
       .first();
   await branch("hotfix/crash").click();
   await branch("feature/theme").click();
-  await expect(side.getByRole("button", { name: "선택 해제" })).toBeVisible();
+  await expect(side.locator("li.focused")).toHaveCount(2);
   await branch("hotfix/crash").click({ button: "right" });
   await page.locator(".context-menu").getByText("브랜치 삭제…").click();
   await page.getByRole("dialog", { name: "브랜치 삭제" }).getByRole("button", { name: "삭제" }).click();
   await expect(branch("hotfix/crash")).toHaveCount(0);
-  // One left: the clear-all button is for two or more.
-  await expect(side.getByRole("button", { name: "선택 해제" })).toHaveCount(0);
   await expect(side.locator("li.focused")).toHaveCount(1);
 });
 

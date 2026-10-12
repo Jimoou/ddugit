@@ -1,5 +1,5 @@
 // Commit summaries as map labels: written straight (left to right), each
-// hanging just under or over its star. Like place names on a map they are
+// hanging a little under or over its star on a thin leader line. Like place names on a map they are
 // placed greedily by importance and a label that would cover a star, a badge
 // or another label tries the next slot (a step further from the lane, or
 // shorter) and is left out when none is free; zooming in frees more room, so
@@ -30,16 +30,20 @@ interface CaptionItem {
 
 interface PlacedCaption extends Box {
   id: string;
-  /** Steps away from the star (0 = right under or over it): > 0 gets a leader line. */
+  /** Steps away from the star (0 = the nearest slot under or over it). */
   level: number;
   /** Hangs above the star. */
   above: boolean;
 }
 
 /** Caption height (a pill with its text centred), px. */
-export const CAPTION_H = 18;
-/** A label starts this far left of its star's centre, so it reads as starting at the star. */
-const LEAD = 6;
+export const CAPTION_H = 21;
+/** Room between a star and its label: the leader line, px. */
+export const CAPTION_DROP = 10;
+/** Room between two labels stacked under one star, px. */
+const STACK_GAP = 4;
+/** A label starts this far left of its star's centre, so its leader line lands just inside it. */
+const LEAD = 8;
 /** A long label tries this much of itself before stepping further out. */
 const SHORT_W = 120;
 
@@ -83,8 +87,9 @@ export function placeCaptions(items: CaptionItem[], obstacles: Box[], r: number)
   for (const b of obstacles) taken.add(b);
   const out: PlacedCaption[] = [];
   for (const it of items) {
-    const below = (level: number) => it.y + r + 5 + level * CAPTION_H;
-    const above = (level: number) => it.y - r - 5 - (level + 1) * CAPTION_H;
+    const step = CAPTION_H + STACK_GAP;
+    const below = (level: number) => it.y + r + CAPTION_DROP + level * step;
+    const above = (level: number) => it.y - r - CAPTION_DROP - CAPTION_H - level * step;
     const slots: { y: number; level: number; above: boolean }[] = [
       { y: below(0), level: 0, above: false },
       ...(it.up ? [{ y: above(0), level: 0, above: true }] : []),
@@ -97,11 +102,11 @@ export function placeCaptions(items: CaptionItem[], obstacles: Box[], r: number)
     for (const slot of slots) {
       for (const w of widths) {
         const box = { x: it.x - LEAD, y: slot.y, w, h: CAPTION_H };
-        // A label further out gets a leader line from the star: keep that clear too.
+        // Every label hangs from a leader line from its star: keep that clear too.
         const top = slot.above ? slot.y + CAPTION_H : it.y + r + 3;
         const bottom = slot.above ? it.y - r - 3 : slot.y;
-        const stem = slot.level ? { x: it.x - 1, y: top, w: 2, h: bottom - top } : null;
-        if (taken.hits(box) || (stem !== null && taken.hits(stem))) continue;
+        const stem = { x: it.x - 1, y: top, w: 2, h: bottom - top };
+        if (taken.hits(box) || taken.hits(stem)) continue;
         placed = { id: it.id, ...box, level: slot.level, above: slot.above };
         break;
       }

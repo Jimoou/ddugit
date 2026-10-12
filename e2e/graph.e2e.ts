@@ -111,7 +111,6 @@ test("several branches can be picked in the sidebar, lighting their histories to
   await branch("hotfix/crash").click();
   await branch("feature/theme").click();
   await expect(side.locator("li.focused")).toHaveCount(3);
-  await expect(side.getByRole("button", { name: "선택 해제" })).toBeVisible();
   await branch("hotfix/crash").click();
   await expect(side.locator("li.focused")).toHaveCount(2);
   await expect(branch("feature/login")).toHaveClass(/focused/);
@@ -120,7 +119,12 @@ test("several branches can be picked in the sidebar, lighting their histories to
   await expect(side.locator("li.focused")).toHaveCount(0);
   await branch("main").click();
   await branch("feature/login").click();
-  await side.getByRole("button", { name: "선택 해제" }).click();
+  // Esc on the map lets go of them all.
+  await page
+    .locator(".app:not([hidden]) canvas")
+    .first()
+    .click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Escape");
   await expect(side.locator("li.focused")).toHaveCount(0);
 });
 
