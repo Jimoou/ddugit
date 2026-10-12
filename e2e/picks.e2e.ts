@@ -51,6 +51,7 @@ test("picks several commits with Ctrl-click and cherry-picks them oldest first",
   // Newest first on purpose: the order of picking doesn't matter.
   await page.keyboard.down("Control");
   for (const id of [b, a]) {
+    await demo.reveal(id);
     const at = (await demo.screenOf(id))!;
     await page.mouse.click(at.x, at.y);
   }

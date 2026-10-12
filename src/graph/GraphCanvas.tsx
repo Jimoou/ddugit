@@ -329,6 +329,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         return { x: p.x + r.left, y: p.y + r.top };
       },
       centerOn: (id: string, zoom?: number) => api.centerOn(id, zoom),
+      reveal,
     };
   });
 

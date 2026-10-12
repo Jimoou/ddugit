@@ -10,6 +10,8 @@ declare global {
       /** Where a stash's diamond is drawn, by its index. */
       stashScreenOf(index: number): { x: number; y: number } | null;
       centerOn(id: string, zoom?: number): void;
+      /** Pan (keeping the zoom) when the commit is off screen. */
+      reveal(id: string): void;
     };
     /** The demo's switches (src/mock/controls.ts). */
     __ddugitDemo: DemoControls;
@@ -76,6 +78,11 @@ export class Demo {
     return this.page.evaluate((id) => window.__ddugit.screenOf(id), id);
   }
 
+  /** Pan (keeping the zoom) to a commit that is off screen, as selecting it with the keyboard would. */
+  reveal(id: string) {
+    return this.page.evaluate((id) => window.__ddugit.reveal(id), id);
+  }
+
   /** Screen position of a commit once the camera has stopped moving (it eases after loads). */
   async screenOf(id: string) {
     // Still for four samples in a row: one equal pair can land before a
@@ -108,12 +115,27 @@ export class Demo {
         await this.page.keyboard.press("Escape");
         await expect(menu).toHaveCount(0, { timeout: 3000 });
       }
+      await this.reveal(id);
       const at = await this.screenOf(id);
       if (!at) throw new Error(`commit ${id.slice(0, 7)} is not drawn`);
       await this.page.mouse.click(at.x, at.y, { button: "right" });
       await expect(title).toHaveText(summary, { timeout: 4000 });
     }).toPass({ timeout: 30_000 });
     return menu;
+  }
+
+  /** Click a commit until the inspector shows it (a click can miss while the camera still moves). */
+  async selectCommit(id: string) {
+    const summary = (await this.snapshot()).commits.find((c) => c.id === id)!.summary;
+    const heading = this.page.locator(".inspector h2");
+    await expect(async () => {
+      if ((await heading.count()) && (await heading.textContent()) === summary) return;
+      await this.reveal(id);
+      const at = await this.screenOf(id);
+      if (!at) throw new Error(`commit ${id.slice(0, 7)} is not drawn`);
+      await this.page.mouse.click(at.x, at.y);
+      await expect(heading).toHaveText(summary, { timeout: 3000 });
+    }).toPass({ timeout: 30_000 });
   }
 
   /** A toast with `text` is up (the newest one, when an earlier step left a similar one showing). */
