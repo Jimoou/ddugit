@@ -8,7 +8,7 @@ test("switches branch from the top bar and re-reads the repository with Cmd/Ctrl
   const menu = page.locator(".context-menu");
   await expect(menu).toContainText("브랜치 바꾸기");
   await menu.getByRole("menuitem", { name: "feature/theme" }).click();
-  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("feature/theme");
+  await demo.onBranch("feature/theme");
   await expect(page.locator(".topbar .branch-now")).toContainText("feature/theme");
 
   // A commit made outside the app shows up on Cmd/Ctrl+R.
@@ -353,7 +353,7 @@ test("checks out a tag and a commit without a branch, then goes back to a branch
 
   await branchNow.click();
   await page.locator(".context-menu").getByRole("menuitem", { name: "main" }).click();
-  await expect.poll(async () => (await demo.snapshot()).head.branch).toBe("main");
+  await demo.onBranch("main");
   await expect(branchNow).toContainText("main");
 });
 
