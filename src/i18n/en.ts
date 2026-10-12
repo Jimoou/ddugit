@@ -136,7 +136,7 @@ export const en: Record<Key, string> = {
   "settings.language.system": "Follow system",
   "settings.sparkle": "Sparkle effects",
   "settings.space": "Map backdrop (star chart / space)",
-  "settings.mapStyle": "Branch map",
+  "settings.mapStyle": "Map style",
   "settings.mapStyle.gauge": "Gauge",
   "settings.mapStyle.metro": "Route map",
   "settings.mapStyle.space": "Space",

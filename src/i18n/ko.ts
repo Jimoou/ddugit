@@ -133,7 +133,7 @@ export const ko = {
   "settings.language.system": "시스템 설정 따르기",
   "settings.sparkle": "반짝임 효과",
   "settings.space": "지도 배경 (성도·우주)",
-  "settings.mapStyle": "브랜치맵",
+  "settings.mapStyle": "브랜치맵 모양",
   "settings.mapStyle.gauge": "계기판",
   "settings.mapStyle.metro": "노선도",
   "settings.mapStyle.space": "우주",

@@ -20,8 +20,8 @@
   --shade: rgba(0, 0, 0, 0.45);
   --shadow: 0 12px 32px var(--shade);
   /* Over the branch map: the overview strip and the help line's veil. */
-  --map-strip: rgba(8, 7, 22, 0.88);
-  --map-veil: rgba(5, 4, 14, 0.6);
+  --map-strip: rgba(14, 16, 18, 0.9);
+  --map-veil: rgba(14, 16, 18, 0.6);
   --hover: rgba(255, 255, 255, 0.05);
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.15);
