@@ -2,7 +2,7 @@ import type { Layout, LayoutEdge } from "./layout";
 
 /** World-space spacing at zoom 1. Time runs left → right (oldest on the left). */
 export const COL = 84;
-export const LANE = 46;
+export const LANE = 62;
 
 /** Conflict / pending-operation colour (matches the CSS `--red` token). */
 export const ALERT = "#ff4d6d";
