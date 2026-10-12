@@ -23,6 +23,7 @@ describe("parseSettings", () => {
       theme: "dark",
       language: "system",
       rotation: 0,
+      listView: false,
       sidebarCollapsed: false,
       sidebarWidth: 220,
       panelWidth: 340,
@@ -49,7 +50,13 @@ describe("parseSettings", () => {
       "stash",
     ]);
     expect(parseSettings(JSON.stringify({ closedSections: [1] }), base).closedSections).toEqual([]);
-    expect(parseSettings(JSON.stringify({ rotation: 3 }), base).rotation).toBe(3);
+    // The old list button set 270°: that is the list now, on an unturned map.
+    expect(parseSettings(JSON.stringify({ rotation: 3 }), base)).toMatchObject({ rotation: 0, listView: true });
+    expect(parseSettings(JSON.stringify({ rotation: 3, listView: false }), base)).toMatchObject({
+      rotation: 3,
+      listView: false,
+    });
+    expect(parseSettings(JSON.stringify({ rotation: 1 }), base)).toMatchObject({ rotation: 1, listView: false });
     expect(parseSettings(JSON.stringify({ space: false, glow: "no" }), base)).toMatchObject({
       space: false,
       glow: true,

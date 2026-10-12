@@ -71,6 +71,192 @@
   right: 14px;
 }
 
+/* ------------------------------------------------------------------- list view */
+/* The history as rows: a graph column (one canvas, see CommitList.tsx), labels and summary, author, date, id. */
+.commit-list {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+  font-size: 12.5px;
+  outline: none;
+}
+.cl-head,
+.cl-row {
+  display: grid;
+  align-items: center;
+  column-gap: 16px;
+  padding-right: 14px;
+}
+.cl-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 28px;
+  font: 600 11px var(--sans);
+  color: var(--muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+/* Sticks under the header and takes no room: the rows scroll beneath it. */
+.cl-canvas {
+  position: sticky;
+  top: 28px;
+  z-index: 1;
+  height: 0;
+  pointer-events: none;
+}
+.cl-canvas canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+/* Room under the last row so the controls don't sit on it. */
+.cl-body {
+  position: relative;
+  margin-bottom: 64px;
+}
+.cl-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  cursor: default;
+}
+.cl-row:hover {
+  background: var(--hover);
+}
+.cl-row.picked {
+  background: color-mix(in srgb, var(--focus) 10%, transparent);
+}
+.cl-row.on {
+  background: color-mix(in srgb, var(--focus) 18%, transparent);
+}
+.cl-row.dim {
+  opacity: 0.4;
+}
+.cl-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cl-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.cl-row.head .cl-summary {
+  font-weight: 600;
+}
+.cl-row.wip {
+  cursor: pointer;
+}
+.cl-row.wip .cl-summary {
+  color: var(--text-2);
+  font-style: italic;
+}
+.cl-author {
+  width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.cl-date {
+  width: 132px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cl-sha {
+  width: 58px;
+  font: 11.5px var(--mono);
+  color: var(--muted);
+}
+.cl-head .cl-sha {
+  font: inherit;
+}
+/* Branch, tag and pull request labels in the lane's colour; the checked-out branch filled. */
+.cl-ref {
+  flex-shrink: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+  height: 18px;
+  padding: 0 6px;
+  font: 600 11px/16px var(--sans);
+  color: var(--ref);
+  border: 1px solid color-mix(in srgb, var(--ref) 60%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ref) 12%, transparent);
+}
+.cl-ref.current {
+  color: var(--bg);
+  background: var(--ref);
+}
+.cl-ref.remote {
+  background: none;
+  border-style: dashed;
+}
+.cl-more {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.cl-badge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  font: 600 10.5px/16px var(--sans);
+  border-radius: 4px;
+  border: 1px solid currentColor;
+}
+.cl-badge.good {
+  color: var(--ok);
+}
+.cl-badge.bad,
+.cl-badge.culprit {
+  color: var(--danger);
+}
+.cl-badge.probe {
+  color: var(--amber);
+}
+.cl-more-rows {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--text-2);
+}
+.cl-more-rows:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+/* A narrow stage keeps the message: the author goes first, then the date. */
+@container stage (max-width: 720px) {
+  .commit-list .cl-author {
+    display: none;
+  }
+}
+@container stage (max-width: 560px) {
+  .commit-list .cl-date {
+    display: none;
+  }
+}
+/* No overview strip under a list: the controls sit at the edge. */
+.hud.list-mode,
+.hud.list-mode ~ .hint {
+  bottom: 14px;
+}
+
 .hud {
   position: absolute;
   right: 14px;

@@ -99,25 +99,44 @@ test("a long commit message pushes the inspector down instead of running over it
   expect(byline.y).toBeGreaterThanOrEqual(m.y + m.height);
 });
 
-test("the list button turns the map into one row per commit and back", async ({ demo }) => {
+test("the list button shows the history as rows, and the rows act like the map's commits", async ({ demo }) => {
   const { page } = demo;
   const list = page.getByRole("button", { name: "목록 보기" });
-  const graph = page.locator(".app:not([hidden]) .graph");
+  const rows = page.locator(".app:not([hidden]) .commit-list .cl-row:not(.wip)");
   await expect(list).toHaveAttribute("aria-pressed", "false");
   await list.click();
   await expect(list).toHaveAttribute("aria-pressed", "true");
-  await expect(graph).toHaveClass(/upright/);
-  // The newest commit on top: HEAD sits above its parent.
-  await expect(page.locator(".hud .turn .deg").first()).toHaveText("270°");
+  await expect(page.locator(".app:not([hidden]) .graph")).toHaveCount(0);
+
+  // Newest on top: HEAD first, its parent further down, each with author and id.
   const snap = await demo.snapshot();
   const head = snap.commits.find((c) => c.id === snap.head.target)!;
-  const h = (await demo.screenOf(head.id))!;
-  const p = (await demo.screenOf(head.parents[0]))!;
-  expect(p.y).toBeGreaterThan(h.y + 20);
-  // Kept across a reload, like the rotation it sets.
+  const parent = snap.commits.find((c) => c.id === head.parents[0])!;
+  await expect(rows.first()).toHaveAttribute("data-id", head.id);
+  const parentRow = page.locator(`.cl-row[data-id="${parent.id}"]`);
+  const ids = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
+  expect(ids.indexOf(parent.id)).toBeGreaterThan(0);
+  await expect(rows.first().locator(".cl-sha")).toHaveText(head.id.slice(0, 7));
+  await expect(rows.first().locator(".cl-author")).toHaveText(head.author);
+  await expect(rows.first().locator(".cl-ref.current")).toHaveText(snap.head.branch!);
+  // Uncommitted changes sit above HEAD and open the composer.
+  await expect(page.locator(".cl-row.wip")).toContainText(`${snap.changes.length}개`);
+
+  // A click shows the commit; ↓ steps to the row below; a right-click opens its menu.
+  await parentRow.click();
+  await expect(page.locator(".inspector h2")).toHaveText(parent.summary);
+  await rows.first().click();
+  await expect(rows.first()).toHaveClass(/\bon\b/);
+  await page.keyboard.press("ArrowDown");
+  await expect(rows.nth(1)).toHaveClass(/\bon\b/);
+  await (await demo.commitMenu(parent.id)).getByText("메시지 고치기…").waitFor();
+  await page.keyboard.press("Escape");
+
+  // Kept across a reload; the map comes back as it was.
   await page.reload();
   await expect(page.getByRole("button", { name: "목록 보기" })).toHaveAttribute("aria-pressed", "true");
+  await expect(rows.first()).toBeVisible();
   await page.getByRole("button", { name: "목록 보기" }).click();
-  await expect(graph).not.toHaveClass(/upright/);
+  await expect(page.locator(".app:not([hidden]) .graph")).toHaveCount(1);
   await expect(page.locator(".hud .turn .deg").first()).toHaveText("0°");
 });

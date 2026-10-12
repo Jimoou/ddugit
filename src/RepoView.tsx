@@ -20,6 +20,7 @@ import { joinPath } from "./recent";
 import { StashPanel } from "./components/StashPanel";
 import { TopBar } from "./components/TopBar";
 import { GraphCanvas, type GraphHandle } from "./graph/GraphCanvas";
+import { CommitList } from "./graph/CommitList";
 import {
   ancestors,
   ancestorsOf,
@@ -43,7 +44,7 @@ import { PANEL_WIDTH, type Settings, SIDEBAR_WIDTH } from "./settings";
 import { t } from "./i18n";
 import { openLink } from "./share";
 import { Rich } from "./i18n/Rich";
-import { type Drag, type Turn, upright } from "./graph/renderer";
+import { type Drag, type Turn } from "./graph/renderer";
 import type { Pt } from "./graph/scene";
 import { StackSection } from "./components/Stacks";
 import { proOpen, usePro } from "./pro";
@@ -157,9 +158,9 @@ export function RepoView({
   const [zoom, setZoom] = useState(1);
   const animate = settings.animate;
   const rotate = () => onChangeSettings({ rotation: ((settings.rotation + 1) % 4) as Turn });
-  /** List view: one row per commit with its whole summary, the newest on top (a quarter turn back). */
-  const listView = upright(settings.rotation);
-  const toggleList = () => onChangeSettings({ rotation: listView ? 0 : 3 });
+  /** List view: the history as rows (`CommitList`) instead of the map. */
+  const listView = settings.listView;
+  const toggleList = () => onChangeSettings({ listView: !listView });
   const toggleLock = () => onChangeSettings({ mapLocked: !settings.mapLocked });
   const toggleMinimap = () => onChangeSettings({ minimap: !settings.minimap });
   // First-run tutorial, played on the demo repository only.
@@ -681,70 +682,105 @@ export function RepoView({
                 onOpenRepo={onRepoMenu}
               />
             )}
-            <GraphCanvas
-              ref={graph}
-              layout={layout}
-              refs={graphRefs}
-              summaries={summaries}
-              headId={snap.head.target}
-              headBranch={snap.head.branch}
-              changeCount={snap.changes.length}
-              selected={selected}
-              picked={pickedSet}
-              onPick={onPick}
-              focus={trailFocus ?? bisect.focus ?? focus}
-              badges={bisect.badges}
-              trail={trailIds}
-              animate={animate}
-              space={settings.space}
-              glow={settings.glow}
-              theme={theme}
-              mapStyle={settings.mapStyle}
-              lanes={lanes}
-              onSelect={(id) => {
-                setPicked([]);
-                if (id || !composer) show({ commit: id });
-              }}
-              onClear={() => setFocusRefs([])}
-              onPlus={() => show({ composer: true })}
-              stashes={snap.stashes}
-              selectedStash={selectedStash}
-              onStash={(i) => show({ stash: i })}
-              canDropOn={canDropOn}
-              onDrop={(sourceId, targetId, mode) => {
-                if (mode === "move") {
-                  const plan = planMove(commitById, snap.head.target!, sourceId, targetId);
-                  if (plan) setSheet({ kind: "rebase", from: plan.base, init: plan.steps });
-                  return;
-                }
-                if (mode === "rebase") return askRebaseOnto(repo, sourceName(targetId, snap.head.branch!), targetId);
-                const target = branchAt(targetId)!;
-                if (mode === "merge")
-                  return setDialog({ kind: "merge", sourceId, targetId, target, source: sourceName(sourceId, target) });
-                confirmPick(repo, sourceId, target);
-              }}
-              incoming={snap.incoming}
-              truncated={snap.truncated}
-              onLoadMore={loadMore}
-              onNodeMenu={(id, x, y) => openMenu(repo, x, y, commitById.get(id)?.summary, nodeMenu(repo, id))}
-              onRefMenu={(r, x, y) => openMenu(repo, x, y, r.name, refMenu(repo, r))}
-              onZoomChange={setZoom}
-              rotation={settings.rotation}
-              onRotate={rotate}
-              minimap={settings.minimap}
-              locked={settings.mapLocked}
-              onToggleLock={toggleLock}
-              onToggleMinimap={toggleMinimap}
-              onHover={(id) => {
-                clearTimeout(peekTimer.current);
-                setPeek(null);
-                if (!id) return;
-                peekTimer.current = setTimeout(() => {
-                  const at = graph.current?.screenOf(id);
-                  if (at) setPeek({ id, at, width: stageGraph.current?.clientWidth ?? 0 });
-                }, PEEK_DELAY_MS);
-              }}
-            />
+            {listView ? (
+              <CommitList
+                ref={graph}
+                layout={layout}
+                commits={commitById}
+                refs={graphRefs}
+                refColor={refColor}
+                lanes={lanes}
+                headId={snap.head.target}
+                headBranch={snap.head.branch}
+                changeCount={snap.changes.length}
+                selected={selected}
+                picked={pickedSet}
+                onPick={onPick}
+                focus={trailFocus ?? bisect.focus ?? focus}
+                badges={bisect.badges}
+                truncated={snap.truncated}
+                onLoadMore={loadMore}
+                onSelect={(id) => {
+                  setPicked([]);
+                  if (id || !composer) show({ commit: id });
+                }}
+                onClear={() => setFocusRefs([])}
+                onPlus={() => show({ composer: true })}
+                onNodeMenu={(id, x, y) => openMenu(repo, x, y, commitById.get(id)?.summary, nodeMenu(repo, id))}
+                onRefMenu={(r, x, y) => openMenu(repo, x, y, r.name, refMenu(repo, r))}
+              />
+            ) : (
+              <GraphCanvas
+                ref={graph}
+                layout={layout}
+                refs={graphRefs}
+                summaries={summaries}
+                headId={snap.head.target}
+                headBranch={snap.head.branch}
+                changeCount={snap.changes.length}
+                selected={selected}
+                picked={pickedSet}
+                onPick={onPick}
+                focus={trailFocus ?? bisect.focus ?? focus}
+                badges={bisect.badges}
+                trail={trailIds}
+                animate={animate}
+                space={settings.space}
+                glow={settings.glow}
+                theme={theme}
+                mapStyle={settings.mapStyle}
+                lanes={lanes}
+                onSelect={(id) => {
+                  setPicked([]);
+                  if (id || !composer) show({ commit: id });
+                }}
+                onClear={() => setFocusRefs([])}
+                onPlus={() => show({ composer: true })}
+                stashes={snap.stashes}
+                selectedStash={selectedStash}
+                onStash={(i) => show({ stash: i })}
+                canDropOn={canDropOn}
+                onDrop={(sourceId, targetId, mode) => {
+                  if (mode === "move") {
+                    const plan = planMove(commitById, snap.head.target!, sourceId, targetId);
+                    if (plan) setSheet({ kind: "rebase", from: plan.base, init: plan.steps });
+                    return;
+                  }
+                  if (mode === "rebase") return askRebaseOnto(repo, sourceName(targetId, snap.head.branch!), targetId);
+                  const target = branchAt(targetId)!;
+                  if (mode === "merge")
+                    return setDialog({
+                      kind: "merge",
+                      sourceId,
+                      targetId,
+                      target,
+                      source: sourceName(sourceId, target),
+                    });
+                  confirmPick(repo, sourceId, target);
+                }}
+                incoming={snap.incoming}
+                truncated={snap.truncated}
+                onLoadMore={loadMore}
+                onNodeMenu={(id, x, y) => openMenu(repo, x, y, commitById.get(id)?.summary, nodeMenu(repo, id))}
+                onRefMenu={(r, x, y) => openMenu(repo, x, y, r.name, refMenu(repo, r))}
+                onZoomChange={setZoom}
+                rotation={settings.rotation}
+                onRotate={rotate}
+                minimap={settings.minimap}
+                locked={settings.mapLocked}
+                onToggleLock={toggleLock}
+                onToggleMinimap={toggleMinimap}
+                onHover={(id) => {
+                  clearTimeout(peekTimer.current);
+                  setPeek(null);
+                  if (!id) return;
+                  peekTimer.current = setTimeout(() => {
+                    const at = graph.current?.screenOf(id);
+                    if (at) setPeek({ id, at, width: stageGraph.current?.clientWidth ?? 0 });
+                  }, PEEK_DELAY_MS);
+                }}
+              />
+            )}
 
             {snap.commits.length === 0 && (
               <div className="empty-hint">
@@ -752,29 +788,43 @@ export function RepoView({
               </div>
             )}
 
-            <div className="hud">
-              <button onClick={() => graph.current?.zoomBy(0.8)} title={t("hud.zoomOut")} aria-label={t("hud.zoomOut")}>
-                <Icon name="minus" />
-              </button>
-              <span className="zoom">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => graph.current?.zoomBy(1.25)} title={t("hud.zoomIn")} aria-label={t("hud.zoomIn")}>
-                <Icon name="plus" />
-              </button>
-              <button onClick={() => graph.current?.fit()} title={t("hud.fit")} aria-label={t("hud.fit")}>
-                <Icon name="fit" />
-              </button>
+            <div className={`hud ${listView ? "list-mode" : ""}`}>
+              {!listView && (
+                <>
+                  <button
+                    onClick={() => graph.current?.zoomBy(0.8)}
+                    title={t("hud.zoomOut")}
+                    aria-label={t("hud.zoomOut")}
+                  >
+                    <Icon name="minus" />
+                  </button>
+                  <span className="zoom">{Math.round(zoom * 100)}%</span>
+                  <button
+                    onClick={() => graph.current?.zoomBy(1.25)}
+                    title={t("hud.zoomIn")}
+                    aria-label={t("hud.zoomIn")}
+                  >
+                    <Icon name="plus" />
+                  </button>
+                  <button onClick={() => graph.current?.fit()} title={t("hud.fit")} aria-label={t("hud.fit")}>
+                    <Icon name="fit" />
+                  </button>
+                </>
+              )}
               <button onClick={() => graph.current?.centerOnHead()} title={t("hud.head")} aria-label={t("hud.head")}>
                 <Icon name="head" />
               </button>
-              <button
-                className="turn"
-                onClick={rotate}
-                title={t("hud.rotate", { deg: settings.rotation * 90 })}
-                aria-label={t("hud.rotate", { deg: settings.rotation * 90 })}
-              >
-                <Icon name="rotate" />
-                <span className="deg">{settings.rotation * 90}°</span>
-              </button>
+              {!listView && (
+                <button
+                  className="turn"
+                  onClick={rotate}
+                  title={t("hud.rotate", { deg: settings.rotation * 90 })}
+                  aria-label={t("hud.rotate", { deg: settings.rotation * 90 })}
+                >
+                  <Icon name="rotate" />
+                  <span className="deg">{settings.rotation * 90}°</span>
+                </button>
+              )}
               <button
                 className={`list ${listView ? "on" : ""}`}
                 onClick={toggleList}
@@ -785,28 +835,32 @@ export function RepoView({
                 <Icon name="list" />
                 <span className="deg">{t("hud.list")}</span>
               </button>
-              <span className="hud-sep" aria-hidden />
-              <button
-                className={settings.minimap ? "on" : ""}
-                onClick={toggleMinimap}
-                aria-pressed={settings.minimap}
-                title={t(settings.minimap ? "hud.minimap.hide" : "hud.minimap.show")}
-                aria-label={t("hud.minimap")}
-              >
-                <Icon name="map" />
-              </button>
-              <button
-                className={settings.mapLocked ? "on lock" : ""}
-                onClick={toggleLock}
-                aria-pressed={settings.mapLocked}
-                title={t(settings.mapLocked ? "hud.unlock" : "hud.lock")}
-                aria-label={t("hud.lockLabel")}
-              >
-                <Icon name={settings.mapLocked ? "lock" : "unlock"} />
-              </button>
+              {!listView && (
+                <>
+                  <span className="hud-sep" aria-hidden />
+                  <button
+                    className={settings.minimap ? "on" : ""}
+                    onClick={toggleMinimap}
+                    aria-pressed={settings.minimap}
+                    title={t(settings.minimap ? "hud.minimap.hide" : "hud.minimap.show")}
+                    aria-label={t("hud.minimap")}
+                  >
+                    <Icon name="map" />
+                  </button>
+                  <button
+                    className={settings.mapLocked ? "on lock" : ""}
+                    onClick={toggleLock}
+                    aria-pressed={settings.mapLocked}
+                    title={t(settings.mapLocked ? "hud.unlock" : "hud.lock")}
+                    aria-label={t("hud.lockLabel")}
+                  >
+                    <Icon name={settings.mapLocked ? "lock" : "unlock"} />
+                  </button>
+                </>
+              )}
             </div>
             <div className="hint">
-              {t(settings.mapLocked ? "graph.hint.locked" : "graph.hint")}
+              {t(listView ? "graph.hint.list" : settings.mapLocked ? "graph.hint.locked" : "graph.hint")}
               {snap.truncated && t("graph.hint.truncated", { n: snap.commits.length })}
             </div>
           </div>
