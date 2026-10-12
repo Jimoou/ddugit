@@ -965,12 +965,19 @@ const chipText = (sub: Subject) => (sub.chip ? sub.chip.label + (sub.breaking ? 
 const scopeText = (sub: Subject, brief: boolean) => (sub.scope && !brief ? `${sub.scope} ` : "");
 
 /** Width of a caption pill holding all of `summary` in `font`. */
-function captionWidth(ctx: CanvasRenderingContext2D, summary: string, font: string, brief: boolean): number {
+function captionWidth(
+  ctx: CanvasRenderingContext2D,
+  summary: string,
+  font: string,
+  brief: boolean,
+  plain: boolean,
+): number {
   const sub = subjectOf(summary);
   let w = 2 * PILL_PAD;
   if (sub.chip) {
+    // A boxed chip in space; a bare word elsewhere (see `drawCaption`).
     ctx.font = CHIP_FONT;
-    w += textWidth(ctx, chipText(sub)) + 8 + PART_GAP;
+    w += textWidth(ctx, chipText(sub)) + (plain ? 2 : 8) + PART_GAP;
   }
   ctx.font = font;
   w += textWidth(ctx, scopeText(sub, brief));
@@ -983,9 +990,9 @@ function captionWidth(ctx: CanvasRenderingContext2D, summary: string, font: stri
 }
 
 /**
- * A commit summary as a pill: outlined in its lane's colour (so it reads as that star's, and
- * apart from the sky), a chip for the kind of change, the text cut to fit, and a pull request
- * number when there is room. `x`, `y` is the pill's top left.
+ * A commit summary on one line (the list view), on the same panel as the map's captions: a
+ * chip for the kind of change, the text cut to fit, and a pull request number when there is
+ * room. `x`, `y` is the panel's top left.
  */
 function drawCaption(
   ctx: CanvasRenderingContext2D,
@@ -1002,14 +1009,14 @@ function drawCaption(
   const { x, y, w } = box;
   const h = CAPTION_H;
   const mid = y + h / 2 + 0.5;
-  // Space: a pill. Gauge and route map: the text set on the map itself (a halo keeps it clear),
-  // the selected one in a light pill of the map's colour.
+  // Space: a pill outlined in the lane's colour. Gauge and route map: a quiet panel of the
+  // map's colour, outlined only when selected (as `drawCaptionPanel`).
   const plain = ink.style !== "space";
   ctx.globalAlpha = dimmed ? 0.35 : 1;
+  roundRect(ctx, x, y, w, h, plain ? 4 : 5);
+  ctx.fillStyle = on ? ink.pillOn : plain ? ink.badge : ink.pill;
+  ctx.fill();
   if (!plain || on) {
-    roundRect(ctx, x, y, w, h, 5);
-    ctx.fillStyle = on ? ink.pillOn : ink.pill;
-    ctx.fill();
     ctx.strokeStyle = alpha(lane, on ? 0.95 : 0.42);
     ctx.lineWidth = on ? 1.4 : 1;
     ctx.stroke();
@@ -1018,10 +1025,7 @@ function drawCaption(
   ctx.textBaseline = "middle";
   let cx = x + PILL_PAD;
   const right = x + w - PILL_PAD;
-  const write = (text: string, at: number) => {
-    if (plain && !on) halo(ctx, ink, text, at, mid);
-    ctx.fillText(text, at, mid);
-  };
+  const write = (text: string, at: number) => ctx.fillText(text, at, mid);
   if (sub.chip) {
     ctx.font = CHIP_FONT;
     const label = chipText(sub);
@@ -1236,7 +1240,7 @@ function drawUprightCaption(
   const on = L.id === s.selected || L.id === s.hovered;
   const brief = s.view.k < ZOOM.captions && !on;
   const font = `${on ? 600 : 400} ${brief ? 12 : 13}px ${SANS}`;
-  const w = Math.min(space, captionWidth(ctx, text, font, brief) + 1);
+  const w = Math.min(space, captionWidth(ctx, text, font, brief, s.ink.style !== "space") + 1);
   drawCaption(ctx, s.ink, text, { x: side > 0 ? x : x - w, y: L.y - CAPTION_H / 2, w }, font, L.color, on, L.d, brief);
 }
 
