@@ -10,6 +10,8 @@ declare global {
       /** Where a stash's diamond is drawn, by its index. */
       stashScreenOf(index: number): { x: number; y: number } | null;
       centerOn(id: string, zoom?: number): void;
+      /** Pan (keeping the zoom) when the commit is off screen. */
+      reveal(id: string): void;
     };
     /** The demo's switches (src/mock/controls.ts). */
     __ddugitDemo: DemoControls;
@@ -76,6 +78,11 @@ export class Demo {
     return this.page.evaluate((id) => window.__ddugit.screenOf(id), id);
   }
 
+  /** Pan (keeping the zoom) to a commit that is off screen, as selecting it with the keyboard would. */
+  reveal(id: string) {
+    return this.page.evaluate((id) => window.__ddugit.reveal(id), id);
+  }
+
   /** Screen position of a commit once the camera has stopped moving (it eases after loads). */
   async screenOf(id: string) {
     // Still for four samples in a row: one equal pair can land before a
@@ -108,6 +115,7 @@ export class Demo {
         await this.page.keyboard.press("Escape");
         await expect(menu).toHaveCount(0, { timeout: 3000 });
       }
+      await this.reveal(id);
       const at = await this.screenOf(id);
       if (!at) throw new Error(`commit ${id.slice(0, 7)} is not drawn`);
       await this.page.mouse.click(at.x, at.y, { button: "right" });

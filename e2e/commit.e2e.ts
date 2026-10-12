@@ -39,10 +39,7 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
   const later = byId.get(snap.head.target!)!.summary;
 
   // Reword the commit before HEAD; HEAD's commit is replayed on top.
-  await expect.poll(async () => (await demo.screenOf(target)) !== null).toBe(true);
-  const at = (await demo.screenOf(target))!;
-  await page.mouse.click(at.x, at.y, { button: "right" });
-  await page.click(".context-menu >> text=메시지 고치기…");
+  await (await demo.commitMenu(target)).getByText("메시지 고치기…").click();
   const dialog = page.getByRole("dialog", { name: "메시지 고치기" });
   await dialog.getByLabel("커밋 메시지").fill("Better words");
   await dialog.getByRole("button", { name: "적용" }).click();
@@ -54,10 +51,7 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
 
   // Split the reworded commit by files (the demo shows a few files per commit).
   const reworded = head.parents[0];
-  await expect.poll(async () => (await demo.screenOf(reworded)) !== null).toBe(true);
-  const at2 = (await demo.screenOf(reworded))!;
-  await page.mouse.click(at2.x, at2.y, { button: "right" });
-  await page.click(".context-menu >> text=커밋 나누기…");
+  await (await demo.commitMenu(reworded)).getByText("커밋 나누기…").click();
   const split = page.getByRole("dialog", { name: "커밋 나누기" });
   await split.locator(".split-files input").first().check();
   await split.getByRole("button", { name: "적용" }).click();
@@ -66,6 +60,7 @@ test("rewords and splits a past commit, and restores a file as of a commit", asy
 
   // Restore one of HEAD's files as it was before HEAD.
   const now = await demo.snapshot();
+  await demo.reveal(now.head.target!);
   const tip = (await demo.screenOf(now.head.target!))!;
   await page.mouse.click(tip.x, tip.y);
   const file = page.locator(".inspector .changed li:not(.dir)").first();

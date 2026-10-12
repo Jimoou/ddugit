@@ -20,7 +20,16 @@ import {
 } from "./scene";
 import { t } from "../i18n";
 import { FILLED, iconPath, type IconName } from "../icons";
-import { type Box, CAPTION_H, laneReach, placeCaptions } from "./captions";
+import {
+  type Box,
+  CAPTION_H,
+  CAPTION_LINE,
+  CAPTION_PAD,
+  type CaptionShape,
+  captionHeight,
+  laneReach,
+  placeCaptions,
+} from "./captions";
 import { parseSubject, type Subject } from "./subject";
 import type { Layout } from "./layout";
 
@@ -728,23 +737,6 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         // Zoomed in, the stash's own label runs to its right.
         badges.push({ x: p.x - sr, y: p.y - sr, w: sr * 2 + (k >= ZOOM.summaries ? 230 : 0), h: sr * 2 });
       }
-      // The lines too: a label set across a line (the route map's thick ones most of all) is hard to read.
-      const half = metro ? Math.max(2, Math.min(5, 5 * k)) / 2 + 1 : 2;
-      for (const e of visible) {
-        const pts = shapeOf(scene, e, metro).samples;
-        let a = toScreen(view, { x: pts[0], y: pts[1] });
-        for (let i = 2; i < pts.length; i += 2) {
-          const b = toScreen(view, { x: pts[i], y: pts[i + 1] });
-          if (!(offscreen(a, 40) && offscreen(b, 40)))
-            badges.push({
-              x: Math.min(a.x, b.x) - half,
-              y: Math.min(a.y, b.y) - half,
-              w: Math.abs(b.x - a.x) + 2 * half,
-              h: Math.abs(b.y - a.y) + 2 * half,
-            });
-          a = b;
-        }
-      }
       const badged = new Set(groups.filter((g) => g.labels.length).map((g) => g.L.id));
       drawMapCaptions(ctx, s, labelQueue, badges, badged, r);
     }
@@ -959,9 +951,6 @@ function drawGravityWell(
 }
 
 /** Longest caption on screen, px; the commit in hand may run longer. Zoomed out, captions are briefer. */
-const CAPTION_MAX = 240;
-const CAPTION_BRIEF = 150;
-const CAPTION_FULL = 380;
 
 const PILL_PAD = 9;
 const PART_GAP = 6;
@@ -1104,37 +1093,116 @@ function drawMapCaptions(
   const k = s.view.k;
   const all = k >= ZOOM.briefs;
   const brief = k < ZOOM.captions;
+  // Each summary keeps to its commit's column when there is room for a readable line; zoomed
+  // out, one line wider than a column, and neighbours give way by importance (`placeCaptions`).
+  const column = Math.min(COL * k - 12, 300);
   const list = queue
     .filter((L) => s.summaries.get(L.id) && (all || inHand(L.id)))
     .sort((a, b) => rank(a.id) - rank(b.id) || (byId.get(a.id)?.row ?? 0) - (byId.get(b.id)?.row ?? 0));
-  // Measure in the font each caption is drawn in: a bold caption measured
-  // regular gets cut short with room to spare.
-  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} ${brief && !inHand(id) ? 11.5 : 12.5}px ${SANS}`;
-  const items = list.map((L) => ({
-    id: L.id,
-    x: L.x,
-    y: L.y,
-    w: Math.min(
-      captionWidth(ctx, s.summaries.get(L.id)!, fontOf(L.id), brief && !inHand(L.id)) + 1,
-      inHand(L.id) ? CAPTION_FULL : brief ? CAPTION_BRIEF : CAPTION_MAX,
-      // Cut short at the canvas edge (with an ellipsis) rather than running off it.
-      Math.max(48, s.w - L.x - 4),
-    ),
-    up: !badged.has(L.id),
-  }));
+  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} ${brief && !inHand(id) ? 12 : 13}px ${SANS}`;
+  const items = list.map((L) => {
+    const on = inHand(L.id);
+    const room = on ? Math.max(column, 260) : brief ? 150 : Math.max(column, 110);
+    const maxW = Math.min(room, Math.max(48, s.w - L.x - 4) * 2);
+    return {
+      id: L.id,
+      x: L.x,
+      y: L.y,
+      shapes: captionShapes(ctx, s.summaries.get(L.id)!, fontOf(L.id), maxW, brief && !on),
+      up: !badged.has(L.id),
+    };
+  });
   const stars = queue.map((L) => ({ x: L.x - r - 3, y: L.y - r - 3, w: 2 * r + 6, h: 2 * r + 6 }));
   const byQueue = new Map(list.map((L) => [L.id, L]));
   for (const c of placeCaptions(items, [...stars, ...obstacles], r)) {
     const L = byQueue.get(c.id)!;
-    ctx.strokeStyle = alpha(L.color, L.d ? 0.15 : 0.45);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(L.x, c.above ? L.y - r - 3 : L.y + r + 3);
-    ctx.lineTo(L.x, c.above ? c.y + CAPTION_H : c.y);
-    ctx.stroke();
-    const on = inHand(c.id);
-    drawCaption(ctx, s.ink, s.summaries.get(c.id)!, c, fontOf(c.id), L.color, on, L.d, brief && !on);
+    const chip = !(brief && !inHand(c.id));
+    drawCaptionPanel(ctx, s.ink, s.summaries.get(c.id)!, { ...c, chip }, fontOf(c.id), L.color, inHand(c.id), L.d);
   }
+}
+
+/**
+ * A summary set to fit `maxW`: in two lines (when it doesn't fit one), then in one, the kind of
+ * change leading the first line. Each shape is the panel's size around its lines.
+ */
+function captionShapes(
+  ctx: CanvasRenderingContext2D,
+  summary: string,
+  font: string,
+  maxW: number,
+  oneLine: boolean,
+): CaptionShape[] {
+  const sub = subjectOf(summary);
+  ctx.font = CHIP_FONT;
+  // Zoomed out (one line) the summary itself matters more than its kind.
+  const chipW = sub.chip && !oneLine ? textWidth(ctx, chipText(sub)) + PART_GAP : 0;
+  ctx.font = font;
+  // The scope stays in the inspector: on the map it only pushes the summary to a second line.
+  const body = sub.text + (sub.pr ? ` ${sub.pr}` : "");
+  const inner = maxW - 2 * CAPTION_PAD.x;
+  const shape = (lines: string[]): CaptionShape => ({
+    lines,
+    w: Math.max(...lines.map((ln, i) => textWidth(ctx, ln) + (i === 0 ? chipW : 0))) + 2 * CAPTION_PAD.x,
+    h: captionHeight(lines.length),
+  });
+  const single = shape([truncate(ctx, body, Math.max(0, inner - chipW))]);
+  if (oneLine || textWidth(ctx, body) + chipW <= inner) return [single];
+  // Greedy by words for the first line; the rest goes on the second, cut short if it must be.
+  const words = body.split(" ");
+  let first = "";
+  let i = 0;
+  for (; i < words.length; i++) {
+    const next = first ? `${first} ${words[i]}` : words[i];
+    if (textWidth(ctx, next) + chipW > inner && first) break;
+    first = next;
+  }
+  const rest = words.slice(i).join(" ");
+  if (!rest) return [single];
+  return [shape([truncate(ctx, first, inner - chipW), truncate(ctx, rest, inner)]), single];
+}
+
+/** A placed summary: its panel (the map's own colour, or a pill in the space style), then its lines, centred. */
+function drawCaptionPanel(
+  ctx: CanvasRenderingContext2D,
+  ink: Ink,
+  summary: string,
+  c: { x: number; y: number; w: number; h: number; lines: string[]; chip: boolean },
+  font: string,
+  lane: string,
+  on: boolean,
+  dimmed: boolean,
+) {
+  const sub = subjectOf(summary);
+  ctx.globalAlpha = dimmed ? 0.35 : 1;
+  roundRect(ctx, c.x, c.y, c.w, c.h, ink.style === "space" ? 6 : 4);
+  ctx.fillStyle = on ? ink.pillOn : ink.style === "space" ? ink.pill : ink.badge;
+  ctx.fill();
+  if (on || ink.style === "space") {
+    ctx.strokeStyle = alpha(lane, on ? 0.95 : 0.42);
+    ctx.lineWidth = on ? 1.4 : 1;
+    ctx.stroke();
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  const cx = c.x + c.w / 2;
+  c.lines.forEach((line, i) => {
+    const mid = c.y + CAPTION_PAD.y + CAPTION_LINE * (i + 0.5) + 0.5;
+    ctx.font = CHIP_FONT;
+    const chip = i === 0 && sub.chip && c.chip ? chipText(sub) : "";
+    const chipW = chip ? textWidth(ctx, chip) + PART_GAP : 0;
+    ctx.font = font;
+    let x = cx - (chipW + textWidth(ctx, line)) / 2;
+    if (chip) {
+      ctx.font = CHIP_FONT;
+      ctx.fillStyle = sub.breaking ? ink.chip.fix : ink.chip[sub.chip!.tone];
+      ctx.fillText(chip, x, mid);
+      x += chipW;
+      ctx.font = font;
+    }
+    ctx.fillStyle = on ? ink.textOn : ink.text;
+    ctx.fillText(line, x, mid);
+  });
+  ctx.globalAlpha = 1;
 }
 
 /** Longest upright caption on screen, px. */
