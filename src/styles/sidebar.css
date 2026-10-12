@@ -1,17 +1,5 @@
 /* The sidebar: refs, remotes, stashes, worktrees, submodules, LFS (components/Sidebar.tsx). */
 
-/* Several branches picked at once: just the way to clear them. */
-.sidebar .side-picked {
-  display: flex;
-  justify-content: flex-end;
-  margin: -4px 0 4px;
-}
-.sidebar .side-picked button {
-  flex-shrink: 0;
-  padding: 0 6px;
-  font-size: 11px;
-  white-space: nowrap;
-}
 /* Fold per remote inside the remote section. */
 .sidebar .fetch-only {
   flex-shrink: 0;
@@ -75,6 +63,12 @@
 }
 .sidebar section.sub li {
   padding-left: 12px;
+}
+/* The row's small buttons centre their icon (an inline svg would sit on the text baseline). */
+.sidebar li :is(.to-local, .eye) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 /* Make a local branch from a remote-only one: shown on hover. */
 .sidebar li .to-local {

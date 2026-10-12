@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { CAPTION_H, laneReach, placeCaptions } from "./captions";
+import { CAPTION_DROP, CAPTION_H, laneReach, placeCaptions } from "./captions";
 import type { Layout } from "./layout";
 
 const star = (x: number, y: number, r = 6) => ({ x: x - r - 2, y: y - r - 2, w: 2 * r + 4, h: 2 * r + 4 });
 const item = (id: string, x: number, y: number, w = 150, up = true) => ({ id, x, y, w, up });
 
 describe("map-style commit captions", () => {
-  it("hang right under their star, starting at it and reading to the right", () => {
+  it("hang a little under their star, starting at it and reading to the right", () => {
     const [c] = placeCaptions([item("a", 100, 100)], [star(100, 100)], 6);
-    expect(c).toMatchObject({ id: "a", x: 94, y: 111, w: 150, level: 0, above: false });
+    expect(c).toMatchObject({ id: "a", x: 92, y: 106 + CAPTION_DROP, w: 150, level: 0, above: false });
     // A short summary is placed whole.
     expect(placeCaptions([item("b", 100, 100, 40)], [], 6)[0].w).toBe(40);
   });
@@ -23,7 +23,7 @@ describe("map-style commit captions", () => {
   it("step further out (with a leader line) when the spot under the star is taken and badges sit above", () => {
     const badge = { x: 120, y: 110, w: 60, h: 14 };
     const [c] = placeCaptions([item("b", 100, 100, 150, false)], [star(100, 100), badge], 6);
-    expect(c).toMatchObject({ id: "b", level: 1, above: false, y: 111 + CAPTION_H });
+    expect(c).toMatchObject({ id: "b", level: 1, above: false, y: 106 + CAPTION_DROP + CAPTION_H + 4 });
   });
 
   it("never run a leader line through another label", () => {

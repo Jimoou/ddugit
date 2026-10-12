@@ -203,11 +203,11 @@ export function RepoView({
     const off = (r: RefInfo) =>
       r.kind !== "tag" && hidden.has(refKey(r)) && !(r.kind === "local" && r.name === snap.head.branch);
     const refs = snap.refs.filter((r) => !off(r));
-    if (refs.length === snap.refs.length) return { commits: snap.commits, refs: snap.refs, hidden: 0 };
+    if (refs.length === snap.refs.length) return { commits: snap.commits, refs: snap.refs };
     const tips = [...refs.map((r) => r.target), ...snap.stashes.map((st) => st.base)];
     if (snap.head.target) tips.push(snap.head.target);
     const gone = hiddenOnly(snap.commits, { shown: tips, hidden: snap.refs.filter(off).map((r) => r.target) });
-    return { commits: snap.commits.filter((c) => !gone.has(c.id)), refs, hidden: snap.refs.length - refs.length };
+    return { commits: snap.commits.filter((c) => !gone.has(c.id)), refs };
   }, [snap, look.hidden]);
   // A chosen colour is one more lane colour after the theme's own; the layout knows it by index.
   const chosenList = useMemo(() => Object.entries(look.colors), [look.colors]);
@@ -556,8 +556,6 @@ export function RepoView({
           refColor={refColor}
           hidden={look.hidden}
           onToggleHidden={(r) => branchLook.setHidden(hideKeys(r), !look.hidden.includes(refKey(r)))}
-          onShowAll={() => branchLook.setHidden(look.hidden, false)}
-          hiddenCount={shown?.hidden ?? 0}
           onRefColor={(r, x, y) => setColorPick({ ref: r, x, y })}
           focused={liveFocus.map((r) => `${r.kind}:${r.name}`)}
           onFocus={(r) => {
@@ -568,7 +566,6 @@ export function RepoView({
             setFocusRefs(next);
             if (next.some((x) => key(x) === key(r))) graph.current?.centerOn(r.target);
           }}
-          onClearFocus={() => setFocusRefs([])}
           onCheckout={(r) => checkoutRef(repo, r)}
           onAddRemote={remote.askRemote}
           remotes={snap.remotes}
@@ -706,6 +703,7 @@ export function RepoView({
                 setPicked([]);
                 if (id || !composer) show({ commit: id });
               }}
+              onClear={() => setFocusRefs([])}
               onPlus={() => show({ composer: true })}
               stashes={snap.stashes}
               selectedStash={selectedStash}

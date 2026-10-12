@@ -378,7 +378,8 @@ test("a branch's colour comes from a palette on its dot, and its eye hides it on
   expect(await onMap(snap.refs.find((r) => r.name === "main")!.target)).toBe(true);
   await page.reload();
   await expect.poll(() => onMap(sync.target)).toBe(false);
-  await page.getByRole("button", { name: "숨긴 브랜치 1개 모두 보이기" }).click();
+  // A hidden branch keeps its eye showing: it brings the branch back.
+  await row.getByRole("button", { name: /브랜치 맵에 다시 보이기/ }).click();
   await expect.poll(() => onMap(sync.target)).toBe(true);
 
   // The checked-out branch can't be hidden.

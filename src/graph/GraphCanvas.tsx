@@ -70,6 +70,8 @@ interface Props {
   /** Lane colours: the theme's, then the branch colours the user chose. */
   lanes: readonly string[];
   onSelect(id: string | null): void;
+  /** Esc, or a click on empty sky: let go of everything picked (commit and branches). */
+  onClear?(): void;
   /** A commit ⌘/Ctrl-clicked (`range`: Shift-clicked), to pick it along with others. */
   onPick?(id: string, range: boolean): void;
   onPlus(): void;
@@ -653,6 +655,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
       propsRef.current.onSelect(s.press.id === propsRef.current.selected ? null : s.press.id);
     } else if (s.pan && !s.pan.moved && !onPlus(p)) {
       propsRef.current.onSelect(null);
+      propsRef.current.onClear?.();
     }
     s.press = null;
     s.pan = null;
@@ -714,6 +717,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         st.current.drag = null;
         wake.current();
         propsRef.current.onSelect(null);
+        propsRef.current.onClear?.();
       } else if (ARROWS[e.key] || e.key === "Enter" || e.key === "ContextMenu") {
         // Only when nothing else has focus: arrows must still scroll lists and sheets.
         if (e.target !== document.body && e.target !== canvasRef.current) return;
