@@ -3,6 +3,7 @@ import { api } from "../api";
 import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
+import { MAP_STYLES } from "../graph/ink";
 import { THEMES } from "../theme";
 import { Icon } from "./Icon";
 import { ExternalSection } from "./ExternalSettings";
@@ -86,9 +87,14 @@ export function SettingsDialog({ settings, at, onChange, onClose, onReport }: Pr
 type SectionProps = Pick<Props, "settings" | "onChange">;
 
 function ScreenSection({ settings, onChange }: SectionProps) {
-  const check = (key: "animate" | "space" | "glow" | "minimap" | "mapLocked", text: string) => (
+  const check = (key: "animate" | "space" | "glow" | "minimap" | "mapLocked", text: string, disabled = false) => (
     <label className="check">
-      <input type="checkbox" checked={settings[key]} onChange={(e) => onChange({ [key]: e.target.checked })} />
+      <input
+        type="checkbox"
+        checked={settings[key]}
+        disabled={disabled}
+        onChange={(e) => onChange({ [key]: e.target.checked })}
+      />
       {text}
     </label>
   );
@@ -115,11 +121,18 @@ function ScreenSection({ settings, onChange }: SectionProps) {
           onChange={(theme) => onChange({ theme })}
           options={THEMES.map((x) => ({ value: x, label: t(`settings.theme.${x}`) }))}
         />
+        <span>{t("settings.mapStyle")}</span>
+        <Segmented
+          label={t("settings.mapStyle")}
+          value={settings.mapStyle}
+          onChange={(mapStyle) => onChange({ mapStyle })}
+          options={MAP_STYLES.map((x) => ({ value: x, label: t(`settings.mapStyle.${x}`) }))}
+        />
         <span>{t("settings.effects")}</span>
         <div className="checks">
           {check("animate", t("settings.sparkle"))}
           {check("space", t("settings.space"))}
-          {check("glow", t("settings.glow"))}
+          {check("glow", t("settings.glow"), settings.mapStyle !== "space")}
         </div>
         <span>{t("settings.map")}</span>
         <div className="checks">

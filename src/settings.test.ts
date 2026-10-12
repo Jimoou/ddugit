@@ -15,6 +15,7 @@ describe("parseSettings", () => {
     );
     expect(s).toEqual({
       animate: false,
+      mapStyle: "gauge",
       space: true,
       glow: true,
       historyPage: 3000,
@@ -73,6 +74,10 @@ describe("parseSettings", () => {
       minimap: false,
       mapLocked: true,
     });
+  });
+  it("keeps a known branch map style, else the gauge", () => {
+    expect(parseSettings(JSON.stringify({ mapStyle: "metro" }), base).mapStyle).toBe("metro");
+    expect(parseSettings(JSON.stringify({ mapStyle: "subway" }), base).mapStyle).toBe("gauge");
   });
   it("respects reduced motion by default", () => {
     expect(defaults(true).animate).toBe(false);

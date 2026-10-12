@@ -1,6 +1,7 @@
 // User settings kept in localStorage. Parsing is pure (and tested) so a
 // corrupt or older stored value falls back to defaults instead of breaking.
 
+import { MAP_STYLES, type MapStyle } from "./graph/ink";
 import type { Turn } from "./graph/renderer";
 import type { Key, LanguagePref } from "./i18n";
 import { type ExternalApps, parseExternal } from "./external";
@@ -12,9 +13,11 @@ import type { Profile } from "./types";
 export interface Settings extends ExternalApps {
   /** Sparkles flowing along edges and node birth bursts. */
   animate: boolean;
-  /** The galaxy (nebulae, stars) behind the graph and the home screen; off is a plain dark backdrop. */
+  /** How the branch map is drawn: an instrument panel (default), a route map, or the night sky. */
+  mapStyle: MapStyle;
+  /** The map's backdrop (a printed star chart, or the galaxy in the space style) and the home screen's; off is plain. */
   space: boolean;
-  /** Neon glow around lines, commits and the [+] node. */
+  /** Neon glow around lines, commits and the [+] node (space style). */
   glow: boolean;
   /** Commits loaded at once (and per "load more"). */
   historyPage: number;
@@ -54,6 +57,7 @@ export const LANGUAGES: readonly LanguagePref[] = ["system", "ko", "en"];
 export function defaults(reducedMotion = false): Settings {
   return {
     animate: !reducedMotion,
+    mapStyle: "gauge",
     space: true,
     glow: true,
     historyPage: 3000,
@@ -94,6 +98,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
   const o = v as Record<string, unknown>;
   return {
     animate: typeof o.animate === "boolean" ? o.animate : base.animate,
+    mapStyle: MAP_STYLES.find((x) => x === o.mapStyle) ?? base.mapStyle,
     space: typeof o.space === "boolean" ? o.space : base.space,
     glow: typeof o.glow === "boolean" ? o.glow : base.glow,
     historyPage:

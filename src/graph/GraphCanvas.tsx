@@ -31,7 +31,7 @@ import { type Run, runIndex, straightRuns } from "./runs";
 import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap, type MinimapHandle } from "./Minimap";
-import { INK } from "./ink";
+import { inkOf, type MapStyle } from "./ink";
 import type { Theme } from "../theme";
 import { t } from "../i18n";
 import { isOnScreen, isTypingTarget } from "../keys";
@@ -65,8 +65,9 @@ interface Props {
   /** Galaxy behind the graph, and glow around lines and commits (settings). */
   space: boolean;
   glow: boolean;
-  /** Night sky or printed chart: the map's colours. */
+  /** Dark or light, and the map's style: together they make its look (`inkOf`). */
   theme: Theme;
+  mapStyle: MapStyle;
   /** Lane colours: the theme's, then the branch colours the user chose. */
   lanes: readonly string[];
   onSelect(id: string | null): void;
@@ -122,7 +123,10 @@ const MAX_K = 3;
 const clampK = (k: number) => Math.min(MAX_K, Math.max(MIN_K, k));
 
 export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(props, ref) {
-  const ink = useMemo(() => ({ ...INK[props.theme], lanes: props.lanes }), [props.theme, props.lanes]);
+  const ink = useMemo(
+    () => ({ ...inkOf(props.mapStyle, props.theme), lanes: props.lanes }),
+    [props.mapStyle, props.theme, props.lanes],
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const scene = useMemo(() => buildScene(props.layout), [props.layout]);
@@ -442,7 +446,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         animate: p.animate,
         space: p.space,
         glow: p.glow,
-        ink: { ...INK[p.theme], lanes: p.lanes },
+        ink: { ...inkOf(p.mapStyle, p.theme), lanes: p.lanes },
         headId: p.headId,
         headBranch: p.headBranch,
         plus: plusPosition(sceneRef.current, p.headId),

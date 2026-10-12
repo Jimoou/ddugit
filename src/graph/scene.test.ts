@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { CommitInfo, RefInfo } from "../types";
 import { computeLayout } from "./layout";
-import { buildScene, COL, type EdgeShape, edgesInRows, fractionAtX, LANE, nodeAtCell, sparklesIn, xOf } from "./scene";
+import {
+  buildScene,
+  COL,
+  type EdgeShape,
+  edgesInRows,
+  fractionAtX,
+  LANE,
+  nodeAtCell,
+  shapeOf,
+  sparklesIn,
+  xOf,
+} from "./scene";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
   id,
@@ -20,6 +31,30 @@ function history(len: number) {
   const commits = [c("m3", "m2", `s${len - 1}`), ...side, c("m2", "m1"), c("m1", "m0"), c("m0")];
   return computeLayout(commits, [local("main", "m3")], { branch: "main", target: "m3" });
 }
+
+describe("shapeOf", () => {
+  // The test environment has no canvas: the path itself isn't looked at, only the samples.
+  globalThis.Path2D ??= class {
+    moveTo() {}
+    lineTo() {}
+    bezierCurveTo() {}
+  } as unknown as typeof Path2D;
+
+  it("bends the route map's lines at 45° between straight runs", () => {
+    const layout = history(1);
+    const scene = buildScene(layout);
+    const e = scene.edges.find((x) => x.edge.isMergeEdge)!;
+    const s = shapeOf(scene, e, true).samples;
+    // Every step is flat or diagonal (|dx| = |dy|), never a curve.
+    for (let i = 2; i < s.length; i += 2) {
+      const dx = Math.abs(s[i] - s[i - 2]),
+        dy = Math.abs(s[i + 1] - s[i - 1]);
+      expect(dy === 0 || Math.abs(dx - dy) < 1e-6).toBe(true);
+    }
+    // The curved shape of the same edge is a separate, sampled curve.
+    expect(shapeOf(scene, e).samples.length).toBeGreaterThan(s.length);
+  });
+});
 
 describe("buildScene", () => {
   it("bounds each edge by its rows and the lanes it runs through", () => {

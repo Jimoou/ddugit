@@ -32,7 +32,7 @@ import {
 } from "./graph/layout";
 import { refKey } from "./branchLook";
 import { useBranchLook } from "./repo/useBranchLook";
-import { INK } from "./graph/ink";
+import { inkOf } from "./graph/ink";
 import { inkFor } from "./color";
 import { ColorPicker } from "./components/ColorPicker";
 import type { Theme } from "./theme";
@@ -321,9 +321,10 @@ export function RepoView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, refresh, openSearch]);
+  const mapInk = inkOf(settings.mapStyle, theme);
   const lanes = useMemo(
-    () => [...INK[theme].lanes, ...chosenList.map(([, hex]) => inkFor(hex, INK[theme]))],
-    [theme, chosenList],
+    () => [...mapInk.lanes, ...chosenList.map(([, hex]) => inkFor(hex, mapInk))],
+    [mapInk, chosenList],
   );
   const colorOf = useCallback((id: string) => lanes[layout?.byId.get(id)?.color ?? 0], [layout, lanes]);
   /** A ref's colour: the one chosen for its branch, else its lane's (a hidden one keeps its automatic colour). */
@@ -698,6 +699,7 @@ export function RepoView({
               space={settings.space}
               glow={settings.glow}
               theme={theme}
+              mapStyle={settings.mapStyle}
               lanes={lanes}
               onSelect={(id) => {
                 setPicked([]);

@@ -78,18 +78,33 @@ function bez(s: Seg, t: number): Pt {
   };
 }
 
-function edgeSegments(e: LayoutEdge, n: number): Seg[] {
+/**
+ * A route-map bend from `a` to `b` (b to the right): straight, then 45° across the lanes, then
+ * straight again. Lanes further apart than the step allows are joined by one steeper line.
+ */
+function octo(a: Pt, b: Pt): Seg[] {
+  const dx = b.x - a.x,
+    dy = Math.abs(b.y - a.y);
+  if (dy === 0 || dy >= dx) return [line(a, b)];
+  const h = (dx - dy) / 2;
+  const p1 = { x: a.x + h, y: a.y },
+    p2 = { x: b.x - h, y: b.y };
+  return [line(a, p1), line(p1, p2), line(p2, b)];
+}
+
+function edgeSegments(e: LayoutEdge, n: number, metro: boolean): Seg[] {
   // Built from the parent (older, left) towards the child (newer, right),
   // which is the direction the sparkles flow.
+  const bend = (a: Pt, b: Pt) => (metro ? octo(a, b) : [cubic(a, b)]);
   const P = { x: xOf(e.parentRow, n), y: yOf(e.parentLane) };
   const C = { x: xOf(e.childRow, n), y: yOf(e.childLane) };
-  if (e.parentRow - e.childRow <= 1) return [cubic(P, C)];
+  if (e.parentRow - e.childRow <= 1) return bend(P, C);
   const pIn = { x: xOf(e.parentRow - 1, n), y: yOf(e.via) };
   const cIn = { x: xOf(e.childRow + 1, n), y: yOf(e.via) };
   const segs: Seg[] = [];
-  segs.push(e.via === e.parentLane ? line(P, pIn) : cubic(P, pIn));
+  segs.push(...(e.via === e.parentLane ? [line(P, pIn)] : bend(P, pIn)));
   if (e.parentRow - 1 > e.childRow + 1) segs.push(line(pIn, cIn));
-  segs.push(e.via === e.childLane ? line(cIn, C) : cubic(cIn, C));
+  segs.push(...(e.via === e.childLane ? [line(cIn, C)] : bend(cIn, C)));
   return segs;
 }
 
@@ -143,17 +158,19 @@ export function nodeAtCell(layout: Layout, row: number, lane: number): string | 
   return node && node.lane === lane ? node.id : undefined;
 }
 
-const shapes = new WeakMap<EdgePath, EdgeShape>();
+const curves = new WeakMap<EdgePath, EdgeShape>();
+const routes = new WeakMap<EdgePath, EdgeShape>();
 
-/** The edge's path and samples, made once per scene. */
-export function shapeOf(scene: Scene, e: EdgePath): EdgeShape {
+/** The edge's path and samples, made once per scene: curved, or bent at 45° for the route map (`metro`). */
+export function shapeOf(scene: Scene, e: EdgePath, metro = false): EdgeShape {
+  const shapes = metro ? routes : curves;
   let shape = shapes.get(e);
-  if (!shape) shapes.set(e, (shape = makeShape(e.edge, scene.layout.rowCount)));
+  if (!shape) shapes.set(e, (shape = makeShape(e.edge, scene.layout.rowCount, metro)));
   return shape;
 }
 
-function makeShape(e: LayoutEdge, n: number): EdgeShape {
-  const segs = edgeSegments(e, n);
+function makeShape(e: LayoutEdge, n: number, metro: boolean): EdgeShape {
+  const segs = edgeSegments(e, n, metro);
   const path = new Path2D();
   path.moveTo(segs[0][0].x, segs[0][0].y);
   const pts: number[] = [segs[0][0].x, segs[0][0].y];

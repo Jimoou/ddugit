@@ -1,6 +1,6 @@
 import { stashTitle } from "../format";
 import { inlineBadges, placeBadges, type PlacedGroup, refShown } from "./labels";
-import { drawSpace } from "./space";
+import { drawChart, drawSpace } from "./space";
 import type { Ink } from "./ink";
 import { type Run, runsInRows } from "./runs";
 import type { RefInfo, StashInfo } from "../types";
@@ -80,9 +80,9 @@ export interface DrawState {
   dpr: number;
   time: number;
   animate: boolean;
-  /** Galaxy behind the graph (off: a plain dark fill). */
+  /** The map's backdrop: the galaxy, or for the gauge and route map a printed star chart (off: a plain fill). */
   space: boolean;
-  /** Glow around edges, commits and the [+] node (off: the lines alone). */
+  /** Glow around edges, commits and the [+] node in the space style (off: the lines alone). */
   glow: boolean;
   /** The theme's colours (lanes, fills, text). */
   ink: Ink;
@@ -260,6 +260,16 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
+/** A ring of the map's own colour behind text set straight on the map, so lines and the chart don't cut it. */
+function halo(ctx: CanvasRenderingContext2D, ink: Ink, text: string, x: number, y: number) {
+  ctx.save();
+  ctx.strokeStyle = ink.paper ? alpha(ink.sky, 0.92) : alpha(ink.sky, 0.9);
+  ctx.lineWidth = 4;
+  ctx.lineJoin = "round";
+  ctx.strokeText(text, x, y);
+  ctx.restore();
+}
+
 /**
  * Label widths and cuts per font: the same labels are measured on every frame they are drawn,
  * and cutting one to fit takes a dozen measurements. Cleared when a font finishes loading.
@@ -305,14 +315,17 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const { scene, view, w, h, dpr, time, ink } = s;
   const { k } = view;
   const lanes = ink.lanes;
-  // Glow adds light: it belongs to the night sky, not to paper.
-  const glow = s.glow && !ink.paper;
+  const space = ink.style === "space",
+    metro = ink.style === "metro";
+  // Glow and sparkles add light: they belong to the night sky, not to paper or the plain styles.
+  const glow = s.glow && space && !ink.paper;
   const n = scene.layout.rowCount;
   s.labelHits.length = 0;
 
-  // --- background: galaxy ---------------------------------------------------
+  // --- background: galaxy, or a printed star chart -------------------------------
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (s.space) drawSpace(ctx, w, h, view, time, s.animate, ink.paper);
+  if (s.space && space) drawSpace(ctx, w, h, view, time, s.animate, ink.paper);
+  else if (s.space) drawChart(ctx, w, h, view, time, s.animate, !ink.paper);
   else {
     ctx.fillStyle = ink.sky;
     ctx.fillRect(0, 0, w, h);
@@ -349,24 +362,27 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = alpha(c, d ? 0.03 : 0.16);
     ctx.lineWidth = 9 / k;
-    const { path } = shapeOf(scene, e);
+    const { path } = shapeOf(scene, e, metro);
     ctx.stroke(path);
     ctx.strokeStyle = alpha(c, d ? 0.05 : 0.28);
     ctx.lineWidth = 4.5 / k;
     ctx.stroke(path);
   }
   ctx.globalCompositeOperation = "source-over";
+  // On screen: the route map's thick lines thin out as it zooms out; the others stay hairlines.
+  const lineW = (merge: boolean) =>
+    metro ? Math.max(2, Math.min(5, 5 * k)) / k : (merge ? 1.6 : space ? 2.2 : 2) / Math.max(k, 0.5);
   for (const e of visible) {
     const c = lanes[e.edge.color];
     const d = dim(e.edge.child) || dim(e.edge.parent);
     ctx.strokeStyle = d ? alpha(c, 0.2) : c;
-    ctx.lineWidth = (e.edge.isMergeEdge ? 1.6 : 2.2) / Math.max(k, 0.5);
-    ctx.stroke(shapeOf(scene, e).path);
+    ctx.lineWidth = lineW(e.edge.isMergeEdge);
+    ctx.stroke(shapeOf(scene, e, metro).path);
   }
 
   // --- sparkles flowing along edges (parent → child, i.e. forward in time) --
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (s.animate && k > 0.2) {
+  if (s.animate && space && k > 0.2) {
     ctx.globalCompositeOperation = ink.blend;
     const speed = 70; // world px / s
     for (const e of visible) {
@@ -489,26 +505,65 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.globalCompositeOperation = "source-over";
     }
 
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
-    if (node.isMerge) {
-      ctx.fillStyle = d ? alpha(c, 0.25) : c;
-      ctx.fill();
-    } else {
-      ctx.fillStyle = ink.hole;
-      ctx.fill();
-      ctx.lineWidth = Math.max(1.5, 2.2 * Math.min(k, 1));
-      ctx.strokeStyle = d ? alpha(c, 0.25) : c;
-      ctx.stroke();
-    }
-
-    if (node.id === s.headId) {
-      const pulse = s.animate ? (Math.sin(time * 3) + 1) / 2 : 0.5;
-      ctx.strokeStyle = alpha(ink.ring, 0.5 + 0.4 * pulse);
-      ctx.lineWidth = 1.5;
+    const isHead = node.id === s.headId;
+    const lane = d ? alpha(c, 0.25) : c;
+    if (metro) {
+      // Stations: white (or the map's own) fill in a ring of the route's colour; a merge is an
+      // interchange, ringed in ink; HEAD the line's terminus, larger and ringed again.
+      const sr = Math.max(3, Math.min(7, 5.5 * k)) * scale;
+      const big = isHead ? sr * 1.7 : node.isMerge ? sr * 1.45 : sr;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, rr + 4 + pulse * 2, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, big, 0, Math.PI * 2);
+      ctx.fillStyle = ink.paper ? "#ffffff" : ink.hole;
+      ctx.fill();
+      ctx.lineWidth = (isHead ? 4 : node.isMerge ? 2.5 : 3) * Math.max(0.5, Math.min(1, k));
+      ctx.strokeStyle = node.isMerge && !isHead ? (d ? alpha(ink.ring, 0.3) : ink.ring) : lane;
       ctx.stroke();
+      if (isHead) {
+        ctx.strokeStyle = ink.ring;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, big + 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (!space) {
+      // Gauge dots: filled, cut out of the lines by a ring of the map's colour; a merge is hollow.
+      const gr = Math.max(2.5, Math.min(6, 4.6 * k)) * scale;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, gr, 0, Math.PI * 2);
+      ctx.fillStyle = node.isMerge ? ink.hole : lane;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = node.isMerge ? lane : ink.hole;
+      ctx.stroke();
+      if (isHead) {
+        ctx.strokeStyle = ink.ring;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, gr + 5.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+      if (node.isMerge) {
+        ctx.fillStyle = lane;
+        ctx.fill();
+      } else {
+        ctx.fillStyle = ink.hole;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.5, 2.2 * Math.min(k, 1));
+        ctx.strokeStyle = lane;
+        ctx.stroke();
+      }
+      if (isHead) {
+        const pulse = s.animate ? (Math.sin(time * 3) + 1) / 2 : 0.5;
+        ctx.strokeStyle = alpha(ink.ring, 0.5 + 0.4 * pulse);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rr + 4 + pulse * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     if (node.id === s.selected || node.id === s.hovered || node.id === s.drag?.target) {
       ctx.strokeStyle = node.id === s.drag?.target ? ink.ring : alpha(ink.ring, node.id === s.selected ? 0.95 : 0.5);
@@ -673,6 +728,23 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         // Zoomed in, the stash's own label runs to its right.
         badges.push({ x: p.x - sr, y: p.y - sr, w: sr * 2 + (k >= ZOOM.summaries ? 230 : 0), h: sr * 2 });
       }
+      // The lines too: a label set across a line (the route map's thick ones most of all) is hard to read.
+      const half = metro ? Math.max(2, Math.min(5, 5 * k)) / 2 + 1 : 2;
+      for (const e of visible) {
+        const pts = shapeOf(scene, e, metro).samples;
+        let a = toScreen(view, { x: pts[0], y: pts[1] });
+        for (let i = 2; i < pts.length; i += 2) {
+          const b = toScreen(view, { x: pts[i], y: pts[i + 1] });
+          if (!(offscreen(a, 40) && offscreen(b, 40)))
+            badges.push({
+              x: Math.min(a.x, b.x) - half,
+              y: Math.min(a.y, b.y) - half,
+              w: Math.abs(b.x - a.x) + 2 * half,
+              h: Math.abs(b.y - a.y) + 2 * half,
+            });
+          a = b;
+        }
+      }
       const badged = new Set(groups.filter((g) => g.labels.length).map((g) => g.L.id));
       drawMapCaptions(ctx, s, labelQueue, badges, badged, r);
     }
@@ -692,27 +764,38 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         const item = b.index >= 0 ? labels[b.index] : null;
         const col =
           item?.rf.kind === "tag" ? lanes[3] : item?.rf.kind === "pr" ? ink.pr[item.rf.checks ?? "none"] : L.color;
-        ctx.globalAlpha = L.d ? 0.3 : item?.rf.kind === "remote" || !item ? 0.75 : 1;
-        roundRect(ctx, b.x, b.y, b.w, BADGE_H, 9);
-        ctx.fillStyle = item?.isHead ? col : ink.badge;
-        ctx.fill();
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = item?.isHead ? ink.onFill : col;
+        const remote = item?.rf.kind === "remote" || !item;
+        const tag = item?.rf.kind === "tag";
+        ctx.globalAlpha = L.d ? 0.3 : remote && !metro ? 0.75 : 1;
+        // Space: outlined pills. Route map: route badges, filled in the line's colour (a remote's
+        // outlined, a tag's in ink). Gauge: the name alone in the lane's colour, HEAD's filled.
+        const filled = item?.isHead || (metro && !remote && !tag);
+        let fg = filled ? ink.onFill : col;
+        if (metro || space || filled) {
+          roundRect(ctx, b.x, b.y, b.w, BADGE_H, space ? 9 : metro ? 3 : 4);
+          ctx.fillStyle = filled ? col : metro && ink.paper ? "#ffffff" : ink.badge;
+          ctx.fill();
+          if (!filled || space) {
+            ctx.strokeStyle = metro && tag ? ink.scope : col;
+            ctx.lineWidth = metro ? 1.5 : 1;
+            ctx.stroke();
+          }
+          if (metro && tag) fg = ink.text;
+        }
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
         ctx.font = `600 12px ${SANS}`;
         const iw = item?.icon ? ICON_W : 0;
         const mw = item?.mark ? ICON_W : 0;
         const iy = b.y + (BADGE_H - 10) / 2;
-        if (item?.icon) drawIcon(ctx, item.icon, b.x + 6, iy, 10, ctx.fillStyle as string);
-        if (item?.mark) drawIcon(ctx, item.mark, b.x + b.w - 6 - 10, iy, 10, ctx.fillStyle as string);
-        ctx.fillText(
-          item ? truncate(ctx, item.text, 160) : `+${pg.hidden}`,
-          b.x + iw + (b.w - iw - mw) / 2,
-          b.y + BADGE_H / 2 + 0.5,
-        );
+        if (item?.icon) drawIcon(ctx, item.icon, b.x + 6, iy, 10, fg);
+        if (item?.mark) drawIcon(ctx, item.mark, b.x + b.w - 6 - 10, iy, 10, fg);
+        const label = item ? truncate(ctx, item.text, 160) : `+${pg.hidden}`;
+        const lx = b.x + iw + (b.w - iw - mw) / 2,
+          ly = b.y + BADGE_H / 2 + 0.5;
+        if (!metro && !space && !filled) halo(ctx, ink, label, lx, ly);
+        ctx.fillStyle = fg;
+        ctx.fillText(label, lx, ly);
         ctx.globalAlpha = 1;
         if (item) s.labelHits.push({ x: b.x, y: b.y, w: b.w, h: BADGE_H, ref: item.rf });
       }
@@ -930,28 +1013,44 @@ function drawCaption(
   const { x, y, w } = box;
   const h = CAPTION_H;
   const mid = y + h / 2 + 0.5;
+  // Space: a pill. Gauge and route map: the text set on the map itself (a halo keeps it clear),
+  // the selected one in a light pill of the map's colour.
+  const plain = ink.style !== "space";
   ctx.globalAlpha = dimmed ? 0.35 : 1;
-  roundRect(ctx, x, y, w, h, 5);
-  ctx.fillStyle = on ? ink.pillOn : ink.pill;
-  ctx.fill();
-  ctx.strokeStyle = alpha(lane, on ? 0.95 : 0.42);
-  ctx.lineWidth = on ? 1.4 : 1;
-  ctx.stroke();
+  if (!plain || on) {
+    roundRect(ctx, x, y, w, h, 5);
+    ctx.fillStyle = on ? ink.pillOn : ink.pill;
+    ctx.fill();
+    ctx.strokeStyle = alpha(lane, on ? 0.95 : 0.42);
+    ctx.lineWidth = on ? 1.4 : 1;
+    ctx.stroke();
+  }
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   let cx = x + PILL_PAD;
   const right = x + w - PILL_PAD;
+  const write = (text: string, at: number) => {
+    if (plain && !on) halo(ctx, ink, text, at, mid);
+    ctx.fillText(text, at, mid);
+  };
   if (sub.chip) {
     ctx.font = CHIP_FONT;
     const label = chipText(sub);
     const cw = textWidth(ctx, label) + 8;
     if (cx + cw <= right) {
       const c = sub.breaking ? ink.chip.fix : ink.chip[sub.chip.tone];
-      roundRect(ctx, cx, y + 4, cw, h - 8, 3);
-      ctx.fillStyle = alpha(c, 0.2);
-      ctx.fill();
-      ctx.fillStyle = c;
-      ctx.fillText(label, cx + 4, mid);
+      if (plain) {
+        // The kind of change as a quiet word before the summary, coloured only when it matters.
+        ctx.fillStyle = sub.breaking || sub.chip.tone === "fix" ? c : ink.scope;
+        write(label, cx);
+        cx -= 8 - 2;
+      } else {
+        roundRect(ctx, cx, y + 4, cw, h - 8, 3);
+        ctx.fillStyle = alpha(c, 0.2);
+        ctx.fill();
+        ctx.fillStyle = c;
+        ctx.fillText(label, cx + 4, mid);
+      }
       cx += cw + PART_GAP;
     }
   }
@@ -964,7 +1063,7 @@ function drawCaption(
   const scope = scopeText(sub, brief);
   if (scope && right - cx - prW - textWidth(ctx, scope) >= Math.min(60, textWidth(ctx, sub.text))) {
     ctx.fillStyle = ink.scope;
-    ctx.fillText(scope, cx, mid);
+    write(scope, cx);
     cx += textWidth(ctx, scope);
   }
   // Keep the number only if the text keeps a readable start.
@@ -973,12 +1072,12 @@ function drawCaption(
   const room = showPr ? roomWithPr : right - cx;
   const line = truncate(ctx, sub.text, Math.max(0, room));
   ctx.fillStyle = on ? ink.textOn : ink.text;
-  ctx.fillText(line, cx, mid);
+  write(line, cx);
   if (showPr) {
     const tw = textWidth(ctx, line);
     ctx.font = PR_FONT;
     ctx.fillStyle = ink.prInk;
-    ctx.fillText(sub.pr!, cx + tw + PART_GAP, mid);
+    write(sub.pr!, cx + tw + PART_GAP);
   }
   ctx.globalAlpha = 1;
 }
