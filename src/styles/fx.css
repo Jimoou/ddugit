@@ -365,6 +365,14 @@
 .blame-gutter code {
   color: var(--star);
 }
+/* The age colours run through near-white, made for the dark sheet: on paper
+   the SHA leans on the ink and the star gets a rim. */
+:root[data-theme="light"] .blame-gutter code {
+  color: color-mix(in srgb, var(--star) 45%, var(--text));
+}
+:root[data-theme="light"] .blame-gutter .star {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 30%, transparent);
+}
 .blame-gutter .who {
   flex: 1;
   min-width: 0;
