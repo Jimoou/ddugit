@@ -11,6 +11,20 @@ use tauri_plugin_updater::UpdaterExt;
 
 const ENDPOINT: Option<&str> = option_env!("DDUGIT_UPDATE_URL");
 
+/// What a copy installed from the Microsoft Store answers: the Store updates it
+/// (a packaged app can't replace its own files, and Store policy says the same).
+pub const FROM_STORE: &str = "Installed from the Microsoft Store: the Store keeps it up to date";
+
+/// Whether this copy runs from an MSIX package the Store installed
+/// (`C:\Program Files\WindowsApps\…`).
+pub fn from_store() -> bool {
+    cfg!(windows) && std::env::current_exe().is_ok_and(|exe| store_path(&exe.to_string_lossy()))
+}
+
+fn store_path(exe: &str) -> bool {
+    exe.to_ascii_lowercase().contains("\\windowsapps\\")
+}
+
 /// A newer version than the one running.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +45,9 @@ fn endpoint(raw: Option<&str>) -> Result<Option<tauri::Url>, String> {
 pub const NOT_UPDATABLE: &str = "This build doesn't check for updates";
 
 async fn find(app: &tauri::AppHandle) -> Result<Option<tauri_plugin_updater::Update>, String> {
+    if from_store() {
+        return Err(FROM_STORE.into());
+    }
     let Some(url) = endpoint(ENDPOINT)? else {
         return Err(NOT_UPDATABLE.into());
     };
@@ -64,6 +81,16 @@ pub async fn install(app: &tauri::AppHandle) -> Result<(), String> {
 mod tests {
     use super::*;
     use base64::Engine;
+
+    #[test]
+    fn a_store_install_is_told_apart_by_its_folder() {
+        assert!(store_path(
+            r"C:\Program Files\WindowsApps\ddugit_1.4.3.0_x64__abc\ddugit.exe"
+        ));
+        assert!(store_path(r"c:\program files\windowsapps\x\ddugit.exe"));
+        assert!(!store_path(r"C:\Users\me\AppData\Local\ddugit\ddugit.exe"));
+        assert!(!store_path("/Applications/ddugit.app/Contents/MacOS/ddugit"));
+    }
 
     #[test]
     fn a_build_without_an_address_never_updates() {

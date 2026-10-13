@@ -5,13 +5,13 @@
 
 _마지막 갱신: 2026-10-12_
 
-## 지금: v1.4.3 릴리스 (진짜 목록 보기 #166, UI 수정 #165)
+## 지금: Windows 무료 서명 = Microsoft Store (MSIX)
 
-- 사용자 요청(2026-10-12): 작업 기록 글자 겹침, 사이드바 원격 줄 배경 제거·'받기만' 배지 정렬, 섹션 +/… 간격(#165), '목록 보기'를 지도 회전 대신 진짜 목록으로
-- 목록: `graph/CommitList.tsx`(`settings.listView`). 그래프 열 캔버스 + 가상 스크롤 행, `GraphHandle` 구현. HUD는 목록에서 HEAD·목록 버튼만
-- Windows 서명: 사용자가 라이선스(인증서) 문제를 더 고민하기로 함. 선택지 정리는 대화에: 스토어(MSIX, 무료) / Certum 개인 / SSL.com 개인 / Azure(사업자 필요)
+- 사용자 결정(2026-10-12): 개인·사업자 없음 → 스토어로. Store가 MSIX에 서명, 스토어 설치는 SmartScreen 경고 없음. ddugit.com `.exe`는 서명 없이 보조로 남김
+- 구현: `scripts/msix.mjs`(매니페스트·타일·exe 배치, runFullTrust), release.yml Windows 잡에서 `makeappx pack`(artifact에 `.msix`), `msix-check.yml`(매니페스트 검사). 스토어 설치본은 `update.rs`의 `from_store`로 앱 안 업데이트 끔(설정 → 정보 문구)
+- 사용자 할 일: Partner Center 개인 계정 → 이름 `ddugit` 예약 → Product identity 세 값을 Actions 변수 `MSIX_IDENTITY_NAME`·`MSIX_PUBLISHER`·`MSIX_PUBLISHER_NAME`에 → 다음 릴리스의 `.msix` 제출(절차: docs/RELEASE.md). 제출 전 실기 확인 한 번
 - Paddle 판매자 검증: 목요일(10/15)까지 기다린 뒤 지원팀 문의
-- 직전: v1.4.2 릴리스(목록 보기 커밋 메시지 바탕 판)
+- 직전: v1.4.3 릴리스(진짜 목록 보기 #166, UI 수정 #165)
 
 ## 남은 일
 

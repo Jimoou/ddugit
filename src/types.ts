@@ -701,6 +701,8 @@ export interface AppInfo {
   os: string;
   osVersion: string;
   arch: string;
+  /** Installed from the Microsoft Store, which updates it (no in-app updates). */
+  store: boolean;
 }
 
 export type ReportKind = "bug" | "question";

@@ -1355,6 +1355,7 @@ export const en: Record<Key, string> = {
   "about.checkUpdates": "Check for updates",
   "about.checking": "Checking…",
   "about.latest": "You're on the latest version.",
+  "about.store": "Installed from the Microsoft Store, which keeps it up to date.",
   "about.checkFailed": "Couldn't check for updates: {error}",
   "about.reportHint": "Reports and questions go to ddugit.com. You can check and edit them before sending.",
   "crash.tab": "Something went wrong in this tab.",

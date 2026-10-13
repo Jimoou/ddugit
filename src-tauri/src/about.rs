@@ -12,6 +12,8 @@ pub struct AppInfo {
     /// Empty when it can't be read.
     pub os_version: String,
     pub arch: String,
+    /// Installed from the Microsoft Store (which then updates it).
+    pub store: bool,
 }
 
 pub fn app_info() -> AppInfo {
@@ -20,6 +22,7 @@ pub fn app_info() -> AppInfo {
         os: std::env::consts::OS.into(),
         os_version: os_version(),
         arch: std::env::consts::ARCH.into(),
+        store: crate::update::from_store(),
     }
 }
 

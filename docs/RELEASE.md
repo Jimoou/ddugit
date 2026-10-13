@@ -162,6 +162,37 @@ CodeSignTool.bat sign -username=... -password=... -credential_id=... -totp_secre
 
 SmartScreen 경고는 서명해도 처음에는 나올 수 있다. 다운로드 평판이 쌓이면 사라진다.
 
+### Windows: Microsoft Store (무료 서명, 2026-10-12 결정)
+
+개인(한국, 사업자 없음)이 무료로 서명된 Windows 앱을 내는 길이다. 스토어는 MSIX 패키지를 심사한 뒤 **Microsoft가 서명**한다. 스토어에서 설치한 사람은 SmartScreen 경고를 보지 않는다. ddugit.com의 `.exe`는 여전히 서명 없음(폐쇄망·스토어가 막힌 PC용으로 남긴다).
+
+릴리스마다 Windows 잡이 같은 `ddugit.exe`로 `ddugit_<버전>_x64.msix`를 만든다(`scripts/msix.mjs` + `makeappx`, 서명 없음, artifact `ddugit-windows-latest`). 스토어 설치본은 앱 안 업데이트를 끈다(`update.rs`의 `from_store`: `WindowsApps` 폴더에서 실행 중이면 업데이트는 스토어가 한다). 매니페스트가 바뀌면 `msix-check.yml`이 Windows에서 `makeappx`로 검사한다.
+
+#### 처음 한 번 (사용자)
+
+1. **Partner Center 개인 개발자 계정**: https://storedeveloper.microsoft.com 에서 개인으로 가입(무료, 신분증·셀카 본인 확인)
+2. **앱 이름 예약**: Partner Center → 앱 및 게임 → 새 제품 → MSIX 또는 PWA 앱 → 이름 `ddugit`
+3. **패키지 ID 값 넣기**: 예약한 앱의 제품 관리 → 제품 ID(Product identity)에 있는 세 값을 이 저장소 Settings → Secrets and variables → Actions → **Variables**에 넣는다(비밀 아님)
+   - `MSIX_IDENTITY_NAME` ← Package/Identity/Name (예: `12345YourName.ddugit`)
+   - `MSIX_PUBLISHER` ← Package/Identity/Publisher (`CN=…`)
+   - `MSIX_PUBLISHER_NAME` ← Package/Properties/PublisherDisplayName
+4. 다음 릴리스부터 Windows artifact에 스토어가 받는 `.msix`가 들어간다(값이 없으면 대신 쓰는 이름으로 만들어지고, 스토어는 받지 않는다)
+
+#### 제출 (릴리스마다)
+
+1. Actions의 Release 실행에서 artifact `ddugit-windows-latest`를 받아 `.msix`를 꺼낸다
+2. Partner Center → ddugit → 새 제출 → 패키지에 `.msix`를 올린다
+3. 처음 제출 때만 채울 것
+   - **가격**: 무료(앱 안의 Pro는 사이트 라이선스. 게임이 아닌 앱은 자체 결제를 써도 된다는 것이 스토어 정책 10.8로 알고 있지만, 제출 전에 정책 원문을 한 번 확인한다)
+   - **개인정보 처리방침 URL**: https://ddugit.com/privacy
+   - **연령 등급** 설문, **스토어 목록**(설명·스크린숏: 사이트의 `public/screens`를 쓴다)
+   - **runFullTrust 사유**(제한된 기능이라 묻는다): "ddugit is a desktop Git client. It runs the user's installed git and ssh programs, and opens the user's editor, terminal and diff tools on files in their repositories."
+4. 심사는 보통 1~3일. 통과하면 ddugit.com의 Windows 다운로드를 스토어 링크로 바꾼다(직접 받기 `.exe`는 보조로)
+
+#### 실기 확인 (스토어에 내기 전에 한 번)
+
+서명 없는 `.msix`는 바로 설치되지 않는다. Windows에서 개발자 모드를 켜고 PowerShell로 `Add-AppxPackage -Register <풀린 폴더>\AppxManifest.xml` 하거나, 스토어의 비공개 배포(숨김/패키지 플라이트)로 받아 확인한다. 볼 것: git·ssh·편집기 실행, 라이선스 활성화(브라우저 → 127.0.0.1), 키체인(자격 증명 관리자), 설정 저장, 설정 → 정보에 "업데이트는 스토어가 해요".
+
 ### 서명한 뒤
 
 `release.yml`의 `releaseBody`에 적힌 "Unsigned build…" 안내를 지운다.
