@@ -20,13 +20,17 @@ export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Ma
     setWasStopped(stopped);
     if (!stopped) setConflict(null);
   }
-  const diffReq = useRef(0);
+  const diffReq = useRef(new Map<string, number>());
 
-  /** Fetch the files for the open diff; only the latest request may land. */
+  /** Fetch the files for the open diff; only the latest request for that diff may land. */
   const fetchDiff = useCallback(
     (source: DiffSource) => {
       if (!path) return;
-      const req = ++diffReq.current;
+      // Counted per diff: a refetch of the tab just left (a snapshot effect that ran after the
+      // switch) must not void the request for the tab now open, or that tab stays empty.
+      const key = JSON.stringify(source);
+      const req = (diffReq.current.get(key) ?? 0) + 1;
+      diffReq.current.set(key, req);
       const load =
         source.kind === "commit"
           ? api.commitDiff(path, source.id)
@@ -36,7 +40,7 @@ export function useSheet(path: string, snap: RepoSnapshot | null, commitById: Ma
       // Only the latest request lands, and only on the diff it was for: a reply for the other
       // working-tree tab (or another commit) must not fill this one.
       const land = (files: Awaited<typeof load>, error: string | null) =>
-        req === diffReq.current &&
+        req === diffReq.current.get(key) &&
         setSheet((s) =>
           s?.kind === "diff" && sameSource(s.source, source) ? { ...s, files, error: error ?? s.error } : s,
         );
