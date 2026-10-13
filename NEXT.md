@@ -3,13 +3,14 @@
 > **갱신형 문서입니다.** 작업 단위가 끝날 때마다 **덮어씁니다.** 이력은 [ROADMAP.md](ROADMAP.md)의 작업 기록에 남깁니다.
 > 컨텍스트가 압축되거나 새 세션을 시작하면 **이 파일부터 읽습니다.**
 
-_마지막 갱신: 2026-10-12_
+_마지막 갱신: 2026-10-13_
 
 ## 지금: Windows 무료 서명 = Microsoft Store (MSIX)
 
 - 사용자 결정(2026-10-12): 개인·사업자 없음 → 스토어로. Store가 MSIX에 서명, 스토어 설치는 SmartScreen 경고 없음. ddugit.com `.exe`는 서명 없이 보조로 남김
-- 구현: `scripts/msix.mjs`(매니페스트·타일·exe 배치, runFullTrust), release.yml Windows 잡에서 `makeappx pack`(artifact에 `.msix`), `msix-check.yml`(매니페스트 검사). 스토어 설치본은 `update.rs`의 `from_store`로 앱 안 업데이트 끔(설정 → 정보 문구)
-- 사용자 할 일: Partner Center 개인 계정 → 이름 `ddugit` 예약 → Product identity 세 값을 Actions 변수 `MSIX_IDENTITY_NAME`·`MSIX_PUBLISHER`·`MSIX_PUBLISHER_NAME`에 → 다음 릴리스의 `.msix` 제출(절차: docs/RELEASE.md). 제출 전 실기 확인 한 번
+- 구현: `scripts/msix.mjs`(매니페스트·타일·exe 배치, runFullTrust), release.yml Windows 잡에서 `makeappx pack`(artifact에 `.msix`), `msix-check.yml`(매니페스트 검사). 스토어 설치본은 `update.rs`의 `from_store`(패키지 ID, `GetCurrentPackageFullName`)로 앱 안 업데이트 끔(설정 → 정보 문구)
+- 완료: Partner Center 이름 예약, Actions 변수 `MSIX_*`, 진짜 ID로 만든 `ddugit_1.4.3_x64.msix`(Release #38, artifact만), 사용자 실기 확인(`Add-AppxPackage -Register`) 문제 없음
+- 사용자 할 일: Partner Center에 `.msix` 제출(절차: docs/RELEASE.md). 통과하면 ddugit.com Windows 다운로드를 스토어 링크로 바꾼다(`.exe`는 보조)
 - Paddle 판매자 검증: 목요일(10/15)까지 기다린 뒤 지원팀 문의
 - 직전: v1.4.3 릴리스(진짜 목록 보기 #166, UI 수정 #165)
 

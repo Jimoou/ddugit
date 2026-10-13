@@ -15,14 +15,28 @@ const ENDPOINT: Option<&str> = option_env!("DDUGIT_UPDATE_URL");
 /// (a packaged app can't replace its own files, and Store policy says the same).
 pub const FROM_STORE: &str = "Installed from the Microsoft Store: the Store keeps it up to date";
 
-/// Whether this copy runs from an MSIX package the Store installed
-/// (`C:\Program Files\WindowsApps\…`).
+/// Whether this copy runs as an MSIX package (the Store's install, or one
+/// registered by hand for a check): Windows gives the process a package
+/// identity then, wherever its files are.
+#[cfg(windows)]
 pub fn from_store() -> bool {
-    cfg!(windows) && std::env::current_exe().is_ok_and(|exe| store_path(&exe.to_string_lossy()))
+    // appmodel.h; Windows 8 and later.
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetCurrentPackageFullName(length: *mut u32, name: *mut u16) -> i32;
+    }
+    const APPMODEL_ERROR_NO_PACKAGE: i32 = 15700;
+    let mut length = 0u32;
+    // With no buffer it answers how long the name is (ERROR_INSUFFICIENT_BUFFER)
+    // or that the process has no package; only the latter matters here.
+    // SAFETY: a valid length pointer and a null buffer of length 0.
+    let status = unsafe { GetCurrentPackageFullName(&mut length, std::ptr::null_mut()) };
+    status != APPMODEL_ERROR_NO_PACKAGE
 }
 
-fn store_path(exe: &str) -> bool {
-    exe.to_ascii_lowercase().contains("\\windowsapps\\")
+#[cfg(not(windows))]
+pub fn from_store() -> bool {
+    false
 }
 
 /// A newer version than the one running.
@@ -83,13 +97,8 @@ mod tests {
     use base64::Engine;
 
     #[test]
-    fn a_store_install_is_told_apart_by_its_folder() {
-        assert!(store_path(
-            r"C:\Program Files\WindowsApps\ddugit_1.4.3.0_x64__abc\ddugit.exe"
-        ));
-        assert!(store_path(r"c:\program files\windowsapps\x\ddugit.exe"));
-        assert!(!store_path(r"C:\Users\me\AppData\Local\ddugit\ddugit.exe"));
-        assert!(!store_path("/Applications/ddugit.app/Contents/MacOS/ddugit"));
+    fn a_test_run_is_not_a_package() {
+        assert!(!from_store());
     }
 
     #[test]
