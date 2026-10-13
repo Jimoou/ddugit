@@ -193,7 +193,8 @@ jobs:
           node scripts/msix.mjs src-tauri/target/release/ddugit.exe "$layout" "$MSIX_NAME" "$MSIX_PUBLISHER" "$MSIX_PUBLISHER_NAME"
           sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64 | sort -V | tail -1)
           mkdir -p "$out"
-          "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$out/ddugit_${version}_x64.msix")"
+          # Git Bash would turn the /o, /d, /p switches into paths.
+          MSYS_NO_PATHCONV=1 "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$out/ddugit_${version}_x64.msix")"
       # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
       - name: Verify macOS signature
         if: runner.os == 'macOS' && env.HAS_APPLE == 'true'

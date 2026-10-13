@@ -30,4 +30,5 @@ jobs:
           cp "$(cygpath -u "$WINDIR")/System32/notepad.exe" "$RUNNER_TEMP/ddugit.exe"
           node scripts/msix.mjs "$RUNNER_TEMP/ddugit.exe" "$layout" ddugit.check "CN=ddugit" ddugit
           sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64 | sort -V | tail -1)
-          "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$RUNNER_TEMP/check.msix")"
+          # Git Bash would turn the /o, /d, /p switches into paths.
+          MSYS_NO_PATHCONV=1 "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$RUNNER_TEMP/check.msix")"
