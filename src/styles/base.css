@@ -200,6 +200,14 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: var(--ui-hover);
 }
+/* Keys and badges inside the filled key take its ink: their own colours are
+   picked for the page, and the key is the page's opposite. */
+button.primary kbd,
+button.primary .pro-badge {
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  background: none;
+}
 button.ghost {
   background-color: transparent;
   border-color: var(--line);
