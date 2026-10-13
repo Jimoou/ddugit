@@ -10,10 +10,9 @@ _마지막 갱신: 2026-10-13_
 - 사용자 결정(2026-10-12): 개인·사업자 없음 → 스토어로. Store가 MSIX에 서명, 스토어 설치는 SmartScreen 경고 없음. ddugit.com `.exe`는 서명 없이 보조로 남김
 - 구현: `scripts/msix.mjs`(매니페스트·타일·exe 배치, runFullTrust), release.yml Windows 잡에서 `makeappx pack`(artifact에 `.msix`), `msix-check.yml`(매니페스트 검사). 스토어 설치본은 `update.rs`의 `from_store`(패키지 ID, `GetCurrentPackageFullName`)로 앱 안 업데이트 끔(설정 → 정보 문구)
 - 완료: Partner Center 이름 예약, Actions 변수 `MSIX_*`, 진짜 ID로 만든 `ddugit_1.4.3_x64.msix`(Release #38, artifact만), 사용자 실기 확인(`Add-AppxPackage -Register`) 문제 없음
-- 제출 완료(2026-10-13, 1.4.3). 인증 결과는 사용자가 알려 준다. 통과하면 ddugit.com Windows 다운로드를 스토어 링크로 바꾼다(`.exe`는 보조)
-- 다음 릴리스(1.4.4)에 들어갈 것: 스토어 설치본 판단을 패키지 ID로(#169), 채운 버튼 위 글자 대비·diff 시트 탭 경쟁 상태(#170)
+- 제출 완료(2026-10-13, 1.4.3). 인증 결과는 사용자가 알려 준다. 통과하면 ddugit.com Windows 다운로드를 스토어 링크로 바꾼다(`.exe`는 보조). 1.4.4 `.msix`는 인증이 끝난 뒤 새 제출로 올린다
 - **판매 시작(2026-10-13)**: Paddle 판매자 검증 통과 → live 전환(Supabase Secrets·Netlify 값, 웹훅 목적지) → 실결제·앱 활성화·환불까지 사용자가 확인
-- 직전: v1.4.3 릴리스(진짜 목록 보기 #166, UI 수정 #165)
+- 직전: v1.4.4 릴리스(스토어 설치본 판단 #169, 글자 대비·diff 탭 #170)
 
 ## 남은 일
 
