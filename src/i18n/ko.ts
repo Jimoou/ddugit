@@ -1335,6 +1335,7 @@ export const ko = {
   "about.checkUpdates": "업데이트 확인",
   "about.checking": "확인하는 중…",
   "about.latest": "최신 버전을 쓰고 있어요.",
+  "about.store": "Microsoft Store에서 설치했어요. 업데이트는 스토어가 해요.",
   "about.checkFailed": "업데이트를 확인하지 못했어요: {error}",
   "about.reportHint": "문제 신고와 문의는 ddugit.com으로 보내져요. 보내기 전에 내용을 확인하고 고칠 수 있어요.",
   "crash.tab": "이 탭에서 문제가 생겼어요.",

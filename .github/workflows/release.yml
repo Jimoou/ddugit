@@ -171,6 +171,29 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.UPDATER_ARGS && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
         with:
           args: ${{ matrix.args }} ${{ env.SIGN_ARGS }} ${{ env.UPDATER_ARGS }}
+      # The Microsoft Store package from the same ddugit.exe, unsigned (the Store signs what it
+      # accepts; docs/RELEASE.md). Its identity comes from Partner Center; without it a stand-in
+      # identity still checks the packing, but the Store won't take that package.
+      - name: Microsoft Store package
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          MSIX_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_NAME: ${{ vars.MSIX_PUBLISHER_NAME }}
+        run: |
+          set -euo pipefail
+          if [ -z "$MSIX_NAME" ]; then
+            echo "::warning::MSIX_IDENTITY_NAME is not set: packed with a stand-in identity the Store won't accept"
+            MSIX_NAME=ddugit.unregistered MSIX_PUBLISHER="CN=ddugit" MSIX_PUBLISHER_NAME=ddugit
+          fi
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          layout="$RUNNER_TEMP/msix"
+          out=src-tauri/target/release/bundle/msix
+          node scripts/msix.mjs src-tauri/target/release/ddugit.exe "$layout" "$MSIX_NAME" "$MSIX_PUBLISHER" "$MSIX_PUBLISHER_NAME"
+          sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64 | sort -V | tail -1)
+          mkdir -p "$out"
+          "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$out/ddugit_${version}_x64.msix")"
       # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
       - name: Verify macOS signature
         if: runner.os == 'macOS' && env.HAS_APPLE == 'true'
@@ -212,6 +235,7 @@ jobs:
           path: |
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msix/*.msix
           if-no-files-found: error
 
   # Once both installers are up: `downloads.json` at the storage root says which

@@ -38,7 +38,7 @@ export function AboutSection({ onReport }: { onReport(): void }) {
         <button onClick={() => openLink(PRIVACY_URL)}>{t("about.privacy")}</button>
       </div>
       <p className="muted small">{t("about.reportHint")}</p>
-      <UpdateCheck />
+      {info?.store ? <p className="muted small">{t("about.store")}</p> : <UpdateCheck />}
     </section>
   );
 }

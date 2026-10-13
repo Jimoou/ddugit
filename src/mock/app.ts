@@ -165,7 +165,8 @@ export const appCommands = {
       return fail("Couldn't reach ddugit.com: io: failed to lookup address information");
     return delay(`demo-${demoControls.sent.length}`);
   },
-  app_info: () => delay({ version: `${appVersion}-demo`, os: "demo", osVersion: navigator.platform, arch: "web" }),
+  app_info: () =>
+    delay({ version: `${appVersion}-demo`, os: "demo", osVersion: navigator.platform, arch: "web", store: false }),
 
   license_status: () => Promise.resolve(demoLicenseStatus()),
   license_install({ text }) {
