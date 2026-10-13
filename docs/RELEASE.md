@@ -166,7 +166,7 @@ SmartScreen 경고는 서명해도 처음에는 나올 수 있다. 다운로드 
 
 개인(한국, 사업자 없음)이 무료로 서명된 Windows 앱을 내는 길이다. 스토어는 MSIX 패키지를 심사한 뒤 **Microsoft가 서명**한다. 스토어에서 설치한 사람은 SmartScreen 경고를 보지 않는다. ddugit.com의 `.exe`는 여전히 서명 없음(폐쇄망·스토어가 막힌 PC용으로 남긴다).
 
-릴리스마다 Windows 잡이 같은 `ddugit.exe`로 `ddugit_<버전>_x64.msix`를 만든다(`scripts/msix.mjs` + `makeappx`, 서명 없음, artifact `ddugit-windows-latest`). 스토어 설치본은 앱 안 업데이트를 끈다(`update.rs`의 `from_store`: `WindowsApps` 폴더에서 실행 중이면 업데이트는 스토어가 한다). 매니페스트가 바뀌면 `msix-check.yml`이 Windows에서 `makeappx`로 검사한다.
+릴리스마다 Windows 잡이 같은 `ddugit.exe`로 `ddugit_<버전>_x64.msix`를 만든다(`scripts/msix.mjs` + `makeappx`, 서명 없음, artifact `ddugit-windows-latest`). 스토어 설치본은 앱 안 업데이트를 끈다(`update.rs`의 `from_store`: 프로세스에 패키지 ID가 있으면(`GetCurrentPackageFullName`) 업데이트는 스토어가 한다. 손으로 `-Register`한 패키지도 같다). 매니페스트가 바뀌면 `msix-check.yml`이 Windows에서 `makeappx`로 검사한다.
 
 #### 처음 한 번 (사용자)
 
