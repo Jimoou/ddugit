@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Tiles the Store and Start need, from the icons `tauri icon` made. */
-export const TILES = ["StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png", "Square310x310Logo.png"];
+export const TILES = ["StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png"];
 
 const xml = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]);
@@ -55,9 +55,7 @@ export function manifest({ name, publisher, publisherName, version, description 
         Description="${xml(description)}"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\\Square150x150Logo.png"
-        Square44x44Logo="Assets\\Square44x44Logo.png">
-        <uap:DefaultTile Square310x310Logo="Assets\\Square310x310Logo.png" />
-      </uap:VisualElements>
+        Square44x44Logo="Assets\\Square44x44Logo.png" />
     </Application>
   </Applications>
   <Capabilities>
