@@ -13,14 +13,14 @@ _마지막 갱신: 2026-10-14_
 - 스토어 인증 통과(2026-10-14, 1.4.3): https://apps.microsoft.com/detail/9MW648MCPQPQ . ddugit.com Windows 다운로드는 스토어가 주 버튼, 서명 없는 `.exe`는 보조 링크(ddugit-site#44, `site.ts`의 `MICROSOFT_STORE_URL`)
 - 다음 스토어 업데이트: 릴리스마다 Windows artifact의 `.msix`를 Partner Center 새 제출로 올린다(손으로). 1.4.4는 사용자가 올릴 차례
 - **판매 시작(2026-10-13)**: Paddle 판매자 검증 통과 → live 전환(Supabase Secrets·Netlify 값, 웹훅 목적지) → 실결제·앱 활성화·환불까지 사용자가 확인
-- 직전: v1.4.5 릴리스(열 때 HEAD 레인에 포커스 #174). 사이트: 오프라인 코드 발급 시 환불 불가(ddugit-site#45)
+- 직전: v1.4.6 릴리스(번들 저작권 `© Grapipe`, Cargo `authors` Grapipe #176). 그 전 v1.4.5: 열 때 HEAD 레인에 포커스(#174), 사이트 오프라인 코드 발급 시 환불 불가(ddugit-site#45)
 
 ## 지금: 이름을 Grapipe로 통일 (2026-10-14)
 
 - 사용자 결정: 화면에 보이는 만든 이는 활동명 **Grapipe**(사업자 아님), 문의는 **support@grapipe.com**. 실명은 꼭 있어야 하는 곳(약관·개인정보의 한 줄, Paddle 계정)에만
 - 앱: 번들 저작권 `© Grapipe`(`tauri.conf.json`). Windows 설치본의 게시자(`bundle.publisher`)는 바꾸지 않았다(NSIS 레지스트리 경로가 바뀌어 업데이트가 옛 설치를 못 찾을 수 있다). 스토어 게시자는 이미 Grapipe
-- 사이트: ddugit-site#46(초안). `SITE.maker`/`SITE.legalName`, `CONTACT_EMAIL` = support@grapipe.com. **support@가 실제로 받아진 뒤에 머지**
-- 메일: Cloudflare Email Routing(받기 → Gmail) + Resend 무료 SMTP(Gmail '다른 주소에서 보내기'). 사용자가 세팅 중
+- 사이트: ddugit-site#46 머지·배포(Netlify, Supabase 함수). `SITE.maker`/`SITE.legalName`, `CONTACT_EMAIL` = support@grapipe.com
+- 메일: Cloudflare Email Routing(받기 → Gmail) + Resend 무료 SMTP(Gmail '다른 주소에서 보내기'). 사용자가 세팅·테스트 완료(2026-10-14)
 
 ## 남은 일
 
@@ -28,8 +28,8 @@ _마지막 갱신: 2026-10-14_
 
 ### 사용자
 
-0. grapipe.com 메일 세팅(Cloudflare 네임서버 → Email Routing → Resend 도메인 → Gmail 보내기) 후 다른 계정에서 보내고 답장해 확인 → ddugit-site#46 머지. Paddle·Partner Center의 지원 이메일도 support@로
-1. Partner Center에 1.4.4 `.msix` 새 제출(Release #39의 `ddugit-windows-latest`)
+0. Paddle 대시보드의 고객용 지원 이메일을 support@grapipe.com으로(있으면). git 커밋 이메일을 GitHub noreply로
+1. Partner Center에 최신 `.msix` 새 제출(Release 실행의 `ddugit-windows-latest`, 1.4.6부터 저작권 Grapipe)
 2. 상품 생성에 쓴 넓은 권한의 라이브 API 키가 남아 있으면 지운다(사이트는 Customers 읽기·Adjustments 쓰기 키만 쓴다)
 3. Windows 실기 점검(창 버튼·크기 조절·SmartScreen), 외부 열기·편집기·저장 창·diff/merge 도구(macOS·Windows)
 4. Supabase Auth → Sessions: 최대 기간·미사용 제한(선택), Providers에서 Email·Phone·Anonymous 꺼짐 확인
