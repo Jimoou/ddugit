@@ -44,7 +44,7 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Graph-first Git client",
-    "copyright": "© ddugit",
+    "copyright": "© Grapipe",
     "macOS": {
       "minimumSystemVersion": "11.0"
     },
