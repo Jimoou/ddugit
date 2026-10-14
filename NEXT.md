@@ -5,12 +5,13 @@
 
 _마지막 갱신: 2026-10-13_
 
-## 지금: Windows 무료 서명 = Microsoft Store (MSIX)
+## 지금: Windows는 Microsoft Store에서 (2026-10-14 인증 통과)
 
 - 사용자 결정(2026-10-12): 개인·사업자 없음 → 스토어로. Store가 MSIX에 서명, 스토어 설치는 SmartScreen 경고 없음. ddugit.com `.exe`는 서명 없이 보조로 남김
 - 구현: `scripts/msix.mjs`(매니페스트·타일·exe 배치, runFullTrust), release.yml Windows 잡에서 `makeappx pack`(artifact에 `.msix`), `msix-check.yml`(매니페스트 검사). 스토어 설치본은 `update.rs`의 `from_store`(패키지 ID, `GetCurrentPackageFullName`)로 앱 안 업데이트 끔(설정 → 정보 문구)
 - 완료: Partner Center 이름 예약, Actions 변수 `MSIX_*`, 진짜 ID로 만든 `ddugit_1.4.3_x64.msix`(Release #38, artifact만), 사용자 실기 확인(`Add-AppxPackage -Register`) 문제 없음
-- 제출 완료(2026-10-13, 1.4.3). 인증 결과는 사용자가 알려 준다. 통과하면 ddugit.com Windows 다운로드를 스토어 링크로 바꾼다(`.exe`는 보조). 1.4.4 `.msix`는 인증이 끝난 뒤 새 제출로 올린다
+- 스토어 인증 통과(2026-10-14, 1.4.3): https://apps.microsoft.com/detail/9MW648MCPQPQ . ddugit.com Windows 다운로드는 스토어가 주 버튼, 서명 없는 `.exe`는 보조 링크(ddugit-site#44, `site.ts`의 `MICROSOFT_STORE_URL`)
+- 다음 스토어 업데이트: 릴리스마다 Windows artifact의 `.msix`를 Partner Center 새 제출로 올린다(손으로). 1.4.4는 사용자가 올릴 차례
 - **판매 시작(2026-10-13)**: Paddle 판매자 검증 통과 → live 전환(Supabase Secrets·Netlify 값, 웹훅 목적지) → 실결제·앱 활성화·환불까지 사용자가 확인
 - 직전: v1.4.4 릴리스(스토어 설치본 판단 #169, 글자 대비·diff 탭 #170)
 
@@ -20,7 +21,7 @@ _마지막 갱신: 2026-10-13_
 
 ### 사용자
 
-1. Microsoft Store 인증 결과 대기(통과하면 사이트 Windows 다운로드를 스토어 링크로)
+1. Partner Center에 1.4.4 `.msix` 새 제출(Release #39의 `ddugit-windows-latest`)
 2. 상품 생성에 쓴 넓은 권한의 라이브 API 키가 남아 있으면 지운다(사이트는 Customers 읽기·Adjustments 쓰기 키만 쓴다)
 3. Windows 실기 점검(창 버튼·크기 조절·SmartScreen), 외부 열기·편집기·저장 창·diff/merge 도구(macOS·Windows)
 4. Supabase Auth → Sessions: 최대 기간·미사용 제한(선택), Providers에서 Email·Phone·Anonymous 꺼짐 확인
