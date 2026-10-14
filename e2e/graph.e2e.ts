@@ -262,3 +262,37 @@ test("zooms with the keys and Ctrl+wheel, pans with the wheel, and the minimap j
   expect(Math.abs(after.x - middle)).toBeLessThan(Math.abs(before.x - middle));
   expect(Math.abs(after.x - middle)).toBeLessThan(box.width / 4);
 });
+
+test("frames HEAD on its own lane, even when the graph is taller than the screen", async ({ demo }) => {
+  const { page } = demo;
+  // Many side branches put HEAD's lane far from the middle of all lanes.
+  await demo.mutate((d) => {
+    const at = (id: string, parents: string[], i: number) => ({
+      id,
+      parents,
+      summary: id,
+      message: id,
+      author: "Minji",
+      email: "minji@example.com",
+      time: 1_700_000_000 + i * 60,
+    });
+    const commits = [at("m3", ["m2"], 40), at("m2", ["m1"], 39), at("m1", ["root"], 38)];
+    const refs = [{ name: "main", kind: "local" as const, target: "m3" }];
+    for (let i = 0; i < 12; i++) {
+      commits.push(at(`b${i}`, ["root"], 20 + i));
+      refs.push({ name: `side-${i}`, kind: "local" as const, target: `b${i}` });
+    }
+    commits.push(at("root", [], 0));
+    d.clean();
+    d.loadHistory({ commits, refs, head: { branch: "main", target: "m3" } as never });
+  });
+  const canvas = page.locator(".app:not([hidden]) .graph-area canvas");
+  await canvas.focus();
+  await page.keyboard.press("h");
+  const box = (await canvas.boundingBox())!;
+  await expect
+    .poll(async () =>
+      Math.abs((await page.evaluate(() => window.__ddugit.screenOf("m3")))!.y - (box.y + box.height / 2)),
+    )
+    .toBeLessThan(10);
+});
