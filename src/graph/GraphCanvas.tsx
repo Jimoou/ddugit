@@ -260,7 +260,8 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
     const sc = sceneRef.current;
     const node = propsRef.current.headId ? sc.layout.byId.get(propsRef.current.headId) : undefined;
     if (!node) return plusPosition(sc, null);
-    return { x: xOf(node.row, sc.layout.rowCount) + COL * 0.5 - (timeSpan() * 0.18) / k, y: sc.height / 2 };
+    // HEAD's own lane, not the middle of all lanes: on a wide graph that can sit off screen.
+    return { x: xOf(node.row, sc.layout.rowCount) + COL * 0.5 - (timeSpan() * 0.18) / k, y: yOf(node.lane) };
   };
 
   /** A commit's position on the canvas, or null if it isn't loaded. */
