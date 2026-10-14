@@ -286,6 +286,8 @@ test("frames HEAD on its own lane, even when the graph is taller than the screen
     d.clean();
     d.loadHistory({ commits, refs, head: { branch: "main", target: "m3" } as never });
   });
+  // H must see the new history: before the app has read it, HEAD's lane is the old one.
+  await expect.poll(() => page.evaluate(() => window.__ddugit.screenOf("b11") !== null)).toBe(true);
   const canvas = page.locator(".app:not([hidden]) .graph-area canvas");
   await canvas.focus();
   await page.keyboard.press("h");

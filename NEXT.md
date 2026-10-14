@@ -13,7 +13,7 @@ _마지막 갱신: 2026-10-13_
 - 스토어 인증 통과(2026-10-14, 1.4.3): https://apps.microsoft.com/detail/9MW648MCPQPQ . ddugit.com Windows 다운로드는 스토어가 주 버튼, 서명 없는 `.exe`는 보조 링크(ddugit-site#44, `site.ts`의 `MICROSOFT_STORE_URL`)
 - 다음 스토어 업데이트: 릴리스마다 Windows artifact의 `.msix`를 Partner Center 새 제출로 올린다(손으로). 1.4.4는 사용자가 올릴 차례
 - **판매 시작(2026-10-13)**: Paddle 판매자 검증 통과 → live 전환(Supabase Secrets·Netlify 값, 웹훅 목적지) → 실결제·앱 활성화·환불까지 사용자가 확인
-- 직전: v1.4.4 릴리스(스토어 설치본 판단 #169, 글자 대비·diff 탭 #170)
+- 직전: v1.4.5 릴리스(열 때 HEAD 레인에 포커스 #174). 사이트: 오프라인 코드 발급 시 환불 불가(ddugit-site#45)
 
 ## 남은 일
 
