@@ -320,6 +320,7 @@ export const ko = {
   "remote.done.pull": "최신 상태로 받았어요",
   "remote.done.pullMerge": "병합해서 받았어요",
   "remote.done.pullRebase": "리베이스해서 받았어요",
+  "remote.pullRebase.skipped": "내 커밋 {n}개는 같은 변경이 이미 원격에 있어서 다시 얹지 않았어요",
   "remote.done.push": "원격에 올렸어요",
   "remote.done.forcePush": "원격을 내 이력으로 덮어썼어요",
   "state.merge": "병합",

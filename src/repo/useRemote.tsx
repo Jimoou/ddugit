@@ -8,7 +8,7 @@ import { SyncDialog } from "../components/SyncDialog";
 import { type Key, t } from "../i18n";
 import type { MissionId } from "../missions";
 import type { Settings } from "../settings";
-import { type SyncOp, syncPlan } from "../sync";
+import { skippedCommits, type SyncOp, syncPlan } from "../sync";
 import type { OpStatus, Progress, RemoteOp, RemoteRefOp, RepoSnapshot } from "../types";
 import type { Repo, Run, Toast } from "./state";
 
@@ -164,6 +164,8 @@ export function useRemote(o: Options) {
       }
       if (r.status === "auth") setOpen({ kind: "auth", op, output: r.output });
       if (r.status === "diverged" || r.status === "rejected") refused(r.status, r.output);
+      const skipped = r.status === "ok" ? skippedCommits(r.output) : 0;
+      if (skipped) toast("ok", t("remote.pullRebase.skipped", { n: skipped }));
       return r.status;
     } finally {
       setRemoteBusy(null);
@@ -178,11 +180,30 @@ export function useRemote(o: Options) {
     if ((await remote(op)) === "ok" && wasRejected) await remote("push");
   };
 
+  /**
+   * Fetch quietly before asking about a pull: the question counts the commits that would come in,
+   * and without it they are counted from the last fetch (often none).
+   */
+  const fetchThenAsk = async () => {
+    if (refuseBusy()) return;
+    setRemoteBusy("fetch");
+    setProgress(null);
+    try {
+      await run(t("remote.done.fetch"), () => api.remote(path, "fetch", setProgress), undefined, true);
+    } finally {
+      setRemoteBusy(null);
+      setProgress(null);
+    }
+    setOpen({ kind: "ask", op: "pull" });
+  };
+
   /** The top bar's buttons: pull and push ask first when the settings say so (or the upstream is fetch-only). */
   const onRemote = (op: RemoteOp) =>
     op === "fetch" || op === "pull" || op === "push"
       ? o.settings.confirmRemote[op] || (op === "push" && pushTarget?.fetchOnly)
-        ? setOpen({ kind: "ask", op })
+        ? op === "pull"
+          ? void fetchThenAsk()
+          : setOpen({ kind: "ask", op })
         : void remote(op)
       : void remote(op);
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { between, syncPlan } from "./sync";
+import { between, skippedCommits, syncPlan } from "./sync";
 import type { CommitInfo, RepoSnapshot } from "./types";
 
 const c = (id: string, ...parents: string[]): CommitInfo => ({
@@ -33,5 +33,18 @@ describe("sync plans", () => {
     const p = syncPlan(snap(null), "push");
     expect(p.upstream).toBeNull();
     expect(p.commits.map((x) => x.id)).toEqual(["c"]);
+  });
+});
+
+describe("skippedCommits", () => {
+  it("counts the commits a rebase left out as already upstream", () => {
+    const out = [
+      "warning: skipped previously applied commit 1a2b3c4",
+      "warning: skipped previously applied commit 5d6e7f8",
+      "hint: use --reapply-cherry-picks to include skipped commits",
+      "Successfully rebased and updated refs/heads/main.",
+    ].join("\n");
+    expect(skippedCommits(out)).toBe(2);
+    expect(skippedCommits("Successfully rebased and updated refs/heads/main.")).toBe(0);
   });
 });

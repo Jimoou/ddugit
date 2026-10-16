@@ -46,3 +46,6 @@ export function syncPlan(snap: RepoSnapshot, op: SyncOp): SyncPlan {
         : [];
   return { op, upstream: head.upstream, commits, dirty: snap.changes.length > 0 };
 }
+
+/** Local commits a rebase pull left out because the upstream already has the same change (git warns once per commit). */
+export const skippedCommits = (output: string) => output.match(/skipped previously applied commit/g)?.length ?? 0;
