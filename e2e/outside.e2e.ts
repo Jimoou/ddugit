@@ -71,8 +71,14 @@ test("the repository opens in the file manager, a terminal and the diff tool", a
 test("the repository opens in the editor chosen in the settings", async ({ demo }) => {
   await chooseEditor(demo, "Cursor");
   await demo.page.keyboard.press("Escape");
-  await repoMenu(demo);
-  await demo.page.locator(".context-menu").getByRole("menuitem", { name: "저장소를 Cursor에서 열기" }).click();
+  // The choice is saved in the background: a menu opened before it lands still has no editor.
+  const item = demo.page.locator(".context-menu").getByRole("menuitem", { name: "저장소를 Cursor에서 열기" });
+  await expect(async () => {
+    if (await demo.page.locator(".context-menu").count()) await demo.page.keyboard.press("Escape");
+    await repoMenu(demo);
+    await expect(item).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await item.click();
   await expect.poll(() => opened(demo)).toEqual([{ what: "editor", file: null, with: "cursor" }]);
 });
 

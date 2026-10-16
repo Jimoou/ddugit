@@ -147,6 +147,12 @@ export const demoControls = {
   keepTabs: !!flag("Tabs"),
   /** The demo tab throws while rendering (the tab's error boundary, e2e) until this is cleared. */
   crashTab: false,
+  /** Snapshot reads, for e2e `settled`: `mark()` numbers a moment; `served` is the newest mark a finished read began at or after. */
+  marks: 0,
+  served: 0,
+  mark() {
+    return ++this.marks;
+  },
   /** Extra milliseconds every demo remote operation takes (e2e: something still running). */
   slow: 0,
   /** Make the next checkout fail with this text, like an unexpected backend error (the toast's Report button). */

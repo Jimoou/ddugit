@@ -13,7 +13,7 @@ _마지막 갱신: 2026-10-14_
 - 스토어 인증 통과(2026-10-14, 1.4.3): https://apps.microsoft.com/detail/9MW648MCPQPQ . ddugit.com Windows 다운로드는 스토어가 주 버튼, 서명 없는 `.exe`는 보조 링크(ddugit-site#44, `site.ts`의 `MICROSOFT_STORE_URL`)
 - 다음 스토어 업데이트: 릴리스마다 Windows artifact의 `.msix`를 Partner Center 새 제출로 올린다(손으로). 1.4.4는 사용자가 올릴 차례
 - **판매 시작(2026-10-13)**: Paddle 판매자 검증 통과 → live 전환(Supabase Secrets·Netlify 값, 웹훅 목적지) → 실결제·앱 활성화·환불까지 사용자가 확인
-- 직전: v1.4.6 릴리스(번들 저작권 `© Grapipe`, Cargo `authors` Grapipe #176). 그 전 v1.4.5: 열 때 HEAD 레인에 포커스(#174), 사이트 오프라인 코드 발급 시 환불 불가(ddugit-site#45)
+- 직전: v1.4.7 릴리스(pull·push 꼬임 수정 #178: rebase pull이 로컬 커밋을 버리지 않음, pull 확인 전 fetch, upstream 없는 브랜치가 같은 이름 원격 브랜치를 따라감). 그 전 v1.4.6: 번들 저작권 `© Grapipe`(#176)
 
 ## 지금: 이름을 Grapipe로 통일 (2026-10-14)
 
@@ -22,7 +22,7 @@ _마지막 갱신: 2026-10-14_
 - 사이트: ddugit-site#46 머지·배포(Netlify, Supabase 함수). `SITE.maker`/`SITE.legalName`, `CONTACT_EMAIL` = support@grapipe.com
 - 메일: Cloudflare Email Routing(받기 → Gmail) + Resend 무료 SMTP(Gmail '다른 주소에서 보내기'). 사용자가 세팅·테스트 완료(2026-10-14)
 
-## 지금: pull·push 꼬임 (2026-10-16, 사용자 제보)
+## 지금: pull·push 꼬임 (2026-10-16, 사용자 제보, #178 머지 → v1.4.7)
 
 - 갈라진 pull에서 '리베이스'를 고르면 로컬 커밋이 사라짐 → 원인: `git pull --rebase`의 fork-point(원격 추적 브랜치 reflog)가 한 번 원격에 올라갔다가 덮어써진 로컬 커밋을 '이미 올라간 것'으로 버린다. 고침: fetch 후 `rebase --no-fork-point @{upstream}`. 같은 변경이 이미 원격에 있는 커밋만 빠지고, 그때는 토스트로 알린다(`sync.ts`의 `skippedCommits`)
 - pull 확인 창이 0건: 마지막 fetch 기준으로 셌다 → 확인 전에 조용히 fetch(`useRemote`의 `fetchThenAsk`)
