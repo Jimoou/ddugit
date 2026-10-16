@@ -38,6 +38,7 @@ test("stops tracking a remote branch, then picks one again (the same name first)
   await branchMenu(page, "feature/theme", "origin/feature/theme 따라가기 그만두기");
   await demo.toast(/feature\/theme.? 이제 원격 브랜치를 따라가지 않아요/);
   expect(await upstreamOf("feature/theme")).toBeUndefined();
+  await demo.settled();
 
   await branchMenu(page, "feature/theme", "따라갈 원격 브랜치 정하기…");
   const pick = page.locator(".context-menu");
@@ -60,6 +61,7 @@ test("fast-forwards and pushes branches that aren't checked out", async ({ demo 
   await demo.toast("main을 origin/main으로 빨리 감았어요");
   expect(await tip("main")).toBe(await tip("origin/main"));
   expect((await demo.snapshot()).head.branch).toBe("feature/graph-zoom");
+  await demo.settled();
 
   // Up to date now; once both sides have their own commits, it says why it can't.
   await localRow(page, "main").click({ button: "right" });

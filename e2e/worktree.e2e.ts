@@ -36,6 +36,7 @@ test("stages a file from its menu, which switches the composer to the index, and
   expect(await change(MINIMAP)).toMatchObject({ staged: null, unstaged: "untracked" });
 
   // The diff sheet stages a whole file, and everything in its tab.
+  await demo.settled();
   await composer.locator(".path", { hasText: RENDERER }).click();
   const sheet = page.locator(".diff-sheet");
   await expect(sheet.locator(".file-bar .path")).toHaveText(RENDERER);

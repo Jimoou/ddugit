@@ -71,7 +71,19 @@ export class Demo {
   /** Change demo state outside the UI, then refresh like returning to the window. */
   async mutate(fn: (demo: DemoControls) => void) {
     await this.page.evaluate(`(${fn.toString()})(window.__ddugitDemo)`);
+    await this.settled();
+  }
+
+  /**
+   * The screen shows the demo as it is now: refresh like returning to the window and wait until a
+   * snapshot read begun after this call is in and drawn. Menus and dialogs read the screen's snapshot,
+   * which lands a moment after the demo changes, so act on them only after this.
+   */
+  async settled() {
+    const mark = await this.page.evaluate(() => window.__ddugitDemo.mark());
     await this.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(() => this.page.evaluate(() => window.__ddugitDemo.served)).toBeGreaterThanOrEqual(mark);
+    await this.page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   }
 
   private rawScreenOf(id: string) {

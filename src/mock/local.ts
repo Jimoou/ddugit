@@ -110,7 +110,13 @@ const patchOf: Table["commit_patch"] = ({ id }) => {
 };
 
 export const localCommands = {
-  repo_snapshot: ({ limit }) => delay(repo.snapshot(limit)),
+  repo_snapshot: ({ limit }) => {
+    const asOf = demoControls.marks;
+    return delay(repo.snapshot(limit)).then((s) => {
+      demoControls.served = Math.max(demoControls.served, asOf);
+      return s;
+    });
+  },
   async git_commit(args) {
     const sign = demoControls.signFail;
     if (sign) {
