@@ -225,6 +225,20 @@ test("groups repositories on the dashboard: create, move in, open all, ungroup",
   await band.getByRole("button", { name: "모두 열기" }).click();
   await expect(page.locator(".tabbar .tab:not(.tab-home)")).toHaveCount(3);
 
+  // Drag the last tab to the front: the others make room and the dragged one shows.
+  const tabs = page.locator(".tabbar .tab:not(.tab-home)");
+  // Titles name the paths: once a tab loads, the demo calls every repository by the same name.
+  const titles = () => tabs.evaluateAll((els) => els.map((el) => el.getAttribute("title")));
+  const before = await titles();
+  const from = (await tabs.nth(2).boundingBox())!;
+  const to = (await tabs.nth(0).boundingBox())!;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + 4, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(titles).toEqual([before[2], before[0], before[1]]);
+  await expect(page.locator(".tab.on")).toHaveAttribute("title", before[2]!);
+
   // Ungrouping keeps the repositories.
   await page.locator(".tabbar .tab-new").click();
   await galaxy

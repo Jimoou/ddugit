@@ -24,7 +24,18 @@ import { isTypingTarget } from "./keys";
 import { RepoView } from "./RepoView";
 import type { ToastAction } from "./repo/state";
 import { defaults, parseSettings, type Settings } from "./settings";
-import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs, type Tabs } from "./tabs";
+import {
+  activeTab,
+  addEmpty,
+  closeTab,
+  cycle,
+  moveTab,
+  openIn,
+  parseTabs,
+  selectAt,
+  serializeTabs,
+  type Tabs,
+} from "./tabs";
 import "./App.css";
 import { readStored, writeStored } from "./storage";
 import { useTheme } from "./theme";
@@ -302,6 +313,7 @@ export default function App() {
         onSelect={(id) => setTabs((tb) => ({ ...tb, active: id }))}
         onClose={(id) => setTabs((tb) => closeTab(tb, id), home)}
         onNew={() => setTabs(addEmpty)}
+        onMove={(id, to) => setTabs((tb) => moveTab(tb, id, to), true)}
         onRepoMenu={(x) => setRepoMenu((o) => (o === null ? x : null))}
         onSettings={() => setSettingsAt("screen")}
         menu={

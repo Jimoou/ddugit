@@ -42,6 +42,16 @@ export function closeTab(t: Tabs, id: number): Tabs {
   return { list, active };
 }
 
+/** Move a tab to position `to` (0-based, clamped) among the others; the visible tab stays the same. */
+export function moveTab(t: Tabs, id: number, to: number): Tabs {
+  const tab = t.list.find((x) => x.id === id);
+  if (!tab) return t;
+  const rest = t.list.filter((x) => x.id !== id);
+  const at = Math.min(Math.max(to, 0), rest.length);
+  if (t.list[at] === tab) return t;
+  return { ...t, list: [...rest.slice(0, at), tab, ...rest.slice(at)] };
+}
+
 /** Select by position (0-based); out of range keeps the current tab. */
 export const selectAt = (t: Tabs, i: number): Tabs => (t.list[i] ? { ...t, active: t.list[i].id } : t);
 
