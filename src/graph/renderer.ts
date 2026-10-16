@@ -26,12 +26,12 @@ import {
   CAPTION_LINE,
   CAPTION_PAD,
   type CaptionShape,
-  captionHeight,
   laneReach,
   placeCaptions,
 } from "./captions";
 import { parseSubject, type Subject } from "./subject";
 import type { Layout } from "./layout";
+import { type MapTextSize, textScale } from "./mapText";
 
 /** Label icons by ref kind (HEAD's branch gets "head"); room they take before the text. */
 const REF_ICON: Partial<Record<RefInfo["kind"], IconName>> = { remote: "cloud", tag: "tag", pr: "pull" };
@@ -95,6 +95,8 @@ export interface DrawState {
   glow: boolean;
   /** The theme's colours (lanes, fills, text). */
   ink: Ink;
+  /** The reader's map text size (Settings); zoom past 100% enlarges it further (`textScale`). */
+  textSize: MapTextSize;
   headId: string | null;
   headBranch: string | null;
   plus: Pt;
@@ -174,7 +176,7 @@ export function stashMarks(scene: Scene, stashes: StashInfo[]): StashMark[] {
 
 export const stashRadius = (k: number) => Math.max(4, Math.min(8, 6 * k));
 
-/** Ref badge height (must match `placeBadges`' default). */
+/** Ref badge height at the base text size. */
 const BADGE_H = 18;
 
 /** Zoom thresholds for semantic zoom. */
@@ -199,6 +201,50 @@ export const runRadius = (k: number) => nodeRadius(k) + 2;
 
 const MONO = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace';
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", "Noto Sans KR", sans-serif';
+
+/** The map's type at one scale (`textScale`): its fonts, and the sizes laid out around text, screen px. */
+interface Type {
+  /** `n` px of the base type, scaled. */
+  px(n: number): number;
+  sans(weight: number, px: number): string;
+  mono(weight: number, px: number): string;
+  badgeH: number;
+  icon: number;
+  chip: string;
+  pr: string;
+  pillPad: number;
+  gap: number;
+  /** Caption panels: a line of text, the padding around the lines, an upright caption's height. */
+  line: number;
+  pad: { x: number; y: number };
+  captionH: number;
+}
+
+const types = new Map<number, Type>();
+function typeAt(scale: number): Type {
+  let T = types.get(scale);
+  if (!T) {
+    const px = (n: number) => n * scale;
+    // Half pixels: crisp enough, and few distinct fonts to measure.
+    const size = (n: number) => Math.round(px(n) * 2) / 2;
+    T = {
+      px,
+      sans: (weight, n) => `${weight} ${size(n)}px ${SANS}`,
+      mono: (weight, n) => `${weight} ${size(n)}px ${MONO}`,
+      badgeH: px(BADGE_H),
+      icon: px(ICON_W),
+      chip: `700 ${size(10)}px ${MONO}`,
+      pr: `600 ${size(11)}px ${SANS}`,
+      pillPad: px(9),
+      gap: px(6),
+      line: px(CAPTION_LINE),
+      pad: { x: px(CAPTION_PAD.x), y: px(CAPTION_PAD.y) },
+      captionH: px(CAPTION_H),
+    };
+    types.set(scale, T);
+  }
+  return T;
+}
 
 /** `p` turned `r` quarter turns clockwise about the origin (screen y points down). */
 export function turn(p: Pt, r: number): Pt {
@@ -323,6 +369,7 @@ function truncate(ctx: CanvasRenderingContext2D, text: string, max: number): str
 export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   const { scene, view, w, h, dpr, time, ink } = s;
   const { k } = view;
+  const T = typeAt(textScale(k, s.textSize));
   const lanes = ink.lanes;
   const space = ink.style === "space",
     metro = ink.style === "metro";
@@ -437,12 +484,12 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
     ctx.restore();
-    ctx.font = `600 11px ${SANS}`;
+    ctx.font = T.sans(600, 11);
     const label = t("graph.loadMore");
-    const bw = textWidth(ctx, label) + 18,
-      bh = 22;
+    const bw = textWidth(ctx, label) + T.px(18),
+      bh = T.px(22);
     const rect = { x: b.x - bw / 2, y: b.y - bh / 2, w: bw, h: bh };
-    roundRect(ctx, rect.x, rect.y, bw, bh, 11);
+    roundRect(ctx, rect.x, rect.y, bw, bh, bh / 2);
     ctx.fillStyle = ink.badge;
     ctx.fill();
     ctx.strokeStyle = alpha(lanes[oldest.color], 0.8);
@@ -599,7 +646,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   // --- folded runs ------------------------------------------------------------
   if (k < ZOOM.fold && !s.focus) {
     const rr = runRadius(k);
-    ctx.font = `600 11px ${SANS}`;
+    ctx.font = T.sans(600, 11);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const run of runsInRows(s.runs, firstCol, lastCol)) {
@@ -671,11 +718,11 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.lineWidth = 1.8;
     ctx.stroke();
     if (on || k >= ZOOM.summaries) {
-      ctx.font = `600 12px ${SANS}`;
+      ctx.font = T.sans(600, 12);
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillStyle = c;
-      ctx.fillText(truncate(ctx, `stash · ${m.message}`, 220), p.x + sr + 6, p.y);
+      ctx.fillText(truncate(ctx, `stash · ${m.message}`, T.px(220)), p.x + sr + 6, p.y);
     }
   }
 
@@ -683,7 +730,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
   if (k >= ZOOM.branches) {
     // Measure every node's badges, then place them all at once so neighbours
     // don't overlap (stacks get lifted, or folded into "+N").
-    ctx.font = `600 12px ${SANS}`;
+    ctx.font = T.sans(600, 12);
     const groups = labelQueue.map((L) => {
       const shown = (s.refs.get(L.id) ?? []).filter((rf) => refShown(rf, k >= ZOOM.allRefs, s.headBranch));
       const labels = shown.map((rf) => {
@@ -691,7 +738,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         const icon: IconName | null = isHead ? "head" : (REF_ICON[rf.kind] ?? null);
         const text = rf.name;
         const mark = rf.review ? REVIEW_ICON[rf.review] : undefined;
-        const w = Math.min(textWidth(ctx, text), 160) + 14 + (icon ? ICON_W : 0) + (mark ? ICON_W : 0);
+        const w = Math.min(textWidth(ctx, text), T.px(160)) + T.px(14) + (icon ? T.icon : 0) + (mark ? T.icon : 0);
         return { rf, isHead, icon, mark, text, w };
       });
       return { L, labels };
@@ -706,7 +753,8 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
             side,
             L.y,
             labels.map((l) => l.w),
-            BADGE_H,
+            T.badgeH,
+            T.px(4),
           );
           rowText.set(L.id, g.end);
           return g;
@@ -718,6 +766,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
             widths: labels.map((l) => l.w),
             priority: L.id === s.headId,
           })),
+          { height: T.badgeH, gap: T.px(4), chipWidth: T.px(30) },
         );
 
     // Summaries go under the badges, so a caption never hides a branch name.
@@ -725,20 +774,20 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       for (const L of labelQueue) {
         const text = s.summaries.get(L.id) ?? "";
         if (text && (k >= ZOOM.briefs || L.id === s.selected || L.id === s.hovered))
-          drawUprightCaption(ctx, s, L, text, rowText.get(L.id) ?? 0, side);
+          drawUprightCaption(ctx, s, T, L, text, rowText.get(L.id) ?? 0, side);
       }
     } else {
-      const badges: Box[] = placed.flatMap((g) => g.badges.map((b) => ({ x: b.x, y: b.y, w: b.w, h: BADGE_H })));
+      const badges: Box[] = placed.flatMap((g) => g.badges.map((b) => ({ x: b.x, y: b.y, w: b.w, h: T.badgeH })));
       const plusR = Math.max(9, Math.min(15, 12 * k)) + 4;
       badges.push({ x: plusS.x - plusR, y: plusS.y - plusR, w: plusR * 2, h: plusR * 2 });
       for (const m of s.stashes) {
         const p = toScreen(view, m.pos);
         const sr = stashRadius(k) + 3;
         // Zoomed in, the stash's own label runs to its right.
-        badges.push({ x: p.x - sr, y: p.y - sr, w: sr * 2 + (k >= ZOOM.summaries ? 230 : 0), h: sr * 2 });
+        badges.push({ x: p.x - sr, y: p.y - sr, w: sr * 2 + (k >= ZOOM.summaries ? T.px(230) : 0), h: sr * 2 });
       }
       const badged = new Set(groups.filter((g) => g.labels.length).map((g) => g.L.id));
-      drawMapCaptions(ctx, s, labelQueue, badges, badged, r);
+      drawMapCaptions(ctx, s, T, labelQueue, badges, badged, r);
     }
 
     groups.forEach(({ L, labels }, gi) => {
@@ -749,7 +798,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(L.x, L.y - r - 2);
-        ctx.lineTo(L.x, pg.badges[0].y + BADGE_H);
+        ctx.lineTo(L.x, pg.badges[0].y + T.badgeH);
         ctx.stroke();
       }
       for (const b of pg.badges) {
@@ -764,7 +813,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         const filled = item?.isHead || (metro && !remote && !tag);
         let fg = filled ? ink.onFill : col;
         if (metro || space || filled) {
-          roundRect(ctx, b.x, b.y, b.w, BADGE_H, space ? 9 : metro ? 3 : 4);
+          roundRect(ctx, b.x, b.y, b.w, T.badgeH, space ? T.badgeH / 2 : metro ? 3 : 4);
           ctx.fillStyle = filled ? col : metro && ink.paper ? "#ffffff" : ink.badge;
           ctx.fill();
           if (!filled || space) {
@@ -776,20 +825,21 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
         }
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
-        ctx.font = `600 12px ${SANS}`;
-        const iw = item?.icon ? ICON_W : 0;
-        const mw = item?.mark ? ICON_W : 0;
-        const iy = b.y + (BADGE_H - 10) / 2;
-        if (item?.icon) drawIcon(ctx, item.icon, b.x + 6, iy, 10, fg);
-        if (item?.mark) drawIcon(ctx, item.mark, b.x + b.w - 6 - 10, iy, 10, fg);
-        const label = item ? truncate(ctx, item.text, 160) : `+${pg.hidden}`;
+        ctx.font = T.sans(600, 12);
+        const iw = item?.icon ? T.icon : 0;
+        const mw = item?.mark ? T.icon : 0;
+        const iconSize = T.px(10);
+        const iy = b.y + (T.badgeH - iconSize) / 2;
+        if (item?.icon) drawIcon(ctx, item.icon, b.x + T.px(6), iy, iconSize, fg);
+        if (item?.mark) drawIcon(ctx, item.mark, b.x + b.w - T.px(6) - iconSize, iy, iconSize, fg);
+        const label = item ? truncate(ctx, item.text, T.px(160)) : `+${pg.hidden}`;
         const lx = b.x + iw + (b.w - iw - mw) / 2,
-          ly = b.y + BADGE_H / 2 + 0.5;
+          ly = b.y + T.badgeH / 2 + 0.5;
         if (!metro && !space && !filled) halo(ctx, ink, label, lx, ly);
         ctx.fillStyle = fg;
         ctx.fillText(label, lx, ly);
         ctx.globalAlpha = 1;
-        if (item) s.labelHits.push({ x: b.x, y: b.y, w: b.w, h: BADGE_H, ref: item.rf });
+        if (item) s.labelHits.push({ x: b.x, y: b.y, w: b.w, h: T.badgeH, ref: item.rf });
       }
     });
   }
@@ -858,7 +908,7 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
       ctx.stroke();
     }
     ctx.restore();
-    ctx.font = `700 12px ${SANS}`;
+    ctx.font = T.sans(700, 12);
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillStyle = c;
@@ -901,18 +951,19 @@ export function draw(ctx: CanvasRenderingContext2D, s: DrawState) {
     ctx.stroke();
 
     if (s.changeCount) {
-      ctx.font = `700 10px ${MONO}`;
+      ctx.font = T.mono(700, 10);
       const label = String(s.changeCount);
-      const bw = Math.max(16, textWidth(ctx, label) + 8);
+      const bh = T.px(15);
+      const bw = Math.max(T.px(16), textWidth(ctx, label) + T.px(8));
       const bx = plusS.x + pr * 0.6,
         by = plusS.y - pr - 6;
-      roundRect(ctx, bx, by, bw, 15, 7.5);
+      roundRect(ctx, bx, by, bw, bh, bh / 2);
       ctx.fillStyle = lanes[1];
       ctx.fill();
       ctx.fillStyle = ink.onFill;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, bx + bw / 2, by + 8);
+      ctx.fillText(label, bx + bw / 2, by + bh / 2 + 0.5);
     }
   }
 }
@@ -952,11 +1003,6 @@ function drawGravityWell(
 
 /** Longest caption on screen, px; the commit in hand may run longer. Zoomed out, captions are briefer. */
 
-const PILL_PAD = 9;
-const PART_GAP = 6;
-const CHIP_FONT = `700 10px ${MONO}`;
-const PR_FONT = `600 11px ${SANS}`;
-
 const subjects = new Map<string, Subject>();
 const subjectOf = (summary: string) => remember(subjects, summary, () => parseSubject(summary));
 const chipText = (sub: Subject) => (sub.chip ? sub.chip.label + (sub.breaking ? "!" : "") : "");
@@ -971,19 +1017,20 @@ function captionWidth(
   font: string,
   brief: boolean,
   plain: boolean,
+  T: Type,
 ): number {
   const sub = subjectOf(summary);
-  let w = 2 * PILL_PAD;
+  let w = 2 * T.pillPad;
   if (sub.chip) {
     // A boxed chip in space; a bare word elsewhere (see `drawCaption`).
-    ctx.font = CHIP_FONT;
-    w += textWidth(ctx, chipText(sub)) + (plain ? 2 : 8) + PART_GAP;
+    ctx.font = T.chip;
+    w += textWidth(ctx, chipText(sub)) + T.px(plain ? 2 : 8) + T.gap;
   }
   ctx.font = font;
   w += textWidth(ctx, scopeText(sub, brief));
   if (sub.pr) {
-    ctx.font = PR_FONT;
-    w += textWidth(ctx, sub.pr) + PART_GAP;
+    ctx.font = T.pr;
+    w += textWidth(ctx, sub.pr) + T.gap;
   }
   ctx.font = font;
   return w + textWidth(ctx, sub.text);
@@ -1004,10 +1051,11 @@ function drawCaption(
   on: boolean,
   dimmed: boolean,
   brief: boolean,
+  T: Type,
 ) {
   const sub = subjectOf(summary);
   const { x, y, w } = box;
-  const h = CAPTION_H;
+  const h = T.captionH;
   const mid = y + h / 2 + 0.5;
   // Space: a pill outlined in the lane's colour. Gauge and route map: a quiet panel of the
   // map's colour, outlined only when selected (as `drawCaptionPanel`).
@@ -1023,54 +1071,54 @@ function drawCaption(
   }
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  let cx = x + PILL_PAD;
-  const right = x + w - PILL_PAD;
+  let cx = x + T.pillPad;
+  const right = x + w - T.pillPad;
   const write = (text: string, at: number) => ctx.fillText(text, at, mid);
   if (sub.chip) {
-    ctx.font = CHIP_FONT;
+    ctx.font = T.chip;
     const label = chipText(sub);
-    const cw = textWidth(ctx, label) + 8;
+    const cw = textWidth(ctx, label) + T.px(8);
     if (cx + cw <= right) {
       const c = sub.breaking ? ink.chip.fix : ink.chip[sub.chip.tone];
       if (plain) {
         // The kind of change as a quiet word before the summary, coloured only when it matters.
         ctx.fillStyle = sub.breaking || sub.chip.tone === "fix" ? c : ink.scope;
         write(label, cx);
-        cx -= 8 - 2;
+        cx -= T.px(8 - 2);
       } else {
-        roundRect(ctx, cx, y + 4, cw, h - 8, 3);
+        roundRect(ctx, cx, y + T.px(4), cw, h - T.px(8), 3);
         ctx.fillStyle = alpha(c, 0.2);
         ctx.fill();
         ctx.fillStyle = c;
-        ctx.fillText(label, cx + 4, mid);
+        ctx.fillText(label, cx + T.px(4), mid);
       }
-      cx += cw + PART_GAP;
+      cx += cw + T.gap;
     }
   }
   let prW = 0;
   if (sub.pr) {
-    ctx.font = PR_FONT;
-    prW = textWidth(ctx, sub.pr) + PART_GAP;
+    ctx.font = T.pr;
+    prW = textWidth(ctx, sub.pr) + T.gap;
   }
   ctx.font = font;
   const scope = scopeText(sub, brief);
-  if (scope && right - cx - prW - textWidth(ctx, scope) >= Math.min(60, textWidth(ctx, sub.text))) {
+  if (scope && right - cx - prW - textWidth(ctx, scope) >= Math.min(T.px(60), textWidth(ctx, sub.text))) {
     ctx.fillStyle = ink.scope;
     write(scope, cx);
     cx += textWidth(ctx, scope);
   }
   // Keep the number only if the text keeps a readable start.
   const roomWithPr = right - cx - prW;
-  const showPr = !!sub.pr && roomWithPr >= Math.min(60, textWidth(ctx, sub.text));
+  const showPr = !!sub.pr && roomWithPr >= Math.min(T.px(60), textWidth(ctx, sub.text));
   const room = showPr ? roomWithPr : right - cx;
   const line = truncate(ctx, sub.text, Math.max(0, room));
   ctx.fillStyle = on ? ink.textOn : ink.text;
   write(line, cx);
   if (showPr) {
     const tw = textWidth(ctx, line);
-    ctx.font = PR_FONT;
+    ctx.font = T.pr;
     ctx.fillStyle = ink.prInk;
-    write(sub.pr!, cx + tw + PART_GAP);
+    write(sub.pr!, cx + tw + T.gap);
   }
   ctx.globalAlpha = 1;
 }
@@ -1085,6 +1133,7 @@ function drawCaption(
 function drawMapCaptions(
   ctx: CanvasRenderingContext2D,
   s: DrawState,
+  T: Type,
   queue: { x: number; y: number; id: string; color: string; d: boolean }[],
   obstacles: Box[],
   badged: Set<string>,
@@ -1099,20 +1148,20 @@ function drawMapCaptions(
   const brief = k < ZOOM.captions;
   // Each summary keeps to its commit's column when there is room for a readable line; zoomed
   // out, one line wider than a column, and neighbours give way by importance (`placeCaptions`).
-  const column = Math.min(COL * k - 12, 300);
+  const column = Math.min(COL * k - 12, T.px(300));
   const list = queue
     .filter((L) => s.summaries.get(L.id) && (all || inHand(L.id)))
     .sort((a, b) => rank(a.id) - rank(b.id) || (byId.get(a.id)?.row ?? 0) - (byId.get(b.id)?.row ?? 0));
-  const fontOf = (id: string) => `${inHand(id) ? 600 : 400} ${brief && !inHand(id) ? 12 : 13}px ${SANS}`;
+  const fontOf = (id: string) => T.sans(inHand(id) ? 600 : 400, brief && !inHand(id) ? 12 : 13);
   const items = list.map((L) => {
     const on = inHand(L.id);
-    const room = on ? Math.max(column, 260) : brief ? 150 : Math.max(column, 110);
+    const room = on ? Math.max(column, T.px(260)) : brief ? T.px(150) : Math.max(column, T.px(110));
     const maxW = Math.min(room, Math.max(48, s.w - L.x - 4) * 2);
     return {
       id: L.id,
       x: L.x,
       y: L.y,
-      shapes: captionShapes(ctx, s.summaries.get(L.id)!, fontOf(L.id), maxW, brief && !on),
+      shapes: captionShapes(ctx, T, s.summaries.get(L.id)!, fontOf(L.id), maxW, brief && !on),
       up: !badged.has(L.id),
     };
   });
@@ -1121,7 +1170,7 @@ function drawMapCaptions(
   for (const c of placeCaptions(items, [...stars, ...obstacles], r)) {
     const L = byQueue.get(c.id)!;
     const chip = !(brief && !inHand(c.id));
-    drawCaptionPanel(ctx, s.ink, s.summaries.get(c.id)!, { ...c, chip }, fontOf(c.id), L.color, inHand(c.id), L.d);
+    drawCaptionPanel(ctx, s.ink, T, s.summaries.get(c.id)!, { ...c, chip }, fontOf(c.id), L.color, inHand(c.id), L.d);
   }
 }
 
@@ -1131,23 +1180,24 @@ function drawMapCaptions(
  */
 function captionShapes(
   ctx: CanvasRenderingContext2D,
+  T: Type,
   summary: string,
   font: string,
   maxW: number,
   oneLine: boolean,
 ): CaptionShape[] {
   const sub = subjectOf(summary);
-  ctx.font = CHIP_FONT;
+  ctx.font = T.chip;
   // Zoomed out (one line) the summary itself matters more than its kind.
-  const chipW = sub.chip && !oneLine ? textWidth(ctx, chipText(sub)) + PART_GAP : 0;
+  const chipW = sub.chip && !oneLine ? textWidth(ctx, chipText(sub)) + T.gap : 0;
   ctx.font = font;
   // The scope stays in the inspector: on the map it only pushes the summary to a second line.
   const body = sub.text + (sub.pr ? ` ${sub.pr}` : "");
-  const inner = maxW - 2 * CAPTION_PAD.x;
+  const inner = maxW - 2 * T.pad.x;
   const shape = (lines: string[]): CaptionShape => ({
     lines,
-    w: Math.max(...lines.map((ln, i) => textWidth(ctx, ln) + (i === 0 ? chipW : 0))) + 2 * CAPTION_PAD.x,
-    h: captionHeight(lines.length),
+    w: Math.max(...lines.map((ln, i) => textWidth(ctx, ln) + (i === 0 ? chipW : 0))) + 2 * T.pad.x,
+    h: lines.length * T.line + 2 * T.pad.y,
   });
   const single = shape([truncate(ctx, body, Math.max(0, inner - chipW))]);
   if (oneLine || textWidth(ctx, body) + chipW <= inner) return [single];
@@ -1169,6 +1219,7 @@ function captionShapes(
 function drawCaptionPanel(
   ctx: CanvasRenderingContext2D,
   ink: Ink,
+  T: Type,
   summary: string,
   c: { x: number; y: number; w: number; h: number; lines: string[]; chip: boolean },
   font: string,
@@ -1190,14 +1241,14 @@ function drawCaptionPanel(
   ctx.textBaseline = "middle";
   const cx = c.x + c.w / 2;
   c.lines.forEach((line, i) => {
-    const mid = c.y + CAPTION_PAD.y + CAPTION_LINE * (i + 0.5) + 0.5;
-    ctx.font = CHIP_FONT;
+    const mid = c.y + T.pad.y + T.line * (i + 0.5) + 0.5;
+    ctx.font = T.chip;
     const chip = i === 0 && sub.chip && c.chip ? chipText(sub) : "";
-    const chipW = chip ? textWidth(ctx, chip) + PART_GAP : 0;
+    const chipW = chip ? textWidth(ctx, chip) + T.gap : 0;
     ctx.font = font;
     let x = cx - (chipW + textWidth(ctx, line)) / 2;
     if (chip) {
-      ctx.font = CHIP_FONT;
+      ctx.font = T.chip;
       ctx.fillStyle = sub.breaking ? ink.chip.fix : ink.chip[sub.chip!.tone];
       ctx.fillText(chip, x, mid);
       x += chipW;
@@ -1230,18 +1281,20 @@ function uprightStart(s: DrawState, id: string, r: number, side: 1 | -1): number
 function drawUprightCaption(
   ctx: CanvasRenderingContext2D,
   s: DrawState,
+  T: Type,
   L: { y: number; id: string; d: boolean; color: string },
   text: string,
   x: number,
   side: 1 | -1,
 ) {
-  const space = Math.min(UPRIGHT_MAX, side > 0 ? s.w - x - 8 : x - 8);
+  const space = Math.min(T.px(UPRIGHT_MAX), side > 0 ? s.w - x - 8 : x - 8);
   if (space < 40) return;
   const on = L.id === s.selected || L.id === s.hovered;
   const brief = s.view.k < ZOOM.captions && !on;
-  const font = `${on ? 600 : 400} ${brief ? 12 : 13}px ${SANS}`;
-  const w = Math.min(space, captionWidth(ctx, text, font, brief, s.ink.style !== "space") + 1);
-  drawCaption(ctx, s.ink, text, { x: side > 0 ? x : x - w, y: L.y - CAPTION_H / 2, w }, font, L.color, on, L.d, brief);
+  const font = T.sans(on ? 600 : 400, brief ? 12 : 13);
+  const w = Math.min(space, captionWidth(ctx, text, font, brief, s.ink.style !== "space", T) + 1);
+  const box = { x: side > 0 ? x : x - w, y: L.y - T.captionH / 2, w };
+  drawCaption(ctx, s.ink, text, box, font, L.color, on, L.d, brief, T);
 }
 
 /**

@@ -2,6 +2,7 @@
 // corrupt or older stored value falls back to defaults instead of breaking.
 
 import { MAP_STYLES, type MapStyle } from "./graph/ink";
+import { MAP_TEXT_SIZES, type MapTextSize } from "./graph/mapText";
 import type { Turn } from "./graph/renderer";
 import type { Key, LanguagePref } from "./i18n";
 import { type ExternalApps, parseExternal } from "./external";
@@ -15,6 +16,8 @@ export interface Settings extends ExternalApps {
   animate: boolean;
   /** How the branch map is drawn: an instrument panel (default), a route map, or the night sky. */
   mapStyle: MapStyle;
+  /** How big the map's labels and commit messages read (zooming in past 100% enlarges them further). */
+  mapText: MapTextSize;
   /** The map's backdrop (a printed star chart, or the galaxy in the space style) and the home screen's; off is plain. */
   space: boolean;
   /** Neon glow around lines, commits and the [+] node (space style). */
@@ -60,6 +63,7 @@ export function defaults(reducedMotion = false): Settings {
   return {
     animate: !reducedMotion,
     mapStyle: "gauge",
+    mapText: "normal",
     space: true,
     glow: true,
     historyPage: 3000,
@@ -103,6 +107,7 @@ export function parseSettings(raw: string | null, base: Settings): Settings {
   return {
     animate: typeof o.animate === "boolean" ? o.animate : base.animate,
     mapStyle: MAP_STYLES.find((x) => x === o.mapStyle) ?? base.mapStyle,
+    mapText: MAP_TEXT_SIZES.find((x) => x === o.mapText) ?? base.mapText,
     space: typeof o.space === "boolean" ? o.space : base.space,
     glow: typeof o.glow === "boolean" ? o.glow : base.glow,
     historyPage:

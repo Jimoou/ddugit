@@ -729,6 +729,7 @@ export function RepoView({
                 glow={settings.glow}
                 theme={theme}
                 mapStyle={settings.mapStyle}
+                textSize={settings.mapText}
                 lanes={lanes}
                 onSelect={(id) => {
                   setPicked([]);
