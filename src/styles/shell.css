@@ -86,6 +86,15 @@
 .tab:hover {
   color: var(--text-2);
 }
+/* A tab being dragged to a new place among the others. */
+.tabbar.sorting,
+.tabbar.sorting .tab {
+  cursor: grabbing;
+}
+.tab.dragging {
+  background: var(--hover);
+  border-radius: 6px 6px 0 0;
+}
 /* The open tab: brighter text over a plain underline. */
 .tab.on {
   color: var(--text);

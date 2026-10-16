@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeTab, addEmpty, closeTab, cycle, openIn, parseTabs, selectAt, serializeTabs } from "./tabs";
+import { activeTab, addEmpty, closeTab, cycle, moveTab, openIn, parseTabs, selectAt, serializeTabs } from "./tabs";
 
 const one = parseTabs(null, "/a");
 
@@ -31,6 +31,19 @@ describe("tabs", () => {
     expect(activeTab(cycle(three, 1)).path).toBe("/a");
     expect(activeTab(cycle(selectAt(three, 0), -1)).path).toBe("/c");
     expect(selectAt(three, 7)).toBe(three);
+  });
+
+  it("moves a tab without changing the visible one", () => {
+    const three = openIn(openIn(one, "/b"), "/c");
+    const paths = (t: typeof three) => t.list.map((x) => x.path);
+    const c = three.list[2].id;
+    expect(paths(moveTab(three, c, 0))).toEqual(["/c", "/a", "/b"]);
+    expect(paths(moveTab(three, three.list[0].id, 9))).toEqual(["/b", "/c", "/a"]);
+    expect(paths(moveTab(three, c, -3))).toEqual(["/c", "/a", "/b"]);
+    expect(moveTab(three, c, 0).active).toBe(three.active);
+    expect(moveTab(three, c, 2)).toBe(three);
+    expect(moveTab(three, 99, 0)).toBe(three);
+    expect(paths(parseTabs(serializeTabs(moveTab(three, c, 0)), null))).toEqual(["/c", "/a", "/b"]);
   });
 
   it("round-trips through storage without welcome tabs", () => {

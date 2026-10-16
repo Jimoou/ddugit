@@ -3,7 +3,7 @@
 > **갱신형 문서입니다.** 작업 단위가 끝날 때마다 **덮어씁니다.** 이력은 [ROADMAP.md](ROADMAP.md)의 작업 기록에 남깁니다.
 > 컨텍스트가 압축되거나 새 세션을 시작하면 **이 파일부터 읽습니다.**
 
-_마지막 갱신: 2026-10-14_
+_마지막 갱신: 2026-10-16_
 
 ## 지금: Windows는 Microsoft Store에서 (2026-10-14 인증 통과)
 
@@ -13,7 +13,7 @@ _마지막 갱신: 2026-10-14_
 - 스토어 인증 통과(2026-10-14, 1.4.3): https://apps.microsoft.com/detail/9MW648MCPQPQ . ddugit.com Windows 다운로드는 스토어가 주 버튼, 서명 없는 `.exe`는 보조 링크(ddugit-site#44, `site.ts`의 `MICROSOFT_STORE_URL`)
 - 다음 스토어 업데이트: 릴리스마다 Windows artifact의 `.msix`를 Partner Center 새 제출로 올린다(손으로). 1.4.4는 사용자가 올릴 차례
 - **판매 시작(2026-10-13)**: Paddle 판매자 검증 통과 → live 전환(Supabase Secrets·Netlify 값, 웹훅 목적지) → 실결제·앱 활성화·환불까지 사용자가 확인
-- 직전: v1.4.7 릴리스(pull·push 꼬임 수정 #178: rebase pull이 로컬 커밋을 버리지 않음, pull 확인 전 fetch, upstream 없는 브랜치가 같은 이름 원격 브랜치를 따라감). 그 전 v1.4.6: 번들 저작권 `© Grapipe`(#176)
+- 직전: 상단 탭 끌어서 순서 바꾸기(다음 릴리스에 들어감). 그 전 v1.4.7 릴리스(pull·push 꼬임 수정 #178: rebase pull이 로컬 커밋을 버리지 않음, pull 확인 전 fetch, upstream 없는 브랜치가 같은 이름 원격 브랜치를 따라감). 그 전 v1.4.6: 번들 저작권 `© Grapipe`(#176)
 
 ## 지금: 이름을 Grapipe로 통일 (2026-10-14)
 
@@ -28,6 +28,10 @@ _마지막 갱신: 2026-10-14_
 - pull 확인 창이 0건: 마지막 fetch 기준으로 셌다 → 확인 전에 조용히 fetch(`useRemote`의 `fetchThenAsk`)
 - pull하면 'push 먼저', push하면 'pull 먼저': upstream 없는 브랜치 + 원격에 같은 이름 브랜치 → 그 브랜치를 upstream으로(`adopt_upstream`), 거부된 첫 push 뒤에도
 - 시나리오 테스트 11개(`src-tauri/src/git/remote/scenarios.rs`): 갈라짐 merge/rebase, fork-point, 같은 변경, upstream 없음, 거부된 첫 push, 새 브랜치, 원격에서 지운 upstream, 커밋 안 한 변경, fetch 전 개수, 거부→rebase→push, 충돌 후 취소. 모두 로컬 커밋이 남거나 멈추고 이유를 말한다
+
+## 다음: ddugit.com 앱 가이드·릴리스 노트 (사이트 저장소)
+
+- 사용자 요청(2026-10-16). 예전에 뺀 변경 기록 페이지(#29)를 되살리는 셈. 기능별 가이드 + 버전별 릴리스 노트(한 페이지, 버전 앵커). SEO는 내용이 있는 고유 페이지 + 구조화 데이터 + sitemap
 
 ## 남은 일
 
