@@ -4,6 +4,7 @@ import { isKey, t } from "../i18n";
 import { Rich } from "../i18n/Rich";
 import { HISTORY_PAGES, LANGUAGES, type Settings, SHORTCUTS } from "../settings";
 import { MAP_STYLES } from "../graph/ink";
+import { MAP_TEXT_SIZES } from "../graph/mapText";
 import { THEMES } from "../theme";
 import { Icon } from "./Icon";
 import { ExternalSection } from "./ExternalSettings";
@@ -127,6 +128,13 @@ function ScreenSection({ settings, onChange }: SectionProps) {
           value={settings.mapStyle}
           onChange={(mapStyle) => onChange({ mapStyle })}
           options={MAP_STYLES.map((x) => ({ value: x, label: t(`settings.mapStyle.${x}`) }))}
+        />
+        <span>{t("settings.mapText")}</span>
+        <Segmented
+          label={t("settings.mapText")}
+          value={settings.mapText}
+          onChange={(mapText) => onChange({ mapText })}
+          options={MAP_TEXT_SIZES.map((x) => ({ value: x, label: t(`settings.mapText.${x}`) }))}
         />
         <span>{t("settings.effects")}</span>
         <div className="checks">

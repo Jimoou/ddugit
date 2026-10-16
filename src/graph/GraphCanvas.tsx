@@ -32,6 +32,7 @@ import { buildScene, COL, LANE, nodeAtCell, type Pt, xOf, yOf } from "./scene";
 import { type Bounds, clampView, turnBounds } from "./camera";
 import { Minimap, type MinimapHandle } from "./Minimap";
 import { inkOf, type MapStyle } from "./ink";
+import type { MapTextSize } from "./mapText";
 import type { Theme } from "../theme";
 import { t } from "../i18n";
 import { isOnScreen, isTypingTarget } from "../keys";
@@ -68,6 +69,8 @@ interface Props {
   /** Dark or light, and the map's style: together they make its look (`inkOf`). */
   theme: Theme;
   mapStyle: MapStyle;
+  /** The reader's map text size (settings). */
+  textSize: MapTextSize;
   /** Lane colours: the theme's, then the branch colours the user chose. */
   lanes: readonly string[];
   onSelect(id: string | null): void;
@@ -449,6 +452,7 @@ export const GraphCanvas = forwardRef<GraphHandle, Props>(function GraphCanvas(p
         space: p.space,
         glow: p.glow,
         ink: { ...inkOf(p.mapStyle, p.theme), lanes: p.lanes },
+        textSize: p.textSize,
         headId: p.headId,
         headBranch: p.headBranch,
         plus: plusPosition(sceneRef.current, p.headId),

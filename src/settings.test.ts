@@ -16,6 +16,7 @@ describe("parseSettings", () => {
     expect(s).toEqual({
       animate: false,
       mapStyle: "gauge",
+      mapText: "normal",
       space: true,
       glow: true,
       historyPage: 3000,
@@ -85,6 +86,8 @@ describe("parseSettings", () => {
   it("keeps a known branch map style, else the gauge", () => {
     expect(parseSettings(JSON.stringify({ mapStyle: "metro" }), base).mapStyle).toBe("metro");
     expect(parseSettings(JSON.stringify({ mapStyle: "subway" }), base).mapStyle).toBe("gauge");
+    expect(parseSettings(JSON.stringify({ mapText: "large" }), base).mapText).toBe("large");
+    expect(parseSettings(JSON.stringify({ mapText: "huge" }), base).mapText).toBe("normal");
   });
   it("respects reduced motion by default", () => {
     expect(defaults(true).animate).toBe(false);

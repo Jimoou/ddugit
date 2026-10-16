@@ -24,11 +24,16 @@ test("settings: shortcut table, sparkles and git path", async ({ demo }) => {
   await expect(dialog.getByLabel(/빛 번짐/)).toBeDisabled();
   await styles.getByRole("radio", { name: "노선도" }).click();
   await styles.getByRole("radio", { name: "우주" }).click();
+  // Map text: default size, and a bigger one is kept.
+  const text = dialog.getByRole("radiogroup", { name: "맵 글자 크기" });
+  await expect(text.getByRole("radio", { name: "보통" })).toBeChecked();
+  await text.getByRole("radio", { name: "크게" }).click();
   // The backdrop and the glow switch off on their own (the graph keeps drawing).
   await dialog.getByLabel(/지도 배경/).uncheck();
   await dialog.getByLabel(/빛 번짐/).uncheck();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ddugit.settings")!))).toMatchObject({
     mapStyle: "space",
+    mapText: "large",
     space: false,
     glow: false,
   });
