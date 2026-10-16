@@ -7,7 +7,7 @@ use super::read::read_head;
 use super::write::conflict_aware;
 use std::path::Path;
 
-use super::{git_streaming, open, workdir, OpResult, OpStatus, Output, Result};
+use super::{git, git_streaming, open, workdir, OpResult, OpStatus, Output, Result};
 
 /// One progress update parsed from git's `--progress` output.
 #[derive(Debug, Serialize, Clone, PartialEq, Eq)]
@@ -110,7 +110,8 @@ impl RemoteOp {
             RemoteOp::Fetch => &["fetch", "--all", "--prune", "--progress"],
             RemoteOp::Pull => &["pull", "--ff-only", "--progress"],
             RemoteOp::PullMerge => &["pull", "--no-rebase", "--no-edit", "--progress"],
-            RemoteOp::PullRebase => &["pull", "--rebase", "--progress"],
+            // Then a rebase of its own (`pull_rebase`), not `pull --rebase`.
+            RemoteOp::PullRebase => &["fetch", "--progress"],
             RemoteOp::Push => &["push", "--progress"],
             RemoteOp::ForcePush => &["push", "--force-with-lease", "--progress"],
         }
@@ -139,17 +140,27 @@ fn default_remote(repo: &Repository) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-pub fn remote(path: &str, op: RemoteOp, on_progress: impl FnMut(Progress)) -> Result<OpResult> {
-    let repo = open(path)?;
+pub fn remote(path: &str, op: RemoteOp, mut on_progress: impl FnMut(Progress)) -> Result<OpResult> {
+    let mut repo = open(path)?;
     let dir = workdir(&repo)?;
-    let head = read_head(&repo);
+    let mut head = read_head(&repo);
 
     let mut args: Vec<String> = op.args().iter().map(|s| s.to_string()).collect();
+    // A first push (`-u`): a refusal means the remote already has this branch.
+    let mut first_push = None;
     if op != RemoteOp::Fetch {
         let branch = head
             .branch
             .clone()
             .ok_or("HEAD is detached; check out a branch first")?;
+        // No upstream, but the remote has a branch of this name: follow it, so a pull doesn't say
+        // "push first" while the push is refused with "pull first".
+        if head.upstream.is_none()
+            && adopt_upstream(&repo, &dir, &branch, op.needs_upstream(), &mut on_progress)?
+        {
+            repo = open(path)?;
+            head = read_head(&repo);
+        }
         // Never push to a fetch-only remote (e.g. the original project of a fork).
         let up_remote = head.upstream.as_deref().and_then(|u| upstream_remote(&repo, u));
         if !op.needs_upstream() {
@@ -171,11 +182,22 @@ pub fn remote(path: &str, op: RemoteOp, on_progress: impl FnMut(Progress)) -> Re
             let remote = default_remote(&repo).ok_or("No remote configured")?;
             super::operand(&remote)?;
             args.extend(["-u".into(), remote, heads_refspec(&branch)]);
+            first_push = Some(branch);
         }
     }
+    if op == RemoteOp::PullRebase {
+        let branch = head.branch.as_deref().unwrap_or_default();
+        return pull_rebase(path, &repo, &dir, branch, on_progress);
+    }
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
-    let o = stream_remote(&dir, &argv, on_progress)?;
+    let o = stream_remote(&dir, &argv, &mut on_progress)?;
     let status = remote_status(&o, matches!(op, RemoteOp::Push | RemoteOp::ForcePush));
+    if status == OpStatus::Rejected {
+        if let Some(branch) = first_push {
+            // Follow the branch that refused us, so the next pull has something to pull from.
+            adopt_upstream(&repo, &dir, &branch, true, &mut on_progress)?;
+        }
+    }
     if status != OpStatus::Failed {
         return Ok(OpResult::with(status, o));
     }
@@ -190,10 +212,70 @@ pub fn remote(path: &str, op: RemoteOp, on_progress: impl FnMut(Progress)) -> Re
                 OpStatus::Failed
             }
         }
-        RemoteOp::PullMerge | RemoteOp::PullRebase => return Ok(conflict_aware(path, o)),
+        RemoteOp::PullMerge => return Ok(conflict_aware(path, o)),
         _ => OpStatus::Failed,
     };
     Ok(OpResult::with(status, o))
+}
+
+/// Make `branch` follow the default remote's branch of the same name when the remote has one,
+/// fetching that remote first when `fetch` and we haven't seen the branch there. Whether it did.
+fn adopt_upstream(
+    repo: &Repository,
+    dir: &Path,
+    branch: &str,
+    fetch: bool,
+    on_progress: impl FnMut(Progress),
+) -> Result<bool> {
+    let Some(remote) = default_remote(repo) else {
+        return Ok(false);
+    };
+    let tracking = format!("refs/remotes/{remote}/{branch}");
+    let known = |repo: &Repository| repo.find_reference(&tracking).is_ok();
+    if !known(repo) {
+        if !fetch {
+            return Ok(false);
+        }
+        let o = stream_remote(
+            dir,
+            &["fetch", "--progress", super::operand(&remote)?],
+            on_progress,
+        )?;
+        if !o.ok || !known(&open(&dir.to_string_lossy())?) {
+            return Ok(false);
+        }
+    }
+    let to = format!("--set-upstream-to={tracking}");
+    Ok(git(dir, &["branch", &to, "--", branch])?.ok)
+}
+
+/// `pull --rebase` in two steps: fetch the upstream's remote, then rebase onto the upstream by name.
+/// `pull` starts the rebase from the remote-tracking branch's reflog (`--fork-point`), so a local
+/// commit that was once on the remote and later overwritten there was silently dropped. Named
+/// explicitly, the upstream keeps every local commit whose change isn't already there.
+fn pull_rebase(
+    path: &str,
+    repo: &Repository,
+    dir: &Path,
+    branch: &str,
+    on_progress: impl FnMut(Progress),
+) -> Result<OpResult> {
+    let remote = repo
+        .branch_upstream_remote(&format!("refs/heads/{branch}"))
+        .ok()
+        .and_then(|r| r.as_str().map(str::to_string));
+    // `.`: the upstream is a local branch, nothing to fetch.
+    if let Some(remote) = remote.filter(|r| r != ".") {
+        let mut args = RemoteOp::PullRebase.args().to_vec();
+        args.push(super::operand(&remote)?);
+        let o = stream_remote(dir, &args, on_progress)?;
+        let status = remote_status(&o, false);
+        if status != OpStatus::Ok {
+            return Ok(OpResult::with(status, o));
+        }
+    }
+    let o = git(dir, &["rebase", "--no-fork-point", "@{upstream}"])?;
+    Ok(conflict_aware(path, o))
 }
 
 /// `refs/heads/b:refs/heads/b`: a branch name as a refspec is read by git, and
@@ -320,6 +402,9 @@ pub fn fetch_one(path: &str, name: &str, on_progress: impl FnMut(Progress)) -> R
 }
 
 #[cfg(test)]
+mod scenarios;
+
+#[cfg(test)]
 mod tests {
     use super::super::read::snapshot;
     use super::super::testutil::{commit_file, identity, repo, s};
@@ -327,7 +412,7 @@ mod tests {
     use super::*;
 
     /// (origin bare repo, clone A with one pushed commit, clone B of the same).
-    fn setup() -> (tempfile::TempDir, tempfile::TempDir, tempfile::TempDir) {
+    pub(super) fn setup() -> (tempfile::TempDir, tempfile::TempDir, tempfile::TempDir) {
         let origin = tempfile::tempdir().unwrap();
         git_ok(origin.path(), &["init", "-q", "--bare", "-b", "main"]).unwrap();
         let a = repo();

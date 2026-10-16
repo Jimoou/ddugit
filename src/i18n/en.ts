@@ -325,6 +325,7 @@ export const en: Record<Key, string> = {
   "remote.done.pull": "Pulled",
   "remote.done.pullMerge": "Pulled and merged",
   "remote.done.pullRebase": "Pulled and rebased",
+  "remote.pullRebase.skipped": "{n} of your commits were left out: the remote already has the same change",
   "remote.done.push": "Pushed",
   "remote.done.forcePush": "Force-pushed; the remote now matches your history",
   "state.merge": "Merge",

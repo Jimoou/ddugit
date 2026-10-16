@@ -22,6 +22,13 @@ _마지막 갱신: 2026-10-14_
 - 사이트: ddugit-site#46 머지·배포(Netlify, Supabase 함수). `SITE.maker`/`SITE.legalName`, `CONTACT_EMAIL` = support@grapipe.com
 - 메일: Cloudflare Email Routing(받기 → Gmail) + Resend 무료 SMTP(Gmail '다른 주소에서 보내기'). 사용자가 세팅·테스트 완료(2026-10-14)
 
+## 지금: pull·push 꼬임 (2026-10-16, 사용자 제보)
+
+- 갈라진 pull에서 '리베이스'를 고르면 로컬 커밋이 사라짐 → 원인: `git pull --rebase`의 fork-point(원격 추적 브랜치 reflog)가 한 번 원격에 올라갔다가 덮어써진 로컬 커밋을 '이미 올라간 것'으로 버린다. 고침: fetch 후 `rebase --no-fork-point @{upstream}`. 같은 변경이 이미 원격에 있는 커밋만 빠지고, 그때는 토스트로 알린다(`sync.ts`의 `skippedCommits`)
+- pull 확인 창이 0건: 마지막 fetch 기준으로 셌다 → 확인 전에 조용히 fetch(`useRemote`의 `fetchThenAsk`)
+- pull하면 'push 먼저', push하면 'pull 먼저': upstream 없는 브랜치 + 원격에 같은 이름 브랜치 → 그 브랜치를 upstream으로(`adopt_upstream`), 거부된 첫 push 뒤에도
+- 시나리오 테스트 11개(`src-tauri/src/git/remote/scenarios.rs`): 갈라짐 merge/rebase, fork-point, 같은 변경, upstream 없음, 거부된 첫 push, 새 브랜치, 원격에서 지운 upstream, 커밋 안 한 변경, fetch 전 개수, 거부→rebase→push, 충돌 후 취소. 모두 로컬 커밋이 남거나 멈추고 이유를 말한다
+
 ## 남은 일
 
 앱 기능 마일스톤은 모두 끝났다. 전체 목록은 [ROADMAP.md](ROADMAP.md)의 '남은 마일스톤'.
