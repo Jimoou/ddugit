@@ -1,11 +1,14 @@
 name: Store package check
 
-# The Microsoft Store manifest (scripts/msix.mjs) is checked by makeappx, which only
-# runs on Windows: pack it around a stand-in executable whenever it changes.
+# The Microsoft Store package (scripts/msix.mjs, msix-pack.sh, the icons) is checked by makepri
+# and makeappx, which only run on Windows: pack it around a stand-in executable whenever it
+# changes, and make sure resources.pri carries the unplated taskbar icons.
 on:
   pull_request:
     paths:
       - scripts/msix.mjs
+      - scripts/msix-pack.sh
+      - scripts/msix-priconfig.xml
       - src-tauri/icons/**
       - .github/workflows/msix-check.yml
   workflow_dispatch:
@@ -26,9 +29,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          layout="$RUNNER_TEMP/msix"
           cp "$(cygpath -u "$WINDIR")/System32/notepad.exe" "$RUNNER_TEMP/ddugit.exe"
-          node scripts/msix.mjs "$RUNNER_TEMP/ddugit.exe" "$layout" ddugit.check "CN=ddugit" ddugit
+          scripts/msix-pack.sh "$RUNNER_TEMP/ddugit.exe" "$RUNNER_TEMP/check.msix" ddugit.check "CN=ddugit" ddugit
+      - name: Unplated icons are in resources.pri
+        shell: bash
+        run: |
+          set -euo pipefail
           sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64 | sort -V | tail -1)
-          # Git Bash would turn the /o, /d, /p switches into paths.
-          MSYS_NO_PATHCONV=1 "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$RUNNER_TEMP/check.msix")"
+          mkdir "$RUNNER_TEMP/unpacked"
+          export MSYS_NO_PATHCONV=1
+          "$sdk/makeappx.exe" unpack /p "$(cygpath -w "$RUNNER_TEMP/check.msix")" /d "$(cygpath -w "$RUNNER_TEMP/unpacked")"
+          "$sdk/makepri.exe" dump /if "$(cygpath -w "$RUNNER_TEMP/unpacked/resources.pri")" /of "$(cygpath -w "$RUNNER_TEMP/pri.xml")" /o
+          # One resources.pri holds every variant (no split resource files).
+          ls "$RUNNER_TEMP/unpacked"
+          [ -z "$(ls "$RUNNER_TEMP/unpacked" | grep -v '^resources.pri$' | grep '\.pri$')" ] \
+            || { echo "::error::resources were split into more than one .pri"; exit 1; }
+          for size in 16 24 32 48 256; do
+            for form in unplated lightunplated; do
+              grep -q "Square44x44Logo.targetsize-${size}_altform-${form}.png" "$RUNNER_TEMP/pri.xml" \
+                || { echo "::error::resources.pri has no ${form} ${size}px icon"; exit 1; }
+            done
+          done

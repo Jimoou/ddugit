@@ -188,13 +188,9 @@ jobs:
             MSIX_NAME=ddugit.unregistered MSIX_PUBLISHER="CN=ddugit" MSIX_PUBLISHER_NAME=ddugit
           fi
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          layout="$RUNNER_TEMP/msix"
-          out=src-tauri/target/release/bundle/msix
-          node scripts/msix.mjs src-tauri/target/release/ddugit.exe "$layout" "$MSIX_NAME" "$MSIX_PUBLISHER" "$MSIX_PUBLISHER_NAME"
-          sdk=$(ls -d "/c/Program Files (x86)/Windows Kits/10/bin/"10.*/x64 | sort -V | tail -1)
-          mkdir -p "$out"
-          # Git Bash would turn the /o, /d, /p switches into paths.
-          MSYS_NO_PATHCONV=1 "$sdk/makeappx.exe" pack /o /d "$(cygpath -w "$layout")" /p "$(cygpath -w "$out/ddugit_${version}_x64.msix")"
+          scripts/msix-pack.sh src-tauri/target/release/ddugit.exe \
+            "src-tauri/target/release/bundle/msix/ddugit_${version}_x64.msix" \
+            "$MSIX_NAME" "$MSIX_PUBLISHER" "$MSIX_PUBLISHER_NAME"
       # Gatekeeper's own verdict on what was just built: signed, notarized, ticket stapled.
       - name: Verify macOS signature
         if: runner.os == 'macOS' && env.HAS_APPLE == 'true'

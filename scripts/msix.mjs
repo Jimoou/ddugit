@@ -1,16 +1,25 @@
 // The Microsoft Store package's contents: the Windows app (one ddugit.exe; the
-// web assets are inside it), its tiles and the manifest. `makeappx pack` turns
-// the folder into the .msix (release.yml). The package is left unsigned: the
+// web assets are inside it), its tiles and the manifest. `scripts/msix-pack.sh`
+// indexes the tiles into resources.pri and packs the folder into the .msix. The package is left unsigned: the
 // Store signs what it accepts. Identity comes from Partner Center (Product
 // identity), so the Store recognises the package as ddugit's.
 // `node scripts/msix.mjs <ddugit.exe> <out dir> <identity name> <publisher> <publisher display name>`
 
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Tiles the Store and Start need, from the icons `tauri icon` made. */
-export const TILES = ["StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png"];
+/**
+ * Tiles and icons (`src-tauri/icons/msix`, from the brand kit), in every scale and target size. The
+ * manifest names each once; Windows picks a variant through resources.pri. Square44x44Logo is the
+ * taskbar, Start list and title bar icon: its `targetsize-N_altform-unplated` (dark taskbar) and
+ * `_altform-lightunplated` (light) variants are drawn full size as they are. Without them Windows
+ * shrinks the scale variant onto a plate of the accent colour.
+ */
+export const ASSETS = "src-tauri/icons/msix";
+export const LOGOS = ["StoreLogo", "Square44x44Logo", "Square150x150Logo", "Wide310x150Logo"];
+/** The icon sizes Windows asks for most (taskbar, Start, Alt+Tab, Explorer). */
+export const UNPLATED_SIZES = [16, 24, 32, 48, 256];
 
 const xml = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]);
@@ -55,7 +64,9 @@ export function manifest({ name, publisher, publisherName, version, description 
         Description="${xml(description)}"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\\Square150x150Logo.png"
-        Square44x44Logo="Assets\\Square44x44Logo.png" />
+        Square44x44Logo="Assets\\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\\Wide310x150Logo.png" />
+      </uap:VisualElements>
     </Application>
   </Applications>
   <Capabilities>
@@ -71,7 +82,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const conf = JSON.parse(readFileSync(join(root, "src-tauri/tauri.conf.json"), "utf8"));
   mkdirSync(join(out, "Assets"), { recursive: true });
   copyFileSync(exe, join(out, "ddugit.exe"));
-  for (const tile of TILES) copyFileSync(join(root, "src-tauri/icons", tile), join(out, "Assets", tile));
+  for (const file of readdirSync(join(root, ASSETS)).filter((f) => f.endsWith(".png")))
+    copyFileSync(join(root, ASSETS, file), join(out, "Assets", file));
   const text = manifest({
     name,
     publisher,
